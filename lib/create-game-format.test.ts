@@ -73,8 +73,8 @@ const keys = reachableFormatKeys();
 // 211.1: scramble adds two shapes — one leaderboard and team v team: 17 → 19.
 eq(keys.length, 19, "current reachable format shape count");
 eq(keys.includes("scramble:field") && keys.includes("scramble:match"), true, "both scramble shapes are reachable");
-eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Teams of 4 · Leaderboard · USGA handicaps", "scramble review (leaderboard)");
-eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 2, scrambleHandicap: "gross", scrambleMinDrives: 3, fmtFamily: "match" } as never), "Scramble · Teams of 2 · Team v team · Gross · each drive ×3", "scramble review (team v team, gross, drives)");
+eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Leaderboard · USGA handicaps", "scramble review (leaderboard)");
+eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 2, scrambleHandicap: "gross", scrambleMinDrives: 3, fmtFamily: "match" } as never), "Scramble · Team v team · Gross · each drive ×3", "scramble review (team v team, gross, drives)");
 eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 1, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Captains only · Leaderboard · Agreed handicaps", "scramble review (captains only — always agreed handicaps)");
 eq(JSON.stringify(selectGuidedFamily({ ...base, gameType: "scramble", fmtFamily: "stroke", matchKind: "ind" } as never, "match")), JSON.stringify({ fmtFamily: "match", matchKind: "team" }), "switching family keeps a scramble (team v team)");
 eq(new Set(keys).size, keys.length, "historical keys unique");

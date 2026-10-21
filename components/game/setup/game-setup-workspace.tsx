@@ -9,7 +9,7 @@ import { ShareLineupModal } from "@/components/share-card";
 import type { CourseTee } from "@/lib/courses";
 import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
-import { pkey, shapeOf } from "@/lib/game-shape";
+import { pkey, shapeOf, scrambleMethodOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import { courseLabel, type Course } from "@/lib/courses";
 import { ShareControl } from "@/components/game/scorecard-views";
@@ -118,7 +118,7 @@ export function GameSetupWorkspace({
   // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
   const isScramble = game.game_type === "scramble";
   const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field",
-    { size: (game as { scramble_team_size?: number | null }).scramble_team_size ?? 4, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed" }) : null;
+    { size: (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? 1 : null, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed" }) : null;
   const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
   const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
@@ -170,7 +170,7 @@ export function GameSetupWorkspace({
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
-    { key: "format" as const, title: "Format", sub: isScramble ? `Scramble · ${((game as { scramble_team_size?: number | null }).scramble_team_size ?? 4) === 1 ? "one player per team" : `teams of ${(game as { scramble_team_size?: number | null }).scramble_team_size ?? 4}`} · ${SCRAMBLE_METHOD_LABEL[((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "format" as const, title: "Format", sub: isScramble ? `Scramble · ${(game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];

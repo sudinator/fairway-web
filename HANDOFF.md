@@ -18,6 +18,7 @@ how anything works, **open the file and read it** — never answer from assumpti
 - RULE: badges and player cards are computed by the SERVER (lib/member-stats-server, /api/member-stats) — never written by the phone (ci/check_server_only_stats.py). A calculated result that others rely on is the server's to compute.
 - LEARNING (211.5): before removing a write permission, search for writes across line breaks (a `.from("x")` on one line, `.upsert(` on the next).
 - RULE (211.7): a new format ships with a rendered test of the WHOLE setup flow — control center → each step as an organizer clicks it — not only its editors in isolation.
+- RULE (212.0): every editable field spreads inputStyle (ci/check_field_style.py ratchet; DISPLAY_RULES.md §2).
 - RULE: a notification link must be one lib/app-links.ts understands (?tab=<APP_TABS>, club=, game=, tt=, wrapped=) — ci/assert-notification-links.sql checks every link the database sends.
 - RULE: statistics code decides what a round is ONLY through lib/round-rules (ci/check_round_rules.py).
 - RULE: every statistics feature runs through lib/test-fixtures/messy-games (lib/messy-data.test.ts) — add a case when real data surprises us.

@@ -1,3 +1,7 @@
+## 212.0.261021 — Scramble teams made in setup, any mix of 2–4; standard fields
+
+Owner (Oct 21). A scramble no longer has one team size chosen up front — that "size" was only a default for balancing, and once teams were picked by hand or numbers didn't divide evenly it became a rule the screen either fought or ignored (Team 1 accepted any number of players).
+
 ## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
 
 Owner redesign (Oct 21).

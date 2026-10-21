@@ -77,7 +77,7 @@ function click(container: HTMLElement, label: string, exact = false) {
 // 211.7 — a SCRAMBLE: opening the Teams step from the control center must land on scramble's own Teams editor
 // (it opened the two-team editor, so the owner had no way to make teams), and making teams must save.
 {
-  const sg = { ...game, game_type: "scramble", teams: null, foursomes: [], scramble_team_size: 4, scramble_mode: "field", scramble_handicap: "usga" } as unknown as Game;
+  const sg = { ...game, game_type: "scramble", teams: null, foursomes: [], scramble_team_size: null, scramble_mode: "field", scramble_handicap: "usga" } as unknown as Game;
   const sp = players.map((p) => ({ ...p, team: null, tee_group: null })) as Player[];
   let saved: unknown = null;
   function ScrambleHarness() {
@@ -93,8 +93,8 @@ function click(container: HTMLElement, label: string, exact = false) {
   const shown = text(v.container);
   ok(!!v.container.querySelector("[data-scramble-teams]"), "the Teams step opens scramble's own Teams editor");
   ok(!shown.includes("RYDER CUP TEAMS"), "…not the two-team editor");
-  click(v.container, "Make balanced teams");
-  ok(Array.isArray(saved) && (saved as unknown[]).length === 2, `Make balanced teams saves two teams of four (got ${JSON.stringify(saved)?.slice(0, 80)})`);
+  click(v.container, "4 players");
+  ok(Array.isArray(saved) && (saved as unknown[]).length === 2, `balanced teams of 4 saves two teams of four (got ${JSON.stringify(saved)?.slice(0, 80)})`);
   v.unmount();
 }
 

@@ -1,3 +1,17 @@
+## 212.0.261021 — Scramble teams made in setup, any mix of 2–4; standard fields
+
+Owner (Oct 21). A scramble no longer has one team size chosen up front — that "size" was only a default for balancing, and once teams were picked by hand or numbers didn't divide evenly it became a rule the screen either fought or ignored (Team 1 accepted any number of players).
+
+**Creating a scramble** asks who's on the app — **Every player** or **Captains only** — plus how teams compete, the handicap method and drives. No team size.
+
+**Setup → Teams** makes the teams: **Make balanced teams of 2 / 3 / 4** (chosen there, split as evenly as possible) or **Pick teams myself**. Each team has 2 to 4 players and teams may differ in size; each shows its count ("4 players (full)"), and a full team drops out of Add to… / Move to… until someone leaves. Mixed sizes are noted ("Teams of different sizes: Team 3 has 3 players — each uses the percentages for its own size"). Captains only: "A team for each captain".
+
+**USGA allowance percentages for every team size at once** — teams of 2 (35/15), 3 (30/20/10) and 4 (25/20/15/10), each editable for the game, Reset to USGA — since a game's teams may differ in size. Agreed handicaps unchanged.
+
+**Standard fields (DISPLAY_RULES.md §2).** The percentage boxes, the agreed-handicap box and the Add to… / Move to… menus set their own green background; they now use the app's one field style (inputStyle). **ci/check_field_style.py** (new, in the guards): every input, menu and text box spreads inputStyle — a ratchet on today's 29 older self-styled fields elsewhere, so none can be added and each fix lowers the count. Those 29: contests-view.tsx (8), money.tsx (5), manage.tsx (2), tee-times.tsx (2), ui.tsx (2), course-history.tsx (1), scorecard-views.tsx (1), groups.tsx (1), lineup-view.tsx (1), courses.tsx (1), organizer.tsx (1), player-card.tsx (1), round-setup.tsx (1), tournaments.tsx (1), yardage-backfill.tsx (1).
+
+Existing scramble games keep working (their teams are already made). No migration.
+
 ## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
 
 Owner redesign (Oct 21).

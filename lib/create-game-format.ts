@@ -108,7 +108,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
       const size = state.scrambleTeamSize ?? 4;
       const drives = state.scrambleMinDrives ? ` · each drive ×${state.scrambleMinDrives}` : "";
       const method = size === 1 || state.scrambleHandicap === "agreed" ? "Agreed handicaps" : state.scrambleHandicap === "gross" ? "Gross" : "USGA handicaps";
-      return `Scramble · ${size === 1 ? "Captains only" : `Teams of ${size}`} · ${(state as Partial<GuidedFormatState>).fmtFamily === "match" ? "Team v team" : "Leaderboard"} · ${method}${drives}`;
+      return `Scramble · ${size === 1 ? "Captains only · " : ""}${(state as Partial<GuidedFormatState>).fmtFamily === "match" ? "Team v team" : "Leaderboard"} · ${method}${drives}`;
     }
     case "skins": {
       const style = skinsStyleFromState(state);

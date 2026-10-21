@@ -46,12 +46,15 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const t = renderScreen(<ScrambleTeamsBuilder game={game()} players={players} readOnly={false} onSave={(g) => { saved = g; }} />);
   const txt = t.el.textContent || "";
   ok(txt.includes("Team handicap 7") && txt.includes("4.2 × 25% = 1.1") && txt.includes("7.44, rounded to 7"), `handicap breakdown shown (${txt.slice(0, 200)})`);
-  const btn = Array.from(t.el.querySelectorAll("button")).find((b) => b.textContent === "Rebalance the teams") as HTMLButtonElement;
+  const btn = Array.from(t.el.querySelectorAll("button")).find((b) => b.textContent === "4 players") as HTMLButtonElement;
   btn.click();
-  ok(Array.isArray(saved) && (saved as unknown[]).length === 2, "rebalancing saves two teams of four");
+  ok(Array.isArray(saved) && (saved as unknown[]).length === 2, "balanced teams of 4: two teams of four");
+  (Array.from(t.el.querySelectorAll("button")).find((b) => b.textContent === "2 players") as HTMLButtonElement).click();
+  ok(Array.isArray(saved) && (saved as any[]).length === 4 && (saved as any[]).every((g) => g.a.length === 2), `balanced teams of 2: four teams of two (got ${JSON.stringify(saved)?.slice(0, 120)})`);
+  ok((t.el.textContent || "").includes("Team 1 · 4 players (full)"), "each team shows its player count, full at 4");
   t.unmount();
   const empty = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: [] })} players={players} readOnly={false} onSave={() => {}} />);
-  ok((empty.el.textContent || "").includes("Make balanced teams") && (empty.el.textContent || "").includes("Make the teams — Setup → Teams."), "no teams yet: says so, offers to make them");
+  ok((empty.el.textContent || "").includes("MAKE BALANCED TEAMS OF") && (empty.el.textContent || "").includes("Make the teams — Setup → Teams."), "no teams yet: says so, offers balanced teams of 2, 3 or 4");
   empty.unmount();
 }
 // the recap
@@ -75,16 +78,15 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   (globalThis as any).confirm = () => true; if (typeof window !== "undefined") (window as any).confirm = () => true;
   const t = renderScreen(<ScrambleSettings game={game()} locked={false} onSave={(p, c) => { calls.push([p, c]); }} />);
   const b = (label: string) => Array.from(t.el.querySelectorAll("button")).find((x) => x.textContent === label) as HTMLButtonElement;
-  b("2 players").click();
+  ok(!Array.from(t.el.querySelectorAll("button")).some((x) => /^[234] players$/.test(x.textContent || "")), "no team-size setting in Format any more");
   b("Agreed handicaps").click();
-  ok(JSON.stringify(calls[0]) === JSON.stringify([{ scramble_team_size: 2 }, true]), `team size: saved, and the teams are cleared (got ${JSON.stringify(calls[0])})`);
-  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_handicap: "agreed" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[1])})`);
+  ok(JSON.stringify(calls[0]) === JSON.stringify([{ scramble_handicap: "agreed" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[0])})`);
   b("Captains only").click();
-  ok(JSON.stringify(calls[2]) === JSON.stringify([{ scramble_team_size: 1, scramble_handicap: "agreed" }, true]), `captains only also switches to agreed handicaps (got ${JSON.stringify(calls[2])})`);
+  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_team_size: 1, scramble_handicap: "agreed" }, true]), `captains only: agreed handicaps, teams cleared (got ${JSON.stringify(calls[1])})`);
   ok(!Array.from(t.el.querySelectorAll("button")).some((x) => x.textContent === "Gross" || x.textContent === "Gross only"), "gross is no longer offered");
   t.unmount();
   const l = renderScreen(<ScrambleSettings game={game()} locked onSave={() => { calls.push("locked"); }} />);
-  (Array.from(l.el.querySelectorAll("button")).find((x) => x.textContent === "3 players") as HTMLButtonElement).click();
+  (Array.from(l.el.querySelectorAll("button")).find((x) => x.textContent === "Captains only") as HTMLButtonElement).click();
   ok(!calls.includes("locked") && (l.el.textContent || "").includes("Scoring has started"), "locked once scoring starts");
   l.unmount();
 }
@@ -118,5 +120,11 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true }));
   ok(added && added[1].a.includes("u-Raj") && !added[0].a.includes("u-Raj"), `Add to… Team 2 puts Raj on Team 2 (got ${JSON.stringify(added)?.slice(0, 160)})`);
   ad.unmount();
+  const full = [{ id: "t1", name: "Team 1", a: ["u-Raj", "u-Nihar", "u-Karan", "u-Sam"], b: [] }, { id: "t2", name: "Team 2", a: ["u-Amit", "u-Vikram", "u-Probir"], b: [] }];
+  const fu = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: full })} players={players} readOnly={false} onSave={() => {}} />);
+  const opts = Array.from((fu.el.querySelector('select[aria-label="Add Hp to a team"]') as HTMLSelectElement).options).map((o) => o.textContent);
+  ok(!opts.some((o) => (o || "").startsWith("Team 1")) && opts.some((o) => (o || "").startsWith("Team 2")), `a full team (4) isn't offered in Add to… (got ${opts})`);
+  ok((fu.el.textContent || "").includes("Teams of different sizes: Team 1 has 4 players"), "mixed sizes are noted");
+  fu.unmount();
 }
 report("scramble screens");

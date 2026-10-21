@@ -1,5 +1,5 @@
 "use client";
-import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS, teamSizeLabel } from "@/lib/scramble-method";
+import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
 import type { ScrambleGroup } from "@/lib/scramble-teams";
@@ -683,7 +683,7 @@ function CreateGame({
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
-        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize, handicap: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
+        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize === 1 ? 1 : null, handicap: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
@@ -1186,10 +1186,12 @@ function CreateGame({
         </div>
         {gameType === "scramble" && (
           <div data-scramble-settings style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM SIZE</div>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>WHO&apos;S ON THE APP</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              {([2, 3, 4, 1] as const).map((n) => <button key={n} onClick={() => { setScrambleTeamSize(n); if (n === 1) setScrambleHandicap("agreed"); }} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{teamSizeLabel(n)}</button>)}
+              <button onClick={() => setScrambleTeamSize(4)} style={{ ...btn(scrambleTeamSize !== 1), flex: 1, fontSize: 13 }}>Every player</button>
+              <button onClick={() => { setScrambleTeamSize(1); setScrambleHandicap("agreed"); }} style={{ ...btn(scrambleTeamSize === 1), flex: 1, fontSize: 13 }}>Captains only</button>
             </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleTeamSize === 1 ? "Each team is represented by its captain, who enters the team's score — the teammates play outside the app." : "Make the teams in Setup → Teams: balanced teams of 2, 3 or 4, or pick them yourself. Teams may differ in size."}</div>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               {OFFERED_METHODS.map((m) => <button key={m} disabled={m === "usga" && scrambleTeamSize === 1} onClick={() => setScrambleHandicap(m)} style={{ ...btn(scrambleHandicap === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && scrambleTeamSize === 1 ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
@@ -1197,13 +1199,12 @@ function CreateGame({
             <div data-scramble-method style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
               {scrambleMethodText(scrambleHandicap, scrambleTeamSize)}
             </div>
-            {scrambleHandicap === "usga" && scrambleTeamSize !== 1 ? <ScrambleAllowanceEditor size={scrambleTeamSize} value={scrambleAllowance} onChange={setScrambleAllowance} /> : null}
+            {scrambleHandicap === "usga" && scrambleTeamSize !== 1 ? <ScrambleAllowanceEditor value={scrambleAllowance} onChange={setScrambleAllowance} /> : null}
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>DRIVE REQUIREMENT</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} onClick={() => setScrambleMinDrives(n)} style={{ ...btn(scrambleMinDrives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}
             </div>
             {scrambleMinDrives ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Each player&apos;s tee shot must be used at least {scrambleMinDrives} times. The scorecard reminds the team — it never blocks a score.</div> : null}
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Make the teams after creating — Setup → Teams balances them by handicap.</div>
           </div>
         )}
         {gameType === "trifecta" && (

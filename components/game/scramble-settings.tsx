@@ -7,15 +7,16 @@ import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import type { Game } from "@/lib/game-types";
-import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS, teamSizeLabel, type ScrambleMethod } from "@/lib/scramble-method";
+import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS, type ScrambleMethod } from "@/lib/scramble-method";
 import { scrambleMethodOf } from "@/lib/game-shape";
 import { ScrambleAllowanceEditor } from "@/components/game/scramble-allowance-editor";
 
-export type ScramblePatch = { scramble_team_size?: 1 | 2 | 3 | 4; scramble_mode?: "field" | "match"; scramble_handicap?: "usga" | "gross" | "agreed"; scramble_min_drives?: number | null; scramble_allowance?: Record<string, number[]> | null };
+export type ScramblePatch = { scramble_team_size?: 1 | null; scramble_mode?: "field" | "match"; scramble_handicap?: "usga" | "gross" | "agreed"; scramble_min_drives?: number | null; scramble_allowance?: Record<string, number[]> | null };
 
 export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked: boolean; onSave: (patch: ScramblePatch, clearTeams: boolean) => Promise<void> | void }) {
   const [busy, setBusy] = useState(false);
-  const size = (game.scramble_team_size ?? 4) as 1 | 2 | 3 | 4;
+  const captains = game.scramble_team_size === 1;   // 212.0: the only team-size setting left
+  const size = captains ? 1 : 4;
   const mode = game.scramble_mode === "match" ? "match" : "field";
   const hcp = scrambleMethodOf(game) as ScrambleMethod;
   const drives = game.scramble_min_drives ?? null;
@@ -30,9 +31,10 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
     <div data-scramble-settings style={{ marginTop: 12 }}>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>Scramble</div>
       {locked ? <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4 }}>Scoring has started — these settings are fixed for this game.</div> : null}
-      <div style={label}>TEAM SIZE</div>
+      <div style={label}>WHO&apos;S ON THE APP</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        {([2, 3, 4, 1] as const).map((n) => <button key={n} disabled={locked || busy} onClick={() => n !== size && save(n === 1 ? { scramble_team_size: 1, scramble_handicap: "agreed" } : { scramble_team_size: n }, true)} style={{ ...btn(size === n), flex: 1, fontSize: 13 }}>{teamSizeLabel(n)}</button>)}
+        <button disabled={locked || busy} onClick={() => captains && save({ scramble_team_size: null }, true)} style={{ ...btn(!captains), flex: 1, fontSize: 13 }}>Every player</button>
+        <button disabled={locked || busy} onClick={() => !captains && save({ scramble_team_size: 1, scramble_handicap: "agreed" }, true)} style={{ ...btn(captains), flex: 1, fontSize: 13 }}>Captains only</button>
       </div>
       <div style={label}>HOW TEAMS COMPETE</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -41,15 +43,15 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
       </div>
       <div style={label}>HANDICAPS</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-        {OFFERED_METHODS.map((m) => <button key={m} disabled={locked || busy || (m === "usga" && size === 1)} onClick={() => hcp !== m && save({ scramble_handicap: m }, false)} style={{ ...btn(hcp === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && size === 1 ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
+        {OFFERED_METHODS.map((m) => <button key={m} disabled={locked || busy || (m === "usga" && captains)} onClick={() => hcp !== m && save({ scramble_handicap: m }, false)} style={{ ...btn(hcp === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && captains ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
       </div>
       <div data-scramble-method style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleMethodText(hcp, size)}</div>
-      {hcp === "usga" && size !== 1 ? <ScrambleAllowanceEditor size={size as 2 | 3 | 4} value={game.scramble_allowance} disabled={locked || busy} onChange={(next) => save({ scramble_allowance: next }, false)} /> : null}
+      {hcp === "usga" && !captains ? <ScrambleAllowanceEditor value={game.scramble_allowance} disabled={locked || busy} onChange={(next) => save({ scramble_allowance: next }, false)} /> : null}
       <div style={label}>DRIVE REQUIREMENT</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
         {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} disabled={locked || busy} onClick={() => n !== drives && save({ scramble_min_drives: n }, false)} style={{ ...btn(drives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}
       </div>
-      <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Changing the team size or how teams compete clears the teams. To play a different format, create a new game.</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Switching between every player and captains only, or how teams compete, clears the teams. To play a different format, create a new game.</div>
     </div>
   );
 }
