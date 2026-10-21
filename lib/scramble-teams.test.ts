@@ -24,4 +24,14 @@ eq(scrambleSetupProblem(field.slice(0, 3), keys, "field"), "4 players aren't on 
 eq(scrambleSetupProblem([{ id: "x", name: "T", a: ["p01"], b: [] }, ...field.slice(1)], keys.filter((k) => !field[0].a.slice(1).includes(k)), "field"), "Team 1 has 1 player — a scramble team has 2 to 4.", "a one-player team");
 eq(scrambleSetupProblem([{ ...field[0], b: [] }, ...field.slice(1)], keys, "match"), "Every match needs two teams.", "team v team without an opponent");
 eq(scrambleSetupProblem([{ id: "x", name: "T", a: ["p01", "p02"], b: [] }, { id: "y", name: "U", a: ["p02", "p03"], b: [] }], ["p01", "p02", "p03"], "field"), "A player is on two teams.", "a player on two teams");
+// 211.8 — one app player per team (teammates outside the app), and entered team handicaps
+eq(scrambleTeamSizes(5, 1), [1, 1, 1, 1, 1], "size 1: every player is their own team");
+const solo = balanceScrambleTeams(P.slice(0, 4), 1, "field")!;
+eq(solo.map((g) => g.a.length), [1, 1, 1, 1], "four one-player teams");
+const soloKeys = P.slice(0, 4).map((p) => p.key);
+eq(scrambleSetupProblem(solo, soloKeys, "field", { size: 1 }), "Enter Team 1's team handicap — its teammates play outside the app.", "a one-player team needs its handicap entered");
+eq(scrambleSetupProblem(solo.map((g, i) => ({ ...g, a_hcp: 8 + i })), soloKeys, "field", { size: 1 }), null, "every handicap entered: complete");
+eq(scrambleSetupProblem(solo, soloKeys, "field", { size: 1, gross: true }), null, "gross: no handicap needed");
+eq(scrambleSetupProblem(solo, soloKeys, "field", { size: 4 }), "Team 1 has 1 player — a scramble team has 2 to 4.", "a one-player team in a normal scramble is still refused");
+eq(scrambleTeamsOf([{ id: "t", name: "T", a: ["x", "y"], b: [], a_hcp: 11 }])[0].hcp, 11, "an entered team handicap is read");
 console.log("scramble-teams tests passed");

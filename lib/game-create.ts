@@ -43,7 +43,7 @@ export type GamePayloadOpts = {
   sideContestsEnabled?: boolean;
   /** 211.1: scramble — team size 2–4, handicap USGA allowance or gross, optional drive requirement; the mode
    *  (one leaderboard or team v team) follows the family it was created under. */
-  scramble?: { teamSize: 2 | 3 | 4; handicap: "usga" | "gross"; minDrives: number | null; mode: "field" | "match" };
+  scramble?: { teamSize: 1 | 2 | 3 | 4; handicap: "usga" | "gross"; minDrives: number | null; mode: "field" | "match" };
 };
 
 // The auto-name label for a game type.

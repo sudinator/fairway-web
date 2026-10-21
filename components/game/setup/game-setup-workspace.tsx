@@ -1,7 +1,7 @@
 "use client";
 
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
-import { scrambleSetupProblem, type ScrambleGroup } from "@/lib/scramble-teams";
+import { scrambleSetupProblem, scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
 import React from "react";
 import { gameTypeLabel } from "@/lib/game-create";
 import { ShareLineupModal } from "@/components/share-card";
@@ -116,7 +116,8 @@ export function GameSetupWorkspace({
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
   // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
   const isScramble = game.game_type === "scramble";
-  const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field") : null;
+  const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field",
+    { size: (game as { scramble_team_size?: number | null }).scramble_team_size ?? 4, gross: (game as { scramble_handicap?: string | null }).scramble_handicap === "gross" }) : null;
   const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
   const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
@@ -137,7 +138,9 @@ export function GameSetupWorkspace({
   React.useEffect(() => setDateEdit(String((game as any).played_at || "").slice(0, 10)), [(game as any).played_at]);
   React.useEffect(() => {
     if (game.game_type === "trifecta" && setupTab === "matchups") onSetupTabChange("groups");
-  }, [game.game_type, onSetupTabChange, setupTab]);
+    // 211.7: a "teams" tab on a format without two global teams (scramble) shows its own editor instead.
+    else if (setupTab === "teams" && !usesTeams && showMatchupsTab) onSetupTabChange("matchups");
+  }, [game.game_type, onSetupTabChange, setupTab, usesTeams, showMatchupsTab]);
 
   const stepDefs = [
     { key: "details", label: "Game", done: !!game.name && !!game.course },
@@ -147,12 +150,17 @@ export function GameSetupWorkspace({
     { key: "review", label: "Review", done: allDone },
   ] as const;
 
+  // 211.7: the Teams step opens on the editor THIS format uses. It always opened "teams" — the two-team editor —
+  // so a scramble (whose teams are built in its own editor, the matchups slot) landed on the wrong one.
+  const firstStructureTab = usesTeams ? "teams" : showMatchupsTab ? "matchups" : "groups";
   const openSection = (key: typeof stepDefs[number]["key"]) => {
-    if (key === "structure") onSetupTabChange("teams");
+    if (key === "structure") onSetupTabChange(firstStructureTab);
     else onSetupTabChange(key);
   };
 
-  const structureSummary = usesTeams
+  const structureSummary = isScramble
+    ? (scrambleProblem ?? `${scrambleTeamsOf(foursomes as never).length} teams · ${(game as { scramble_mode?: string | null }).scramble_mode === "match" ? "team v team" : "one leaderboard"}`)
+    : usesTeams
     ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped`
     : usesMatchups
       ? `${cPlaced}/${total} matched · ${cGrouped}/${total} grouped`
@@ -161,7 +169,7 @@ export function GameSetupWorkspace({
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
-    { key: "format" as const, title: "Format", sub: `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "format" as const, title: "Format", sub: isScramble ? `Scramble · ${((game as { scramble_team_size?: number | null }).scramble_team_size ?? 4) === 1 ? "one player per team" : `teams of ${(game as { scramble_team_size?: number | null }).scramble_team_size ?? 4}`} · ${(game as { scramble_handicap?: string | null }).scramble_handicap === "gross" ? "gross" : "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];

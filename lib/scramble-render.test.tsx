@@ -5,6 +5,7 @@ import { scrambleResults } from "@/lib/scramble-game";
 import { ScrambleView } from "@/components/game/scramble-view";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { RecapBody } from "@/components/game/recap-body";
+import { ScrambleSettings } from "@/components/game/scramble-settings";
 import { buildRecap } from "@/lib/game-recap";
 import { scrambleRowValue } from "@/lib/scramble-game";
 import type { Game, Player } from "@/lib/game-types";
@@ -67,5 +68,37 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const t = renderScreen(<RecapBody game={game({ status: "ended" })} recap={rc} mode="share" />);
   ok((t.el.querySelector("[data-recap-scramble]")?.textContent || "").includes("net 54 (63 − 9)"), "the recap shows the scramble leaderboard");
   t.unmount();
+}
+// 211.7 — Setup → Format: a scramble's own settings
+{
+  const calls: unknown[] = [];
+  (globalThis as any).confirm = () => true; if (typeof window !== "undefined") (window as any).confirm = () => true;
+  const t = renderScreen(<ScrambleSettings game={game()} locked={false} onSave={(p, c) => { calls.push([p, c]); }} />);
+  const b = (label: string) => Array.from(t.el.querySelectorAll("button")).find((x) => x.textContent === label) as HTMLButtonElement;
+  b("2 players").click();
+  b("Gross only").click();
+  ok(JSON.stringify(calls[0]) === JSON.stringify([{ scramble_team_size: 2 }, true]), `team size: saved, and the teams are cleared (got ${JSON.stringify(calls[0])})`);
+  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_handicap: "gross" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[1])})`);
+  t.unmount();
+  const l = renderScreen(<ScrambleSettings game={game()} locked onSave={() => { calls.push("locked"); }} />);
+  (Array.from(l.el.querySelectorAll("button")).find((x) => x.textContent === "3 players") as HTMLButtonElement).click();
+  ok(!calls.includes("locked") && (l.el.textContent || "").includes("Scoring has started"), "locked once scoring starts");
+  l.unmount();
+}
+// 211.8 — an entered team handicap wins; one-player teams
+{
+  const og = game({ foursomes: [{ ...groups[0], a_hcp: 12 }, groups[1]] });
+  const r2 = scrambleResults(og, players, rows);
+  ok(r2.teams.map((x) => x.handicap).join(",") === "12,9", `entered handicap 12 replaces the calculated 7 (got ${r2.teams.map((x) => x.handicap)})`);
+  const sg = game({ scramble_team_size: 1, foursomes: [{ id: "team-1", name: "Team 1", a: ["u-Raj"], b: [] }, { id: "team-2", name: "Team 2", a: ["u-Amit"], b: [], a_hcp: 6 }] });
+  let saved: any = null;
+  const two = players.filter((p) => p.display_name === "Raj" || p.display_name === "Amit");
+  const tb = renderScreen(<ScrambleTeamsBuilder game={sg} players={two} readOnly={false} onSave={(g) => { saved = g; }} />);
+  const txt = tb.el.textContent || "";
+  ok(txt.includes("One player per team") && txt.includes("Handicap needed") && txt.includes("Team handicap 6 (entered)") && txt.includes("Enter Team 1's team handicap"), `one-player teams: needs and entered shown (${txt.slice(0, 160)})`);
+  const input = tb.el.querySelector('input[aria-label="Team 1 team handicap"]') as HTMLInputElement;
+  input.value = "9"; input.dispatchEvent(new Event("focusout", { bubbles: true }));
+  ok(saved && saved[0].a_hcp === 9 && saved[1].a_hcp === 6, `typing 9 saves Team 1's handicap, Team 2's kept (got ${JSON.stringify(saved)})`);
+  tb.unmount();
 }
 report("scramble screens");

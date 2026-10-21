@@ -6,11 +6,14 @@
 // Each group's players share a tee group (group number = position + 1), so scoring permissions and markers work
 // exactly as they do for alternate shot.
 
-export type ScrambleGroup = { id: string; name: string; a: string[]; b: string[] };
+// 211.8: a_hcp / b_hcp — a team handicap the organizer entered (null / absent = calculated from its players).
+export type ScrambleGroup = { id: string; name: string; a: string[]; b: string[]; a_hcp?: number | null; b_hcp?: number | null };
 export type TeamPlayer = { key: string; ch: number | null };
 
-/** Team sizes as even as possible within 2–4 (e.g. 10 players in teams of 4 → 4, 3, 3). null = can't (fewer than 2). */
-export function scrambleTeamSizes(players: number, size: 2 | 3 | 4): number[] | null {
+/** Team sizes as even as possible within 2–4 (e.g. 10 players in teams of 4 → 4, 3, 3). null = can't (fewer than 2).
+ *  Size 1 (211.8): every player is their own team — their teammates play outside the app. */
+export function scrambleTeamSizes(players: number, size: 1 | 2 | 3 | 4): number[] | null {
+  if (size === 1) return players >= 1 ? Array(players).fill(1) : null;
   if (players < 2) return null;
   let teams = Math.ceil(players / size);
   while (teams > 1 && Math.floor(players / teams) < 2) teams--;
@@ -23,7 +26,7 @@ export function scrambleTeamSizes(players: number, size: 2 | 3 | 4): number[] | 
  * Balanced teams: players spread by course handicap, snake-style (lowest to team 1, next to team 2 … then back),
  * so every team gets a fair mix. For team v team, teams are paired into matches in order (1 v 2, 3 v 4, …).
  */
-export function balanceScrambleTeams(players: TeamPlayer[], size: 2 | 3 | 4, mode: "field" | "match"): ScrambleGroup[] | null {
+export function balanceScrambleTeams(players: TeamPlayer[], size: 1 | 2 | 3 | 4, mode: "field" | "match"): ScrambleGroup[] | null {
   const sizes = scrambleTeamSizes(players.length, size);
   if (!sizes) return null;
   const sorted = [...players].sort((x, y) => (x.ch ?? 99) - (y.ch ?? 99) || x.key.localeCompare(y.key));
@@ -43,27 +46,33 @@ export function balanceScrambleTeams(players: TeamPlayer[], size: 2 | 3 | 4, mod
 }
 
 /** Every team as { group, side, members } — the leaderboard and the scorecard read teams this way. */
-export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined): { groupId: string; side: "a" | "b"; name: string; members: string[] }[] {
-  const out: { groupId: string; side: "a" | "b"; name: string; members: string[] }[] = [];
+export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined): { groupId: string; side: "a" | "b"; name: string; members: string[]; hcp: number | null }[] {
+  const out: { groupId: string; side: "a" | "b"; name: string; members: string[]; hcp: number | null }[] = [];
   let n = 0;
   for (const g of groups || []) for (const side of ["a", "b"] as const) {
     const members = (g[side] || []) as string[];
     if (!members.length) continue;
     n++;
-    out.push({ groupId: g.id, side, name: `Team ${n}`, members });
+    const h = g[side === "a" ? "a_hcp" : "b_hcp"];
+    out.push({ groupId: g.id, side, name: `Team ${n}`, members, hcp: typeof h === "number" && Number.isFinite(h) ? h : null });
   }
   return out;
 }
 
-/** Setup is complete: every player on exactly one team of 2–4; team v team needs two teams in every match. */
-export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match"): string | null {
+/** Setup is complete: every player on exactly one team of 2–4 (or 1 in a "teammates outside the app" game, where
+ *  every team needs its handicap entered unless the game is gross); team v team needs two teams in every match. */
+export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match", opts: { size?: number | null; gross?: boolean } = {}): string | null {
+  const solo = opts.size === 1;
   const gs = groups || [];
   if (!gs.length) return "Make the teams — Setup → Teams.";
   const placed = gs.flatMap((g) => [...g.a, ...g.b]);
   if (new Set(placed).size !== placed.length) return "A player is on two teams.";
   const missing = playerKeys.filter((k) => !placed.includes(k)).length;
   if (missing) return `${missing} player${missing === 1 ? " isn't" : "s aren't"} on a team yet.`;
-  for (const t of scrambleTeamsOf(gs)) if (t.members.length < 2 || t.members.length > 4) return `${t.name} has ${t.members.length} player${t.members.length === 1 ? "" : "s"} — a scramble team has 2 to 4.`;
+  for (const t of scrambleTeamsOf(gs)) {
+    if (t.members.length < (solo ? 1 : 2) || t.members.length > 4) return `${t.name} has ${t.members.length} player${t.members.length === 1 ? "" : "s"} — a scramble team has 2 to 4.`;
+    if (solo && !opts.gross && t.hcp == null) return `Enter ${t.name}'s team handicap — its teammates play outside the app.`;
+  }
   if (mode === "match" && gs.some((g) => !g.a.length || !g.b.length)) return "Every match needs two teams.";
   return null;
 }

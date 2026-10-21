@@ -43,7 +43,7 @@ export type GameSetupDraft = {
     team2: string;
     /** 209.4: colours chosen with the names (optional — drafts saved earlier have none). */
     teamColors?: [string | null, string | null];
-    scrambleTeamSize?: 2 | 3 | 4;
+    scrambleTeamSize?: 1 | 2 | 3 | 4;
     scrambleHandicap?: "usga" | "gross";
     scrambleMinDrives?: number | null;
   };
@@ -79,7 +79,7 @@ export type GameSetupDraftInput = {
   team1: string;
   team2: string;
   teamColors?: [string | null, string | null];
-  scrambleTeamSize?: 2 | 3 | 4;
+  scrambleTeamSize?: 1 | 2 | 3 | 4;
   scrambleHandicap?: "usga" | "gross";
   scrambleMinDrives?: number | null;
   flightMode: "off" | "oneoff";

@@ -1,6 +1,7 @@
 "use client";
 import { ScrambleView } from "@/components/game/scramble-view";
 import type { ScrambleGroup } from "@/lib/scramble-teams";
+import type { ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
@@ -316,7 +317,7 @@ function CreateGame({
   const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   // 211.1: scramble settings — the mode (one leaderboard / team v team) follows fmtFamily.
-  const [scrambleTeamSize, setScrambleTeamSize] = useState<2 | 3 | 4>(4);
+  const [scrambleTeamSize, setScrambleTeamSize] = useState<1 | 2 | 3 | 4>(4);
   const [scrambleHandicap, setScrambleHandicap] = useState<"usga" | "gross">("usga");
   const [scrambleMinDrives, setScrambleMinDrives] = useState<number | null>(null);
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
@@ -1184,7 +1185,7 @@ function CreateGame({
           <div data-scramble-settings style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM SIZE</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              {([2, 3, 4] as const).map((n) => <button key={n} onClick={() => setScrambleTeamSize(n)} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{n} players</button>)}
+              {([2, 3, 4, 1] as const).map((n) => <button key={n} onClick={() => setScrambleTeamSize(n)} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{n === 1 ? "1 · outside the app" : `${n} players`}</button>)}
             </div>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -1192,7 +1193,8 @@ function CreateGame({
               <button onClick={() => setScrambleHandicap("gross")} style={{ ...btn(scrambleHandicap === "gross"), flex: 1, fontSize: 13 }}>Gross only</button>
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
-              {scrambleHandicap === "gross" ? "No handicap strokes — lowest team score wins."
+              {scrambleTeamSize === 1 ? "Each player is their own team — their teammates play outside the app. The player enters the team's score, and you enter each team's handicap in Setup → Teams (or choose Gross only)."
+                : scrambleHandicap === "gross" ? "No handicap strokes — lowest team score wins."
                 : scrambleTeamSize === 4 ? "Team handicap: 25% of the lowest course handicap, 20%, 15% and 10% of the highest, added up — strokes taken hole by hole."
                 : scrambleTeamSize === 3 ? "Team handicap: 30% of the lowest course handicap, 20% and 10% of the highest, added up — strokes taken hole by hole."
                 : "Team handicap: 35% of the lower course handicap plus 15% of the higher — strokes taken hole by hole."}
@@ -2588,6 +2590,17 @@ function GameRoom({
   // Team formats edit a visible slot rather than a player's standalone group row.
   // Save the player leaving and the player entering in one RPC so there is never
   // a transient duplicate in two group dropdowns.
+  // 211.7: a scramble's settings, from Setup → Format — until scoring starts. A change that no longer fits the
+  // teams (team size, how teams compete) clears them and their tee groups; the organizer remakes them in Teams.
+  const setScrambleSettings = async (patch: ScramblePatch, clearTeams: boolean) => {
+    if (!game || game.game_type !== "scramble") return;
+    if (players.some((p) => (p.scores || []).some((x) => x != null)) || game.alt_shot_scoring_started_at) { notifyError("Scramble settings can't change once scoring has started."); return; }
+    const { error } = await supabase.from("games").update({ ...patch, ...(clearTeams ? { foursomes: [] } : {}) }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the scramble settings — please try again."); return; }
+    if (clearTeams) await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: players.map((p) => ({ player: p.id, group: null })) });
+    await load();
+  };
+
   // 211.1: scramble teams — saved as the game's groups, each group's players in one tee group (so scoring
   // permissions and markers work as for alternate shot). Not once scoring has started.
   const setScrambleTeams = async (groups: ScrambleGroup[]) => {
@@ -3556,7 +3569,7 @@ function GameRoom({
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
-          onSetAllowance: setAllowance, onSetFormat: setFormat, courseHoles, onSetMatchLength: setMatchLength, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetScrambleSettings: setScrambleSettings, courseHoles, onSetMatchLength: setMatchLength, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,

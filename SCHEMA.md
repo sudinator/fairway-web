@@ -1,3 +1,7 @@
+## 211.8 — Scramble team handicaps (0209)
+
+games.scramble_team_size 1–4 (1 = one app player per team); games.foursomes[].a_hcp / b_hcp — entered team handicap (null = calculated); save_scramble_side_score accepts one-player teams only when scramble_team_size = 1; get_live_scorecard foursomes carry a_hcp / b_hcp.
+
 ## 211.6 — Player cards server-only (0208)
 
 player_cards: player_cards_read_own (select own); member writes revoked; written by /api/member-stats (service role).

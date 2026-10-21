@@ -28,7 +28,7 @@ export type SetupDraft = {
   /** 209.4: colours chosen with the names (optional — drafts saved earlier have none). */
   teamColors?: [string | null, string | null];
   /** 211.1: scramble settings (optional — drafts saved earlier have none). */
-  scrambleTeamSize?: 2 | 3 | 4;
+  scrambleTeamSize?: 1 | 2 | 3 | 4;
   scrambleHandicap?: "usga" | "gross";
   scrambleMinDrives?: number | null;
   flightMode?: string;

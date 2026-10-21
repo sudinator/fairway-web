@@ -1,3 +1,25 @@
+## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
+
+Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.
+
+**One player per team.** Team size has a fourth choice, "1 · outside the app" (creation and Setup → Format): every player is their own team, scoring for it; teams compete on one leaderboard or team v team as usual. Setup is complete only when every team's handicap is entered (or the game is gross only). 0209 lets a one-player team score — only in a game set up this way; everywhere else a team still has 2 to 4 players.
+
+**Entered team handicaps — any scramble.** Setup → Teams shows a "Team handicap" box on every team: blank uses the calculated handicap ("9 (calculated)"), a number replaces it ("Team handicap 12 (entered)"); whole strokes, plus handicaps as negatives. Only the organizer sets it (players setting their own team's handicap could give themselves strokes). The one place a team handicap is worked out (lib/game-shape scrambleTeamHandicapFor) uses it, so the scorecard, leaderboard, matches, recap and email agree; 0209 adds it to the live page's feed.
+
+Tests: assert-scramble.sql (a one-player team scores only in such a game), scramble-teams (sizes, completeness), scramble-render (the override wins; one-player teams on the Teams screen; typing a handicap saves it), create-game-format (review label).
+
+Deploy: staging 0209 → code; production 0209 → merge.
+
+## 211.7.261021 — Scramble: making teams in setup, and editing a scramble's settings
+
+**Teams couldn't be made (owner).** The setup control center's Teams step always opened the "teams" tab — the two-team editor four-ball and alternate shot use. A scramble has no two global teams; its own Teams editor sat on another tab, so the step led to the wrong editor and there was no evident way to make teams. Now the Teams step opens on the editor the format actually uses (scramble → its Teams editor), and a "teams" tab on a format without two global teams moves there too. The control center speaks scramble ("Make the teams — Setup → Teams.", then "4 teams · one leaderboard"), and the format line reads "Scramble · teams of 4 · USGA allowance" instead of the raw key.
+
+**A scramble's settings are editable in Setup → Format** until scoring starts — team size, how teams compete, handicaps, drive requirement (components/game/scramble-settings.tsx). Changing the team size or how teams compete clears the teams (with a confirmation) and their tee groups; handicaps and drives keep them. A scramble isn't switched to another format there — its teams would be left behind; a different format is a new game.
+
+**The test that would have caught it:** lib/game-setup-workspace.test.tsx renders the real setup screen for a scramble, opens the Teams step from the control center as an organizer would, and checks scramble's Teams editor appears and "Make balanced teams" saves — it fails on 211.6. Settings panel: rendered tests (clears on size change, keeps on handicap change, locked once scoring starts).
+
+No migration. Deploy: code only.
+
 ## 211.6.261021 — Badges and player cards worked out by the server (0208)
 
 Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.

@@ -434,6 +434,10 @@ export function strokeSets(
 export function scrambleTeamHandicapFor(game: DotGame & { scramble_handicap?: string | null }, allPlayers: ShapePlayer[], key: string): number | null {
   const f = (game.foursomes || []).find((x) => [...x.a, ...x.b].includes(key));
   if (!f) return null;
+  if (game.scramble_handicap === "gross") return 0;
+  // 211.8: a team handicap the organizer entered wins over the calculated one
+  const entered = (f as { a_hcp?: unknown; b_hcp?: unknown })[f.a.includes(key) ? "a_hcp" : "b_hcp"];
+  if (typeof entered === "number" && Number.isFinite(entered)) return entered;
   const members = (f.a.includes(key) ? f.a : f.b).map((k) => allPlayers.find((x) => pkey(x) === k)).filter((x): x is ShapePlayer => !!x);
   const th = scrambleTeamHandicap(members.map((m) => chBasis(m, game.course_par, game.holes_meta?.length)), game.scramble_handicap === "gross");
   return th ? th.total : null;

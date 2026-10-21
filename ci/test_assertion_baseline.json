@@ -1,5 +1,5 @@
 {
-  "total": 439545,
+  "total": 439551,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -47,7 +47,7 @@
     "player-scoring": 63,
     "round stat completeness": 8,
     "scoring matrix": 3698,
-    "scramble screens": 17,
+    "scramble screens": 23,
     "screen render": 67,
     "season entry": 6,
     "season wrapped": 12,

@@ -43,7 +43,7 @@ type LiveGame = {
 type LiveData = {
   game: LiveGame; players: LivePlayer[];
   pairings: { a: string | null; b: string | null }[];
-  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[];
+  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[]; a_hcp?: number | null; b_hcp?: number | null }[];
   /** Alternate Shot side-owned scores (0151). Absent on payloads from before that migration. */
   alt_shot_scores?: LiveAltShotScore[];
 };
@@ -753,7 +753,10 @@ function LiveScramble({ data }: { data: LiveData }) {
     if (!ids.length) return [];
     n++;
     const th = scrambleTeamHandicap(ids.map((id) => byId[id]?.ch ?? 0), gross);
-    return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap: th?.total ?? 0,
+    // 211.8 (0209): a team handicap the organizer entered wins over the calculated one, as in the app
+    const entered = f[side === "a" ? "a_hcp" : "b_hcp"];
+    const handicap = gross ? 0 : typeof entered === "number" ? entered : th?.total ?? 0;
+    return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
       scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
   }));
   const toPar = (x: number) => (x === 0 ? "E" : x > 0 ? `+${x}` : String(x));

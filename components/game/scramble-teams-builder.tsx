@@ -15,7 +15,8 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
 }) {
   const [busy, setBusy] = useState(false);
   const g = game as Game & { scramble_team_size?: number | null; scramble_mode?: string | null; scramble_handicap?: string | null };
-  const size = (g.scramble_team_size ?? 4) as 2 | 3 | 4;
+  const size = (g.scramble_team_size ?? 4) as 1 | 2 | 3 | 4;
+  const solo = size === 1;   // 211.8: one app player per team — teammates play outside the app
   const mode = g.scramble_mode === "match" ? "match" : "field";
   const gross = g.scramble_handicap === "gross";
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
@@ -24,7 +25,14 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
   const ch = (p: Player) => Number(chBasis(p, game.course_par, nh >= 18 ? undefined : nh) ?? 0);
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
   const teams = scrambleTeamsOf(groups);
-  const problem = scrambleSetupProblem(groups, live.map(pkey), mode);
+  const problem = scrambleSetupProblem(groups, live.map(pkey), mode, { size, gross });
+  // 211.8: a team handicap entered by the organizer (blank = calculated); whole strokes, plus handicaps as negatives
+  const setHcp = (groupId: string, side: "a" | "b", raw: string) => {
+    const v = raw.trim() === "" ? null : Math.round(Number(raw));
+    if (v != null && (!Number.isFinite(v) || v < -10 || v > 60)) return;
+    const next = groups.map((gr) => (gr.id === groupId ? { ...gr, [side === "a" ? "a_hcp" : "b_hcp"]: v } : gr));
+    void save(next);
+  };
 
   const save = async (next: ScrambleGroup[]) => { setBusy(true); try { await onSave(next); } finally { setBusy(false); } };
   const balance = () => {
@@ -43,7 +51,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
   return (
     <div data-scramble-teams>
       <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45 }}>
-        Teams of {size} · {mode === "match" ? "team v team" : "one leaderboard"} · {gross ? "gross — no handicap strokes" : "USGA scramble allowance"}.
+        {solo ? "One player per team — their teammates play outside the app" : `Teams of ${size}`} · {mode === "match" ? "team v team" : "one leaderboard"} · {gross ? "gross — no handicap strokes" : solo ? "enter each team's handicap" : "USGA scramble allowance"}.
       </div>
       {!readOnly ? (
         <button disabled={busy || live.length < 2} onClick={balance} style={{ ...btn(!groups.length), width: "100%", marginTop: 10, fontSize: 13, opacity: busy ? 0.6 : 1 }}>
@@ -53,7 +61,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
       {problem ? <div data-scramble-problem style={{ color: C.gold, fontSize: 12.5, marginTop: 10 }}>{problem}</div> : null}
       {teams.map((t, ti) => {
         const members = t.members.map((k) => byKey.get(k)).filter((p): p is Player => !!p);
-        const th = scrambleTeamHandicap(members.map(ch), gross);
+        const th = solo ? null : scrambleTeamHandicap(members.map(ch), gross);
         const match = mode === "match" && t.side === "a" ? groups.find((gr) => gr.id === t.groupId) : null;
         return (
           <React.Fragment key={`${t.groupId}-${t.side}`}>
@@ -61,7 +69,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
             <div data-scramble-team={t.name} style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <span style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{t.name}</span>
-                <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{th ? `Team handicap ${th.total}` : "2 to 4 players"}</span>
+                <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{gross ? "Gross" : t.hcp != null ? `Team handicap ${t.hcp} (entered)` : th ? `Team handicap ${th.total}` : solo ? "Handicap needed" : "2 to 4 players"}</span>
               </div>
               {members.map((p) => {
                 const part = th?.parts.find((x) => members[x.index] === p);
@@ -79,7 +87,17 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
                   </div>
                 );
               })}
-              {th && !gross ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{th.raw.toFixed(2)}, rounded to {th.total}</div> : null}
+              {th && !gross && t.hcp == null ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{th.raw.toFixed(2)}, rounded to {th.total}</div> : null}
+              {solo ? <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores for the team — its teammates play outside the app.</div> : null}
+              {!gross && !readOnly ? (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: C.sage }}>
+                  Team handicap
+                  <input aria-label={`${t.name} team handicap`} inputMode="numeric" defaultValue={t.hcp ?? ""} key={`${t.groupId}-${t.side}-${t.hcp ?? ""}`}
+                    placeholder={solo ? "required" : th ? `${th.total} (calculated)` : ""} disabled={busy}
+                    onBlur={(e) => { const raw = e.currentTarget.value; if ((raw.trim() === "" ? null : Math.round(Number(raw))) !== t.hcp) setHcp(t.groupId, t.side, raw); }}
+                    style={{ width: 120, background: C.greenMid, color: C.cream, border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
+                </label>
+              ) : null}
             </div>
           </React.Fragment>
         );

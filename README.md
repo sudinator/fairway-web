@@ -1,3 +1,11 @@
+## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
+
+Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.
+
+## 211.7.261021 — Scramble: making teams in setup, and editing a scramble's settings
+
+**Teams couldn't be made (owner).** The setup control center's Teams step always opened the "teams" tab — the two-team editor four-ball and alternate shot use. A scramble has no two global teams; its own Teams editor sat on another tab, so the step led to the wrong editor and there was no evident way to make teams. Now the Teams step opens on the editor the format actually uses (scramble → its Teams editor), and a "teams" tab on a format without two global teams moves there too. The control center speaks scramble ("Make the teams — Setup → Teams.", then "4 teams · one leaderboard"), and the format line reads "Scramble · teams of 4 · USGA allowance" instead of the raw key.
+
 ## 211.6.261021 — Badges and player cards worked out by the server (0208)
 
 Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.

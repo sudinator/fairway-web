@@ -33,7 +33,7 @@ export type Game = {
   ended_at?: string | null;
   alt_shot_scoring_started_at?: string | null;
   /** 211.1: scramble settings (0203) — null for every other format. */
-  scramble_team_size?: 2 | 3 | 4 | null;
+  scramble_team_size?: 1 | 2 | 3 | 4 | null;   // 1 = one app player per team (211.8)
   scramble_mode?: "field" | "match" | null;
   scramble_handicap?: "usga" | "gross" | null;
   scramble_min_drives?: number | null;

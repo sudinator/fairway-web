@@ -44,6 +44,16 @@ begin
   begin perform public.save_scramble_score_fenced(gid, 0, 'g2', 'a', 0, 4, null); ok := false; exception when others then ok := sqlerrm like '%2 to 4 players%'; end;
   if not ok then raise exception 'a one-player scramble team was accepted'; end if;
   execute 'reset role';
+  -- 0209: a one-player team is accepted when the game is set up for teammates outside the app
+  update public.games set scramble_team_size = 1 where id = gid;
+  perform set_config('request.jwt.claim.sub', a1, true);
+  perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000d1');
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"20300000-0000-0000-0000-0000000000d1"}', true);
+  execute 'set local role authenticated';
+  perform public.save_scramble_score_fenced(gid, 0, 'g2', 'a', 0, 5, null);
+  execute 'reset role';
+  if (select strokes from game_alt_shot_scores where game_id = gid and foursome_id = 'g2' and hole_index = 0) is distinct from 5 then raise exception 'a one-player team could not score in a teammates-outside-the-app game'; end if;
+  update public.games set scramble_team_size = 4 where id = gid;
   -- only scramble games (as that alternate-shot game's organizer, who passes the fence — so the format check decides)
   perform set_config('request.jwt.claim.sub', a1, true);
   perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000d1');
@@ -54,6 +64,6 @@ begin
   if not ok then raise exception 'scramble scoring worked on an alternate-shot game'; end if;
   -- the inner function can't be called directly (only through the fence) — checked by privilege
   if has_function_privilege('authenticated', 'public.save_scramble_side_score(uuid,text,text,integer,integer,text)', 'execute') then raise exception 'app users can skip the fence'; end if;
-  raise notice 'SCRAMBLE_PASS team scores and drives saved through the fence; 3- and 4-player teams; foreign drives, other teams, one-player teams and non-scramble games refused';
+  raise notice 'SCRAMBLE_PASS team scores and drives saved through the fence; 3- and 4-player teams; one-player teams only when set up that way; foreign drives, other teams, one-player teams and non-scramble games refused';
 end $$;
 rollback;
