@@ -1,3 +1,7 @@
+## 211.0 — Scramble (0203)
+
+games.scramble_team_size (2–4), scramble_mode (field | match), scramble_handicap (usga | gross), scramble_min_drives. game_alt_shot_scores.drive_key. save_scramble_score_fenced(game, version, foursome, side, hole, strokes, drive) — authenticated; save_scramble_side_score not callable directly.
+
 ## 210.12 — System admins read every club (0202)
 
 groups_select_member / group_members_select_visible gain OR is_admin().

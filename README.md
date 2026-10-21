@@ -1,3 +1,7 @@
+## 211.0.261021 — Scramble foundations (not yet selectable)
+
+The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).
+
 ## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
 
 **Admin sees every club (0202).** Player admin listed Jigar Shukla in LEMG but not PA-NJ golfers, which he runs. The rules for CHANGING memberships already allowed system admins in every club; the rules for READING clubs and memberships never had the same exception, so five Admin screens silently showed only the owner's own clubs — Player admin (memberships, its add-to-club list), Admin → Users (admit-to-club list), Club reports (club picker), Clubs oversight (test-club markers) and course reviews (club names) — and removing someone from a club the owner isn't in silently did nothing. Now system admins can read every club and membership (matching what they can change); members still see only their own clubs. Pending clubs show by name, marked "(pending)". ci/assert-admin-reads-clubs.sql — fails on the old rules ("a system admin cannot see a club they are not in"); the live security baseline records the two rules' new wording.

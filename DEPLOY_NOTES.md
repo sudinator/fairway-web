@@ -1,3 +1,15 @@
+## 211.0.261021 — Scramble foundations (not yet selectable)
+
+The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).
+
+**Engine (lib/scramble.ts).** Team handicap from the USGA's recommended scramble allowances (Rules of Handicapping, Appendix C: 4 players 25/20/15/10%, 3 players 30/20/10%, 2 players 35/15%, lowest course handicap to highest, unrounded, only the total rounded) — reproduces the USGA's worked example (13.65 → 14); plus handicaps and gross-only handled; strokes allotted hole by hole by stroke index with the app's one allocator; the leaderboard ranked to par with shared ties; team v team match play (decided when a lead can't be caught); drive counts with "can no longer make it". lib/scramble.test.ts.
+
+**Database (0203).** games.scramble_team_size / scramble_mode / scramble_handicap / scramble_min_drives; game_alt_shot_scores.drive_key; save_scramble_score_fenced — a team's hole score and drive, saved through alternate shot's safeguards (score-reset fence, primary scoring device) and permission rules, for teams of 2–4, with the drive checked against the team. ci/assert-scramble.sql.
+
+Not yet registered as a game type: the game-type coverage test requires a format's label, creation and setup screen before it may be listed — that comes with the screens.
+
+Deploy: staging 0203 → code; production 0203 → merge. No visible change.
+
 ## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
 
 **Admin sees every club (0202).** Player admin listed Jigar Shukla in LEMG but not PA-NJ golfers, which he runs. The rules for CHANGING memberships already allowed system admins in every club; the rules for READING clubs and memberships never had the same exception, so five Admin screens silently showed only the owner's own clubs — Player admin (memberships, its add-to-club list), Admin → Users (admit-to-club list), Club reports (club picker), Clubs oversight (test-club markers) and course reviews (club names) — and removing someone from a club the owner isn't in silently did nothing. Now system admins can read every club and membership (matching what they can change); members still see only their own clubs. Pending clubs show by name, marked "(pending)". ci/assert-admin-reads-clubs.sql — fails on the old rules ("a system admin cannot see a club they are not in"); the live security baseline records the two rules' new wording.

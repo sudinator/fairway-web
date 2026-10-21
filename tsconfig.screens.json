@@ -36,6 +36,7 @@
     "lib/messy-data.test.ts",
     "lib/app-links.test.ts",
     "lib/resume-game.test.ts",
+    "lib/scramble.test.ts",
     "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",
     "components/team-colour-dot.tsx",
