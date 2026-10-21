@@ -15,7 +15,8 @@ import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@
 import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
-import { scrambleTeamHandicap, scrambleLeaderboard, scrambleMatch } from "@/lib/scramble";
+import { scrambleTeamHandicap, scrambleLeaderboard, scrambleMatch, customAllowanceFor } from "@/lib/scramble";
+import { scrambleMethodOf } from "@/lib/game-shape";
 import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ type LiveGame = {
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
   /** 211.1 (0204): a scramble's competition and handicap — absent on older feeds. */
-  scramble_mode?: "field" | "match" | null; scramble_handicap?: "usga" | "gross" | null;
+  scramble_mode?: "field" | "match" | null; scramble_handicap?: "usga" | "gross" | "agreed" | null;
 };
 type LiveData = {
   game: LiveGame; players: LivePlayer[];
@@ -752,10 +753,11 @@ function LiveScramble({ data }: { data: LiveData }) {
     const ids = (f[side] || []).filter(Boolean) as string[];
     if (!ids.length) return [];
     n++;
-    const th = scrambleTeamHandicap(ids.map((id) => byId[id]?.ch ?? 0), gross);
+    const method = scrambleMethodOf(game as never);
+    const th = scrambleTeamHandicap(ids.map((id) => byId[id]?.ch ?? 0), false, customAllowanceFor((game as { scramble_allowance?: unknown }).scramble_allowance, ids.length));
     // 211.8 (0209): a team handicap the organizer entered wins over the calculated one, as in the app
     const entered = f[side === "a" ? "a_hcp" : "b_hcp"];
-    const handicap = gross ? 0 : typeof entered === "number" ? entered : th?.total ?? 0;
+    const handicap = method === "gross" ? 0 : method === "agreed" ? (typeof entered === "number" ? entered : 0) : th?.total ?? 0;
     return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
       scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
   }));

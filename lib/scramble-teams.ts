@@ -61,7 +61,8 @@ export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined): { g
 
 /** Setup is complete: every player on exactly one team of 2–4 (or 1 in a "teammates outside the app" game, where
  *  every team needs its handicap entered unless the game is gross); team v team needs two teams in every match. */
-export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match", opts: { size?: number | null; gross?: boolean } = {}): string | null {
+export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match", opts: { size?: number | null; gross?: boolean; method?: "usga" | "gross" | "agreed" | null } = {}): string | null {
+  const method = opts.method ?? (opts.gross ? "gross" : "usga");
   const solo = opts.size === 1;
   const gs = groups || [];
   if (!gs.length) return "Make the teams — Setup → Teams.";
@@ -69,9 +70,10 @@ export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined,
   if (new Set(placed).size !== placed.length) return "A player is on two teams.";
   const missing = playerKeys.filter((k) => !placed.includes(k)).length;
   if (missing) return `${missing} player${missing === 1 ? " isn't" : "s aren't"} on a team yet.`;
+  if (mode === "field" && gs.some((g) => !g.a.length && !g.b.length)) return "A team has no players — add players to it or remove it.";
   for (const t of scrambleTeamsOf(gs)) {
     if (t.members.length < (solo ? 1 : 2) || t.members.length > 4) return `${t.name} has ${t.members.length} player${t.members.length === 1 ? "" : "s"} — a scramble team has 2 to 4.`;
-    if (solo && !opts.gross && t.hcp == null) return `Enter ${t.name}'s team handicap — its teammates play outside the app.`;
+    if (solo && method === "usga" && t.hcp == null) return `Enter ${t.name}'s team handicap — its teammates play outside the app.`;
   }
   if (mode === "match" && gs.some((g) => !g.a.length || !g.b.length)) return "Every match needs two teams.";
   return null;

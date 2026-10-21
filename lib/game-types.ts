@@ -35,8 +35,10 @@ export type Game = {
   /** 211.1: scramble settings (0203) — null for every other format. */
   scramble_team_size?: 1 | 2 | 3 | 4 | null;   // 1 = one app player per team (211.8)
   scramble_mode?: "field" | "match" | null;
-  scramble_handicap?: "usga" | "gross" | null;
+  scramble_handicap?: "usga" | "gross" | "agreed" | null;
   scramble_min_drives?: number | null;
+  /** 211.9 (0210): the game's own allowance percentages — {"4": [30, 20, 15, 10]}; absent size = USGA's. */
+  scramble_allowance?: Record<string, number[]> | null;
   scores_reset_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
   created_by: string;
   created_at: string;

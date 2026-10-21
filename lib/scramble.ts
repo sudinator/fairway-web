@@ -25,9 +25,10 @@ export type TeamHandicap = { total: number; raw: number; parts: { index: number;
  * points back to the input). Missing handicaps count as 0. Returns null for a team size the USGA table doesn't
  * cover (fewer than 2 or more than 4 players). gross = true → 0.
  */
-export function scrambleTeamHandicap(courseHandicaps: (number | null | undefined)[], gross = false): TeamHandicap | null {
+export function scrambleTeamHandicap(courseHandicaps: (number | null | undefined)[], gross = false, customPcts?: number[] | null): TeamHandicap | null {
   const n = courseHandicaps.length as ScrambleTeamSize;
-  const pcts = SCRAMBLE_ALLOWANCES[n];
+  // 211.9: a game may set its own percentages (fractions, lowest course handicap first) — else the USGA's
+  const pcts = customPcts && customPcts.length === n ? customPcts : SCRAMBLE_ALLOWANCES[n];
   if (!pcts) return null;
   const sorted = courseHandicaps.map((ch, index) => ({ index, ch: Number.isFinite(Number(ch)) ? Number(ch) : 0 })).sort((a, b) => a.ch - b.ch || a.index - b.index);
   const parts = sorted.map((p, i) => ({ ...p, pct: gross ? 0 : pcts[i], counts: gross ? 0 : p.ch * pcts[i] }));
@@ -115,4 +116,12 @@ export function driveTally(drives: (string | null | undefined)[], players: strin
   const needs = !minDrives ? [] : players.map((p) => ({ player: p, more: Math.max(0, minDrives - counts[p]), holesLeft, short: Math.max(0, minDrives - counts[p]) > holesLeft }))
     .filter((x) => x.more > 0);
   return { counts, needs, met: !minDrives || needs.length === 0 };
+}
+
+/** 211.9: a game's own allowance for a team of `n` (games.scramble_allowance — percent per position), as fractions;
+ *  null when the game uses the USGA's for that size (or the entry is malformed). */
+export function customAllowanceFor(allowance: unknown, n: number): number[] | null {
+  const v = allowance && typeof allowance === "object" ? (allowance as Record<string, unknown>)[String(n)] : null;
+  if (!Array.isArray(v) || v.length !== n || !v.every((x) => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 100)) return null;
+  return v.map((x) => x / 100);
 }

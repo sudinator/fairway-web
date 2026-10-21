@@ -43,7 +43,7 @@ export type GamePayloadOpts = {
   sideContestsEnabled?: boolean;
   /** 211.1: scramble — team size 2–4, handicap USGA allowance or gross, optional drive requirement; the mode
    *  (one leaderboard or team v team) follows the family it was created under. */
-  scramble?: { teamSize: 1 | 2 | 3 | 4; handicap: "usga" | "gross"; minDrives: number | null; mode: "field" | "match" };
+  scramble?: { teamSize: 1 | 2 | 3 | 4; handicap: "usga" | "gross" | "agreed"; minDrives: number | null; mode: "field" | "match"; allowance?: Record<string, number[]> | null };
 };
 
 // The auto-name label for a game type.
@@ -113,7 +113,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     // 211.1: scramble settings (null for every other format)
     ...(o.gameType === "scramble" ? {
       scramble_team_size: o.scramble?.teamSize ?? 4, scramble_handicap: o.scramble?.handicap ?? "usga",
-      scramble_min_drives: o.scramble?.minDrives ?? null, scramble_mode: o.scramble?.mode ?? "field",
+      scramble_min_drives: o.scramble?.minDrives ?? null, scramble_mode: o.scramble?.mode ?? "field", scramble_allowance: o.scramble?.allowance ?? null,
     } : {}),
     flight_mode: o.flightsSupported ? o.flightMode : "off",
     flights: o.flightMode === "oneoff" && o.flightsSupported ? o.flightBands : null,

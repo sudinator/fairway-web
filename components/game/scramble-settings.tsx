@@ -7,14 +7,17 @@ import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import type { Game } from "@/lib/game-types";
+import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS, teamSizeLabel, type ScrambleMethod } from "@/lib/scramble-method";
+import { scrambleMethodOf } from "@/lib/game-shape";
+import { ScrambleAllowanceEditor } from "@/components/game/scramble-allowance-editor";
 
-export type ScramblePatch = { scramble_team_size?: 1 | 2 | 3 | 4; scramble_mode?: "field" | "match"; scramble_handicap?: "usga" | "gross"; scramble_min_drives?: number | null };
+export type ScramblePatch = { scramble_team_size?: 1 | 2 | 3 | 4; scramble_mode?: "field" | "match"; scramble_handicap?: "usga" | "gross" | "agreed"; scramble_min_drives?: number | null; scramble_allowance?: Record<string, number[]> | null };
 
 export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked: boolean; onSave: (patch: ScramblePatch, clearTeams: boolean) => Promise<void> | void }) {
   const [busy, setBusy] = useState(false);
   const size = (game.scramble_team_size ?? 4) as 1 | 2 | 3 | 4;
   const mode = game.scramble_mode === "match" ? "match" : "field";
-  const hcp = game.scramble_handicap === "gross" ? "gross" : "usga";
+  const hcp = scrambleMethodOf(game) as ScrambleMethod;
   const drives = game.scramble_min_drives ?? null;
   const hasTeams = Array.isArray(game.foursomes) && game.foursomes.length > 0;
   const save = async (patch: ScramblePatch, clears: boolean) => {
@@ -29,7 +32,7 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
       {locked ? <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4 }}>Scoring has started — these settings are fixed for this game.</div> : null}
       <div style={label}>TEAM SIZE</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        {([2, 3, 4, 1] as const).map((n) => <button key={n} disabled={locked || busy} onClick={() => n !== size && save({ scramble_team_size: n }, true)} style={{ ...btn(size === n), flex: 1, fontSize: 13 }}>{n === 1 ? "1 · outside the app" : `${n} players`}</button>)}
+        {([2, 3, 4, 1] as const).map((n) => <button key={n} disabled={locked || busy} onClick={() => n !== size && save(n === 1 ? { scramble_team_size: 1, scramble_handicap: "agreed" } : { scramble_team_size: n }, true)} style={{ ...btn(size === n), flex: 1, fontSize: 13 }}>{teamSizeLabel(n)}</button>)}
       </div>
       <div style={label}>HOW TEAMS COMPETE</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -37,10 +40,11 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
         <button disabled={locked || busy} onClick={() => mode !== "match" && save({ scramble_mode: "match" }, true)} style={{ ...btn(mode === "match"), flex: 1, fontSize: 13 }}>Team v team</button>
       </div>
       <div style={label}>HANDICAPS</div>
-      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        <button disabled={locked || busy} onClick={() => hcp !== "usga" && save({ scramble_handicap: "usga" }, false)} style={{ ...btn(hcp === "usga"), flex: 1, fontSize: 13 }}>USGA allowance</button>
-        <button disabled={locked || busy} onClick={() => hcp !== "gross" && save({ scramble_handicap: "gross" }, false)} style={{ ...btn(hcp === "gross"), flex: 1, fontSize: 13 }}>Gross only</button>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        {OFFERED_METHODS.map((m) => <button key={m} disabled={locked || busy || (m === "usga" && size === 1)} onClick={() => hcp !== m && save({ scramble_handicap: m }, false)} style={{ ...btn(hcp === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && size === 1 ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
       </div>
+      <div data-scramble-method style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleMethodText(hcp, size)}</div>
+      {hcp === "usga" && size !== 1 ? <ScrambleAllowanceEditor size={size as 2 | 3 | 4} value={game.scramble_allowance} disabled={locked || busy} onChange={(next) => save({ scramble_allowance: next }, false)} /> : null}
       <div style={label}>DRIVE REQUIREMENT</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
         {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} disabled={locked || busy} onClick={() => n !== drives && save({ scramble_min_drives: n }, false)} style={{ ...btn(drives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}

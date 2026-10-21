@@ -1,3 +1,7 @@
+## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
+
+Owner redesign (Oct 21).
+
 ## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
 
 Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.

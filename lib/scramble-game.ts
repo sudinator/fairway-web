@@ -3,7 +3,7 @@
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
-import { pkey, scrambleTeamHandicapFor } from "@/lib/game-shape";
+import { pkey, scrambleTeamHandicapFor, scrambleMethodOf } from "@/lib/game-shape";
 import { scrambleLeaderboard, scrambleMatch, scrambleCard, type LeaderboardRow, type ScrambleMatch } from "@/lib/scramble";
 import { scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
 
@@ -17,7 +17,7 @@ export type ScrambleResults = {
 
 export function scrambleResults(game: Game, players: Player[], rows: AltShotScoreRow[]): ScrambleResults {
   const holes = Array.isArray(game.holes_meta) ? game.holes_meta : [];
-  const gross = game.scramble_handicap === "gross";
+  const gross = scrambleMethodOf(game) === "gross";   // legacy games only — gross is no longer offered (211.9)
   const mode = game.scramble_mode === "match" ? "match" : "field";
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
   const byKey = new Map(players.map((p) => [pkey(p), p]));

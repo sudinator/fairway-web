@@ -1,3 +1,7 @@
+## 211.9 — Scramble handicap methods (0210)
+
+games.scramble_handicap: usga | agreed (gross legacy); games.scramble_allowance jsonb {"<size>": [pct…]} lowest first, absent = USGA; team size 1 = captains only (always agreed); get_live_scorecard game block carries scramble_allowance.
+
 ## 211.8 — Scramble team handicaps (0209)
 
 games.scramble_team_size 1–4 (1 = one app player per team); games.foursomes[].a_hcp / b_hcp — entered team handicap (null = calculated); save_scramble_side_score accepts one-player teams only when scramble_team_size = 1; get_live_scorecard foursomes carry a_hcp / b_hcp.

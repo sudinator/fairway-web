@@ -1,4 +1,6 @@
 "use client";
+import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS, teamSizeLabel } from "@/lib/scramble-method";
+import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
 import type { ScrambleGroup } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
@@ -318,8 +320,9 @@ function CreateGame({
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   // 211.1: scramble settings — the mode (one leaderboard / team v team) follows fmtFamily.
   const [scrambleTeamSize, setScrambleTeamSize] = useState<1 | 2 | 3 | 4>(4);
-  const [scrambleHandicap, setScrambleHandicap] = useState<"usga" | "gross">("usga");
+  const [scrambleHandicap, setScrambleHandicap] = useState<"usga" | "gross" | "agreed">("usga");
   const [scrambleMinDrives, setScrambleMinDrives] = useState<number | null>(null);
+  const [scrambleAllowance, setScrambleAllowance] = useState<ScrambleAllowance | null>(null);   // 211.9: null = USGA's
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
   const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" ? "match" : "stroke");
   const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
@@ -522,7 +525,7 @@ function CreateGame({
     setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2); setTeamColours(d.teamColors ?? [null, null]);
-    if (d.scrambleTeamSize) setScrambleTeamSize(d.scrambleTeamSize); if (d.scrambleHandicap) setScrambleHandicap(d.scrambleHandicap); setScrambleMinDrives(d.scrambleMinDrives ?? null);
+    if (d.scrambleTeamSize) setScrambleTeamSize(d.scrambleTeamSize); if (d.scrambleHandicap) setScrambleHandicap(d.scrambleHandicap); setScrambleMinDrives(d.scrambleMinDrives ?? null); setScrambleAllowance(d.scrambleAllowance ?? null);
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
@@ -553,11 +556,11 @@ function CreateGame({
     ...toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
       teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, teamColors: teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
+      skinsMode, team1, team2, teamColors: teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -680,7 +683,7 @@ function CreateGame({
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
-        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize, handicap: scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field" } : undefined,
+        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize, handicap: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
@@ -1185,20 +1188,16 @@ function CreateGame({
           <div data-scramble-settings style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM SIZE</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              {([2, 3, 4, 1] as const).map((n) => <button key={n} onClick={() => setScrambleTeamSize(n)} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{n === 1 ? "1 · outside the app" : `${n} players`}</button>)}
+              {([2, 3, 4, 1] as const).map((n) => <button key={n} onClick={() => { setScrambleTeamSize(n); if (n === 1) setScrambleHandicap("agreed"); }} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{teamSizeLabel(n)}</button>)}
             </div>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              <button onClick={() => setScrambleHandicap("usga")} style={{ ...btn(scrambleHandicap === "usga"), flex: 1, fontSize: 13 }}>USGA allowance</button>
-              <button onClick={() => setScrambleHandicap("gross")} style={{ ...btn(scrambleHandicap === "gross"), flex: 1, fontSize: 13 }}>Gross only</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              {OFFERED_METHODS.map((m) => <button key={m} disabled={m === "usga" && scrambleTeamSize === 1} onClick={() => setScrambleHandicap(m)} style={{ ...btn(scrambleHandicap === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && scrambleTeamSize === 1 ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
             </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
-              {scrambleTeamSize === 1 ? "Each player is their own team — their teammates play outside the app. The player enters the team's score, and you enter each team's handicap in Setup → Teams (or choose Gross only)."
-                : scrambleHandicap === "gross" ? "No handicap strokes — lowest team score wins."
-                : scrambleTeamSize === 4 ? "Team handicap: 25% of the lowest course handicap, 20%, 15% and 10% of the highest, added up — strokes taken hole by hole."
-                : scrambleTeamSize === 3 ? "Team handicap: 30% of the lowest course handicap, 20% and 10% of the highest, added up — strokes taken hole by hole."
-                : "Team handicap: 35% of the lower course handicap plus 15% of the higher — strokes taken hole by hole."}
+            <div data-scramble-method style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {scrambleMethodText(scrambleHandicap, scrambleTeamSize)}
             </div>
+            {scrambleHandicap === "usga" && scrambleTeamSize !== 1 ? <ScrambleAllowanceEditor size={scrambleTeamSize} value={scrambleAllowance} onChange={setScrambleAllowance} /> : null}
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>DRIVE REQUIREMENT</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} onClick={() => setScrambleMinDrives(n)} style={{ ...btn(scrambleMinDrives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}

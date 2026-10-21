@@ -1,3 +1,22 @@
+## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
+
+Owner redesign (Oct 21).
+
+**Pick teams yourself.** Setup → Teams offers "Make balanced teams" (snake-drafted by course handicap, as before) or "Pick teams myself": empty teams plus a "Not on a team yet" list with Add to… for each player. Either way: Move to…, Take off team, Add a team / match, Remove an empty one. Setup isn't complete while a team is empty or a player unplaced.
+
+**Two handicap methods; gross no longer offered.**
+- **USGA allowance** — each team's handicap from its players' course handicaps with the allowance percentages; the USGA's are the default (25/20/15/10, 30/20/10, 35/15, lowest to highest) and a game may set its own — one box per position, the USGA figure beside each as guidance, Reset to USGA (create form and Setup → Format). Smaller teams left by uneven numbers use the USGA's for their size.
+- **Agreed handicaps** — the organizer enters each team's handicap, whatever the players agree, in Setup → Teams; a blank team plays scratch.
+Both take strokes hole by hole, hardest holes first. Games created with gross keep working (scratch). The per-team override under USGA (211.8) is gone — the method decides: USGA is calculated with your percentages; agreed is typed in. Every place describes the chosen method in the same words (lib/scramble-method.ts).
+
+**Captains only** (was "1 · outside the app"): each team is represented in the app by its captain, who enters the team's score; the teammates play outside the app. Always agreed handicaps (USGA shown unavailable, with the reason).
+
+0210: games.scramble_handicap accepts 'agreed'; games.scramble_allowance (the game's percentages); the live page's feed carries them. One method rule (lib/game-shape scrambleMethodOf / scrambleTeamHandicapFor) used by the scorecard, leaderboard, recap, email and live page.
+
+Tests: custom 30/20/15/10 gives 8 where USGA gives 7; agreed 12 / blank scratch; a leftover number is ignored under USGA; captains only on the Teams screen; Pick teams myself → empty teams → Add to…; captains only switches to agreed; gross not offered; an empty team blocks setup.
+
+Deploy: staging 0210 → code; production 0210 → merge.
+
 ## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
 
 Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.

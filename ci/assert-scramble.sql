@@ -54,6 +54,14 @@ begin
   execute 'reset role';
   if (select strokes from game_alt_shot_scores where game_id = gid and foursome_id = 'g2' and hole_index = 0) is distinct from 5 then raise exception 'a one-player team could not score in a teammates-outside-the-app game'; end if;
   update public.games set scramble_team_size = 4 where id = gid;
+  -- 0210: the "agreed" handicap method is a valid setting; an unknown one isn't
+  update public.games set scramble_handicap = 'agreed' where id = gid;
+  begin update public.games set scramble_handicap = 'made-up' where id = gid; ok := false; exception when check_violation then ok := true; end;
+  if not ok then raise exception 'an unknown scramble handicap method was accepted'; end if;
+  update public.games set scramble_handicap = 'usga' where id = gid;
+  update public.games set scramble_allowance = '{"4": [30, 20, 15, 10]}' where id = gid;
+  begin update public.games set scramble_allowance = '[1,2]' where id = gid; ok := false; exception when check_violation then ok := true; end;
+  if not ok then raise exception 'a malformed allowance was accepted'; end if;
   -- only scramble games (as that alternate-shot game's organizer, who passes the fence — so the format check decides)
   perform set_config('request.jwt.claim.sub', a1, true);
   perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000d1');

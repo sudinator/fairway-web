@@ -76,29 +76,47 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const t = renderScreen(<ScrambleSettings game={game()} locked={false} onSave={(p, c) => { calls.push([p, c]); }} />);
   const b = (label: string) => Array.from(t.el.querySelectorAll("button")).find((x) => x.textContent === label) as HTMLButtonElement;
   b("2 players").click();
-  b("Gross only").click();
+  b("Agreed handicaps").click();
   ok(JSON.stringify(calls[0]) === JSON.stringify([{ scramble_team_size: 2 }, true]), `team size: saved, and the teams are cleared (got ${JSON.stringify(calls[0])})`);
-  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_handicap: "gross" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[1])})`);
+  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_handicap: "agreed" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[1])})`);
+  b("Captains only").click();
+  ok(JSON.stringify(calls[2]) === JSON.stringify([{ scramble_team_size: 1, scramble_handicap: "agreed" }, true]), `captains only also switches to agreed handicaps (got ${JSON.stringify(calls[2])})`);
+  ok(!Array.from(t.el.querySelectorAll("button")).some((x) => x.textContent === "Gross" || x.textContent === "Gross only"), "gross is no longer offered");
   t.unmount();
   const l = renderScreen(<ScrambleSettings game={game()} locked onSave={() => { calls.push("locked"); }} />);
   (Array.from(l.el.querySelectorAll("button")).find((x) => x.textContent === "3 players") as HTMLButtonElement).click();
   ok(!calls.includes("locked") && (l.el.textContent || "").includes("Scoring has started"), "locked once scoring starts");
   l.unmount();
 }
-// 211.8 — an entered team handicap wins; one-player teams
+// 211.9 — USGA with the game's own percentages; agreed handicaps; captains only; picking teams yourself
 {
-  const og = game({ foursomes: [{ ...groups[0], a_hcp: 12 }, groups[1]] });
-  const r2 = scrambleResults(og, players, rows);
-  ok(r2.teams.map((x) => x.handicap).join(",") === "12,9", `entered handicap 12 replaces the calculated 7 (got ${r2.teams.map((x) => x.handicap)})`);
-  const sg = game({ scramble_team_size: 1, foursomes: [{ id: "team-1", name: "Team 1", a: ["u-Raj"], b: [] }, { id: "team-2", name: "Team 2", a: ["u-Amit"], b: [], a_hcp: 6 }] });
-  let saved: any = null;
+  const custom = scrambleResults(game({ scramble_allowance: { "4": [30, 20, 15, 10] } }), players, rows);
+  ok(custom.teams[0].handicap === 8, `custom 30/20/15/10: Team 1 = 1.26 + 1.96 + 2.19 + 2.24 = 7.65 → 8 (got ${custom.teams[0].handicap})`);
+  const agreed = scrambleResults(game({ scramble_handicap: "agreed", foursomes: [{ ...groups[0], a_hcp: 12 }, groups[1]] }), players, rows);
+  ok(agreed.teams.map((x) => x.handicap).join(",") === "12,0", `agreed: 12 entered, blank plays scratch (got ${agreed.teams.map((x) => x.handicap)})`);
+  ok(scrambleResults(game({ foursomes: [{ ...groups[0], a_hcp: 12 }, groups[1]] }), players, rows).teams[0].handicap === 7, "USGA: a leftover entered number is not used — the method decides");
   const two = players.filter((p) => p.display_name === "Raj" || p.display_name === "Amit");
-  const tb = renderScreen(<ScrambleTeamsBuilder game={sg} players={two} readOnly={false} onSave={(g) => { saved = g; }} />);
+  const cg = game({ scramble_team_size: 1, scramble_handicap: "agreed", foursomes: [{ id: "team-1", name: "Team 1", a: ["u-Raj"], b: [] }, { id: "team-2", name: "Team 2", a: ["u-Amit"], b: [], a_hcp: 6 }] });
+  let saved: any = null;
+  const tb = renderScreen(<ScrambleTeamsBuilder game={cg} players={two} readOnly={false} onSave={(g) => { saved = g; }} />);
   const txt = tb.el.textContent || "";
-  ok(txt.includes("One player per team") && txt.includes("Handicap needed") && txt.includes("Team handicap 6 (entered)") && txt.includes("Enter Team 1's team handicap"), `one-player teams: needs and entered shown (${txt.slice(0, 160)})`);
+  ok(txt.includes("Captains only") && txt.includes("Raj · captain") && txt.includes("Scratch (no handicap entered)") && txt.includes("Team handicap 6"), `captains only on the Teams screen (${txt.slice(0, 200)})`);
   const input = tb.el.querySelector('input[aria-label="Team 1 team handicap"]') as HTMLInputElement;
   input.value = "9"; input.dispatchEvent(new Event("focusout", { bubbles: true }));
-  ok(saved && saved[0].a_hcp === 9 && saved[1].a_hcp === 6, `typing 9 saves Team 1's handicap, Team 2's kept (got ${JSON.stringify(saved)})`);
+  ok(saved && saved[0].a_hcp === 9 && saved[1].a_hcp === 6, `typing 9 saves Team 1's agreed handicap (got ${JSON.stringify(saved)})`);
   tb.unmount();
+  // pick teams myself: empty teams, then Add to… from "Not on a team yet"
+  let picked: any = null;
+  const pk = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: [] })} players={players} readOnly={false} onSave={(g) => { picked = g; }} />);
+  (Array.from(pk.el.querySelectorAll("button")).find((b) => b.textContent === "Pick teams myself") as HTMLButtonElement).click();
+  ok(Array.isArray(picked) && picked.length === 2 && picked.every((g: any) => !g.a.length), `pick teams myself: two empty teams for eight players (got ${JSON.stringify(picked)?.slice(0, 120)})`);
+  pk.unmount();
+  let added: any = null;
+  const ad = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: picked })} players={players} readOnly={false} onSave={(g) => { added = g; }} />);
+  ok(!!ad.el.querySelector("[data-scramble-unplaced]") && (ad.el.textContent || "").includes("NOT ON A TEAM YET"), "everyone is listed as not on a team yet");
+  const sel = ad.el.querySelector('select[aria-label="Add Raj to a team"]') as HTMLSelectElement;
+  sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+  ok(added && added[1].a.includes("u-Raj") && !added[0].a.includes("u-Raj"), `Add to… Team 2 puts Raj on Team 2 (got ${JSON.stringify(added)?.slice(0, 160)})`);
+  ad.unmount();
 }
 report("scramble screens");

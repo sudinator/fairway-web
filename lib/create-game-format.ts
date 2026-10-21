@@ -16,7 +16,7 @@ export type CreateFormatState = {
   matchLength?: MatchLength;
   /** 211.1: scramble settings — optional so existing drafts load unchanged. */
   scrambleTeamSize?: 1 | 2 | 3 | 4;
-  scrambleHandicap?: "usga" | "gross";
+  scrambleHandicap?: "usga" | "gross" | "agreed";
   scrambleMinDrives?: number | null;
 };
 
@@ -107,7 +107,8 @@ export function formatReviewLabel(state: CreateFormatState): string {
     case "scramble": {
       const size = state.scrambleTeamSize ?? 4;
       const drives = state.scrambleMinDrives ? ` · each drive ×${state.scrambleMinDrives}` : "";
-      return `Scramble · ${size === 1 ? "One player per team (teammates outside the app)" : `Teams of ${size}`} · ${(state as Partial<GuidedFormatState>).fmtFamily === "match" ? "Team v team" : "Leaderboard"} · ${state.scrambleHandicap === "gross" ? "Gross" : "USGA handicaps"}${drives}`;
+      const method = size === 1 || state.scrambleHandicap === "agreed" ? "Agreed handicaps" : state.scrambleHandicap === "gross" ? "Gross" : "USGA handicaps";
+      return `Scramble · ${size === 1 ? "Captains only" : `Teams of ${size}`} · ${(state as Partial<GuidedFormatState>).fmtFamily === "match" ? "Team v team" : "Leaderboard"} · ${method}${drives}`;
     }
     case "skins": {
       const style = skinsStyleFromState(state);

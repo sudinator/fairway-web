@@ -29,8 +29,9 @@ export type SetupDraft = {
   teamColors?: [string | null, string | null];
   /** 211.1: scramble settings (optional — drafts saved earlier have none). */
   scrambleTeamSize?: 1 | 2 | 3 | 4;
-  scrambleHandicap?: "usga" | "gross";
+  scrambleHandicap?: "usga" | "gross" | "agreed";
   scrambleMinDrives?: number | null;
+  scrambleAllowance?: Record<string, number[]> | null;
   flightMode?: string;
   flightCount?: number;
   // Create Game tee inheritance (177.50+). Optional so all older saved drafts still load.

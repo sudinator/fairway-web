@@ -4,7 +4,7 @@ import { shortNamer } from "./short-names";
 // Unit-tested in game-shape.test.ts.
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact, trifectaSingles } from "./golf";
 import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
-import { scrambleTeamHandicap } from "./scramble";
+import { scrambleTeamHandicap, customAllowanceFor } from "./scramble";
 
 /**
  * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
@@ -431,14 +431,23 @@ export function strokeSets(
  * USGA allowances (lib/scramble); 0 for a gross game; null if the player isn't on a team of 2–4. The ONE place a
  * scramble team handicap is worked out from a game, for the scorecard, the leaderboard and the recap.
  */
-export function scrambleTeamHandicapFor(game: DotGame & { scramble_handicap?: string | null }, allPlayers: ShapePlayer[], key: string): number | null {
+export function scrambleTeamHandicapFor(game: DotGame & { scramble_handicap?: string | null; scramble_team_size?: number | null; scramble_allowance?: unknown }, allPlayers: ShapePlayer[], key: string): number | null {
   const f = (game.foursomes || []).find((x) => [...x.a, ...x.b].includes(key));
   if (!f) return null;
-  if (game.scramble_handicap === "gross") return 0;
-  // 211.8: a team handicap the organizer entered wins over the calculated one
-  const entered = (f as { a_hcp?: unknown; b_hcp?: unknown })[f.a.includes(key) ? "a_hcp" : "b_hcp"];
-  if (typeof entered === "number" && Number.isFinite(entered)) return entered;
-  const members = (f.a.includes(key) ? f.a : f.b).map((k) => allPlayers.find((x) => pkey(x) === k)).filter((x): x is ShapePlayer => !!x);
-  const th = scrambleTeamHandicap(members.map((m) => chBasis(m, game.course_par, game.holes_meta?.length)), game.scramble_handicap === "gross");
+  const side = f.a.includes(key) ? "a" : "b";
+  const method = scrambleMethodOf(game);
+  if (method === "gross") return 0;                                   // legacy games created with gross: scratch
+  if (method === "agreed") {                                          // 211.9: entered by the organizer; blank = scratch
+    const entered = (f as { a_hcp?: unknown; b_hcp?: unknown })[side === "a" ? "a_hcp" : "b_hcp"];
+    return typeof entered === "number" && Number.isFinite(entered) ? entered : 0;
+  }
+  const members = (side === "a" ? f.a : f.b).map((k) => allPlayers.find((x) => pkey(x) === k)).filter((x): x is ShapePlayer => !!x);
+  const th = scrambleTeamHandicap(members.map((m) => chBasis(m, game.course_par, game.holes_meta?.length)), false, customAllowanceFor(game.scramble_allowance, members.length));
   return th ? th.total : null;
+}
+
+/** 211.9: the method a scramble game uses — captains only always uses agreed handicaps. */
+export function scrambleMethodOf(game: { scramble_handicap?: string | null; scramble_team_size?: number | null }): "usga" | "agreed" | "gross" {
+  if (game.scramble_team_size === 1) return "agreed";
+  return game.scramble_handicap === "agreed" ? "agreed" : game.scramble_handicap === "gross" ? "gross" : "usga";
 }
