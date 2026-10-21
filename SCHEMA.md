@@ -1,3 +1,7 @@
+## 211.3 — anon boundary (0205)
+
+anon: no privileges on public tables; EXECUTE only on get_live_scorecard / get_live_competition / get_live_lineup among SECURITY DEFINER functions; default privileges revoke anon.
+
 ## 211.1 — Live scramble (0204)
 
 get_live_scorecard's game block adds scramble_mode and scramble_handicap.

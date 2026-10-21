@@ -159,7 +159,8 @@ begin
       select array_agg(privilege_type order by privilege_type) into got
       from information_schema.role_table_grants
       where table_schema='public' and table_name=t and grantee=r;
-      if got is distinct from expected then
+      -- 0205 (211.3): signed-out visitors hold NO privilege on any public table; members keep the full set.
+      if got is distinct from (case when r = 'anon' then null else expected end) then
         raise exception 'Core table grant mismatch for %.%: got %', t, r, got;
       end if;
     end loop;
