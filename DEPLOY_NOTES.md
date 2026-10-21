@@ -1,3 +1,18 @@
+## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
+
+**Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.
+
+**The shim now mirrors Supabase's defaults exactly** (ci/local_supabase_shim.sql), so local, GitHub and production agree; the security contract snapshot is re-recorded on that faithful copy (132 policies, 45 member table privileges, 195 privileged functions).
+
+**0206.** It was partly a real gap: on the money tables, tee times, RSVPs and guests, row rules let club members write, so a pending or suspended account still in a club could have written there directly (0197 covered only the tables the shim showed as writable). Now:
+1. outside the 12 core tables, members keep a table privilege only where a row rule can use it (row security refused the rest anyway — nothing a member can do changes); TRUNCATE / REFERENCES / TRIGGER removed;
+2. every member-writable table carries the approved-accounts rule — 11 tables gained it (expenses, expense payers / shares / audit, settlements, money activity, tee times, RSVPs, guests, badges, player cards) — with three recorded exceptions: push_subscriptions (a pending member must receive "you're approved"), daily_active (activity ping), feedback (anyone signed in can write to the owner);
+3. new public tables are no longer opened to members by default;
+4. can_decide_signup, an internal helper 0189 never meant members to call (Supabase's defaults did), is revoked from members.
+ci/assert-member-privileges.sql (in 0206's TESTS header): no unguarded member-writable table; no TRUNCATE / REFERENCES / TRIGGER; a suspended member still in a club can't add a guest, an active one can.
+
+Deploy: staging 0206 → code; production 0206 → merge. 211.3 can stay deployed meanwhile — nothing is broken.
+
 ## 211.3.261021 — Defence in depth for signed-out visitors (0205)
 
 Measured before this: signed-out visitors (anon) held Supabase's default full privileges on the 12 core tables, and could call 83 privileged (SECURITY DEFINER) functions, including admin ones. Nothing was exploitable — row-level security refused every table and every function refused internally — but each protection was one layer.

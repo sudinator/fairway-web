@@ -37,3 +37,10 @@ grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 alter default privileges in schema public grant all on tables to service_role;
 alter default privileges in schema public grant all on sequences to service_role;
+-- 211.4: Supabase ALSO gives signed-out visitors (anon) and members (authenticated) every privilege on new public
+-- tables, sequences and functions by default. The shim omitted this, so locally migrations produced FEWER
+-- permissions than Supabase (and production) — and the security contract passed locally while it failed on
+-- GitHub's real Supabase image. Mirrored exactly now, so local, GitHub and production agree.
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

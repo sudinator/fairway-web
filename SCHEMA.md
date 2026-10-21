@@ -1,3 +1,7 @@
+## 211.4 — Member privileges (0206)
+
+Non-core tables: authenticated privileges only where a permissive rule for that command exists (SELECT also where any write rule exists); guard_active_account on every member-writable table except profiles, notifications, push_subscriptions, daily_active, feedback; default privileges revoke tables from authenticated; can_decide_signup not callable by members.
+
 ## 211.3 — anon boundary (0205)
 
 anon: no privileges on public tables; EXECUTE only on get_live_scorecard / get_live_competition / get_live_lineup among SECURITY DEFINER functions; default privileges revoke anon.

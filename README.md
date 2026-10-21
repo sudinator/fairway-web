@@ -1,3 +1,7 @@
+## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
+
+**Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.
+
 ## 211.3.261021 — Defence in depth for signed-out visitors (0205)
 
 Measured before this: signed-out visitors (anon) held Supabase's default full privileges on the 12 core tables, and could call 83 privileged (SECURITY DEFINER) functions, including admin ones. Nothing was exploitable — row-level security refused every table and every function refused internally — but each protection was one layer.

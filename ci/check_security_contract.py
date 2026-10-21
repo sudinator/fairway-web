@@ -18,7 +18,9 @@ and the diff of ci/security_contract.json then shows, in the release, every perm
 import json, subprocess, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SNAP = ROOT / "ci" / "security_contract.json"
-GUARD_EXCEPTIONS = {"profiles": "account fields locked by guard_account_fields (0189)", "notifications": "members mark their own as read"}
+GUARD_EXCEPTIONS = {"profiles": "account fields locked by guard_account_fields (0189)", "notifications": "members mark their own as read",
+                    "push_subscriptions": "a pending member must be able to receive 'you're approved' (0206)",
+                    "daily_active": "the activity ping (0206)", "feedback": "anyone signed in can write to the owner, even while waiting (0206)"}
 
 def q(db, sql):
     out = subprocess.run(["psql", db, "-X", "-tA", "-c", f"select coalesce(json_agg(x), '[]') from ({sql}) x"], capture_output=True, text=True)

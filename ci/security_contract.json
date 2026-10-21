@@ -197,8 +197,11 @@
   "void_contest_entry(uuid,boolean)": "authenticated"
  },
  "guard_exceptions": {
+  "daily_active": "the activity ping (0206)",
+  "feedback": "anyone signed in can write to the owner, even while waiting (0206)",
   "notifications": "members mark their own as read",
-  "profiles": "account fields locked by guard_account_fields (0189)"
+  "profiles": "account fields locked by guard_account_fields (0189)",
+  "push_subscriptions": "a pending member must be able to receive 'you're approved' (0206)"
  },
  "policies": {
   "activity_log.admins read activity": {
@@ -996,28 +999,49 @@
  },
  "table_grants": {
   "authenticated:activity_log": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:banned_emails": "SELECT",
   "authenticated:club_reports": "SELECT",
   "authenticated:competition_players": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:competition_schedule_events": "SELECT",
   "authenticated:competition_sessions": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:competitions": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:course_change_requests": "SELECT",
+  "authenticated:course_freshness": "SELECT",
   "authenticated:course_versions": "SELECT",
+  "authenticated:daily_active": "INSERT,SELECT",
+  "authenticated:expense_audit": "INSERT,SELECT",
+  "authenticated:expense_payers": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:expense_shares": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:expenses": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:favorite_courses": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:feedback": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:game_alt_shot_scores": "SELECT",
+  "authenticated:game_contest_entries": "SELECT",
+  "authenticated:game_contests": "SELECT",
   "authenticated:game_players": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:games": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_activity": "INSERT,SELECT",
   "authenticated:group_course_overrides": "SELECT",
   "authenticated:group_courses": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:group_events": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_guests": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:group_invites": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:group_members": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:groups": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:holes": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:member_badges": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:money_audit": "SELECT",
   "authenticated:notifications": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:nudges": "SELECT",
+  "authenticated:player_cards": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:profiles": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:push_subscriptions": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:rounds": "DELETE,INSERT,SELECT,UPDATE",
-  "authenticated:schema_migrations": "SELECT"
+  "authenticated:schema_migrations": "SELECT",
+  "authenticated:score_audit": "SELECT",
+  "authenticated:settlement_allocations": "SELECT",
+  "authenticated:settlements": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:tee_time_rsvps": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:tee_times": "DELETE,INSERT,SELECT,UPDATE"
  }
 }
