@@ -1,3 +1,21 @@
+## 211.2.261021 — The security contract: every release checks permissions and privacy, without exceptions
+
+Owner (Oct 21): "each version needs to check [RLS security and integrity] without compromise." Before this, CI checked each migration's wording, that every table had row-level security on, and exactly pinned the rules of 12 core tables — but a migration could loosen a rule on any of the other ~48 tables, add a member-writable table without the approved-accounts rule (0197 was only a written note), or make a privileged function callable by signed-out visitors, and nothing would fail. Measured today: 47 tables refuse a signed-out visitor outright, 12 return nothing, none showed a row; no anon-callable privileged function is exploitable — but only because every migration so far happened to be careful.
+
+**ci/check_security_contract.py — runs in both chain checks (local and GitHub), against the database built from every migration:**
+1. every table has row-level security ON (no exceptions);
+2. every access rule on EVERY table (132) matches ci/security_contract.json exactly — name, command, roles, USING, WITH CHECK;
+3. every privilege signed-out visitors and members hold on tables (36), and who can EXECUTE each privileged function (195), matches the snapshot — so nothing becomes publicly callable unless the snapshot records it;
+4. every SECURITY DEFINER function pins its search_path (no exceptions);
+5. every table members can write carries the approved-accounts rule (guard_active_account), except the two recorded exceptions (profiles, notifications).
+Any difference fails the build and prints exactly what changed; recording it is a deliberate `--update`, so the snapshot's diff shows, in the release, every permission that moved. Proven: a probe "anyone reads every round" rule fails it ("policy ADDED … using true"), and so does a member-writable table without the rule.
+
+**Every security-touching migration names its own test (from 0205).** ci/check_migration_authorization.py: a migration that changes privileged functions, grants, policies, row-level security or triggers must carry `-- TESTS: ci/assert-….sql`, and that test must exist and run in both chain checks. Proven on a probe migration.
+
+Note for the first GitHub run: the snapshot was recorded on the local chain database; GitHub builds from Supabase's image. The existing core-RLS check compares the same way and passes in both, so they should match — if GitHub reports grant differences, they'll be listed exactly and reconciled in the next release.
+
+No migration. Deploy: code only.
+
 ## 211.1.261021 — Scramble
 
 The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.

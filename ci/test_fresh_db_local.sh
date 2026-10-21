@@ -36,6 +36,8 @@ for f in assert-historical-baseline-columns assert-core-rls-live assert-core-rls
   psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$ROOT/ci/$f.sql" >/dev/null 2>/tmp/bnn_local_chain.err || { echo "FAILED $f.sql"; grep -i "ERROR\|DETAIL\|CONTEXT" /tmp/bnn_local_chain.err | head -5; exit 1; }
   echo "ok   $f.sql"
 done
+# 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot.
+python3 "$ROOT/ci/check_security_contract.py" "$DB_URL" || { echo "FAILED security contract"; exit 1; }
 for mode_and_exit in ok:0 midquota:2 drift:1 ledgerdown:2 freshness:0; do
   HARNESS_DB_URL="$DB_URL" HARNESS_MODE="${mode_and_exit%%:*}" HARNESS_EXPECT_EXIT="${mode_and_exit##*:}" COURSE_CHECK_BUDGET=5 \
     node "$ROOT/ci/external/contract-harness.mjs" >/dev/null || { echo "FAILED harness $mode_and_exit"; exit 1; }

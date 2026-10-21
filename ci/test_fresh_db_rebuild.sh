@@ -186,6 +186,10 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.
 # retention of last-known values, and the permission boundary.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-api-checks.sql"
 
+# 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot
+# (ci/security_contract.json). A difference fails the build; recording it is a deliberate --update.
+python3 "$ROOT/ci/check_security_contract.py" "$DB_URL"
+
 # 0164: the WHOLE monitor script against a PostgREST-shaped ledger stub backed by this database and
 # a stub provider. Every exit path must leave a recorded outcome: a clean week, a mid-run daily
 # quota (checked courses recorded, unreached ones released), drift, and a dead ledger.

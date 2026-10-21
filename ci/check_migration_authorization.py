@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ENFORCE_FROM = 125   # -- AUTHORIZATION: header required from here
 MECH_ENFORCE_FROM = 126  # mechanical checks apply to new migrations from here (0125 is superseded by 0126)
+TESTS_ENFORCE_FROM = 205 # 211.2: a security-touching migration must name its own test (-- TESTS: ci/assert-….sql)
 
 def mig_no(p):
     m = re.match(r"^(\d+)_", p.name)
@@ -54,6 +55,23 @@ def main() -> int:
             # 1) Documentation header (from 0125)
             if n >= DOC_ENFORCE_FROM and privileged and "-- authorization:" not in low_raw:
                 failures.append(f"{rel}: privileged migration missing '-- AUTHORIZATION:' header")
+
+            # 1b) 211.2 (owner): from 0205, any migration that touches security — privileged functions, grants,
+            # access rules (policies), row-level security or triggers — must name its own test, and that test
+            # must exist and actually run in BOTH chain checks.
+            touches_security = privileged or bool(re.search(r"\b(create|alter|drop)\s+policy\b|\bgrant\b|\brevoke\b|row\s+level\s+security|\bcreate\s+trigger\b", low))
+            if n >= TESTS_ENFORCE_FROM and touches_security:
+                m_t = re.search(r"--\s*tests:\s*(ci/[\w./-]+\.sql)", raw, re.I)
+                if not m_t:
+                    failures.append(f"{rel}: touches security but has no '-- TESTS: ci/assert-….sql' header naming its test")
+                else:
+                    tf = m_t.group(1)
+                    if not (ROOT / tf).exists():
+                        failures.append(f"{rel}: its test {tf} does not exist")
+                    else:
+                        for chain in ("ci/test_fresh_db_local.sh", "ci/test_fresh_db_rebuild.sh"):
+                            if Path(tf).stem not in (ROOT / chain).read_text():
+                                failures.append(f"{rel}: its test {tf} is not run by {chain}")
 
             if n < MECH_ENFORCE_FROM or not privileged:
                 continue

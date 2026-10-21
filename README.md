@@ -1,3 +1,7 @@
+## 211.2.261021 — The security contract: every release checks permissions and privacy, without exceptions
+
+Owner (Oct 21): "each version needs to check [RLS security and integrity] without compromise." Before this, CI checked each migration's wording, that every table had row-level security on, and exactly pinned the rules of 12 core tables — but a migration could loosen a rule on any of the other ~48 tables, add a member-writable table without the approved-accounts rule (0197 was only a written note), or make a privileged function callable by signed-out visitors, and nothing would fail. Measured today: 47 tables refuse a signed-out visitor outright, 12 return nothing, none showed a row; no anon-callable privileged function is exploitable — but only because every migration so far happened to be careful.
+
 ## 211.1.261021 — Scramble
 
 The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.

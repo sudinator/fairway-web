@@ -12,6 +12,8 @@ how anything works, **open the file and read it** — never answer from assumpti
 - RULE: guards are judged by the account/data affected, never by current_user (definer functions run as owner) and never by a session flag.
 - RULE: account changes are server functions that refuse out loud; no browser-side multi-step deletes.
 - STAGING: deliberately sends no push notifications — no notifications webhook in staging's Supabase (owner, Oct 2026). Not a fault; don't "fix" it.
+- RULE (owner, Oct 21 2026 — no compromise): THE SECURITY CONTRACT (ci/check_security_contract.py) runs on every release against the fully migrated database: RLS on every table; every policy, table grant and privileged-function EXECUTE matches ci/security_contract.json; every SECURITY DEFINER pins search_path; every member-writable table has guard_active_account (exceptions: profiles, notifications). A permission change is recorded deliberately with --update and reviewed in the release diff.
+- RULE: from 0205, a migration touching security (privileged functions, grants, policies, RLS, triggers) carries `-- TESTS: ci/assert-….sql`, and that test runs in both chain checks.
 - RULE: a notification link must be one lib/app-links.ts understands (?tab=<APP_TABS>, club=, game=, tt=, wrapped=) — ci/assert-notification-links.sql checks every link the database sends.
 - RULE: statistics code decides what a round is ONLY through lib/round-rules (ci/check_round_rules.py).
 - RULE: every statistics feature runs through lib/test-fixtures/messy-games (lib/messy-data.test.ts) — add a case when real data surprises us.
