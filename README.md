@@ -1,3 +1,7 @@
+## 211.1.261021 — Scramble
+
+The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.
+
 ## 211.0.261021 — Scramble foundations (not yet selectable)
 
 The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).

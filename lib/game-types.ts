@@ -32,6 +32,11 @@ export type Game = {
   lineup_slug?: string | null; // readable line-up link (0177): course-date-6chars; minted with share_token
   ended_at?: string | null;
   alt_shot_scoring_started_at?: string | null;
+  /** 211.1: scramble settings (0203) — null for every other format. */
+  scramble_team_size?: 2 | 3 | 4 | null;
+  scramble_mode?: "field" | "match" | null;
+  scramble_handicap?: "usga" | "gross" | null;
+  scramble_min_drives?: number | null;
   scores_reset_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
   created_by: string;
   created_at: string;

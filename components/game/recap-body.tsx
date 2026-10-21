@@ -3,6 +3,7 @@
 // can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
+import { scrambleRowValue } from "@/lib/scramble-game";
 import { shortenedNote } from "@/lib/round-rules";
 import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
@@ -109,6 +110,18 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
               </div>
             );
           })}
+        </div>
+      ) : null}
+      {s.scramble ? (
+        <div style={S.box} data-recap-scramble>
+          <div style={S.th}>{s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`}</div>
+          {s.scramble.mode === "match"
+            ? s.scramble.matches.map((m, i) => <div key={i} style={S.row}><span style={S.name}>{m}</span></div>)
+            : s.scramble.rows.map((r, i) => (
+              <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span>
+                <span style={S.name}>{r.name}<span style={{ color: C.sage, fontSize: 11, display: "block" }}>{r.members}</span></span>
+                <span style={S.num}>{scrambleRowValue(r, s.scramble!.gross)}</span></div>
+            ))}
         </div>
       ) : null}
       {s.leaderboard && !s.flights?.length ? (

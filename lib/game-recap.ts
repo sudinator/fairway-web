@@ -10,6 +10,7 @@ import type { Game, Player } from "@/lib/game-types";
 
 import { buildHighlights, type Highlights } from "@/lib/game-highlights";
 import { buildRecapSections, andList, type RecapSections } from "@/lib/game-recap-sections";
+import { scrambleResults } from "@/lib/scramble-game";
 
 export type Recap = {
   highlights: Highlights;         // the shared sections (top 3, net birdies, group, course)
@@ -42,6 +43,28 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
     const name = teams?.find((t) => t.key === p.team)?.name ?? "Your team";
     personal[pkey(p)] = winner == null ? `${name} tied` : winner === p.team ? `${name} won` : `${name} lost`;
   });
+
+  // SCRAMBLE (211.1): one score per team — the results are lib/scramble-game's, the same as the game screen.
+  if (game.game_type === "scramble") {
+    const r = scrambleResults(game, players, altShotScores);
+    const sig = r.mode === "match" ? `scramble:match:${r.matches.map((m) => m.line).join("|")}` : `scramble:field:${r.board.map((b) => `${b.key}=${b.thru}/${b.gross}/${b.net}`).join("|")}`;
+    const teamOf = (p: Player) => r.teams.find((t) => (game.foursomes || []).some((f) => f.id === t.groupId && (f[t.side] as string[]).includes(pkey(p))));
+    if (r.mode === "match") {
+      const done = r.matches.filter((m) => m.status.thru > 0);
+      const headline = !done.length ? "Scramble — no scores yet" : r.matches.length === 1 ? r.matches[0].line : `${r.matches.length} matches: ${r.matches.map((m) => m.line).join(" · ")}`;
+      live.forEach((p) => { const t = teamOf(p); const m = t && r.matches.find((x) => x.groupId === t.groupId); if (m) personal[pkey(p)] = `Your team (${t!.name}): ${m.line}`; });
+      return { headline, endedEarly: false, notes, personal, signature: sig, winner: null };
+    }
+    const scored = r.board.filter((b) => b.thru > 0);
+    const lead = scored.filter((b) => b.rank === 1);
+    const basis = r.gross ? "gross" : "net";
+    const headline = !scored.length ? "Scramble — no scores yet"
+      : lead.length > 1 ? `${andList(lead.map((b) => b.name))} tie — ${basis} ${r.gross ? lead[0].gross : lead[0].net}`
+      : `${lead[0].name} wins the scramble — ${basis} ${r.gross ? lead[0].gross : lead[0].net}`;
+    const ord = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+    live.forEach((p) => { const t = teamOf(p); const b = t && r.board.find((x) => x.key === t.key); if (b && b.thru > 0) personal[pkey(p)] = `Your team (${b.name}) finished ${b.pos.startsWith("T") ? "tied " : ""}${ord(b.rank)}, ${basis} ${r.gross ? b.gross : b.net}`; });
+    return { headline, endedEarly: false, notes, personal, signature: sig, winner: lead.length === 1 ? lead[0].name : null };
+  }
 
   // Team formats: decided points only — an unfinished match is never counted as settled.
   if (teams && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") && shape.usesTeams) {

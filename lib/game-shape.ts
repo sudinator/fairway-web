@@ -4,6 +4,7 @@ import { shortNamer } from "./short-names";
 // Unit-tested in game-shape.test.ts.
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact, trifectaSingles } from "./golf";
 import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
+import { scrambleTeamHandicap } from "./scramble";
 
 /**
  * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
@@ -11,11 +12,11 @@ import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
  * The single ball is what drives everything else — a side has one score rather than two, and the
  * handicap allowance is 50% of the partners' combined Course Handicaps.
  */
-export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot";
+export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot" | "scramble";
 
 /** Every game type, for exhaustiveness tests and for building pickers without hardcoding a list. */
 export const GAME_TYPES: GameType[] = [
-  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot",
+  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot", "scramble",
 ];
 export type TeamDef = { key: string; name: string };
 export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null };
@@ -46,8 +47,8 @@ export type GameShape = {
   usesTeams: boolean;
   usesMatchups: boolean;
   usesFoursomes: boolean;
-  dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side";
-  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
+  dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side" | "scramble_team";
+  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "scramble" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
 };
 export function shapeOf(game: ShapeGame): GameShape {
   const gt = game.game_type;
@@ -56,14 +57,16 @@ export function shapeOf(game: ShapeGame): GameShape {
   const skinsStyle: GameShape["skinsStyle"] =
     gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
   const usesFoursomes =
-    gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || skinsStyle === "team_2v2";
+    gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || gt === "scramble" || skinsStyle === "team_2v2";
   // The global Teams step applies when two named teams actually exist. New Four-Ball and
   // Alternate Shot games always have two global teams; legacy games without them retain
   // their historical local-foursome matchup structure for backward compatibility.
   const usesTeams =
     teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot");
   const usesMatchups =
-    gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+    gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null)
+    // 211.1: scramble teams (2–4 players each) are built in setup's Teams editor, which sits in the matchups slot.
+    || gt === "scramble";
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"
@@ -72,6 +75,10 @@ export function shapeOf(game: ShapeGame): GameShape {
       // handicap (50% of the partners combined) and strokes are the difference between SIDES.
       : gt === "alt_shot"
       ? "alt_shot_side"
+      // Scramble (211.1): each TEAM has one handicap (USGA scramble allowances, lib/scramble), its strokes
+      // allotted hole by hole by stroke index — per team, not relative to another side.
+      : gt === "scramble"
+      ? "scramble_team"
       : gt === "fourball" || gt === "trifecta"
       ? "relative_foursome"
       : gt === "skins"
@@ -226,6 +233,13 @@ export function dotStrokes(
       return matchStrokesFor(a, si, allocHoles(game));
     }
     return matchStrokesFor(mine, si, allocHoles(game));
+  }
+
+  // SCRAMBLE (211.1). One ball per TEAM, so the team has one handicap (USGA scramble allowances) and its strokes
+  // fall on the holes its stroke index gives — every player on the team shows the same dots.
+  if (basis === "scramble_team") {
+    const total = scrambleTeamHandicapFor(game, allPlayers, key);
+    return total == null ? 0 : matchStrokesFor(total, si, allocHoles(game));
   }
 
   // ALTERNATE SHOT. One ball per side, so the SIDE has one handicap — 50% of the two partners'
@@ -410,4 +424,17 @@ export function strokeSets(
 
   // Stableford, stroke play, individual skins: the course handicap IS the scoring basis.
   return [course];
+}
+
+/**
+ * A scramble team's handicap (211.1) — the team holding `key`, from its players' unrounded course handicaps and the
+ * USGA allowances (lib/scramble); 0 for a gross game; null if the player isn't on a team of 2–4. The ONE place a
+ * scramble team handicap is worked out from a game, for the scorecard, the leaderboard and the recap.
+ */
+export function scrambleTeamHandicapFor(game: DotGame & { scramble_handicap?: string | null }, allPlayers: ShapePlayer[], key: string): number | null {
+  const f = (game.foursomes || []).find((x) => [...x.a, ...x.b].includes(key));
+  if (!f) return null;
+  const members = (f.a.includes(key) ? f.a : f.b).map((k) => allPlayers.find((x) => pkey(x) === k)).filter((x): x is ShapePlayer => !!x);
+  const th = scrambleTeamHandicap(members.map((m) => chBasis(m, game.course_par, game.holes_meta?.length)), game.scramble_handicap === "gross");
+  return th ? th.total : null;
 }

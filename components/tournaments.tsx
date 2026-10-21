@@ -1,4 +1,6 @@
 "use client";
+import { ScrambleView } from "@/components/game/scramble-view";
+import type { ScrambleGroup } from "@/lib/scramble-teams";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
@@ -313,6 +315,10 @@ function CreateGame({
   // 18 / front nine / back nine. Applies to every format, not just alternate shot.
   const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
+  // 211.1: scramble settings — the mode (one leaderboard / team v team) follows fmtFamily.
+  const [scrambleTeamSize, setScrambleTeamSize] = useState<2 | 3 | 4>(4);
+  const [scrambleHandicap, setScrambleHandicap] = useState<"usga" | "gross">("usga");
+  const [scrambleMinDrives, setScrambleMinDrives] = useState<number | null>(null);
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
   const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" ? "match" : "stroke");
   const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
@@ -515,6 +521,7 @@ function CreateGame({
     setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2); setTeamColours(d.teamColors ?? [null, null]);
+    if (d.scrambleTeamSize) setScrambleTeamSize(d.scrambleTeamSize); if (d.scrambleHandicap) setScrambleHandicap(d.scrambleHandicap); setScrambleMinDrives(d.scrambleMinDrives ?? null);
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
@@ -545,11 +552,11 @@ function CreateGame({
     ...toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
       teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, teamColors: teamColours, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
+      skinsMode, team1, team2, teamColors: teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -672,6 +679,7 @@ function CreateGame({
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
+        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize, handicap: scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field" } : undefined,
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
@@ -1130,6 +1138,7 @@ function CreateGame({
             <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stableford"))} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
             <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stroke"))} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
             <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("skins"))} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("scramble"))} style={{ ...btn(gameType === "scramble"), flex: 1, minWidth: 100, fontSize: 13 }}>Scramble</button>
           </div>
         ) : (
           <>
@@ -1147,6 +1156,7 @@ function CreateGame({
                 <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("alt_shot"))} style={{ ...btn(gameType === "alt_shot"), flex: 1, minWidth: 150, fontSize: 13 }}>Alternate Shot</button>
                 <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 150, fontSize: 13 }}>Trifecta</button>
                 <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 150, fontSize: 13 }}>Skins</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("scramble"))} style={{ ...btn(gameType === "scramble"), flex: 1, minWidth: 150, fontSize: 13 }}>Scramble</button>
               </div>
             )}
           </>
@@ -1162,10 +1172,39 @@ function CreateGame({
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : gameType === "trifecta"
             ? "Each 2-v-2 foursome plays for three points per hole: the two singles (each player vs their opposite number) plus a team point. Three points per hole riding on every group — set up the foursomes after creating."
+            : gameType === "scramble"
+            ? (fmtFamily === "match"
+              ? "Every player hits, the team picks the best shot and everyone plays from there — one score per team. Teams play team v team, hole by hole. Scramble rounds don't count toward handicaps."
+              : "Every player hits, the team picks the best shot and everyone plays from there — one score per team. Every team on one leaderboard. Scramble rounds don't count toward handicaps.")
             : gameType === "stroke"
             ? "Everyone plays their own ball; lowest total wins. Pick gross or net below — every stroke counts, with no Stableford safety net."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
+        {gameType === "scramble" && (
+          <div data-scramble-settings style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM SIZE</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+              {([2, 3, 4] as const).map((n) => <button key={n} onClick={() => setScrambleTeamSize(n)} style={{ ...btn(scrambleTeamSize === n), flex: 1, fontSize: 13 }}>{n} players</button>)}
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+              <button onClick={() => setScrambleHandicap("usga")} style={{ ...btn(scrambleHandicap === "usga"), flex: 1, fontSize: 13 }}>USGA allowance</button>
+              <button onClick={() => setScrambleHandicap("gross")} style={{ ...btn(scrambleHandicap === "gross"), flex: 1, fontSize: 13 }}>Gross only</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {scrambleHandicap === "gross" ? "No handicap strokes — lowest team score wins."
+                : scrambleTeamSize === 4 ? "Team handicap: 25% of the lowest course handicap, 20%, 15% and 10% of the highest, added up — strokes taken hole by hole."
+                : scrambleTeamSize === 3 ? "Team handicap: 30% of the lowest course handicap, 20% and 10% of the highest, added up — strokes taken hole by hole."
+                : "Team handicap: 35% of the lower course handicap plus 15% of the higher — strokes taken hole by hole."}
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>DRIVE REQUIREMENT</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} onClick={() => setScrambleMinDrives(n)} style={{ ...btn(scrambleMinDrives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}
+            </div>
+            {scrambleMinDrives ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Each player&apos;s tee shot must be used at least {scrambleMinDrives} times. The scorecard reminds the team — it never blocks a score.</div> : null}
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Make the teams after creating — Setup → Teams balances them by handicap.</div>
+          </div>
+        )}
         {gameType === "trifecta" && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
@@ -1726,7 +1765,7 @@ function GameRoom({
       setPlayers(mergedPlayers);
       let offlineAlt = (snap.altShotScores || []) as AltShotScoreRow[];
       for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) {
-        if ((d.scoringVersion ?? 0) === (snap.game.scoring_version ?? 0)) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+        if ((d.scoringVersion ?? 0) === (snap.game.scoring_version ?? 0)) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes, d.driveKey);
       }
       setAltShotScores(offlineAlt);
       const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
@@ -1770,14 +1809,14 @@ function GameRoom({
     if (!postedError) setPostedRoundCount(postedRounds || 0);
     const { data: altRows, error: altError } = await supabase
       .from("game_alt_shot_scores")
-      .select("game_id,foursome_id,side,hole_index,strokes,updated_at,updated_by")
+      .select("game_id,foursome_id,side,hole_index,strokes,drive_key,updated_at,updated_by")
       .eq("game_id", gameId);
     if (request !== loadRequestRef.current || revision !== scoreRevisionRef.current || scoreWriterRef.current?.busy) return;
     let loadedAlt = (altRows || loadGameSnapshot(gameId)?.altShotScores || []) as AltShotScoreRow[];
     const altResetAt = (g as any)?.scores_reset_at ? new Date((g as any).scores_reset_at).getTime() : 0;
     for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) {
       if (((d.scoringVersion ?? 0) !== (g.scoring_version ?? 0)) || (altResetAt && d.at < altResetAt)) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
-      loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+      loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes, d.driveKey);
     }
     if (!altError) setAltShotScores(loadedAlt);
     // Defensively normalize: a freshly created or legacy game may have null
@@ -2256,8 +2295,28 @@ function GameRoom({
     window.setTimeout(() => setSyncState((cur) => cur === "synced" ? "idle" : cur), 1200);
   };
 
+  // 211.1: a scramble team's hole score and whose drive — the same path as alternate shot (saved on the phone
+  // first, retried when signal returns, primary-device and reset rules), through save_scramble_score_fenced.
+  const setScrambleSideHole = async (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null, driveKey: string | null) => {
+    if (!game || game.game_type !== "scramble" || !isPrimaryScoringDevice()) return;
+    setAltShotScores((rows) => upsertAltShotScoreLocal(rows, game.id, foursomeId, side, holeIdx, strokes, driveKey));
+    const draft = { foursomeId, side, holeIndex: holeIdx, strokes, driveKey, at: Date.now(), scoringVersion: game.scoring_version ?? 0 };
+    saveAltShotDraft(game.id, draft);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) { setSyncState("retry"); return; }
+    setSyncState("saving");
+    const { error } = await supabase.rpc("save_scramble_score_fenced", { p_game: game.id, p_version: draft.scoringVersion, p_foursome_id: foursomeId, p_side: side, p_hole_index: holeIdx, p_strokes: strokes, p_drive_key: driveKey });
+    if (isDeviceRejection(error)) markScoringDeviceRevoked();
+    if (error) {
+      if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      setSyncState("error"); return;
+    }
+    clearAltShotDraft(game.id, foursomeId, side, holeIdx);
+    setSyncState("synced");
+    window.setTimeout(() => setSyncState((cur) => cur === "synced" ? "idle" : cur), 1200);
+  };
+
   useEffect(() => {
-    if (!game || game.game_type !== "alt_shot") return;
+    if (!game || (game.game_type !== "alt_shot" && game.game_type !== "scramble")) return;
     const flush = async () => {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       if (!isPrimaryScoringDevice()) return;
@@ -2266,7 +2325,9 @@ function GameRoom({
       for (const d of drafts) {
         if (!isPrimaryScoringDevice()) return;
         if (((d.scoringVersion ?? 0) !== (game.scoring_version ?? 0)) || (resetAt && d.at < resetAt)) { clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex); continue; }
-        const { error } = await supabase.rpc("save_alt_shot_score_fenced", { p_game: game.id, p_version: d.scoringVersion ?? (game.scoring_version ?? 0), p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
+        const { error } = game.game_type === "scramble"
+          ? await supabase.rpc("save_scramble_score_fenced", { p_game: game.id, p_version: d.scoringVersion ?? (game.scoring_version ?? 0), p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes, p_drive_key: d.driveKey ?? null })
+          : await supabase.rpc("save_alt_shot_score_fenced", { p_game: game.id, p_version: d.scoringVersion ?? (game.scoring_version ?? 0), p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
         if (isDeviceRejection(error)) markScoringDeviceRevoked();
         if (error?.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); return; }
         if (!error) clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex);
@@ -2527,6 +2588,22 @@ function GameRoom({
   // Team formats edit a visible slot rather than a player's standalone group row.
   // Save the player leaving and the player entering in one RPC so there is never
   // a transient duplicate in two group dropdowns.
+  // 211.1: scramble teams — saved as the game's groups, each group's players in one tee group (so scoring
+  // permissions and markers work as for alternate shot). Not once scoring has started.
+  const setScrambleTeams = async (groups: ScrambleGroup[]) => {
+    if (!game || game.game_type !== "scramble") return;
+    if (players.some((p) => (p.scores || []).some((x) => x != null)) || game.alt_shot_scoring_started_at) { notifyError("Teams can't change once scoring has started."); return; }
+    const { error } = await supabase.from("games").update({ foursomes: groups }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the teams — please try again."); return; }
+    const assignments = players.map((p) => {
+      const gi = groups.findIndex((gr) => gr.a.includes(pkey(p)) || gr.b.includes(pkey(p)));
+      return { player: p.id, group: gi >= 0 ? gi + 1 : null };
+    });
+    const { error: tErr } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: assignments });
+    if (tErr) notifyError("Teams saved, but the tee groups didn't update — please try again.");
+    await load();
+  };
+
   const setTeamGroupSlot = async (current: Player | null, next: Player | null, group: number) => {
     if (!game || current?.id === next?.id) return;
     const changes = [
@@ -3484,7 +3561,7 @@ function GameRoom({
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
-          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, isCompetitionGame: !!competitionLink,
+          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, onSetScrambleTeams: setScrambleTeams, isCompetitionGame: !!competitionLink,
           courseTees,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
@@ -3720,6 +3797,7 @@ function GameRoom({
             onSetHole={setPlayerHole}
             altShotScores={altShotScores}
             onSetAltShotScore={setAltShotSideHole}
+            onSetScrambleScore={setScrambleSideHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
             groupLocked={viewedGroupLocked || gameEnded}
@@ -3756,6 +3834,8 @@ function GameRoom({
           mode={roomTab}
           onChanged={load}
         />
+      ) : game.game_type === "scramble" && roomTab === "play" ? (
+        <ScrambleView game={game} players={players} altShotScores={altShotScores} />
       ) : game.game_type === "skins" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <SkinsView game={game} players={players} user={user}
           isCreator={game.created_by === user.id} mode={roomTab} onChanged={load} />

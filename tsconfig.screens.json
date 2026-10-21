@@ -37,6 +37,8 @@
     "lib/app-links.test.ts",
     "lib/resume-game.test.ts",
     "lib/scramble.test.ts",
+    "lib/scramble-teams.test.ts",
+    "lib/scramble-render.test.tsx",
     "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",
     "components/team-colour-dot.tsx",

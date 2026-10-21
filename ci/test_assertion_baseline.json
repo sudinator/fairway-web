@@ -1,5 +1,5 @@
 {
-  "total": 439517,
+  "total": 439545,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -25,7 +25,7 @@
     "finish-gaps": 18,
     "format picker": 25,
     "format rules": 34,
-    "game type coverage": 89,
+    "game type coverage": 100,
     "game-create": 64,
     "game-utils": 21,
     "golf/computeBetting tests": 53,
@@ -47,6 +47,7 @@
     "player-scoring": 63,
     "round stat completeness": 8,
     "scoring matrix": 3698,
+    "scramble screens": 17,
     "screen render": 67,
     "season entry": 6,
     "season wrapped": 12,

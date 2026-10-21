@@ -39,6 +39,12 @@ gated: set[str] = set()
 for e in editors:
     gated |= set(re.findall(r'game_type === "(\w+)"', e))
 
+# 211.1: a format may have its OWN setup editor instead of the foursome editor — scramble's teams are built in
+# Setup → Teams (components/game/scramble-teams-builder.tsx), rendered by the setup workspace for that format.
+# Counted as reachable only if the workspace really renders that editor for it.
+workspace_src = (ROOT / "components/game/setup/game-setup-workspace.tsx").read_text()
+if "<ScrambleTeamsBuilder" in workspace_src and 'game.game_type === "scramble"' in workspace_src:
+    gated.add("scramble")
 missing = foursome_types - gated
 if missing:
     failures.append(

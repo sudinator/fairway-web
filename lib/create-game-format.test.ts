@@ -70,7 +70,12 @@ eq(formatReviewLabel({ ...base, gameType: "skins", teamMode: true, skinsTeamStyl
 
 const keys = reachableFormatKeys();
 // 183.0: Trifecta has one rule, so the two per-hole shapes (trifecta:best_ball:per_hole, trifecta:aggregate:per_hole) are gone: 19 → 17.
-eq(keys.length, 17, "current reachable format shape count");
+// 211.1: scramble adds two shapes — one leaderboard and team v team: 17 → 19.
+eq(keys.length, 19, "current reachable format shape count");
+eq(keys.includes("scramble:field") && keys.includes("scramble:match"), true, "both scramble shapes are reachable");
+eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Teams of 4 · Leaderboard · USGA handicaps", "scramble review (leaderboard)");
+eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 2, scrambleHandicap: "gross", scrambleMinDrives: 3, fmtFamily: "match" } as never), "Scramble · Teams of 2 · Team v team · Gross · each drive ×3", "scramble review (team v team, gross, drives)");
+eq(JSON.stringify(selectGuidedFamily({ ...base, gameType: "scramble", fmtFamily: "stroke", matchKind: "ind" } as never, "match")), JSON.stringify({ fmtFamily: "match", matchKind: "team" }), "switching family keeps a scramble (team v team)");
 eq(new Set(keys).size, keys.length, "historical keys unique");
 for (const required of ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "fourball:team:aggregate", "trifecta:aggregate", "skins:individual:split", "skins:team_11:carryover", "skins:team_2v2:aggregate:split"]) eq(keys.includes(required), true, `reachable ${required}`);
 

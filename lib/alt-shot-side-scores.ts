@@ -7,6 +7,8 @@ export type AltShotScoreRow = {
   side: AltShotScoreSide;
   hole_index: number;
   strokes: number | null;
+  /** 211.1: scramble — whose drive was used (a player key on that team). */
+  drive_key?: string | null;
   updated_at?: string | null;
   updated_by?: string | null;
 };
@@ -16,6 +18,8 @@ export type AltShotScoreDraft = {
   side: AltShotScoreSide;
   holeIndex: number;
   strokes: number | null;
+  /** 211.1: scramble — whose drive (undefined for alternate shot). */
+  driveKey?: string | null;
   at: number;
   scoringVersion?: number;
 };
@@ -43,12 +47,15 @@ export function upsertAltShotScoreLocal(
   side: AltShotScoreSide,
   holeIndex: number,
   strokes: number | null,
+  driveKey?: string | null,   // 211.1: scramble — undefined keeps the drive already recorded
 ): AltShotScoreRow[] {
+  const prev = rows.find((r) => r.foursome_id === foursomeId && r.side === side && r.hole_index === holeIndex);
   const rest = rows.filter((r) => !(r.foursome_id === foursomeId && r.side === side && r.hole_index === holeIndex));
   // Keep a null tombstone. Historical Alternate Shot games may still have the old
   // duplicated player score underneath; deleting the canonical row would let that
   // legacy value reappear after the user explicitly cleared the side score.
-  return [...rest, { game_id: gameId, foursome_id: foursomeId, side, hole_index: holeIndex, strokes }];
+  const drive = driveKey !== undefined ? driveKey : prev?.drive_key ?? null;
+  return [...rest, { game_id: gameId, foursome_id: foursomeId, side, hole_index: holeIndex, strokes, ...(drive ? { drive_key: drive } : {}) }];
 }
 
 const key = (gameId: string) => `bnn:altshot-side-drafts:${gameId}`;

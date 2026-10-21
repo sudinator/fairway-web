@@ -1,5 +1,7 @@
 "use client";
 
+import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
+import { scrambleSetupProblem, type ScrambleGroup } from "@/lib/scramble-teams";
 import React from "react";
 import { gameTypeLabel } from "@/lib/game-create";
 import { ShareLineupModal } from "@/components/share-card";
@@ -29,6 +31,8 @@ export type GameSetupWorkspaceProps = {
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
+  /** 211.1: save a scramble's teams (games.foursomes + tee groups). */
+  onSetScrambleTeams?: (groups: ScrambleGroup[]) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onSetLegConfig?: (cfg: LegConfig) => void;
@@ -63,6 +67,7 @@ export function GameSetupWorkspace({
   onChangeCourse,
   onSetTeeGroup,
   onSetTeamGroupSlot,
+  onSetScrambleTeams,
   onSetAltShotFirstDriver,
   onSetTrifectaPairing,
   onSetLegConfig,
@@ -109,7 +114,10 @@ export function GameSetupWorkspace({
   const cGrouped = players.filter((p) => p.tee_group != null).length;
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
-  const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
+  // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
+  const isScramble = game.game_type === "scramble";
+  const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field") : null;
+  const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
   const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
   const showMatchupsTab = usesMatchups && game.game_type !== "trifecta";
@@ -290,7 +298,7 @@ export function GameSetupWorkspace({
         <>
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {usesTeams && <button onClick={() => onSetupTabChange("teams")} style={{ ...btn(setupTab === "teams"), flex: 1, fontSize: 12 }}>Teams</button>}
-            {showMatchupsTab && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
+            {showMatchupsTab && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>{isScramble ? "Teams" : "Matchups"}</button>}
             {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
           {setupTab === "teams" && (isCompetitionGame ? (
@@ -309,7 +317,9 @@ export function GameSetupWorkspace({
             </div>
           ) : <OrganizerPanel section="teams" {...organizerPanelProps} />)}
           {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
-          {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
+          {setupTab === "matchups" && (isScramble
+            ? <div style={cardStyle}><ScrambleTeamsBuilder game={game} players={players} readOnly={anyScores || !onSetScrambleTeams} onSave={(g) => onSetScrambleTeams?.(g)} /></div>
+            : <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>)}
         </>
       )}
 
@@ -343,7 +353,7 @@ export function GameSetupWorkspace({
             {[
               [playersDone, "All players have tees and handicaps set"],
               [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
-              [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
+              [matchupsDone, isScramble ? (scrambleProblem ?? "Teams are complete") : usesMatchups ? "Matchups are complete" : "Matchups are not required"],
               [groupsDone, teamGroupFormat ? (game.game_type === "alt_shot" ? "Teams, groups and first tee players are set" : "Teams and groups define each Four-Ball match") : usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
             ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
           </div>

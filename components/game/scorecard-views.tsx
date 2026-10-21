@@ -1,4 +1,6 @@
 "use client";
+import { scrambleTeamsOf } from "@/lib/scramble-teams";
+import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { altShotDrivers } from "@/lib/alt-shot";
@@ -45,7 +47,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides, scrambleTeamHandicapFor } from "@/lib/game-shape";
 import { randomTeeGroups, teamGroupSlotChoices, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -78,7 +80,7 @@ import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
-export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, onSetScrambleScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
   readOnly?: boolean;
   game: Game; players: Player[];
   /** Every player in the game. `players` is filtered by tee group for DISPLAY; stroke bases
@@ -90,6 +92,8 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
   altShotScores?: AltShotScoreRow[];
   onSetAltShotScore?: (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null) => void;
+  /** 211.1: scramble — a team's hole score and whose drive (null keeps none). */
+  onSetScrambleScore?: (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null, driveKey: string | null) => void;
   teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
   onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
   onMarkOut?: (p: Player) => void;
@@ -167,6 +171,25 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
       if (rest.length && out.length) out.push({ type: "divider" });
       rest.forEach((p) => out.push({ type: "player", p }));
       return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
+    }
+    // SCRAMBLE (211.1): one ball per TEAM — each team in this group is one row, scores from game_alt_shot_scores.
+    if (gt === "scramble" && Array.isArray(game.foursomes)) {
+      const allTeams = scrambleTeamsOf(game.foursomes as never);
+      const out: Col[] = [];
+      for (const f of game.foursomes) {
+        if (![...f.a, ...f.b].some((uid) => ps.some((p) => pkey(p) === uid))) continue;
+        for (const which of ["a", "b"] as const) {
+          const members = (f[which] || []).map((uid) => strokePool.find((p) => pkey(p) === uid)).filter((p): p is Player => !!p);
+          if (!members.length) continue;
+          const teamName = allTeams.find((t) => t.groupId === f.id && t.side === which)?.name ?? "Team";
+          const gross = canonicalAltShotGross(altShotScores, f.id, which, meta.length, null);
+          if (out.length) out.push({ type: "divider" });
+          out.push({ type: "player", p: { ...members[0], display_name: teamName, scores: gross },
+            altSide: { name: teamName, memberIds: members.map((m) => m.id), memberNames: members.map((m) => m.display_name),
+              sideCh: scrambleTeamHandicapFor(game, strokePool, pkey(members[0])), receiving: false, matchStrokes: 0, foursomeId: f.id, side: which } });
+        }
+      }
+      if (out.length) return out;
     }
     // Alternate shot is one ball per side. Canonical scores now live in game_alt_shot_scores;
     // historical duplicated partner rows are read only as a backward-compatible fallback.
@@ -512,7 +535,9 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                     <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>
                     <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => shortOf(n)).join(" / ")}</div>
                     <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div>
-                    <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>
+                    {game.game_type === "scramble"
+                      ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}>{game.scramble_handicap === "gross" ? "gross" : `team hcp ${c.altSide.sideCh ?? "–"}`}</div>
+                      : <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>}
                   </>
                 ) : (
                   <>
@@ -603,10 +628,28 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             showPenalties={!sideCol?.altSide}
             scoreLocked={scoreLocked}
             lockedByName={markerName}
-            onPatch={(patch) => { if (sideCol?.altSide && edit.alt && onSetAltShotScore) { onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null); } else if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
+            onPatch={(patch) => { if (sideCol?.altSide && edit.alt && game.game_type === "scramble" && onSetScrambleScore) { onSetScrambleScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null, scrambleDriveAt(altShotScores, edit.alt.foursomeId, edit.alt.side, edit.holeIdx)); } else if (sideCol?.altSide && edit.alt && onSetAltShotScore) { onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null); } else if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
             onNext={scoreLocked ? () => { const ni = edit.holeIdx + 1; if (ni < meta.length) setEdit({ playerId: p.id, holeIdx: ni }); else setEdit(null); } : goNext}
             onClose={() => setEdit(null)}
-            belowPicker={<ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
+            belowPicker={game.game_type === "scramble" && sideCol?.altSide && edit.alt && game.scramble_min_drives && onSetScrambleScore ? (() => {
+              const team = sideCol.altSide!; const alt = edit.alt!;
+              const keys = team.memberIds.map((id) => { const q = strokePool.find((x) => x.id === id); return q ? pkey(q) : id; });
+              const drives = Array.from({ length: meta.length }, (_, hi) => scrambleDriveAt(altShotScores, alt.foursomeId, alt.side, hi));
+              const tally = driveTally(drives, keys, game.scramble_min_drives ?? null, meta.length);
+              const current = drives[edit.holeIdx];
+              return (
+                <div data-scramble-drives style={{ marginTop: 10 }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>WHOSE DRIVE?</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                    {keys.map((k, ki) => (
+                      <button key={k} type="button" onClick={() => onSetScrambleScore(alt.foursomeId, alt.side, edit.holeIdx, gross ?? null, current === k ? null : k)}
+                        style={{ ...btn(current === k), padding: "8px 12px", fontSize: 12 }}>{shortOf(team.memberNames[ki])} {tally.counts[k] ?? 0}{current === k ? " ✓" : ""}</button>
+                    ))}
+                  </div>
+                  {tally.needs.length ? <div style={{ color: C.gold, fontSize: 11.5, marginTop: 6 }}>{tally.needs.map((x) => `${shortOf(team.memberNames[keys.indexOf(x.player)])} needs ${x.more} more${x.short ? " — can no longer make it" : ""}`).join(" · ")} · {tally.needs[0].holesLeft} holes left</div> : null}
+                </div>
+              );
+            })() : <ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
           />
         );
       })()}
@@ -954,4 +997,9 @@ export function ShareControl({ game, onShare, token, path = "live", title, blurb
       )}
     </div>
   );
+}
+
+/** 211.1: whose drive a scramble team used on a hole (null when none recorded). */
+function scrambleDriveAt(rows: AltShotScoreRow[], foursomeId: string, side: AltShotScoreSide, holeIdx: number): string | null {
+  return rows.find((r) => r.foursome_id === foursomeId && r.side === side && r.hole_index === holeIdx)?.drive_key ?? null;
 }

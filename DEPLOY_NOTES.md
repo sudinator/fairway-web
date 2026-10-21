@@ -1,3 +1,21 @@
+## 211.1.261021 — Scramble
+
+The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.
+
+**Creating.** "Scramble" under Stroke play (every team on one leaderboard) and under Match play → Team (team v team) — the family decides how teams compete. Settings: team size 2 / 3 / 4; handicaps USGA allowance or gross only; drive requirement none / ×2 / ×3 / ×4 (default none). Review label, saved draft, state inventory.
+
+**Setup → Teams.** Balanced teams, snake-drafted by course handicap, as even as possible within 2–4 (10 players → 4, 3, 3); each team's handicap breakdown ("4.2 × 25% = 1.1 … 7.44, rounded to 7"); Move to… for any player; plain messages until setup is complete. Saving also sets tee groups, so scoring permissions and markers work as for alternate shot.
+
+**Scoring.** One row per team with its team handicap; strokes allotted hole by hole by stroke index (lib/game-shape dotStrokes → scrambleTeamHandicapFor, the one place a team handicap is worked out from a game); "Whose drive?" chips with counts and "needs 2 more — can no longer make it", only when a requirement is set; saved through alternate shot's path (on the phone first, retried offline, primary-device and reset rules) via save_scramble_score_fenced.
+
+**Results.** The game screen's leaderboard (net or gross to par, ties shared) or matches ("Team 1 2 UP thru 9"); the recap ("Team 2 wins the scramble — net 54", each player's "Your team (Team 2) finished 1st, net 54", the final leaderboard "net 54 (63 − 9)") in the app, on the shared image and in the round email, word for word; the public live page (0204 adds the scramble settings to its feed). All from lib/scramble-game — one implementation.
+
+**Never individual.** Scramble scores never post as anyone's round (post_game_rounds) and never feed individual statistics (lib/round-rules).
+
+Tests: lib/scramble.test.ts (USGA examples), scramble-teams, scramble-render (results, view, Teams screen, recap), game type coverage, create-game format (19 shapes), messy data. staging_seed_scramble.sql creates four test games on staging.
+
+Deploy: staging 0204 (and 0203) → code; production 0204 → merge.
+
 ## 211.0.261021 — Scramble foundations (not yet selectable)
 
 The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).

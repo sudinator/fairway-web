@@ -1,3 +1,7 @@
+## 211.1 — Live scramble (0204)
+
+get_live_scorecard's game block adds scramble_mode and scramble_handicap.
+
 ## 211.0 — Scramble (0203)
 
 games.scramble_team_size (2–4), scramble_mode (field | match), scramble_handicap (usga | gross), scramble_min_drives. game_alt_shot_scores.drive_key. save_scramble_score_fenced(game, version, foursome, side, hole, strokes, drive) — authenticated; save_scramble_side_score not callable directly.

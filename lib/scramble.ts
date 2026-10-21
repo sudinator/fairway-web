@@ -11,8 +11,8 @@
 //
 // A scramble score belongs to the team: it is never an individual round (no handicap posting, no personal stats —
 // lib/round-rules countsForIndividualStats).
-import { allocateStrokes } from "@/lib/golf";
-import { holeScore } from "@/lib/round-rules";
+import { allocateStrokes } from "./golf";
+import { holeScore } from "./round-rules";
 
 export type ScrambleTeamSize = 2 | 3 | 4;
 /** USGA recommended scramble allowances, lowest course handicap first. */

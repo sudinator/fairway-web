@@ -41,11 +41,14 @@ export type GamePayloadOpts = {
   // Games launched from a Ryder Cup session start with every optional side
   // contest off. Standalone games omit this flag and keep historical defaults.
   sideContestsEnabled?: boolean;
+  /** 211.1: scramble — team size 2–4, handicap USGA allowance or gross, optional drive requirement; the mode
+   *  (one leaderboard or team v team) follows the family it was created under. */
+  scramble?: { teamSize: 2 | 3 | 4; handicap: "usga" | "gross"; minDrives: number | null; mode: "field" | "match" };
 };
 
 // The auto-name label for a game type.
 export function gameTypeLabel(gameType: GameTypeOpt): string {
-  return gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
+  return gameType === "scramble" ? "Scramble" : gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
 }
 
 // The automatic game name, "Format / Course / Date", used when the organizer leaves the name blank.
@@ -101,12 +104,17 @@ export function buildGamePayload(o: GamePayloadOpts) {
             { key: "B", name: o.team2.trim() || "Team 2", ...(o.teamColors?.[1] ? { color: o.teamColors[1] } : {}) },
           ]
         : null,
-    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
+    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || o.gameType === "scramble" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
     team_score_mode: o.gameType === "trifecta" || o.gameType === "fourball" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? o.teamScoreMode : "best_ball",
     trifecta_scoring: o.gameType === "trifecta" ? "match" : null, // one Trifecta rule (183.0)
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
-    leg_config: o.gameType === "alt_shot" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,
+    leg_config: o.gameType === "alt_shot" || o.gameType === "scramble" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,
+    // 211.1: scramble settings (null for every other format)
+    ...(o.gameType === "scramble" ? {
+      scramble_team_size: o.scramble?.teamSize ?? 4, scramble_handicap: o.scramble?.handicap ?? "usga",
+      scramble_min_drives: o.scramble?.minDrives ?? null, scramble_mode: o.scramble?.mode ?? "field",
+    } : {}),
     flight_mode: o.flightsSupported ? o.flightMode : "off",
     flights: o.flightMode === "oneoff" && o.flightsSupported ? o.flightBands : null,
   };
