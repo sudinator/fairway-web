@@ -1,3 +1,11 @@
+## 211.6 — Player cards server-only (0208)
+
+player_cards: player_cards_read_own (select own); member writes revoked; written by /api/member-stats (service role).
+
+## 211.5 — Policy review fixes (0207)
+
+game_players guests_added_by_players / guests_removed_by_players (plays_with_guest, not after end); member_badges read-only (member_badges_read_own); activity_log_insert_by_meaning; log_club_deleted trigger on groups (action club_deleted).
+
 ## 211.4 — Member privileges (0206)
 
 Non-core tables: authenticated privileges only where a permissive rule for that command exists (SELECT also where any write rule exists); guard_active_account on every member-writable table except profiles, notifications, push_subscriptions, daily_active, feedback; default privileges revoke tables from authenticated; can_decide_signup not callable by members.

@@ -1,3 +1,11 @@
+## 211.6.261021 — Badges and player cards worked out by the server (0208)
+
+Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.
+
+## 211.5.261021 — Access-rule review fixes (0207) and the cross-club isolation suite
+
+**Review of every access rule (132) and member-callable privileged function (160)** — owner decisions Oct 21.
+
 ## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
 
 **Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.

@@ -14,6 +14,9 @@ how anything works, **open the file and read it** — never answer from assumpti
 - STAGING: deliberately sends no push notifications — no notifications webhook in staging's Supabase (owner, Oct 2026). Not a fault; don't "fix" it.
 - RULE (owner, Oct 21 2026 — no compromise): THE SECURITY CONTRACT (ci/check_security_contract.py) runs on every release against the fully migrated database: RLS on every table; every policy, table grant and privileged-function EXECUTE matches ci/security_contract.json; every SECURITY DEFINER pins search_path; every member-writable table has guard_active_account (exceptions: profiles, notifications). A permission change is recorded deliberately with --update and reviewed in the release diff.
 - RULE: from 0205, a migration touching security (privileged functions, grants, policies, RLS, triggers) carries `-- TESTS: ci/assert-….sql`, and that test runs in both chain checks.
+- RULE: ci/assert-club-isolation.sql proves cross-club isolation on every release; a new club-scoped table is added to it, with its positive control.
+- RULE: badges and player cards are computed by the SERVER (lib/member-stats-server, /api/member-stats) — never written by the phone (ci/check_server_only_stats.py). A calculated result that others rely on is the server's to compute.
+- LEARNING (211.5): before removing a write permission, search for writes across line breaks (a `.from("x")` on one line, `.upsert(` on the next).
 - RULE: a notification link must be one lib/app-links.ts understands (?tab=<APP_TABS>, club=, game=, tt=, wrapped=) — ci/assert-notification-links.sql checks every link the database sends.
 - RULE: statistics code decides what a round is ONLY through lib/round-rules (ci/check_round_rules.py).
 - RULE: every statistics feature runs through lib/test-fixtures/messy-games (lib/messy-data.test.ts) — add a case when real data surprises us.

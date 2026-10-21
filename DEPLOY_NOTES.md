@@ -1,3 +1,33 @@
+## 211.6.261021 — Badges and player cards worked out by the server (0208)
+
+Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.
+
+**Now the server works both out** from the rounds the database holds. The phone calls POST /api/member-stats with no numbers; the server confirms who is asking (active accounts only), loads their finished rounds exactly as the home screen does, and runs the SAME code (lib/badge-sync, lib/card-sync) — so the numbers are identical to before (lib/member-stats-server.ts, one implementation, no second copy of the handicap maths). 0208: members only read their player card. ci/check_server_only_stats.py: badge and card writing can only happen on the server.
+
+**Fixes a regression in 211.5 (my error).** 211.5's 0207 removed members' badge writes on the basis that "the app never writes badges" — but the phone did, in two places (home and the achievements screen), in statements split across lines that my search missed. With 211.5 alone, new badges would stop being awarded (existing ones kept). 211.6 moves both to the server, so badges are awarded again — now tamper-proof.
+
+Scorecards untouched: members still enter and correct their own scores exactly as before.
+
+Deploy: staging 0207 (if not yet) and 0208 → code; production 0207 and 0208 → merge. If 211.5 reached production, deploy this promptly.
+
+## 211.5.261021 — Access-rule review fixes (0207) and the cross-club isolation suite
+
+**Review of every access rule (132) and member-callable privileged function (160)** — owner decisions Oct 21.
+
+**0207 fixes:**
+1. **Guests in a game** — any member of the game's club could add a guest to, or delete a guest (scores and all) from, any of the club's games, even one they weren't playing in, even after it ended (the gap 0194 closed for editing). Now only players in the guest's own group, and never once the game has ended; the organizer keeps their rights.
+2. **Badges** — members could create their own badge rows by a direct request. Badges are awarded by the server when earned (the app never wrote them), so members now only read theirs.
+3. **The activity log, by meaning** — a member could log "approved a club" about themselves. System-admin acts are accepted only from a system admin; club-admin acts (role changed, member added / removed) only from that club's admin — adding or removing yourself (joining, leaving) stays yours; a member's own activity is theirs to log. A refused entry never breaks the action.
+4. **Club deletions are recorded by the database itself** ("club_deleted": who, which club, when) — the app's own entry comes after the club is gone, when the writer's authority can't be confirmed.
+
+**Reviewed and right as designed:** the course library and which clubs use which course (shared by design — owner); club members see each other's profiles, including email and phone (a social app — owner); notifications (yourself only), feedback, push subscriptions, games (your club), money (members read; creator or club admins write), rounds and holes (your own). Every member-callable privileged function checks properly (ownership, invites, the caller's own data, hourly-limited housekeeping, or system admin) — the merge preview requires an active system admin. Minor, left as is: person_label shows a person's name (or the start of their email if unnamed) to anyone holding their account id.
+
+**Open question for the owner:** player cards — the phone writes each member's own stats card, so a member could inflate their own displayed stats with a direct request; a fix means the server computing the card.
+
+**ci/assert-club-isolation.sql — runs in both chain checks.** Club A's data in 24 club-scoped tables (games, players, guests, rounds, holes, events, expenses, shares, payers, settlements, allocations, money audit, activity, guests, tee times, RSVPs, invites, competitions, sessions, players, club reports, notifications, nudges, memberships); a Club B member must read, change and delete nothing, and add nothing to Club A; a suspended Club A member must be refused by the approved-accounts rule. Positive controls: the same statements as Club A's admin must work, so a wrong test can't pass by failing. Proven: a planted "anyone reads expenses" rule fails it.
+
+Deploy: staging 0207 → code; production 0207 → merge.
+
 ## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
 
 **Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.

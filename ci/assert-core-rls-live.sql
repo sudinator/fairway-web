@@ -31,7 +31,14 @@ begin
       ('activity_log'::text, 'admins read activity'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, '(EXISTS ( SELECT 1
      FROM profiles p
     WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))'::text, null::text),
-      ('activity_log'::text, 'insert own activity'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '(actor_id = auth.uid())'::text),
+      ('game_players'::text, 'guests_added_by_players'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, NULL::text, '((is_guest = true) AND (user_id IS NULL) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1
+   FROM games g
+  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM ''ended''::text)))))'::text),
+      ('game_players'::text, 'guests_removed_by_players'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'DELETE'::text, '((is_guest = true) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1
+   FROM games g
+  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM ''ended''::text)))))'::text, NULL::text),
+      ('activity_log'::text, 'activity_log_insert_by_meaning'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, NULL::text, '((actor_id = auth.uid()) AND ((action <> ALL (ARRAY[''admin_entered_group''::text, ''admin_exited_group''::text, ''admin_game_repair''::text, ''group_approved''::text, ''group_declined''::text, ''group_merged''::text, ''group_set_default''::text, ''group_invites_revoked''::text, ''group_deleted''::text, ''handicap_changed''::text, ''player_deactivated''::text, ''player_reactivated''::text, ''approved''::text, ''course_edit_approved_global''::text, ''course_edit_kept_group_only''::text, ''course_edit_rejected_removed''::text, ''rejected_removed''::text, ''group_only''::text, ''course_api_manual_refresh''::text])) OR is_admin()) AND ((action <> ALL (ARRAY[''role_changed''::text, ''member_added''::text, ''member_removed''::text])) OR is_admin() OR ((group_id IS NOT NULL) AND is_group_admin(group_id, auth.uid())) OR ((action = ANY (ARRAY[''member_added''::text, ''member_removed''::text])) AND (target_user_id = auth.uid()))))
+'::text),
       ('favorite_courses'::text, 'admin sets vetted'::text, 'PERMISSIVE'::text, 'public'::text, 'UPDATE'::text, '(EXISTS ( SELECT 1
      FROM profiles p
     WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))'::text, 'true'::text),
@@ -51,14 +58,6 @@ begin
     WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))'::text, '(EXISTS ( SELECT 1
      FROM games g
     WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))'::text),
-      ('game_players'::text, 'members_add_guests'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, null::text, '((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1
-     FROM (games g
-       JOIN group_members gm ON ((gm.group_id = g.group_id)))
-    WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))'::text),
-      ('game_players'::text, 'members_delete_guests'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'DELETE'::text, '((is_guest = true) AND (EXISTS ( SELECT 1
-     FROM (games g
-       JOIN group_members gm ON ((gm.group_id = g.group_id)))
-    WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))'::text, null::text),
       ('game_players'::text, 'members_select_guests'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1
      FROM (games g
        JOIN group_members gm ON ((gm.group_id = g.group_id)))

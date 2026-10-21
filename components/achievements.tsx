@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole } from "@/lib/golf";
 import { BADGES, BADGE_BY_KEY, badgeEvidence, visibleWallBadges, FIRST_SUPERSEDED_BY } from "@/lib/badges";
-import { syncBadges } from "@/lib/badge-sync";
 import { Eyebrow } from "@/components/ui";
 
 const supabase = createClient();
@@ -61,7 +60,8 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
     (async () => {
       // Sync first so the round link is attached before anything renders — this is
       // why opening Profile always shows the earning round, with no stale first click.
-      if (rounds && rounds.length) { try { await syncBadges(supabase, user.id, rounds); } catch {} }
+      // 211.6: badges are awarded by the SERVER from this member's rounds (lib/member-stats-server).
+      if (rounds && rounds.length) { try { await fetch("/api/member-stats", { method: "POST" }); } catch {} }
       if (!alive) return;
       const { data } = await supabase
         .from("member_badges")

@@ -204,17 +204,17 @@
   "push_subscriptions": "a pending member must be able to receive 'you're approved' (0206)"
  },
  "policies": {
+  "activity_log.activity_log_insert_by_meaning": {
+   "check": "((actor_id = auth.uid()) AND ((action <> ALL (ARRAY['admin_entered_group'::text, 'admin_exited_group'::text, 'admin_game_repair'::text, 'group_approved'::text, 'group_declined'::text, 'group_merged'::text, 'group_set_default'::text, 'group_invites_revoked'::text, 'group_deleted'::text, 'handicap_changed'::text, 'player_deactivated'::text, 'player_reactivated'::text, 'approved'::text, 'course_edit_approved_global'::text, 'course_edit_kept_group_only'::text, 'course_edit_rejected_removed'::text, 'rejected_removed'::text, 'group_only'::text, 'course_api_manual_refresh'::text])) OR is_admin()) AND ((action <> ALL (ARRAY['role_changed'::text, 'member_added'::text, 'member_removed'::text])) OR is_admin() OR ((group_id IS NOT NULL) AND is_group_admin(group_id, auth.uid())) OR ((action = ANY (ARRAY['member_added'::text, 'member_removed'::text])) AND (target_user_id = auth.uid()))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
   "activity_log.admins read activity": {
    "check": null,
    "cmd": "r",
    "roles": "public",
    "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
-  },
-  "activity_log.insert own activity": {
-   "check": "(actor_id = auth.uid())",
-   "cmd": "a",
-   "roles": "public",
-   "using": null
   },
   "banned_emails.banned_emails_admin_select": {
    "check": null,
@@ -486,6 +486,18 @@
    "roles": "public",
    "using": "(auth.uid() = user_id)"
   },
+  "game_players.guests_added_by_players": {
+   "check": "((is_guest = true) AND (user_id IS NULL) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM 'ended'::text)))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "game_players.guests_removed_by_players": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "((is_guest = true) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM 'ended'::text)))))"
+  },
   "game_players.guests_scored_by_their_group": {
    "check": "((is_guest = true) AND plays_with_guest(game_id, tee_group))",
    "cmd": "w",
@@ -503,18 +515,6 @@
    "cmd": "w",
    "roles": "authenticated",
    "using": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))"
-  },
-  "game_players.members_add_guests": {
-   "check": "((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))",
-   "cmd": "a",
-   "roles": "authenticated",
-   "using": null
-  },
-  "game_players.members_delete_guests": {
-   "check": null,
-   "cmd": "d",
-   "roles": "authenticated",
-   "using": "((is_guest = true) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))"
   },
   "game_players.members_select_guests": {
    "check": null,
@@ -774,10 +774,10 @@
    "roles": "public",
    "using": "is_admin()"
   },
-  "member_badges.member_badges_own": {
-   "check": "(user_id = auth.uid())",
-   "cmd": "*",
-   "roles": "public",
+  "member_badges.member_badges_read_own": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
    "using": "(user_id = auth.uid())"
   },
   "money_audit.money_audit_select": {
@@ -816,10 +816,10 @@
    "roles": "public",
    "using": "is_admin()"
   },
-  "player_cards.player_cards_own": {
-   "check": "(user_id = auth.uid())",
-   "cmd": "*",
-   "roles": "public",
+  "player_cards.player_cards_read_own": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
    "using": "(user_id = auth.uid())"
   },
   "profiles.insert own profile": {
@@ -1029,11 +1029,11 @@
   "authenticated:group_members": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:groups": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:holes": "DELETE,INSERT,SELECT,UPDATE",
-  "authenticated:member_badges": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:member_badges": "SELECT",
   "authenticated:money_audit": "SELECT",
   "authenticated:notifications": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:nudges": "SELECT",
-  "authenticated:player_cards": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:player_cards": "SELECT",
   "authenticated:profiles": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:push_subscriptions": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:rounds": "DELETE,INSERT,SELECT,UPDATE",
