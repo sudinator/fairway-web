@@ -1,4 +1,5 @@
 "use client";
+import { ScrambleSettings, type ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
@@ -115,6 +116,8 @@ export type OrganizerPanelProps = {
   onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
   onSetFormat?: (f: GameType) => Promise<void>;
+  /** 211.7: a scramble's own settings (Setup → Format); clearTeams when the change no longer fits the teams. */
+  onSetScrambleSettings?: (patch: ScramblePatch, clearTeams: boolean) => Promise<void>;
   courseHoles?: { n?: number | null; hole_number?: number | null; par?: number | null; si?: number | null }[];
   onSetMatchLength?: (length: MatchLength) => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
@@ -145,6 +148,7 @@ export function OrganizerPanel({
   onAddGuest,
   onSetAllowance,
   onSetFormat,
+  onSetScrambleSettings,
   courseHoles = [],
   onSetMatchLength,
   onSetTeamScoreMode,
@@ -667,7 +671,10 @@ export function OrganizerPanel({
               </div>
             )}
 
-            {game.status !== "ended" && onSetFormat && (
+            {game.status !== "ended" && game.game_type === "scramble" && onSetScrambleSettings && (
+              <ScrambleSettings game={game} locked={anyScores} onSave={onSetScrambleSettings} />
+            )}
+            {game.status !== "ended" && onSetFormat && game.game_type !== "scramble" && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
                 <FormatFamilySelector value={manageFormatFamily} onChange={setManageFormatFamily} />

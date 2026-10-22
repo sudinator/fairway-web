@@ -3,7 +3,8 @@ p = Path('components/game/setup/game-setup-workspace.tsx').read_text()
 required = [
     'DESTRUCTIVE ACTIONS',
     'These actions cannot be undone.',
-    'const structureSummary = usesTeams',
+    'const structureSummary = isScramble',   # 211.7: scramble's own summary first, then the team formats
+    ': usesTeams\n    ? `${cWithTeam}/${total} team assignments',
     'usesMatchups',
     '${cPlaced}/${total} matched',
     'sub: structureSummary',

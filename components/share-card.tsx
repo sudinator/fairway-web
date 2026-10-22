@@ -1,4 +1,5 @@
 "use client";
+import { ScrambleLineupCard, scrambleLineupText } from "@/components/game/scramble-lineup";
 import { teamColour } from "@/lib/game-colors";
 import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -442,9 +443,10 @@ export function ShareLineupModal({
   const [groupName, setGroupName] = useState<string>(myGroup || groupNames[0] || "Players");
   const groupRows = lineup.rows.filter((r) => (r.group || "Players") === groupName);
 
+  const isScramble = game.game_type === "scramble";   // 212.4: a scramble's line-up is by TEAM — the shared card
   const { busy, msg, shareImage, copyText } = useCardExport(
-    cardRef, `lineup-${groupName.replace(/\s+/g, "-").toLowerCase()}`, `Line-up — ${groupName}`,
-    () => buildLineupText(game, { ...lineup, rows: groupRows }),
+    cardRef, isScramble ? "lineup-scramble" : `lineup-${groupName.replace(/\s+/g, "-").toLowerCase()}`, isScramble ? "Line-up — scramble" : `Line-up — ${groupName}`,
+    () => (isScramble ? scrambleLineupText(game, players || []) : buildLineupText(game, { ...lineup, rows: groupRows })),
   );
 
   return (
@@ -458,15 +460,23 @@ export function ShareLineupModal({
 
         {/* Per-group card: one foursome per image. */}
         <div style={{ background: C.greenMid, borderRadius: 14, padding: "13px 16px" }}>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.6, fontWeight: 800 }}>GROUP CARD</div>
-          {groupNames.length > 1 ? (
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.6, fontWeight: 800 }}>{isScramble ? "TEAMS" : "GROUP CARD"}</div>
+          {isScramble ? (
+            <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px", marginTop: 10 }}>
+              <ScrambleLineupCard game={game} players={players || []} />
+              <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                Check your team and handicap before we start · <b style={{ color: C.gold }}>Birdie Num Num</b>
+              </div>
+            </div>
+          ) : null}
+          {!isScramble && groupNames.length > 1 ? (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
               {groupNames.map((g) => (
                 <button key={g} onClick={() => setGroupName(g)} style={{ ...btn(g === groupName), fontSize: 12, padding: "8px 12px" }}>{g}{g === myGroup ? " (you)" : ""}</button>
               ))}
             </div>
           ) : null}
-          <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px", marginTop: 10 }}>
+          {!isScramble ? <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px", marginTop: 10 }}>
             <div style={{ textAlign: "center", marginBottom: 12 }}>
               <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP · {groupName.toUpperCase()}</div>
               <div style={{ color: C.cream, fontSize: 19, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>{game.name || "Game"}</div>
@@ -515,9 +525,9 @@ export function ShareLineupModal({
             <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
               Check your handicap, tee and opponent before we start · <b style={{ color: C.gold }}>Birdie Num Num</b>
             </div>
-          </div>
+          </div> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Preparing…" : "📤 Share this group"}</button>
+            <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Preparing…" : isScramble ? "📤 Share the teams" : "📤 Share this group"}</button>
             <button onClick={copyText} style={{ ...btn(), flex: 1, fontSize: 13 }}>Copy as text</button>
           </div>
           {msg ? <div style={{ color: C.sage, fontSize: 11.5, textAlign: "center", marginTop: 6 }}>{msg}</div> : null}

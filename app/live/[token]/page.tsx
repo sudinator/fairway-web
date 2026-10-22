@@ -15,6 +15,10 @@ import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@
 import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
+import { scrambleLeaderboard, scrambleMatch } from "@/lib/scramble";
+import { liveScrambleTeamHandicap } from "@/lib/live-scramble";
+import { cupSideNames } from "@/lib/scramble-teams";
+import { scrambleMethodOf } from "@/lib/game-shape";
 import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
@@ -36,11 +40,13 @@ type LiveGame = {
   stroke_basis: "gross" | "net" | null;
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
+  /** 211.1 (0204): a scramble's competition and handicap — absent on older feeds. */
+  scramble_mode?: "field" | "match" | null; scramble_handicap?: "usga" | "gross" | "agreed" | null; scramble_team_size?: number | null;
 };
 type LiveData = {
   game: LiveGame; players: LivePlayer[];
   pairings: { a: string | null; b: string | null }[];
-  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[];
+  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[]; a_hcp?: number | null; b_hcp?: number | null }[];
   /** Alternate Shot side-owned scores (0151). Absent on payloads from before that migration. */
   alt_shot_scores?: LiveAltShotScore[];
 };
@@ -161,6 +167,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
+    case "scramble": return `Scramble — every player hits, the team picks the best shot and everyone plays from there, so each team posts one score per hole. ${game.scramble_mode === "match" ? "Teams play team v team, hole by hole." : "Every team on one leaderboard."} ${game.scramble_handicap === "gross" ? "Gross — no handicap strokes." : "Team handicaps use the USGA scramble allowance, with strokes taken hole by hole."}`;
     default: return "";
   }
 }
@@ -328,6 +335,8 @@ function Scorecard({ data }: { data: LiveData }) {
         {summaryText(game, ts?.rows)}
       </div>
 
+      {game.game_type === "scramble" && <LiveScramble data={data!} />}
+
       {ts && (
         <>
           <SectionTitle>Team scores</SectionTitle>
@@ -388,7 +397,14 @@ function Scorecard({ data }: { data: LiveData }) {
       <SkinsCarry game={game} players={players} meta={meta} allowance={allowance} />
 
       <SectionTitle>Scorecards</SectionTitle>
-      {game.game_type === "alt_shot" ? altSides.map((sd) => (
+      {game.game_type === "scramble" ? liveScrambleTeams(data).map((t) => {
+        // 212.1: one card per TEAM — players record no score of their own in a scramble. The team's strokes come
+        // from its team handicap, allotted by stroke index (lib/golf allocateStrokes), never a player's own.
+        const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si ?? null, par: m.par })), t.handicap);
+        const st = computeSideStat(t.scores, meta.map((m) => alloc[m.n] || 0), meta);
+        return <SideRow key={t.key} title={`${t.name} · ${t.members.join(", ")}`} colorDot={C.sage} stat={st} meta={meta}
+          right={st.thru ? String(st.gross) : "\u2014"} status={game.scramble_handicap === "gross" ? "gross" : `team hcp ${t.handicap}`} />;
+      }) : game.game_type === "alt_shot" ? altSides.map((sd) => (
         <SideRow key={sd.key} title={sd.title} colorDot={sd.color} stat={sd.stat} meta={meta}
           right={sd.stat.thru ? String(sd.stat.gross) : "\u2014"}
           status={sd.ch != null ? `side hcp ${Math.round(sd.ch)}` : ""} />
@@ -729,6 +745,70 @@ function SkinsCarry({ game, players, meta, allowance }: { game: LiveGame; player
         {carried.length > 0 && <div>Holes tied and carried: <b>{carried.join(", ")}</b>.</div>}
         {bigWins.map((b) => <div key={b.hole} style={{ marginTop: 4 }}>{b.who} took a <b>{b.value}-skin</b> pot on hole {b.hole}.</div>)}
         {res.carryAtEnd > 0 && <div style={{ marginTop: 4, color: C.faint }}>{res.carryAtEnd} skin{res.carryAtEnd === 1 ? "" : "s"} still in the pot.</div>}
+      </div>
+    </>
+  );
+}
+
+
+/** 211.1: a scramble on the live page — the same engine as the app (lib/scramble): the leaderboard or the matches. */
+/** 212.1: a scramble's teams on the live page — ONE calculation for the leaderboard and the team cards. */
+function liveScrambleTeams(data: LiveData) {
+  const { game, players, foursomes } = data;
+  const meta = game.holes_meta || [];
+  const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+  let n = 0;
+  return foursomes.flatMap((f) => (["a", "b"] as const).flatMap((side) => {
+    const ids = (f[side] || []).filter(Boolean) as string[];
+    if (!ids.length) return [];
+    n++;
+    // 212.3: the shared live rule (lib/live-scramble) — the Cup live page uses the same one
+    const handicap = liveScrambleTeamHandicap(game as never, ids.map((id) => byId[id]?.ch ?? 0), f[side === "a" ? "a_hcp" : "b_hcp"]);
+    const cup = cupSideNames(game as never);   // 212.5: a Ryder Cup scramble's sides are the Cup's teams
+    return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: cup ? cup[side === "a" ? 0 : 1] : `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
+      scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
+  }));
+}
+
+function LiveScramble({ data }: { data: LiveData }) {
+  const { game, foursomes } = data;
+  const meta = game.holes_meta || [];
+  const gross = game.scramble_handicap === "gross";
+  const teams = liveScrambleTeams(data);
+  const toPar = (x: number) => (x === 0 ? "E" : x > 0 ? `+${x}` : String(x));
+  if (!teams.length) return null;
+  if (game.scramble_mode === "match") {
+    return (
+      <>
+        <SectionTitle>Scramble matches</SectionTitle>
+        <div style={{ background: C.card, borderRadius: 14, color: C.ink, padding: 14 }} data-live-scramble>
+          {foursomes.map((f) => {
+            const a = teams.find((t) => t.groupId === f.id && t.side === "a"), b = teams.find((t) => t.groupId === f.id && t.side === "b");
+            if (!a || !b) return null;
+            const st = scrambleMatch(meta as never, a, b);
+            const leader = st.lead > 0 ? a.name : b.name;
+            const line = st.thru === 0 ? "Not started" : st.decided ? (st.lead === 0 ? "Halved" : `${leader} won ${st.result}`) : st.lead === 0 ? `All square thru ${st.thru}` : `${leader} ${Math.abs(st.lead)} UP thru ${st.thru}`;
+            return <div key={f.id} style={{ marginBottom: 10 }}><div style={{ fontWeight: 800, fontSize: 15 }}>{line}</div>
+              <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{a.name}: {a.members.join(" · ")} — {b.name}: {b.members.join(" · ")}</div></div>;
+          })}
+        </div>
+      </>
+    );
+  }
+  const board = scrambleLeaderboard(meta as never, teams, gross ? "gross" : "net");
+  return (
+    <>
+      <SectionTitle>{`Scramble leaderboard · ${gross ? "gross" : "net"}`}</SectionTitle>
+      <div style={{ background: C.card, borderRadius: 14, color: C.ink, padding: 14 }} data-live-scramble>
+        {board.map((r, i) => {
+          const t = teams.find((x) => x.key === r.key)!;
+          return (
+            <div key={r.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: i ? "1px solid #E8E2CE" : "none", padding: "8px 12px" }}>
+              <div><div style={{ fontWeight: 800, fontSize: 15 }}>{r.pos} · {r.name}</div><div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>{t.members.join(" · ")}{r.thru ? ` · thru ${r.thru}` : ""}</div></div>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800, color: i === 0 && r.thru ? C.green : C.faint }}>{r.thru ? toPar(gross ? r.grossToPar : r.netToPar) : "—"}</div>
+            </div>
+          );
+        })}
       </div>
     </>
   );

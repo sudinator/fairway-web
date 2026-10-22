@@ -11,6 +11,7 @@ import { rankTies, type Ranked, type Highlights } from "@/lib/game-highlights";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
 import { isFullCard } from "@/lib/round-rules";
+import { scrambleResults } from "@/lib/scramble-game";
 
 export type MatchRow = { winners: string[]; losers: string[]; result: string; team: string | null; halved: boolean; lead: number; thru: number };
 export type SkinRow = { name: string; holes: { n: number; value: number }[]; skins: number };
@@ -24,7 +25,9 @@ export type RecapSections = {
   leaderboard?: { basis: "net" | "gross" | "points"; rows: Ranked<{ name: string; score: number; gross: number }> };
   flights?: { name: string; players: number; rows: Ranked<{ name: string; score: number }> }[];
   pairs?: { gross: Ranked<{ names: string[]; score: number }>; net: Ranked<{ names: string[]; score: number }> };
-  individualStats: boolean;      // false for alternate shot (one ball per pair)
+  individualStats: boolean;      // false for alternate shot (one ball per pair) and scramble (one per team)
+  /** 211.1: a scramble's final leaderboard, or its matches. */
+  scramble?: { mode: "field" | "match"; gross: boolean; rows: { pos: string; name: string; members: string; gross: number; handicap: number; net: number; toPar: number; thru: number }[]; matches: string[] };
   tiles: Tile[];
 };
 
@@ -71,6 +74,16 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
     if (h.mostParsOrBetter) tiles.push({ label: "Most pars or better", who: h.mostParsOrBetter.names.join(" · "), what: String(h.mostParsOrBetter.count) });
   };
   const out: RecapSections = { sub: null, individualStats: true, tiles };
+  if (game.game_type === "scramble") {
+    // 211.1: team scores only — no individual stats; the same results as the game screen.
+    const r = scrambleResults(game, players, altShotScores);
+    out.individualStats = false;
+    out.scramble = { mode: r.mode, gross: r.gross, matches: r.matches.map((m) => `${m.line} (${m.a.name} v ${m.b.name})`),
+      rows: r.board.filter((b) => b.thru > 0).map((b) => ({ pos: b.pos, name: b.name, members: (r.teams.find((x) => x.key === b.key)?.memberNames || []).join(", "),
+        gross: b.gross, handicap: b.handicap, net: b.net, toPar: r.gross ? b.grossToPar : b.netToPar, thru: b.thru })) };
+    out.sub = r.mode === "match" ? `Team v team scramble · ${r.matches.length} match${r.matches.length === 1 ? "" : "es"}` : `${r.teams.length} teams · ${r.gross ? "gross" : "net, USGA scramble allowance"}`;
+    return out;
+  }
   const dayWinner = teamResult?.winner ?? "A";
   let best: { who: string[]; down: number; vs: string[]; halved: boolean } | null = null;
   const consider = (c: typeof best) => { if (c && (!best || c.down > best.down)) best = c; };

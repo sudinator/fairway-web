@@ -31,11 +31,13 @@ done
 echo "applied $n migrations"
 # Same files, same order as ci/test_fresh_db_rebuild.sh (the concurrency test needs the CLI stack and is skipped).
 for f in assert-historical-baseline-columns assert-core-rls-live assert-core-rls-behavior assert-profile-privileges \
-         assert-personal-round-persistence assert-primary-scoring-device assert-notifications assert-course-reviews assert-admin-course-status assert-push-device-health assert-live-lineup assert-no-rpc-overloads assert-readable-live-links assert-finish-game-clocks assert-season-wrapped assert-security-posture assert-course-freshness-integrity assert-game-structure-atomic assert-course-versions assert-course-status-view assert-game-recap-announce assert-account-signup assert-account-merge assert-no-app-call-to-revoked assert-season-wrapped-active assert-course-selective assert-round-email assert-guest-scoring assert-club-reports assert-merge-guards assert-active-accounts assert-email-announce assert-club-requests assert-support-visit assert-notification-links assert-admin-reads-clubs assert-game-reset-fencing \
+         assert-personal-round-persistence assert-primary-scoring-device assert-notifications assert-course-reviews assert-admin-course-status assert-push-device-health assert-live-lineup assert-no-rpc-overloads assert-readable-live-links assert-finish-game-clocks assert-season-wrapped assert-security-posture assert-course-freshness-integrity assert-game-structure-atomic assert-course-versions assert-course-status-view assert-game-recap-announce assert-account-signup assert-account-merge assert-no-app-call-to-revoked assert-season-wrapped-active assert-course-selective assert-round-email assert-guest-scoring assert-club-reports assert-merge-guards assert-active-accounts assert-email-announce assert-club-requests assert-support-visit assert-notification-links assert-admin-reads-clubs assert-scramble assert-anon-boundary assert-member-privileges assert-policy-review assert-club-isolation assert-game-reset-fencing \
          assert-game-round-manual-handicap assert-match-length-roundtrip assert-course-api-checks; do
   psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$ROOT/ci/$f.sql" >/dev/null 2>/tmp/bnn_local_chain.err || { echo "FAILED $f.sql"; grep -i "ERROR\|DETAIL\|CONTEXT" /tmp/bnn_local_chain.err | head -5; exit 1; }
   echo "ok   $f.sql"
 done
+# 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot.
+python3 "$ROOT/ci/check_security_contract.py" "$DB_URL" || { echo "FAILED security contract"; exit 1; }
 for mode_and_exit in ok:0 midquota:2 drift:1 ledgerdown:2 freshness:0; do
   HARNESS_DB_URL="$DB_URL" HARNESS_MODE="${mode_and_exit%%:*}" HARNESS_EXPECT_EXIT="${mode_and_exit##*:}" COURSE_CHECK_BUDGET=5 \
     node "$ROOT/ci/external/contract-harness.mjs" >/dev/null || { echo "FAILED harness $mode_and_exit"; exit 1; }

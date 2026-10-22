@@ -74,4 +74,51 @@ function click(container: HTMLElement, label: string, exact = false) {
   v.unmount();
 }
 
+// 211.7 — a SCRAMBLE: opening the Teams step from the control center must land on scramble's own Teams editor
+// (it opened the two-team editor, so the owner had no way to make teams), and making teams must save.
+{
+  const sg = { ...game, game_type: "scramble", teams: null, foursomes: [], scramble_team_size: null, scramble_mode: "field", scramble_handicap: "usga" } as unknown as Game;
+  const sp = players.map((p) => ({ ...p, team: null, tee_group: null })) as Player[];
+  let saved: unknown = null;
+  function ScrambleHarness() {
+    const [tab, setTab] = React.useState<SetupTab>("overview");
+    return <GameSetupWorkspace game={sg} players={sp} setupTab={tab} onSetupTabChange={setTab} organizerPanelProps={{} as any} onSetGameDate={async()=>{}}
+      courseOptions={[]} onChangeCourse={async()=>{}} onSetTeeGroup={async()=>{}} onSetTeamGroupSlot={async()=>{}} onSetScrambleTeams={async (g) => { saved = g; }}
+      getTeeGroupPolicy={()=>({ blocked:false })} onRandomizeGroups={async()=>{}} canRandomize randomizeReason=""
+      randomizing={false} groupOverflow={[]} isCompetitionGame={false} />;
+  }
+  const v = renderToDom(<ScrambleHarness />);
+  ok(text(v.container).includes("Make the teams — Setup → Teams."), "control center: the Teams step says teams are still to make");
+  click(v.container, "Teams & groups");
+  const shown = text(v.container);
+  ok(!!v.container.querySelector("[data-scramble-teams]"), "the Teams step opens scramble's own Teams editor");
+  ok(!shown.includes("RYDER CUP TEAMS"), "…not the two-team editor");
+  click(v.container, "4 players");
+  ok(Array.isArray(saved) && (saved as unknown[]).length === 2, `balanced teams of 4 saves two teams of four (got ${JSON.stringify(saved)?.slice(0, 80)})`);
+  v.unmount();
+}
+
+// 212.5 — a RYDER CUP scramble picks each match's players like four-ball / alternate shot / trifecta: Setup → Groups,
+// N slots per Cup side (here 3 v 3), not scramble's separate Teams editor.
+{
+  const cg = { ...game, game_type: "scramble", teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }], foursomes: [], scramble_team_size: 3, scramble_mode: "match", scramble_handicap: "usga" } as unknown as Game;
+  const cp = Array.from({ length: 6 }, (_, k) => ({ ...players[k % players.length], id: `cp${k}`, user_id: `cu${k}`, display_name: `P${k}`, team: k < 3 ? "A" : "B", tee_group: null, no_show: false })) as Player[];
+  function CupHarness() {
+    const [tab, setTab] = React.useState<SetupTab>("overview");
+    return <GameSetupWorkspace game={cg} players={cp} setupTab={tab} onSetupTabChange={setTab} organizerPanelProps={{} as any} onSetGameDate={async()=>{}}
+      courseOptions={[]} onChangeCourse={async()=>{}} onSetTeeGroup={async()=>{}} onSetTeamGroupSlot={async()=>{}} onSetScrambleTeams={async()=>{}}
+      getTeeGroupPolicy={()=>({ blocked:false })} onRandomizeGroups={async()=>{}} onBalanceMatchups={async()=>{}} canRandomize randomizeReason=""
+      randomizing={false} groupOverflow={[]} isCompetitionGame />;
+  }
+  const v = renderToDom(<CupHarness />);
+  ok(text(v.container).includes("Ryder Cup · 3 v 3"), "control center: the format reads Ryder Cup · 3 v 3");
+  click(v.container, "Teams & groups");
+  click(v.container, "Groups");
+  const shown = text(v.container);
+  ok(shown.includes("exactly 3 of each") && !v.container.querySelector("[data-scramble-teams]"), `Groups: the slot builder, 3 per side — not the scramble Teams editor (${shown.slice(0, 160)})`);
+  const reds = v.container.querySelectorAll('select[aria-label^="Group 1 Reds player"]').length, blues = v.container.querySelectorAll('select[aria-label^="Group 1 Blues player"]').length;
+  ok(reds === 3 && blues === 3, `three menus per side in Group 1 (Reds ${reds}, Blues ${blues})`);
+  v.unmount();
+}
+
 report("game setup workspace navigation");

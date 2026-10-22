@@ -4,6 +4,7 @@ import { shortNamer } from "./short-names";
 // Unit-tested in game-shape.test.ts.
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact, trifectaSingles } from "./golf";
 import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
+import { scrambleTeamHandicap, customAllowanceFor } from "./scramble";
 
 /**
  * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
@@ -11,11 +12,11 @@ import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
  * The single ball is what drives everything else — a side has one score rather than two, and the
  * handicap allowance is 50% of the partners' combined Course Handicaps.
  */
-export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot";
+export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot" | "scramble";
 
 /** Every game type, for exhaustiveness tests and for building pickers without hardcoding a list. */
 export const GAME_TYPES: GameType[] = [
-  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot",
+  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot", "scramble",
 ];
 export type TeamDef = { key: string; name: string };
 export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null };
@@ -46,8 +47,8 @@ export type GameShape = {
   usesTeams: boolean;
   usesMatchups: boolean;
   usesFoursomes: boolean;
-  dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side";
-  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
+  dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side" | "scramble_team";
+  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "scramble" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
 };
 export function shapeOf(game: ShapeGame): GameShape {
   const gt = game.game_type;
@@ -56,14 +57,19 @@ export function shapeOf(game: ShapeGame): GameShape {
   const skinsStyle: GameShape["skinsStyle"] =
     gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
   const usesFoursomes =
-    gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || skinsStyle === "team_2v2";
+    gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || gt === "scramble" || skinsStyle === "team_2v2";
   // The global Teams step applies when two named teams actually exist. New Four-Ball and
   // Alternate Shot games always have two global teams; legacy games without them retain
   // their historical local-foursome matchup structure for backward compatibility.
   const usesTeams =
-    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot");
+    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot"
+      // 212.5: a Ryder Cup scramble has the Cup's two teams; its matches are built from groups, like four-ball
+      || gt === "scramble");
   const usesMatchups =
-    gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+    gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null)
+    // 211.1: scramble teams (2–4 players each) are built in setup's Teams editor, which sits in the matchups slot —
+    // except a Ryder Cup scramble (two teams), built in Groups like the other Cup team formats (212.5).
+    || (gt === "scramble" && !teams2);
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"
@@ -72,6 +78,10 @@ export function shapeOf(game: ShapeGame): GameShape {
       // handicap (50% of the partners combined) and strokes are the difference between SIDES.
       : gt === "alt_shot"
       ? "alt_shot_side"
+      // Scramble (211.1): each TEAM has one handicap (USGA scramble allowances, lib/scramble), its strokes
+      // allotted hole by hole by stroke index — per team, not relative to another side.
+      : gt === "scramble"
+      ? "scramble_team"
       : gt === "fourball" || gt === "trifecta"
       ? "relative_foursome"
       : gt === "skins"
@@ -228,6 +238,20 @@ export function dotStrokes(
     return matchStrokesFor(mine, si, allocHoles(game));
   }
 
+  // SCRAMBLE (211.1). One ball per TEAM, so the team has one handicap (USGA scramble allowances) and its strokes
+  // fall on the holes its stroke index gives — every player on the team shows the same dots.
+  if (basis === "scramble_team") {
+    // 212.6: the engine's own allocation (lib/golf allocateStrokes, as the leaderboard uses) — signed, so a PLUS team
+    // gives strokes back on the easiest holes (matchStrokesFor only gives, so a plus team's card showed none).
+    const total = scrambleTeamHandicapFor(game, allPlayers, key);
+    if (total == null || si == null) return 0;
+    const holes = allocHoles(game);
+    if (!holes) return 0;
+    const alloc = allocateStrokes(holes as never, total);
+    const hole = holes.find((h) => h.stroke_index === si);
+    return hole ? alloc[hole.hole_number] || 0 : 0;
+  }
+
   // ALTERNATE SHOT. One ball per side, so the SIDE has one handicap — 50% of the two partners'
   // combined — and strokes are the difference between the two sides, the lower playing scratch.
   // Both partners receive the same dots: the dot means "this SIDE gets a stroke here".
@@ -297,7 +321,7 @@ export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): n
 // Every surface renders from this function, so a dot cannot exist without a basis and a label, and
 // the same basis is the same colour everywhere. `dotStrokes`/`fullStrokes` remain for callers that
 // only need one number; both are expressible through this.
-export type StrokeBasisKey = "course" | "opponent" | "group_low" | "alt_side";
+export type StrokeBasisKey = "course" | "opponent" | "group_low" | "alt_side" | "team";
 export type StrokeSet = {
   key: StrokeBasisKey;
   /** Strokes this player RECEIVES on this hole under this basis. */
@@ -370,6 +394,13 @@ export function strokeSets(
 
   // Alternate shot: one ball per side, so there is no individual score to give a course-handicap
   // dot any meaning here. The side handicap is a pair basis with SIDES instead of players.
+  // 212.1: a scramble's ONLY strokes are the team's (USGA allowance or agreed) — nobody plays their own ball, so a
+  // player's own course handicap is meaningless here. Without this case the default below drew the first player's
+  // personal strokes on the team's row (a 12 handicap showed a stroke on every hole and two on some).
+  if (basis === "scramble_team") {
+    const n = dotStrokes(game, p, si, allPlayers);   // signed: negative = a plus team gives a stroke back here
+    return [{ key: "team", strokes: Math.max(0, n), gives: Math.max(0, -n), label: "your team" }];
+  }
   if (basis === "alt_shot_side") {
     return [{ key: "alt_side", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your side" }];
   }
@@ -410,4 +441,30 @@ export function strokeSets(
 
   // Stableford, stroke play, individual skins: the course handicap IS the scoring basis.
   return [course];
+}
+
+/**
+ * A scramble team's handicap (211.1) — the team holding `key`, from its players' unrounded course handicaps and the
+ * USGA allowances (lib/scramble); 0 for a gross game; null if the player isn't on a team of 2–4. The ONE place a
+ * scramble team handicap is worked out from a game, for the scorecard, the leaderboard and the recap.
+ */
+export function scrambleTeamHandicapFor(game: DotGame & { scramble_handicap?: string | null; scramble_team_size?: number | null; scramble_allowance?: unknown }, allPlayers: ShapePlayer[], key: string): number | null {
+  const f = (game.foursomes || []).find((x) => [...x.a, ...x.b].includes(key));
+  if (!f) return null;
+  const side = f.a.includes(key) ? "a" : "b";
+  const method = scrambleMethodOf(game);
+  if (method === "gross") return 0;                                   // legacy games created with gross: scratch
+  if (method === "agreed") {                                          // 211.9: entered by the organizer; blank = scratch
+    const entered = (f as { a_hcp?: unknown; b_hcp?: unknown })[side === "a" ? "a_hcp" : "b_hcp"];
+    return typeof entered === "number" && Number.isFinite(entered) ? entered : 0;
+  }
+  const members = (side === "a" ? f.a : f.b).map((k) => allPlayers.find((x) => pkey(x) === k)).filter((x): x is ShapePlayer => !!x);
+  const th = scrambleTeamHandicap(members.map((m) => chBasis(m, game.course_par, game.holes_meta?.length)), false, customAllowanceFor(game.scramble_allowance, members.length));
+  return th ? th.total : null;
+}
+
+/** 211.9: the method a scramble game uses — captains only always uses agreed handicaps. */
+export function scrambleMethodOf(game: { scramble_handicap?: string | null; scramble_team_size?: number | null }): "usga" | "agreed" | "gross" {
+  if (game.scramble_team_size === 1) return "agreed";
+  return game.scramble_handicap === "agreed" ? "agreed" : game.scramble_handicap === "gross" ? "gross" : "usga";
 }

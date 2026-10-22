@@ -65,4 +65,20 @@ eq(buildClubReport("Empty", period, []).games, 0, "an empty period is an empty r
   eq(rep.mostImproved, null, "a missing index is skipped — no fake '20 → 0'");
   ok(!JSON.stringify(rep.mostNetBirdies || {}).includes("Alt Pair"), "alternate-shot pair scores never become individual awards");
 }
+// 212.2 — one-ball formats count for games, rounds and attendance (each player carries the side's / team's card),
+// and feed no individual statistic. Before, their players' empty cards meant they counted nowhere.
+{
+  const H = Array.from({ length: 18 }, (_, k) => ({ n: k + 1, par: 4, si: k + 1 }));
+  const mkP = (id: string, name: string) => ({ id, game_id: "sg", user_id: id, display_name: name, scores: Array(18).fill(null), course_handicap: 10, course_handicap_source: "manual", no_show: false });
+  const rows = (fid: string, side: "a" | "b", gid: string) => Array.from({ length: 18 }, (_, i) => ({ game_id: gid, foursome_id: fid, side, hole_index: i, strokes: 4 }));
+  const sg = { id: "sg", game_type: "scramble", played_at: period.from, course: "Oak", course_par: 72, holes_meta: H, scramble_handicap: "usga", foursomes: [{ id: "t1", name: "Team 1", a: ["s1", "s2"], b: [] }] };
+  const ag = { id: "ag", game_type: "alt_shot", played_at: period.from, course: "Oak", course_par: 72, holes_meta: H, foursomes: [{ id: "m1", name: "Match 1", a: ["a1", "a2"], b: ["a3", "a4"] }] };
+  const rep = buildClubReport("Test Club", period, [
+    { game: sg as never, players: [mkP("s1", "S One"), mkP("s2", "S Two")] as never, altScores: rows("t1", "a", "sg") as never },
+    { game: ag as never, players: [mkP("a1", "A1"), mkP("a2", "A2"), mkP("a3", "A3"), mkP("a4", "A4")] as never, altScores: [...rows("m1", "a", "ag"), ...rows("m1", "b", "ag")] as never },
+  ]) as any;
+  const rounds = rep.rounds ?? rep.totals?.rounds;
+  if (rounds !== 6) throw new Error(`a scramble (2 players) and an alternate-shot game (4) count 6 rounds (got ${rounds}; report keys: ${Object.keys(rep).join(",")})`);
+  if (rep.bestGross || rep.bestNet) throw new Error("one-ball formats must not produce a best gross / best net");
+}
 console.log("club-report tests passed");

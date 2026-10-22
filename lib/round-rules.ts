@@ -10,7 +10,8 @@
 //   * a FULL CARD has a real score on every hole of the game — needed for anything compared stroke for stroke
 //     (best gross / best net, the recap's finishers, net position);
 //   * a missing handicap index is missing — never 0;
-//   * alternate-shot scores belong to the pair, so they feed no individual scoring statistic.
+//   * alternate-shot scores belong to the pair, and scramble scores to the team, so they feed no individual
+//     scoring statistic (and the database never posts them as anyone's round — post_game_rounds_internal).
 
 type Scores = readonly (number | string | null | undefined)[] | null | undefined;
 
@@ -50,9 +51,9 @@ export function handicapReading(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Whether a format's scores belong to individual players (alternate shot: to the pair). */
+/** Whether a format's scores belong to individual players (alternate shot: to the pair; scramble: to the team). */
 export function countsForIndividualStats(gameType: string | null | undefined): boolean {
-  return gameType !== "alt_shot";
+  return gameType !== "alt_shot" && gameType !== "scramble";
 }
 
 /** The one sentence that says shortened rounds don't count toward exceptional play (210.6, owner) — used by the

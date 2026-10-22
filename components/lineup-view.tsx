@@ -9,6 +9,8 @@ import { buildLineup, strokesPhrase, type LineupRow } from "@/lib/lineup";
 import { lineupTitle, fmtMatchDate } from "@/lib/lineup-meta";
 import { APP_VERSION } from "@/lib/app-version";
 import { tint } from "@/lib/team-tint";
+import type { Game, Player } from "@/lib/game-types";
+import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 
 // Where the "open the app" button leads depends on the platform, and the page must say the truth:
 //   ios-browser  — iOS gives web apps no way to claim their links, so a tap from WhatsApp always lands
@@ -57,6 +59,10 @@ export function LiveLineupView({ data, err, platform = "other", teamStyle = "ban
       </div>
     );
   }
+
+  // 212.1: a scramble's line-up is its TEAMS — nobody plays their own ball, so individual playing handicaps mean
+  // nothing; each team's handicap (USGA allowance with the game's percentages, or agreed) is what counts.
+  if (data.game_type === "scramble") return shell(<ScrambleLineup data={data} />);
 
   const lineup = buildLineup(data, data.players || [], data.course_tees || []);
   const pct = lineup.allowancePct;
@@ -174,4 +180,11 @@ function OpenAppButton({ code, platform }: { code?: string | null; platform: Lin
     );
   }
   return <a href={href} style={style} data-open-app="navigate">Open in Birdie Num Num</a>;
+}
+
+
+/** 212.4: the scramble line-up — the shared card (components/game/scramble-lineup), by team, inputs and method. */
+function ScrambleLineup({ data }: { data: any }) {
+  const game = { ...data, id: data.id ?? "lineup", game_type: "scramble", holes_meta: data.holes_meta || [], foursomes: data.foursomes || [], played_at: data.played_on || data.played_at } as Game;
+  return <ScrambleLineupCard game={game} players={(data.players || []) as Player[]} />;
 }

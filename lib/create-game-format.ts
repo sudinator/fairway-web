@@ -14,6 +14,10 @@ export type CreateFormatState = {
    * saved games, which predate the setting, keep behaving as 18 holes.
    */
   matchLength?: MatchLength;
+  /** 211.1: scramble settings — optional so existing drafts load unchanged. */
+  scrambleTeamSize?: 1 | 2 | 3 | 4;
+  scrambleHandicap?: "usga" | "gross" | "agreed";
+  scrambleMinDrives?: number | null;
 };
 
 export type GuidedFormatState = CreateFormatState & {
@@ -28,6 +32,9 @@ export type CreateFormatPatch = Partial<GuidedFormatState>;
 // inventing a second flat format model. The React caller owns state setters and
 // allowance defaults; these helpers own which format-state fields each click changes.
 export function selectGuidedFamily(state: GuidedFormatState, family: "stroke" | "match"): CreateFormatPatch {
+  // 211.1: a scramble stays a scramble — under stroke play its teams share one leaderboard, under match play
+  // they play team v team.
+  if (state.gameType === "scramble") return family === "match" ? { fmtFamily: "match", matchKind: "team" } : { fmtFamily: "stroke" };
   if (family === "stroke") {
     if (state.gameType === "match" || state.gameType === "fourball" || state.gameType === "trifecta") {
       return { fmtFamily: "stroke", gameType: "stableford" };
@@ -45,7 +52,7 @@ export function selectGuidedFamily(state: GuidedFormatState, family: "stroke" | 
   return { fmtFamily: "match" };
 }
 
-export function selectGuidedStrokeFormat(gameType: "stableford" | "stroke" | "skins"): CreateFormatPatch {
+export function selectGuidedStrokeFormat(gameType: "stableford" | "stroke" | "skins" | "scramble"): CreateFormatPatch {
   if (gameType === "skins") return { gameType, teamMode: false, skinsTeamStyle: "head_to_head" };
   return { gameType };
 }
@@ -58,8 +65,9 @@ export function selectGuidedMatchKind(state: GuidedFormatState, kind: "ind" | "t
 }
 
 export function selectGuidedTeamFormat(
-  gameType: "fourball" | "trifecta" | "skins" | "alt_shot",
+  gameType: "fourball" | "trifecta" | "skins" | "alt_shot" | "scramble",
 ): CreateFormatPatch {
+  if (gameType === "scramble") return { gameType, teamMode: true };
   if (gameType === "skins") return { gameType, teamMode: true, skinsTeamStyle: "best_ball" };
   if (gameType === "fourball") return { gameType, teamMode: true };
   if (gameType === "alt_shot") {
@@ -96,6 +104,12 @@ export function formatReviewLabel(state: CreateFormatState): string {
       // difference from four-ball. The match length is worth showing because a nine is a genuinely
       // different match, not a shorter one.
       return `Alternate Shot · 2 v 2 Match${state.matchLength && state.matchLength !== "18" ? ` · ${state.matchLength === "front9" ? "Front 9" : "Back 9"}` : ""}`;
+    case "scramble": {
+      const size = state.scrambleTeamSize ?? 4;
+      const drives = state.scrambleMinDrives ? ` · each drive ×${state.scrambleMinDrives}` : "";
+      const method = size === 1 || state.scrambleHandicap === "agreed" ? "Agreed handicaps" : state.scrambleHandicap === "gross" ? "Gross" : "USGA handicaps";
+      return `Scramble · ${size === 1 ? "Captains only · " : ""}${(state as Partial<GuidedFormatState>).fmtFamily === "match" ? "Team v team" : "Leaderboard"} · ${method}${drives}`;
+    }
     case "skins": {
       const style = skinsStyleFromState(state);
       const styleLabel = style === "individual" ? "Individual" : style === "team_11" ? "1:1 Teams" : "2 v 2 Best-ball";
@@ -114,5 +128,7 @@ export function reachableFormatKeys(): string[] {
     out.push(`skins:team_11:${ties}`);
     for (const score of ["best_ball", "aggregate"] as const) out.push(`skins:team_2v2:${score}:${ties}`);
   }
+  // 211.1: scramble — one leaderboard (created under stroke play) or team v team (under match play).
+  out.push("scramble:field", "scramble:match");
   return out;
 }

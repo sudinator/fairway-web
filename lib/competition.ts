@@ -1,6 +1,7 @@
 import type { Game, Player } from "./game-types";
+import { scrambleMatchProgress } from "./scramble";
 import { altShotProgress, computeTrifecta, fourballProgress, matchCloseoutStatus, matchProgress, type FourballMember } from "./golf";
-import { pkey, chBasis, altShotSides } from "./game-shape";
+import { pkey, chBasis, altShotSides, scrambleTeamHandicapFor } from "./game-shape";
 import { readAltShotSideScores } from "./alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "./alt-shot-side-scores";
 
@@ -39,7 +40,9 @@ export type CompetitionSession = {
   id: string;
   competition_id: string;
   name: string;
-  format: "fourball" | "alt_shot" | "match" | "trifecta";
+  format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble";
+  /** 212.3 (0212): a scramble session's team size — both teams in every match have this many players. */
+  scramble_team_size?: number | null;
   session_order: number;
   play_date: string;
   points_per_match: number;
@@ -103,7 +106,7 @@ export function fmtCompetitionPoints(n: number): string {
 }
 
 export function competitionFormatLabel(format: CompetitionSession["format"]): string {
-  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : format === "trifecta" ? "Trifecta" : "Singles";
+  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : format === "trifecta" ? "Trifecta" : format === "scramble" ? "Scramble" : "Singles";
 }
 
 export function competitionSchedule(sessions: CompetitionSession[], tieRule: Competition["tie_rule"] = "shared"): CompetitionSchedule {
@@ -194,13 +197,21 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
     return out;
   }
 
-  if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta") return out;
+  if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble") return out;
   for (const f of game.foursomes || []) {
     if (!f.a.length || !f.b.length) continue;
     const ta = teamOf(f.a[0]), tb = teamOf(f.b[0]);
     if (!ta || !tb || ta === tb) continue;
     let st: { thru: number; lead: number; result: string; decided: boolean } | null = null;
-    if (game.game_type === "alt_shot") {
+    if (game.game_type === "scramble") {
+      // 212.3: team v team — each team's handicap by the game's method (the one rule, lib/game-shape), its canonical
+      // team scores, and the scramble engine's running lead through the shared closeout, as every other session.
+      const aH = scrambleTeamHandicapFor(game as never, players as never, f.a[0]) ?? 0;
+      const bH = scrambleTeamHandicapFor(game as never, players as never, f.b[0]) ?? 0;
+      st = matchCloseoutStatus(scrambleMatchProgress((game.holes_meta || []) as never,
+        { scores: canonicalAltShotGross(altShotScores, f.id, "a", holesCount, null), handicap: aH },
+        { scores: canonicalAltShotGross(altShotScores, f.id, "b", holesCount, null), handicap: bH }), holesCount);
+    } else if (game.game_type === "alt_shot") {
       if (f.a.length !== 2 || f.b.length !== 2) continue;
       const aRows = f.a.map(playerOf), bRows = f.b.map(playerOf);
       if (aRows.some((p) => !p) || bRows.some((p) => !p)) continue;

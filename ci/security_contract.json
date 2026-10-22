@@ -1,0 +1,1047 @@
+{
+ "definer_execute": {
+  "_money_snapshot(uuid)": "",
+  "accept_group_email_invites()": "authenticated",
+  "account_activity(uuid)": "authenticated",
+  "account_merge_preview(uuid,uuid)": "authenticated",
+  "account_merge_preview_for(uuid,uuid,uuid)": "",
+  "acknowledge_not_duplicate()": "authenticated",
+  "admin_club_requests()": "authenticated",
+  "admin_course_check_log(text,integer)": "authenticated",
+  "admin_course_status()": "authenticated",
+  "admin_delete_game(uuid)": "authenticated",
+  "admin_delete_group(uuid)": "authenticated",
+  "admin_delete_stale_game(uuid)": "authenticated",
+  "admin_end_game(uuid)": "authenticated",
+  "admin_enter_group(uuid,text)": "authenticated",
+  "admin_exit_group(uuid)": "authenticated",
+  "admin_game_oversight(text,text,integer)": "authenticated",
+  "admin_group_overview()": "authenticated",
+  "admin_list_users()": "authenticated",
+  "admin_member_signups()": "authenticated",
+  "admin_merge_group(uuid,uuid)": "authenticated",
+  "admin_merge_users(uuid,uuid)": "authenticated",
+  "admin_merge_users_preview(uuid,uuid)": "authenticated",
+  "admin_pending_signups()": "authenticated",
+  "admin_push_delivery_log(uuid,integer)": "authenticated",
+  "admin_push_device_stats()": "authenticated",
+  "admin_push_devices(text)": "authenticated",
+  "admin_reassign_organizer(uuid,uuid)": "authenticated",
+  "admin_reopen_game(uuid)": "authenticated",
+  "admin_reset_game(uuid)": "authenticated",
+  "admin_revoke_group_invites(uuid)": "authenticated",
+  "admin_sandbaggers()": "authenticated",
+  "admin_score_audit(uuid)": "authenticated",
+  "admin_set_banned(uuid,boolean)": "authenticated",
+  "admin_set_default_group(uuid)": "authenticated",
+  "admin_set_group_status(uuid,text)": "authenticated",
+  "admin_set_system_admin(uuid,boolean)": "authenticated",
+  "admin_set_test(uuid,boolean)": "authenticated",
+  "admin_stale_games()": "authenticated",
+  "admin_stat_users(text,text,date)": "authenticated",
+  "admin_unblock_email(text)": "authenticated",
+  "admin_wipe_group(uuid)": "authenticated",
+  "admin_wipe_user(uuid)": "authenticated",
+  "admit_signup(uuid,uuid)": "authenticated",
+  "announce_game_recap(uuid,text,jsonb,jsonb)": "",
+  "apply_course_freshness(uuid,bigint)": "authenticated",
+  "apply_course_freshness_selected_as(uuid,uuid,bigint,jsonb,text[],jsonb)": "",
+  "apply_game_structure(uuid,jsonb,jsonb,jsonb)": "authenticated",
+  "assert_primary_scoring_device()": "",
+  "begin_account(text)": "authenticated",
+  "begin_game_score_write(uuid,integer)": "authenticated",
+  "bump_ai_usage(text,integer,integer)": "authenticated",
+  "bump_rate_limit(text,integer,integer)": "authenticated",
+  "can_decide_signup(uuid,uuid)": "",
+  "can_manage_competition(uuid,uuid)": "authenticated",
+  "can_see_game(uuid)": "authenticated",
+  "change_game_course_before_scoring(uuid,text,integer,jsonb)": "authenticated",
+  "change_game_match_length_before_scoring(uuid,jsonb)": "authenticated",
+  "claim_course_api_checks(text[],integer,interval)": "",
+  "claim_game_recap(uuid,text)": "",
+  "claim_group_marker(uuid)": "authenticated",
+  "claim_marker(uuid)": "authenticated",
+  "claim_scoring_device(uuid,uuid,boolean)": "authenticated",
+  "clear_my_notifications()": "authenticated",
+  "club_pending_signups(uuid)": "authenticated",
+  "course_api_status(text[])": "authenticated",
+  "course_owner_groups(uuid)": "authenticated",
+  "course_review_detail(uuid)": "authenticated",
+  "course_tee_usage(uuid,integer)": "authenticated",
+  "create_game_contest(uuid,text,text,integer[],text,text)": "authenticated",
+  "create_group_invite_multi(uuid,text,integer,integer)": "authenticated",
+  "create_notification(uuid,text,uuid,text,text,text)": "authenticated",
+  "create_team_competition(uuid,text,text,date,text,text,jsonb)": "authenticated",
+  "decide_club_request(uuid,boolean)": "authenticated",
+  "delete_bet_expense_atomic(uuid,uuid)": "authenticated",
+  "delete_competition_session_game(uuid)": "authenticated",
+  "delete_game(uuid,boolean)": "authenticated",
+  "delete_game_contest(uuid)": "authenticated",
+  "delete_group_safely(uuid)": "authenticated",
+  "delete_team_competition(uuid)": "authenticated",
+  "disband_group_scoring(uuid)": "authenticated",
+  "dismiss_course_freshness(uuid,bigint,text)": "authenticated",
+  "due_club_report_emails(integer)": "",
+  "due_round_emails(integer)": "",
+  "end_user_sessions(uuid)": "",
+  "ensure_game_event(uuid)": "authenticated",
+  "expire_support_sessions(integer)": "authenticated",
+  "find_duplicate_member(uuid)": "",
+  "finish_game(uuid)": "authenticated",
+  "finish_game_and_post_rounds(uuid)": "authenticated",
+  "finish_stale_rounds()": "authenticated",
+  "finish_tee_group(uuid)": "authenticated",
+  "finish_tee_group_and_post(uuid)": "authenticated",
+  "get_admin_analytics()": "authenticated",
+  "get_admin_engagement()": "authenticated",
+  "get_admin_extra_stats()": "authenticated",
+  "get_admin_todos()": "authenticated",
+  "get_friction_items(text)": "authenticated",
+  "get_friction_rounds(uuid)": "authenticated",
+  "get_live_competition(text)": "anon,authenticated",
+  "get_live_lineup(text)": "anon,authenticated",
+  "get_live_scorecard(text)": "anon,authenticated",
+  "get_ops_metrics()": "authenticated",
+  "get_power_users(integer)": "authenticated",
+  "group_badges(uuid)": "authenticated",
+  "group_cards(uuid)": "authenticated",
+  "group_pay_roster(uuid)": "authenticated",
+  "group_roster(uuid)": "authenticated",
+  "is_admin()": "authenticated",
+  "is_game_member(uuid)": "authenticated",
+  "is_game_organizer(uuid)": "authenticated",
+  "is_group_admin(uuid,uuid)": "authenticated",
+  "is_group_member(uuid,uuid)": "authenticated",
+  "is_owner()": "authenticated",
+  "is_tee_group_marker(uuid,smallint)": "authenticated",
+  "is_test_group(uuid)": "authenticated",
+  "join_default_group(text)": "authenticated",
+  "join_group_to_marker(uuid)": "authenticated",
+  "link_tee_time_game(uuid,uuid)": "authenticated",
+  "lock_competition_schedule(uuid)": "authenticated",
+  "log_contest_entry(uuid,integer,uuid,uuid,text,numeric)": "authenticated",
+  "make_competition_slug(uuid)": "",
+  "make_lineup_slug(uuid)": "",
+  "mark_active(boolean)": "authenticated",
+  "mark_season_wrapped_seen(integer)": "authenticated",
+  "merge_accounts_as(uuid,uuid,uuid,text)": "",
+  "move_expense_event(uuid,uuid)": "authenticated",
+  "my_push_delivery_log(integer)": "authenticated",
+  "notify_signup_approvers(uuid,text,text)": "",
+  "pending_course_reviews()": "authenticated",
+  "person_label(uuid)": "authenticated",
+  "plays_with_guest(uuid,smallint)": "authenticated",
+  "post_game_rounds(uuid)": "authenticated",
+  "post_game_rounds_internal(uuid,boolean)": "",
+  "post_group_rounds(uuid,integer)": "authenticated",
+  "prune_push_subscriptions()": "",
+  "purge_old_notifications()": "",
+  "queue_club_reports(text,text,date,date)": "",
+  "record_club_report_email(uuid,uuid,text,text)": "",
+  "record_course_api_check(text,text,text,text,text,text,integer)": "authenticated",
+  "record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text,jsonb)": "",
+  "record_course_freshness_internal(uuid,jsonb,jsonb,boolean)": "",
+  "record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)": "",
+  "record_migration(text)": "",
+  "record_round_email(uuid,uuid,text,text,text,text)": "",
+  "record_settlement(uuid,uuid,uuid,integer,text,uuid,text,text,jsonb)": "authenticated",
+  "redeem_group_invite_multi(text)": "authenticated",
+  "reject_signup(uuid,text)": "authenticated",
+  "release_course_api_claims(text[],text)": "",
+  "release_group_marker(uuid)": "authenticated",
+  "release_marker(uuid)": "authenticated",
+  "remember_course_declines_as(uuid,uuid,jsonb)": "",
+  "remind_pending_signups()": "",
+  "remove_account(uuid,text)": "authenticated",
+  "rename_team_competition(uuid,text)": "authenticated",
+  "reopen_competition_schedule(uuid,text)": "authenticated",
+  "reset_game_scores(uuid)": "authenticated",
+  "resolve_friction(uuid,text,text,uuid,boolean)": "authenticated",
+  "restore_account(uuid)": "authenticated",
+  "restore_course_version(uuid,integer,text)": "authenticated",
+  "review_course_correction(uuid,text)": "authenticated",
+  "save_alt_shot_score_fenced(uuid,integer,text,text,integer,integer)": "authenticated",
+  "save_alt_shot_side_score(uuid,text,text,integer,integer)": "authenticated",
+  "save_bet_expense_atomic(uuid,uuid,uuid,uuid,text,integer,jsonb,jsonb)": "authenticated",
+  "save_club_report(uuid,jsonb)": "",
+  "save_expense_atomic(uuid,uuid,text,integer,text,uuid,jsonb,jsonb)": "authenticated",
+  "save_hole_scores(uuid,jsonb,jsonb,jsonb,jsonb,jsonb,timestamp with time zone,timestamp with time zone)": "authenticated",
+  "save_hole_stats(uuid,jsonb,jsonb,jsonb,jsonb)": "authenticated",
+  "save_scramble_score_fenced(uuid,integer,text,text,integer,integer,text)": "authenticated",
+  "save_scramble_side_score(uuid,text,text,integer,integer,text)": "",
+  "season_club_stats(integer)": "authenticated",
+  "season_wrapped_preview(integer)": "authenticated",
+  "security_posture()": "",
+  "send_nudge(uuid,uuid,text)": "authenticated",
+  "send_season_wrapped(integer)": "",
+  "send_tee_reminders()": "",
+  "set_account_suspended(uuid,boolean,text)": "authenticated",
+  "set_competition_share(uuid,boolean)": "authenticated",
+  "set_event_closed(uuid,boolean)": "authenticated",
+  "set_game_played_date(uuid,date)": "authenticated",
+  "set_game_share(uuid,boolean)": "authenticated",
+  "set_group_marker(uuid,boolean)": "authenticated",
+  "set_my_avatar(text)": "authenticated",
+  "set_my_scorer(uuid,boolean)": "authenticated",
+  "set_player_bets(uuid,boolean)": "authenticated",
+  "set_tee_group(uuid,smallint)": "authenticated",
+  "set_tee_groups(uuid,jsonb)": "authenticated",
+  "set_tee_time_captain(uuid,uuid)": "authenticated",
+  "shares_active_club(uuid)": "authenticated",
+  "submit_course_correction(uuid,uuid,text,text,jsonb,text,text)": "authenticated",
+  "sweep_friction(boolean)": "authenticated",
+  "sweep_stale_games()": "authenticated",
+  "update_game_contest(uuid,text,integer[],text,text)": "authenticated",
+  "upsert_tee_time_rsvp(uuid,uuid,text,text[])": "authenticated",
+  "valid_invite(text)": "",
+  "void_contest_entry(uuid,boolean)": "authenticated"
+ },
+ "guard_exceptions": {
+  "daily_active": "the activity ping (0206)",
+  "feedback": "anyone signed in can write to the owner, even while waiting (0206)",
+  "notifications": "members mark their own as read",
+  "profiles": "account fields locked by guard_account_fields (0189)",
+  "push_subscriptions": "a pending member must be able to receive 'you're approved' (0206)"
+ },
+ "policies": {
+  "activity_log.activity_log_insert_by_meaning": {
+   "check": "((actor_id = auth.uid()) AND ((action <> ALL (ARRAY['admin_entered_group'::text, 'admin_exited_group'::text, 'admin_game_repair'::text, 'group_approved'::text, 'group_declined'::text, 'group_merged'::text, 'group_set_default'::text, 'group_invites_revoked'::text, 'group_deleted'::text, 'handicap_changed'::text, 'player_deactivated'::text, 'player_reactivated'::text, 'approved'::text, 'course_edit_approved_global'::text, 'course_edit_kept_group_only'::text, 'course_edit_rejected_removed'::text, 'rejected_removed'::text, 'group_only'::text, 'course_api_manual_refresh'::text])) OR is_admin()) AND ((action <> ALL (ARRAY['role_changed'::text, 'member_added'::text, 'member_removed'::text])) OR is_admin() OR ((group_id IS NOT NULL) AND is_group_admin(group_id, auth.uid())) OR ((action = ANY (ARRAY['member_added'::text, 'member_removed'::text])) AND (target_user_id = auth.uid()))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "activity_log.admins read activity": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
+  },
+  "banned_emails.banned_emails_admin_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "club_reports.club_reports_members_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "((snapshot IS NOT NULL) AND (is_admin() OR is_group_member(group_id, auth.uid())))"
+  },
+  "competition_players.competition_players_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_players.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))"
+  },
+  "competition_players.competition_players_insert": {
+   "check": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_players.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "competition_players.competition_players_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_players.competition_id) AND (is_group_member(c.group_id, auth.uid()) OR is_admin()))))"
+  },
+  "competition_players.competition_players_update": {
+   "check": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_players.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_players.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))"
+  },
+  "competition_schedule_events.competition_schedule_events_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_schedule_events.competition_id) AND (is_group_member(c.group_id, auth.uid()) OR is_admin()))))"
+  },
+  "competition_sessions.competition_sessions_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_sessions.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))"
+  },
+  "competition_sessions.competition_sessions_insert": {
+   "check": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_sessions.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "competition_sessions.competition_sessions_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_sessions.competition_id) AND (is_group_member(c.group_id, auth.uid()) OR is_admin()))))"
+  },
+  "competition_sessions.competition_sessions_update": {
+   "check": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_sessions.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM competitions c\n  WHERE ((c.id = competition_sessions.competition_id) AND (is_admin() OR (is_group_member(c.group_id, auth.uid()) AND ((c.created_by = auth.uid()) OR is_group_admin(c.group_id, auth.uid())))))))"
+  },
+  "competitions.competition_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "(is_admin() OR (is_group_member(group_id, auth.uid()) AND ((created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()))))"
+  },
+  "competitions.competition_insert": {
+   "check": "((created_by = auth.uid()) AND (is_group_admin(group_id, auth.uid()) OR is_admin()))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "competitions.competition_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_group_member(group_id, auth.uid()) OR is_admin())"
+  },
+  "competitions.competition_update": {
+   "check": "(is_admin() OR (is_group_member(group_id, auth.uid()) AND ((created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()))))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "(is_admin() OR (is_group_member(group_id, auth.uid()) AND ((created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()))))"
+  },
+  "course_change_requests.course_change_requests_select_relevant": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_admin() OR is_group_member(group_id, auth.uid()))"
+  },
+  "course_freshness.course_freshness_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "true"
+  },
+  "course_versions.course_versions_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM favorite_courses fc\n  WHERE (fc.id = course_versions.course_id)))"
+  },
+  "daily_active.daily_active insert self": {
+   "check": "(user_id = auth.uid())",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "expense_audit.money_audit_insert": {
+   "check": "(EXISTS ( SELECT 1\n   FROM (expenses e\n     JOIN group_members gm ON ((gm.group_id = e.group_id)))\n  WHERE ((e.id = expense_audit.expense_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "expense_audit.money_audit_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM (expenses e\n     JOIN group_members gm ON ((gm.group_id = e.group_id)))\n  WHERE ((e.id = expense_audit.expense_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "expense_payers.money_payers_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM (expenses e\n     JOIN group_members gm ON ((gm.group_id = e.group_id)))\n  WHERE ((e.id = expense_payers.expense_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "expense_payers.money_payers_write": {
+   "check": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_payers.expense_id) AND ((e.created_by = auth.uid()) OR (EXISTS ( SELECT 1\n           FROM group_members gm\n          WHERE ((gm.group_id = e.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))))",
+   "cmd": "*",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_payers.expense_id) AND ((e.created_by = auth.uid()) OR (EXISTS ( SELECT 1\n           FROM group_members gm\n          WHERE ((gm.group_id = e.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))))"
+  },
+  "expense_shares.money_shares_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM (expenses e\n     JOIN group_members gm ON ((gm.group_id = e.group_id)))\n  WHERE ((e.id = expense_shares.expense_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "expense_shares.money_shares_write": {
+   "check": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_shares.expense_id) AND ((e.created_by = auth.uid()) OR (EXISTS ( SELECT 1\n           FROM group_members gm\n          WHERE ((gm.group_id = e.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))))",
+   "cmd": "*",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_shares.expense_id) AND ((e.created_by = auth.uid()) OR (EXISTS ( SELECT 1\n           FROM group_members gm\n          WHERE ((gm.group_id = e.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))))"
+  },
+  "expenses.money_expenses_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = expenses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "expenses.money_expenses_insert": {
+   "check": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = expenses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "expenses.money_expenses_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = expenses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "expenses.money_expenses_update": {
+   "check": null,
+   "cmd": "w",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = expenses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "favorite_courses.admin sets vetted": {
+   "check": "true",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
+  },
+  "favorite_courses.anyone reads courses": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(auth.uid() IS NOT NULL)"
+  },
+  "favorite_courses.authenticated_adds_global_courses": {
+   "check": "(auth.uid() IS NOT NULL)",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "favorite_courses.course_admin_updates_global_courses": {
+   "check": "is_admin()",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "is_admin()"
+  },
+  "favorite_courses.creator or admin deletes": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((user_id = auth.uid()) OR is_admin())"
+  },
+  "favorite_courses.favorite_courses_group_member_all": {
+   "check": "is_group_member(group_id, auth.uid())",
+   "cmd": "*",
+   "roles": "authenticated",
+   "using": "is_group_member(group_id, auth.uid())"
+  },
+  "favorite_courses.favorite_courses_select_global_non_deleted": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(COALESCE(deleted, false) = false)"
+  },
+  "favorite_courses.read vetted courses": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "((vetted = true) AND (auth.uid() IS NOT NULL))"
+  },
+  "feedback.feedback_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "feedback.feedback_insert": {
+   "check": "(auth.uid() = user_id)",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "feedback.feedback_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(is_admin() OR (auth.uid() = user_id))"
+  },
+  "feedback.feedback_update": {
+   "check": "is_admin()",
+   "cmd": "w",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "game_alt_shot_scores.game_alt_shot_scores_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_game_member(game_id) OR (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_alt_shot_scores.game_id) AND (g.created_by = auth.uid())))) OR is_admin())"
+  },
+  "game_contest_entries.gce_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM game_contests c\n  WHERE ((c.id = game_contest_entries.contest_id) AND can_see_game(c.game_id))))"
+  },
+  "game_contests.gc_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "can_see_game(game_id)"
+  },
+  "game_players.edit own scores": {
+   "check": "(auth.uid() = user_id)",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(auth.uid() = user_id)"
+  },
+  "game_players.guests_added_by_players": {
+   "check": "((is_guest = true) AND (user_id IS NULL) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM 'ended'::text)))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "game_players.guests_removed_by_players": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "((is_guest = true) AND plays_with_guest(game_id, tee_group) AND (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.status IS DISTINCT FROM 'ended'::text)))))"
+  },
+  "game_players.guests_scored_by_their_group": {
+   "check": "((is_guest = true) AND plays_with_guest(game_id, tee_group))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "((is_guest = true) AND plays_with_guest(game_id, tee_group))"
+  },
+  "game_players.join as self": {
+   "check": "((auth.uid() = user_id) AND is_group_member(( SELECT g.group_id\n   FROM games g\n  WHERE (g.id = game_players.game_id)), auth.uid()))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "game_players.marker_can_update_group_scores": {
+   "check": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))"
+  },
+  "game_players.members_select_guests": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))"
+  },
+  "game_players.organizer adds players": {
+   "check": "((auth.uid() = user_id) OR (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "game_players.organizer manages players": {
+   "check": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid()))))",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid()))))"
+  },
+  "game_players.organizer removes players": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((auth.uid() = user_id) OR (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))"
+  },
+  "game_players.see co-players": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_game_member(game_id)"
+  },
+  "game_players.system admins read game players": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "is_admin()"
+  },
+  "game_players.tee_group_marker_can_update": {
+   "check": "is_tee_group_marker(game_id, tee_group)",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "is_tee_group_marker(game_id, tee_group)"
+  },
+  "games.create games": {
+   "check": "((auth.uid() = created_by) AND ((group_id IS NULL) OR is_group_member(group_id, auth.uid())))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "games.find or member games": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(is_game_member(id) OR is_group_member(group_id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())"
+  },
+  "games.organizer deletes game": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(created_by = auth.uid())"
+  },
+  "games.update own games": {
+   "check": "((auth.uid() = created_by) AND ((group_id IS NULL) OR is_group_member(group_id, auth.uid())))",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(auth.uid() = created_by)"
+  },
+  "group_activity.money_activity_insert": {
+   "check": "((actor_user_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_activity.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "group_activity.money_activity_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_activity.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "group_course_overrides.group_course_overrides_select_member": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_group_member(group_id, auth.uid()) OR is_admin())"
+  },
+  "group_courses.add group_courses": {
+   "check": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_courses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "group_courses.ga delete group_courses": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(is_group_admin(group_id, auth.uid()) OR is_admin())"
+  },
+  "group_courses.read group_courses": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(auth.role() = 'authenticated'::text)"
+  },
+  "group_courses.remove group_courses": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_courses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "group_events.group_events_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((status = 'open'::text) AND ((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_events.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))"
+  },
+  "group_events.group_events_insert": {
+   "check": "((created_by = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_events.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "group_events.group_events_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_events.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "group_events.group_events_update": {
+   "check": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_events.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))",
+   "cmd": "w",
+   "roles": "public",
+   "using": "((status = 'open'::text) AND ((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_events.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))"
+  },
+  "group_guests.money_guests_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_guests.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "group_guests.money_guests_insert": {
+   "check": "((EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_guests.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))) AND (EXISTS ( SELECT 1\n   FROM group_members gs\n  WHERE ((gs.group_id = group_guests.group_id) AND (gs.user_id = group_guests.sponsor_user_id) AND (gs.status = 'active'::text)))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "group_guests.money_guests_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_guests.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "group_guests.money_guests_update": {
+   "check": "(EXISTS ( SELECT 1\n   FROM group_members gs\n  WHERE ((gs.group_id = group_guests.group_id) AND (gs.user_id = group_guests.sponsor_user_id) AND (gs.status = 'active'::text))))",
+   "cmd": "w",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_guests.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "group_invites.ga delete invites": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(is_group_admin(group_id, auth.uid()) OR is_admin())"
+  },
+  "group_invites.group_invites_admin_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "is_group_admin(group_id, auth.uid())"
+  },
+  "group_invites.group_invites_admin_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "is_group_admin(group_id, auth.uid())"
+  },
+  "group_invites.group_invites_admin_update": {
+   "check": "is_group_admin(group_id, auth.uid())",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "is_group_admin(group_id, auth.uid())"
+  },
+  "group_members.ga delete memberships": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(is_group_admin(group_id, auth.uid()) OR is_admin())"
+  },
+  "group_members.group_members_insert_admin_or_self": {
+   "check": "(is_admin() OR is_group_admin(group_id, auth.uid()) OR ((user_id = auth.uid()) AND (role = 'admin'::text) AND (status = 'active'::text) AND (EXISTS ( SELECT 1\n   FROM groups g\n  WHERE ((g.id = group_members.group_id) AND (g.created_by = auth.uid()))))))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "group_members.group_members_select_visible": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_group_member(group_id, auth.uid()) OR (user_id = auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))) OR is_admin())"
+  },
+  "group_members.group_members_update_admin_or_self_invite": {
+   "check": "(is_admin() OR is_group_admin(group_id, auth.uid()))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "(is_admin() OR is_group_admin(group_id, auth.uid()))"
+  },
+  "groups.admin updates groups": {
+   "check": "true",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
+  },
+  "groups.group admin can delete group": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(is_group_admin(id, auth.uid()) OR is_admin())"
+  },
+  "groups.groups_insert_authenticated": {
+   "check": "(created_by = auth.uid())",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "groups.groups_select_member": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(is_group_member(id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())"
+  },
+  "groups.groups_update_admin": {
+   "check": "is_group_admin(id, auth.uid())",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "is_group_admin(id, auth.uid())"
+  },
+  "holes.admin reads all holes": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "holes.admin updates all holes": {
+   "check": "is_admin()",
+   "cmd": "w",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "holes.own holes": {
+   "check": "(EXISTS ( SELECT 1\n   FROM rounds\n  WHERE ((rounds.id = holes.round_id) AND (rounds.user_id = auth.uid()))))",
+   "cmd": "*",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM rounds\n  WHERE ((rounds.id = holes.round_id) AND (rounds.user_id = auth.uid()))))"
+  },
+  "member_badges.member_badges_admin": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "member_badges.member_badges_read_own": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(user_id = auth.uid())"
+  },
+  "money_audit.money_audit_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = money_audit.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "notifications.create notifications": {
+   "check": "(user_id = auth.uid())",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "notifications.read own notifications": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(user_id = auth.uid())"
+  },
+  "notifications.update own notifications": {
+   "check": null,
+   "cmd": "w",
+   "roles": "public",
+   "using": "(user_id = auth.uid())"
+  },
+  "nudges.nudges_own": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "((sender_id = auth.uid()) OR (recipient_id = auth.uid()))"
+  },
+  "player_cards.player_cards_admin": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "player_cards.player_cards_read_own": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "(user_id = auth.uid())"
+  },
+  "profiles.insert own profile": {
+   "check": "(id = auth.uid())",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "profiles.read own, co-members, or admin": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "((id = auth.uid()) OR is_admin() OR shares_active_club(id))"
+  },
+  "profiles.update own or admin all": {
+   "check": "((id = auth.uid()) OR is_admin())",
+   "cmd": "w",
+   "roles": "public",
+   "using": "((id = auth.uid()) OR is_admin())"
+  },
+  "push_subscriptions.push_sub_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "(user_id = auth.uid())"
+  },
+  "push_subscriptions.push_sub_insert": {
+   "check": "(user_id = auth.uid())",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "push_subscriptions.push_sub_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(user_id = auth.uid())"
+  },
+  "push_subscriptions.push_sub_update": {
+   "check": "(user_id = auth.uid())",
+   "cmd": "w",
+   "roles": "public",
+   "using": "(user_id = auth.uid())"
+  },
+  "rounds.admin reads all rounds": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "rounds.admin updates all rounds": {
+   "check": "is_admin()",
+   "cmd": "w",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "rounds.own rounds": {
+   "check": "(auth.uid() = user_id)",
+   "cmd": "*",
+   "roles": "public",
+   "using": "(auth.uid() = user_id)"
+  },
+  "rounds.rounds_group_member_insert": {
+   "check": "((user_id = auth.uid()) AND is_group_member(group_id, auth.uid()))",
+   "cmd": "a",
+   "roles": "authenticated",
+   "using": null
+  },
+  "rounds.rounds_group_member_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "((user_id = auth.uid()) OR is_group_member(group_id, auth.uid()))"
+  },
+  "rounds.rounds_group_owner_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "authenticated",
+   "using": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))"
+  },
+  "rounds.rounds_group_owner_update": {
+   "check": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))",
+   "cmd": "w",
+   "roles": "authenticated",
+   "using": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))"
+  },
+  "schema_migrations.schema_migrations_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(auth.uid() IS NOT NULL)"
+  },
+  "score_audit.score_audit_no_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "is_admin()"
+  },
+  "settlement_allocations.settle_alloc_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlement_allocations.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "settlements.money_settle_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "settlements.money_settle_insert": {
+   "check": "((EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))) AND ((from_user_id = auth.uid()) OR (to_user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members ga\n  WHERE ((ga.group_id = settlements.group_id) AND (ga.user_id = auth.uid()) AND (ga.status = 'active'::text) AND (ga.role = ANY (ARRAY['admin'::text, 'owner'::text])))))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "settlements.money_settle_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "settlements.money_settle_update": {
+   "check": "((from_user_id = auth.uid()) OR (to_user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))",
+   "cmd": "w",
+   "roles": "public",
+   "using": "((from_user_id = auth.uid()) OR (to_user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "tee_time_rsvps.ttr_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM (tee_times t\n     JOIN group_members gm ON ((gm.group_id = t.group_id)))\n  WHERE ((t.id = tee_time_rsvps.tee_time_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))) OR (EXISTS ( SELECT 1\n   FROM tee_times t3\n  WHERE ((t3.id = tee_time_rsvps.tee_time_id) AND (t3.created_by = auth.uid())))))"
+  },
+  "tee_time_rsvps.ttr_insert": {
+   "check": "((EXISTS ( SELECT 1\n   FROM (tee_times t\n     JOIN group_members gm ON ((gm.group_id = t.group_id)))\n  WHERE ((t.id = tee_time_rsvps.tee_time_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))) AND ((user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM (tee_times t2\n     JOIN group_members gm2 ON ((gm2.group_id = t2.group_id)))\n  WHERE ((t2.id = tee_time_rsvps.tee_time_id) AND (gm2.user_id = auth.uid()) AND (gm2.status = 'active'::text) AND (gm2.role = ANY (ARRAY['admin'::text, 'owner'::text]))))) OR (EXISTS ( SELECT 1\n   FROM tee_times t3\n  WHERE ((t3.id = tee_time_rsvps.tee_time_id) AND (t3.created_by = auth.uid()))))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "tee_time_rsvps.ttr_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM (tee_times t\n     JOIN group_members gm ON ((gm.group_id = t.group_id)))\n  WHERE ((t.id = tee_time_rsvps.tee_time_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "tee_time_rsvps.ttr_update": {
+   "check": null,
+   "cmd": "w",
+   "roles": "public",
+   "using": "((user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM (tee_times t\n     JOIN group_members gm ON ((gm.group_id = t.group_id)))\n  WHERE ((t.id = tee_time_rsvps.tee_time_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))) OR (EXISTS ( SELECT 1\n   FROM tee_times t3\n  WHERE ((t3.id = tee_time_rsvps.tee_time_id) AND (t3.created_by = auth.uid())))))"
+  },
+  "tee_times.tt_delete": {
+   "check": null,
+   "cmd": "d",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = tee_times.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  },
+  "tee_times.tt_insert": {
+   "check": "((created_by = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = tee_times.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text)))))",
+   "cmd": "a",
+   "roles": "public",
+   "using": null
+  },
+  "tee_times.tt_select": {
+   "check": null,
+   "cmd": "r",
+   "roles": "public",
+   "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = tee_times.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+  },
+  "tee_times.tt_update": {
+   "check": null,
+   "cmd": "w",
+   "roles": "public",
+   "using": "((created_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = tee_times.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
+  }
+ },
+ "table_grants": {
+  "authenticated:activity_log": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:banned_emails": "SELECT",
+  "authenticated:club_reports": "SELECT",
+  "authenticated:competition_players": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:competition_schedule_events": "SELECT",
+  "authenticated:competition_sessions": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:competitions": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:course_change_requests": "SELECT",
+  "authenticated:course_freshness": "SELECT",
+  "authenticated:course_versions": "SELECT",
+  "authenticated:daily_active": "INSERT,SELECT",
+  "authenticated:expense_audit": "INSERT,SELECT",
+  "authenticated:expense_payers": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:expense_shares": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:expenses": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:favorite_courses": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:feedback": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:game_alt_shot_scores": "SELECT",
+  "authenticated:game_contest_entries": "SELECT",
+  "authenticated:game_contests": "SELECT",
+  "authenticated:game_players": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:games": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_activity": "INSERT,SELECT",
+  "authenticated:group_course_overrides": "SELECT",
+  "authenticated:group_courses": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_events": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_guests": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_invites": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:group_members": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:groups": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:holes": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:member_badges": "SELECT",
+  "authenticated:money_audit": "SELECT",
+  "authenticated:notifications": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:nudges": "SELECT",
+  "authenticated:player_cards": "SELECT",
+  "authenticated:profiles": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:push_subscriptions": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:rounds": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:schema_migrations": "SELECT",
+  "authenticated:score_audit": "SELECT",
+  "authenticated:settlement_allocations": "SELECT",
+  "authenticated:settlements": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:tee_time_rsvps": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:tee_times": "DELETE,INSERT,SELECT,UPDATE"
+ }
+}

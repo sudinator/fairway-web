@@ -1,3 +1,71 @@
+## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
+
+Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."
+
+## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
+
+Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.
+
+## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
+
+Owner (Oct 22), from staging:
+
+## 212.3.261021 — Scramble as a Ryder Cup session (0212)
+
+Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."
+
+## 212.2.261021 — Scramble end-to-end check: fixes
+
+Owner asked for a full end-to-end check. Method: every app file and database function that treats alternate shot specially (the closest format — one score per side, same score table) was checked for scramble (21 files, 10 functions), then the journey traced from creating a game to the season. Fixed:
+
+## 212.1.261021 — Scramble: team strokes only; the line-up card and live scorecard show teams (0211)
+
+**Team handicaps weren't the strokes being drawn (owner).** A 12 handicap's team showed a stroke on every hole and two on several. The team handicap was calculated correctly, but the scorecard's stroke sets (lib/game-shape strokeSets) had no scramble case, so the team's row fell through to the default — the FIRST player's own course handicap — and a second check also drew individual course-handicap dots and a Stableford column. In a scramble nobody plays their own ball: now the only strokes shown are the team's ("your team"), from the one team-handicap calculation, on the group card and the personal card alike (which kept its own copy of the stroke-basis list — now the shared type). Test: a team whose first player is 24.8 shows its 9 team strokes, not 25 — fails on 212.0.
+
+## 212.0.261021 — Scramble teams made in setup, any mix of 2–4; standard fields
+
+Owner (Oct 21). A scramble no longer has one team size chosen up front — that "size" was only a default for balancing, and once teams were picked by hand or numbers didn't divide evenly it became a rule the screen either fought or ignored (Team 1 accepted any number of players).
+
+## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
+
+Owner redesign (Oct 21).
+
+## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
+
+Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.
+
+## 211.7.261021 — Scramble: making teams in setup, and editing a scramble's settings
+
+**Teams couldn't be made (owner).** The setup control center's Teams step always opened the "teams" tab — the two-team editor four-ball and alternate shot use. A scramble has no two global teams; its own Teams editor sat on another tab, so the step led to the wrong editor and there was no evident way to make teams. Now the Teams step opens on the editor the format actually uses (scramble → its Teams editor), and a "teams" tab on a format without two global teams moves there too. The control center speaks scramble ("Make the teams — Setup → Teams.", then "4 teams · one leaderboard"), and the format line reads "Scramble · teams of 4 · USGA allowance" instead of the raw key.
+
+## 211.6.261021 — Badges and player cards worked out by the server (0208)
+
+Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.
+
+## 211.5.261021 — Access-rule review fixes (0207) and the cross-club isolation suite
+
+**Review of every access rule (132) and member-callable privileged function (160)** — owner decisions Oct 21.
+
+## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
+
+**Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.
+
+## 211.3.261021 — Defence in depth for signed-out visitors (0205)
+
+Measured before this: signed-out visitors (anon) held Supabase's default full privileges on the 12 core tables, and could call 83 privileged (SECURITY DEFINER) functions, including admin ones. Nothing was exploitable — row-level security refused every table and every function refused internally — but each protection was one layer.
+
+## 211.2.261021 — The security contract: every release checks permissions and privacy, without exceptions
+
+Owner (Oct 21): "each version needs to check [RLS security and integrity] without compromise." Before this, CI checked each migration's wording, that every table had row-level security on, and exactly pinned the rules of 12 core tables — but a migration could loosen a rule on any of the other ~48 tables, add a member-writable table without the approved-accounts rule (0197 was only a written note), or make a privileged function callable by signed-out visitors, and nothing would fail. Measured today: 47 tables refuse a signed-out visitor outright, 12 return nothing, none showed a row; no anon-callable privileged function is exploitable — but only because every migration so far happened to be careful.
+
+## 211.1.261021 — Scramble
+
+The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.
+
+## 211.0.261021 — Scramble foundations (not yet selectable)
+
+The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).
+
 ## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
 
 **Admin sees every club (0202).** Player admin listed Jigar Shukla in LEMG but not PA-NJ golfers, which he runs. The rules for CHANGING memberships already allowed system admins in every club; the rules for READING clubs and memberships never had the same exception, so five Admin screens silently showed only the owner's own clubs — Player admin (memberships, its add-to-club list), Admin → Users (admit-to-club list), Club reports (club picker), Clubs oversight (test-club markers) and course reviews (club names) — and removing someone from a club the owner isn't in silently did nothing. Now system admins can read every club and membership (matching what they can change); members still see only their own clubs. Pending clubs show by name, marked "(pending)". ci/assert-admin-reads-clubs.sql — fails on the old rules ("a system admin cannot see a club they are not in"); the live security baseline records the two rules' new wording.

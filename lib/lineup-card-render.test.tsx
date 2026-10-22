@@ -4,6 +4,7 @@
  * they can be looked at before shipping (201.0).
  */
 import { renderScreen, ok, report } from "./screen-harness";
+import { scrambleLineupText } from "@/components/game/scramble-lineup";
 import * as React from "react";
 import { ShareLineupModal } from "@/components/share-card";
 import { LiveLineupView } from "@/components/lineup-view";
@@ -85,5 +86,36 @@ const wrap = (title: string, note: string, html: string) =>
   ok(!t.includes("\\u00b7") && !t.includes("\\u2014"), "no literal escapes");
   const card = s.el.querySelector("[data-lineup-row]")?.parentElement as HTMLElement | null;
   if (card) writeFileSync(".testout-screens/lineup-group-card.html", wrap("Per-group card (201.0)", "the real ShareLineupModal's image card for Group 1 — what 'Share this group' exports. One foursome per image.", card.outerHTML));
+}
+// 212.4 — a SCRAMBLE line-up: BY TEAM, each player's own handicap as an INPUT (index → course hcp), and the METHOD
+// with its working; the share card shows the same card, and its text says the same.
+{
+  const holes = Array.from({ length: 18 }, (_, k) => ({ n: k + 1, par: 4, si: k + 1 }));
+  const mk = (id: string, name: string, idx: number, ch: number) => ({ id, user_id: id, display_name: name, course_handicap: ch, course_handicap_source: "manual", handicap_index: idx, no_show: false });
+  const payload: any = {
+    ended: false, id: "g", code: "1", name: "Saturday Scramble", course: "Oak", played_on: "2026-10-25", game_type: "scramble", status: "active", course_par: 72, holes_meta: holes,
+    scramble_mode: "field", scramble_handicap: "usga", scramble_allowance: null, scramble_team_size: null,
+    foursomes: [{ id: "t1", name: "Team 1", a: ["p4", "p1", "p2", "p3"], b: [] }, { id: "t2", name: "Team 2", a: ["p5", "p6"], b: [] }],
+    players: [mk("p1", "Raj", 3.8, 4.2), mk("p2", "Nihar", 8.9, 9.8), mk("p3", "Karan", 13.1, 14.6), mk("p4", "Sam", 20.2, 22.4), mk("p5", "Amit", 5.5, 6.1), mk("p6", "Vikram", 10.2, 11.3)],
+  };
+  const sc = renderScreen(<LiveLineupView data={payload} err={null} />);
+  const txt = sc.el.textContent || "";
+  ok(sc.el.querySelectorAll("[data-lineup-team]").length === 2 && txt.includes("Team 1") && txt.includes("Team 2"), "by team: two team cards");
+  ok(txt.includes("Index 3.8 → course hcp 4.2") && txt.includes("Index 20.2 → course hcp 22.4"), `each player's own handicap shown as an input (${txt.slice(0, 300)})`);
+  ok(txt.includes("course hcp 4.2 × 25% = 1.1") && txt.includes("course hcp 22.4 × 10% = 2.2"), "the USGA working per player, lowest first");
+  ok(txt.includes("1.1 + 2.0 + 2.2 + 2.2 = 7.44 → 7"), "the sum line to the team handicap");
+  ok(txt.includes("teams of 2: 35 / 15%") && txt.includes("teams of 4: 25 / 20 / 15 / 10%"), "the method, with the percentages actually used for each team size");
+  ok(!txt.includes("PLAYING HCP") && !txt.includes("COURSE HCP"), "no individual playing-handicap layout");
+  sc.unmount();
+  const ag = renderScreen(<LiveLineupView data={{ ...payload, scramble_handicap: "agreed", foursomes: [{ ...payload.foursomes[0], a_hcp: 9 }, payload.foursomes[1]] }} err={null} />);
+  const at = ag.el.textContent || "";
+  ok(at.includes("Agreed handicaps") && at.includes("Agreed team handicap: 9") && at.includes("course hcp 4.2"), "agreed: the agreed number, players' handicaps for reference");
+  ag.unmount();
+  const share = renderScreen(<ShareLineupModal game={{ ...payload, played_at: payload.played_on }} players={payload.players} onClose={() => {}} />);
+  const st = share.el.textContent || "";
+  ok(st.includes("TEAMS") && st.includes("1.1 + 2.0 + 2.2 + 2.2 = 7.44 → 7") && !st.includes("GROUP CARD"), "the share card shows the same team line-up, not the group card");
+  share.unmount();
+  const text = scrambleLineupText({ ...payload } as never, payload.players as never);
+  ok(text.includes("Team 1 — team handicap 7") && text.includes("Raj: index 3.8 → course hcp 4.2 × 25% = 1.1"), `copy-as-text says the same (${text.slice(0, 200)})`);
 }
 report("lineup renders");

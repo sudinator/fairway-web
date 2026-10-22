@@ -1,3 +1,247 @@
+## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
+
+Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."
+
+**lib/scramble-simulation.test.tsx (in CI):** 240 seeded random games through the real code — one leaderboard and team v team; teams of 2, 3, 4 and mixed; captains only; USGA default and custom percentages, agreed handicaps (some blank); plus handicaps; drive requirements; Ryder Cup 2 v 2, 3 v 3, 4 v 4; partial and full rounds — each checked against an INDEPENDENT calculation in the test: team handicaps; strokes on the card (team only, totalling the handicap, on the right holes); leaderboard (net = gross − strokes, order, shared ties); match lead and closeout; Ryder Cup points (app = live page, a decided match worth 1); live page, line-up and recap agreeing; club-report rounds; drive tallies. 24,622 checks. A one-off 1,500-game run with another seed: 158,522 checks.
+
+**Found and fixed:**
+1. **Plus-handicap teams showed no strokes on the card** (the leaderboard was right). The card's team strokes came from a give-only allocator; now the engine's own signed allocation — a plus team gives strokes back on the easiest holes, drawn with the hollow "you give a stroke" mark.
+2. **The Cup live page ignored a scramble's handicap method.** liveCupSessionScore handed the engine a cut-down game (type, allowance, mode, par), dropping the scramble settings — so every Cup scramble was scored there as USGA with the standard percentages, and agreed handicaps or custom percentages gave different leads than the app. The settings now pass through.
+
+No migration. Deploy: code only.
+
+## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
+
+Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.
+
+**What was wrong.** Four-ball, alternate shot and trifecta pick each match's players in Setup → Groups (the slot builder — per group, N menus per Cup side, matches derived from the groups). 212.3 gave a Cup scramble a separate editor in a different tab — a second, different way to do the same thing, with one-line rows (name, working, a "Match 1 · Reds" menu) too wide for a phone.
+
+**Now a Ryder Cup scramble is a team-group format like the others:**
+- lib/game-shape — a scramble with the Cup's two teams uses Teams + Groups (a normal scramble keeps its Teams editor);
+- the slot builder (scorecard-views TeamGroupsBuilder) takes N per side — 2, 3 or 4, the session's size: N menus per side, "ready" at N v N, "Each group is one match: its Reds players are one scramble team, its Blues players the other — exactly N of each"; its menus wrap on a phone;
+- groups become matches as for the others (syncTeamPlayFoursomes → deriveTeamFoursomesFromGroups); setup complete at N v N in every group;
+- "⚖️ Build balanced matchups" / "🎲 Build even groups" build teams of exactly N from each side (snake-drafted by course handicap) — team i of each side in Group i — saved with the matches in one transaction (apply_game_structure);
+- the control center reads "Scramble · Ryder Cup · 3 v 3 · USGA allowance";
+- a Cup scramble's sides are named by the Cup ("Reds", "Blues") — scorecard, results ("Reds 2 UP thru 12"), recap, line-up, live pages (scrambleTeamsOf / cupSideNames).
+212.3's separate Cup branch in the scramble Teams editor is removed (one way to build Cup matches). Normal scramble Teams screen: each player's Add to… / Move to… menu on its own full-width line, so rows fit a phone.
+
+Tests: the setup flow for a Cup scramble 3 v 3 (format line; Teams & groups → Groups shows the slot builder with three menus per side, not the Teams editor); Cup side names in results; game type coverage (a scramble supplies teams only as a Cup session).
+
+No migration. Deploy: code only.
+
+## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
+
+Owner (Oct 22), from staging:
+
+**The line-up card didn't make sense for a scramble.** There are two line-up cards: the public line-up page (which had a scramble version since 212.1) and the line-up you share from the app (components/share-card), which still laid every game out by group with individual playing handicaps. Both now use ONE scramble line-up (components/game/scramble-lineup.tsx): by team (and by match for team v team); each player's own handicap shown as the input it is ("Index 3.8 → course hcp 4.2"); the method stated with the percentages actually used for each team size; under USGA each player's "× 25% = 1.1" and the sum line ("1.1 + 2.0 + 2.2 + 2.2 = 7.44 → 7"); under agreed the agreed number with players' handicaps for reference. Each team handicap is shown prominently in light text on the card's dark green. "Copy as text" says the same (scrambleLineupText).
+
+**Random scores (staging) didn't show in a scramble's results.** The 🎲 tool wrote individual scores to each player's own card — visible in the score history, but a scramble's (and alternate shot's) results read team / side scores. For one-ball formats it now writes team / side scores through the same fenced save as the scorecard, and for a scramble with a drive requirement records whose drive, round-robin.
+
+**Scorecard header:** a scramble team no longer shows the handicap twice ("playing hcp" and "team hcp") — just "team hcp"; the score-entry title says "team hcp".
+
+**"Protected Deployment – Vercel" on a shared staging link** is Vercel's Deployment Protection on the staging project (a Vercel login is required); production isn't protected that way. Not an app change — the owner can turn it off for staging, or use a protection-bypass link, in the Vercel project's settings.
+
+No migration. Deploy: code only.
+
+## 212.3.261021 — Scramble as a Ryder Cup session (0212)
+
+Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."
+
+**A scramble session** is a set of team v team matches — one scramble team from each Cup side, both with the session's number of players (2 v 2 by default; 3 v 3 or 4 v 4) — hole by hole with team handicaps (USGA allowance with the game's percentages, or agreed). Points as other sessions: a win 1, a halve ½ each.
+
+- **Cup → Add a session:** format Scramble, "Players per team" 2 / 3 / 4.
+- **Set up this session's game:** created as a team v team scramble keeping the Cup's two teams; the form shows "RYDER CUP · 2 V 2" instead of who's on the app; handicap method and percentages as usual.
+- **Setup → Teams:** "Make balanced matches" — each Cup side snake-drafted by course handicap into teams of exactly N, paired Match 1, 2, … (Team A's team on side a); "Pick matches myself"; Add to… / Move to… only offer a player their own Cup side, where there's room; each team is labelled by its Cup side. Setup is complete only when every match is exactly N v N ("Match 1: Blues have 1 of 2 players").
+- **Points everywhere from one engine:** the app's Cup scoring (lib/competition scoreCompetitionGame — standings, session recap, Cup box) and the Cup live page (lib/live-scoring liveLegs) both use the scramble engine's running lead (scrambleMatchProgress) through the shared closeout, so results read like other sessions' ("2&1", "AS"); team handicaps by the one method rule (app) and its feed twin (lib/live-scramble, also now used by the scramble live page). Test: the same match scored by both agrees.
+- **0212:** competition_sessions.format accepts 'scramble' and has scramble_team_size (2–4); guard_competition_game_structure — a Cup scramble is team v team and no team is larger than the session's size (its trigger now also fires when scramble_mode changes — it didn't, caught by the test); get_live_competition carries the scramble settings and entered team handicaps.
+
+Deploy: staging 0212 → code; production 0212 → merge.
+
+## 212.2.261021 — Scramble end-to-end check: fixes
+
+Owner asked for a full end-to-end check. Method: every app file and database function that treats alternate shot specially (the closest format — one score per side, same score table) was checked for scramble (21 files, 10 functions), then the journey traced from creating a game to the season. Fixed:
+
+1. **Setup rules counted a scramble mid-round as unscored.** lib/game-setup-policy judged "scoring has started" from players' own cards (empty in a scramble) plus alternate shot's side-scoring marker only. Now the marker counts for scramble too, and once set every player counts as having scores — so removing a player, changing teams or moving groups mid-round is blocked or confirmed as for alternate shot, with the message naming "scramble team scoring". (The setup screens themselves already locked correctly.)
+2. **One-ball formats counted nowhere in the club report.** Since alternate shot moved to the canonical side-score store (0140), its players' own cards are empty — so alternate shot AND scramble counted no game, round or attendance (side scores fed rivalries only). Now each player carries their side's / team's card: the round counts for games, rounds and attendance, and still feeds no individual statistic; older alternate-shot games (scores on players' cards) keep counting.
+3. **Scorecard view showed nothing under the card for a scramble** — other team formats show their results there; now the scramble leaderboard / matches.
+4. **Admin screens showed the raw key "scramble"** — now "Scramble".
+
+Checked and right: score resets clear team scores for any format; deleting a game removes its team scores; match length can't change once a team score exists; the primary-device rule guards the team-score table; no betting is offered on a scramble; the share-my-card buttons stay hidden (no individual card exists — the recap is the shareable result); results code for other formats is never reached by a scramble.
+
+Tests: setup rules (blocked once team scoring starts, with the scramble wording; not blocked before); club report (a scramble and an alternate-shot game count 6 rounds, no best gross).
+
+No migration. Deploy: code only.
+
+## 212.1.261021 — Scramble: team strokes only; the line-up card and live scorecard show teams (0211)
+
+**Team handicaps weren't the strokes being drawn (owner).** A 12 handicap's team showed a stroke on every hole and two on several. The team handicap was calculated correctly, but the scorecard's stroke sets (lib/game-shape strokeSets) had no scramble case, so the team's row fell through to the default — the FIRST player's own course handicap — and a second check also drew individual course-handicap dots and a Stableford column. In a scramble nobody plays their own ball: now the only strokes shown are the team's ("your team"), from the one team-handicap calculation, on the group card and the personal card alike (which kept its own copy of the stroke-basis list — now the shared type). Test: a team whose first player is 24.8 shows its 9 team strokes, not 25 — fails on 212.0.
+
+**The line-up card shows a scramble's teams** — the method in setup's words, each team with its players and team handicap, each player's "course hcp × % = counts" under USGA (with the game's own percentages and each team's own size), "agreed" under agreed handicaps, the captain under captains only, grouped by match for team v team. No individual playing handicaps.
+
+**The live scorecard shows a card per team** — hole-by-hole gross, the team's strokes, net and the team handicap — instead of empty player cards; the leaderboard and the cards share one calculation.
+
+0211: get_live_lineup carries the scramble settings (method, percentages, captains only); get_live_scorecard adds captains only. Both stay public by token.
+
+Deploy: staging 0211 → code; production 0211 → merge.
+
+## 212.0.261021 — Scramble teams made in setup, any mix of 2–4; standard fields
+
+Owner (Oct 21). A scramble no longer has one team size chosen up front — that "size" was only a default for balancing, and once teams were picked by hand or numbers didn't divide evenly it became a rule the screen either fought or ignored (Team 1 accepted any number of players).
+
+**Creating a scramble** asks who's on the app — **Every player** or **Captains only** — plus how teams compete, the handicap method and drives. No team size.
+
+**Setup → Teams** makes the teams: **Make balanced teams of 2 / 3 / 4** (chosen there, split as evenly as possible) or **Pick teams myself**. Each team has 2 to 4 players and teams may differ in size; each shows its count ("4 players (full)"), and a full team drops out of Add to… / Move to… until someone leaves. Mixed sizes are noted ("Teams of different sizes: Team 3 has 3 players — each uses the percentages for its own size"). Captains only: "A team for each captain".
+
+**USGA allowance percentages for every team size at once** — teams of 2 (35/15), 3 (30/20/10) and 4 (25/20/15/10), each editable for the game, Reset to USGA — since a game's teams may differ in size. Agreed handicaps unchanged.
+
+**Standard fields (DISPLAY_RULES.md §2).** The percentage boxes, the agreed-handicap box and the Add to… / Move to… menus set their own green background; they now use the app's one field style (inputStyle). **ci/check_field_style.py** (new, in the guards): every input, menu and text box spreads inputStyle — a ratchet on today's 29 older self-styled fields elsewhere, so none can be added and each fix lowers the count. Those 29: contests-view.tsx (8), money.tsx (5), manage.tsx (2), tee-times.tsx (2), ui.tsx (2), course-history.tsx (1), scorecard-views.tsx (1), groups.tsx (1), lineup-view.tsx (1), courses.tsx (1), organizer.tsx (1), player-card.tsx (1), round-setup.tsx (1), tournaments.tsx (1), yardage-backfill.tsx (1).
+
+Existing scramble games keep working (their teams are already made). No migration.
+
+## 211.9.261021 — Scramble: pick teams yourself; two handicap methods; Captains only (0210)
+
+Owner redesign (Oct 21).
+
+**Pick teams yourself.** Setup → Teams offers "Make balanced teams" (snake-drafted by course handicap, as before) or "Pick teams myself": empty teams plus a "Not on a team yet" list with Add to… for each player. Either way: Move to…, Take off team, Add a team / match, Remove an empty one. Setup isn't complete while a team is empty or a player unplaced.
+
+**Two handicap methods; gross no longer offered.**
+- **USGA allowance** — each team's handicap from its players' course handicaps with the allowance percentages; the USGA's are the default (25/20/15/10, 30/20/10, 35/15, lowest to highest) and a game may set its own — one box per position, the USGA figure beside each as guidance, Reset to USGA (create form and Setup → Format). Smaller teams left by uneven numbers use the USGA's for their size.
+- **Agreed handicaps** — the organizer enters each team's handicap, whatever the players agree, in Setup → Teams; a blank team plays scratch.
+Both take strokes hole by hole, hardest holes first. Games created with gross keep working (scratch). The per-team override under USGA (211.8) is gone — the method decides: USGA is calculated with your percentages; agreed is typed in. Every place describes the chosen method in the same words (lib/scramble-method.ts).
+
+**Captains only** (was "1 · outside the app"): each team is represented in the app by its captain, who enters the team's score; the teammates play outside the app. Always agreed handicaps (USGA shown unavailable, with the reason).
+
+0210: games.scramble_handicap accepts 'agreed'; games.scramble_allowance (the game's percentages); the live page's feed carries them. One method rule (lib/game-shape scrambleMethodOf / scrambleTeamHandicapFor) used by the scorecard, leaderboard, recap, email and live page.
+
+Tests: custom 30/20/15/10 gives 8 where USGA gives 7; agreed 12 / blank scratch; a leftover number is ignored under USGA; captains only on the Teams screen; Pick teams myself → empty teams → Add to…; captains only switches to agreed; gross not offered; an empty team blocks setup.
+
+Deploy: staging 0210 → code; production 0210 → merge.
+
+## 211.8.261021 — Scramble: one app player per team, and entered team handicaps (0209)
+
+Owner (Oct 21): at an outing only one golfer per team may use BNN — their teammates stay outside the app (not even as guests), the player enters the team's score, and the team handicap comes from the outing. And for any scramble, the organizer may enter a team's handicap instead of the calculated USGA allowance.
+
+**One player per team.** Team size has a fourth choice, "1 · outside the app" (creation and Setup → Format): every player is their own team, scoring for it; teams compete on one leaderboard or team v team as usual. Setup is complete only when every team's handicap is entered (or the game is gross only). 0209 lets a one-player team score — only in a game set up this way; everywhere else a team still has 2 to 4 players.
+
+**Entered team handicaps — any scramble.** Setup → Teams shows a "Team handicap" box on every team: blank uses the calculated handicap ("9 (calculated)"), a number replaces it ("Team handicap 12 (entered)"); whole strokes, plus handicaps as negatives. Only the organizer sets it (players setting their own team's handicap could give themselves strokes). The one place a team handicap is worked out (lib/game-shape scrambleTeamHandicapFor) uses it, so the scorecard, leaderboard, matches, recap and email agree; 0209 adds it to the live page's feed.
+
+Tests: assert-scramble.sql (a one-player team scores only in such a game), scramble-teams (sizes, completeness), scramble-render (the override wins; one-player teams on the Teams screen; typing a handicap saves it), create-game-format (review label).
+
+Deploy: staging 0209 → code; production 0209 → merge.
+
+## 211.7.261021 — Scramble: making teams in setup, and editing a scramble's settings
+
+**Teams couldn't be made (owner).** The setup control center's Teams step always opened the "teams" tab — the two-team editor four-ball and alternate shot use. A scramble has no two global teams; its own Teams editor sat on another tab, so the step led to the wrong editor and there was no evident way to make teams. Now the Teams step opens on the editor the format actually uses (scramble → its Teams editor), and a "teams" tab on a format without two global teams moves there too. The control center speaks scramble ("Make the teams — Setup → Teams.", then "4 teams · one leaderboard"), and the format line reads "Scramble · teams of 4 · USGA allowance" instead of the raw key.
+
+**A scramble's settings are editable in Setup → Format** until scoring starts — team size, how teams compete, handicaps, drive requirement (components/game/scramble-settings.tsx). Changing the team size or how teams compete clears the teams (with a confirmation) and their tee groups; handicaps and drives keep them. A scramble isn't switched to another format there — its teams would be left behind; a different format is a new game.
+
+**The test that would have caught it:** lib/game-setup-workspace.test.tsx renders the real setup screen for a scramble, opens the Teams step from the control center as an organizer would, and checks scramble's Teams editor appears and "Make balanced teams" saves — it fails on 211.6. Settings panel: rendered tests (clears on size change, keeps on handicap change, locked once scoring starts).
+
+No migration. Deploy: code only.
+
+## 211.6.261021 — Badges and player cards worked out by the server (0208)
+
+Owner (Oct 21): "have the database do the math". A member's **player card** (the handicap index calculated from their rounds, its trend, recent form and round count — seen by club-mates, and compared by the admin sandbagger check with the index they ENTERED) and their **badges** were computed on the phone and written as results; a member could overwrite them by a direct request — e.g. set their calculated index to match their entered one and vanish from the sandbagger check, rounds untouched.
+
+**Now the server works both out** from the rounds the database holds. The phone calls POST /api/member-stats with no numbers; the server confirms who is asking (active accounts only), loads their finished rounds exactly as the home screen does, and runs the SAME code (lib/badge-sync, lib/card-sync) — so the numbers are identical to before (lib/member-stats-server.ts, one implementation, no second copy of the handicap maths). 0208: members only read their player card. ci/check_server_only_stats.py: badge and card writing can only happen on the server.
+
+**Fixes a regression in 211.5 (my error).** 211.5's 0207 removed members' badge writes on the basis that "the app never writes badges" — but the phone did, in two places (home and the achievements screen), in statements split across lines that my search missed. With 211.5 alone, new badges would stop being awarded (existing ones kept). 211.6 moves both to the server, so badges are awarded again — now tamper-proof.
+
+Scorecards untouched: members still enter and correct their own scores exactly as before.
+
+Deploy: staging 0207 (if not yet) and 0208 → code; production 0207 and 0208 → merge. If 211.5 reached production, deploy this promptly.
+
+## 211.5.261021 — Access-rule review fixes (0207) and the cross-club isolation suite
+
+**Review of every access rule (132) and member-callable privileged function (160)** — owner decisions Oct 21.
+
+**0207 fixes:**
+1. **Guests in a game** — any member of the game's club could add a guest to, or delete a guest (scores and all) from, any of the club's games, even one they weren't playing in, even after it ended (the gap 0194 closed for editing). Now only players in the guest's own group, and never once the game has ended; the organizer keeps their rights.
+2. **Badges** — members could create their own badge rows by a direct request. Badges are awarded by the server when earned (the app never wrote them), so members now only read theirs.
+3. **The activity log, by meaning** — a member could log "approved a club" about themselves. System-admin acts are accepted only from a system admin; club-admin acts (role changed, member added / removed) only from that club's admin — adding or removing yourself (joining, leaving) stays yours; a member's own activity is theirs to log. A refused entry never breaks the action.
+4. **Club deletions are recorded by the database itself** ("club_deleted": who, which club, when) — the app's own entry comes after the club is gone, when the writer's authority can't be confirmed.
+
+**Reviewed and right as designed:** the course library and which clubs use which course (shared by design — owner); club members see each other's profiles, including email and phone (a social app — owner); notifications (yourself only), feedback, push subscriptions, games (your club), money (members read; creator or club admins write), rounds and holes (your own). Every member-callable privileged function checks properly (ownership, invites, the caller's own data, hourly-limited housekeeping, or system admin) — the merge preview requires an active system admin. Minor, left as is: person_label shows a person's name (or the start of their email if unnamed) to anyone holding their account id.
+
+**Open question for the owner:** player cards — the phone writes each member's own stats card, so a member could inflate their own displayed stats with a direct request; a fix means the server computing the card.
+
+**ci/assert-club-isolation.sql — runs in both chain checks.** Club A's data in 24 club-scoped tables (games, players, guests, rounds, holes, events, expenses, shares, payers, settlements, allocations, money audit, activity, guests, tee times, RSVPs, invites, competitions, sessions, players, club reports, notifications, nudges, memberships); a Club B member must read, change and delete nothing, and add nothing to Club A; a suspended Club A member must be refused by the approved-accounts rule. Positive controls: the same statements as Club A's admin must work, so a wrong test can't pass by failing. Proven: a planted "anyone reads expenses" rule fails it.
+
+Deploy: staging 0207 → code; production 0207 → merge.
+
+## 211.4.261021 — Security contract fixed on GitHub; members' privileges match their row rules (0206)
+
+**Why 211.2 / 211.3 failed GitHub's fresh-database check.** GitHub builds its test database with Supabase's real image, where members (authenticated) and signed-out visitors (anon) receive EVERY privilege on every new public table and function by default — as in production. The local test database's Supabase shim mirrored that only for service_role, so locally migrations produced fewer permissions than Supabase, the contract passed locally, and on GitHub it found 27 member-writable tables without the approved-accounts rule. App behaviour was never affected.
+
+**The shim now mirrors Supabase's defaults exactly** (ci/local_supabase_shim.sql), so local, GitHub and production agree; the security contract snapshot is re-recorded on that faithful copy (132 policies, 45 member table privileges, 195 privileged functions).
+
+**0206.** It was partly a real gap: on the money tables, tee times, RSVPs and guests, row rules let club members write, so a pending or suspended account still in a club could have written there directly (0197 covered only the tables the shim showed as writable). Now:
+1. outside the 12 core tables, members keep a table privilege only where a row rule can use it (row security refused the rest anyway — nothing a member can do changes); TRUNCATE / REFERENCES / TRIGGER removed;
+2. every member-writable table carries the approved-accounts rule — 11 tables gained it (expenses, expense payers / shares / audit, settlements, money activity, tee times, RSVPs, guests, badges, player cards) — with three recorded exceptions: push_subscriptions (a pending member must receive "you're approved"), daily_active (activity ping), feedback (anyone signed in can write to the owner);
+3. new public tables are no longer opened to members by default;
+4. can_decide_signup, an internal helper 0189 never meant members to call (Supabase's defaults did), is revoked from members.
+ci/assert-member-privileges.sql (in 0206's TESTS header): no unguarded member-writable table; no TRUNCATE / REFERENCES / TRIGGER; a suspended member still in a club can't add a guest, an active one can.
+
+Deploy: staging 0206 → code; production 0206 → merge. 211.3 can stay deployed meanwhile — nothing is broken.
+
+## 211.3.261021 — Defence in depth for signed-out visitors (0205)
+
+Measured before this: signed-out visitors (anon) held Supabase's default full privileges on the 12 core tables, and could call 83 privileged (SECURITY DEFINER) functions, including admin ones. Nothing was exploitable — row-level security refused every table and every function refused internally — but each protection was one layer.
+
+**0205.** Signed-out visitors now hold NO privilege on any public table, and can call NO privileged function except the three public live-link functions, each guarded by its secret token (get_live_scorecard, get_live_competition, get_live_lineup). Where members or the server could call a function only through the PUBLIC grant, that right was granted back to them explicitly first — no function lost member or server access. New tables and functions are no longer opened to anon by default. The public pages need nothing else (the join page reads nothing until the visitor signs in).
+
+**Recorded by the security contract** (the first change under the 211.2 rules): 12 anon table grants removed, 80 functions from "anon, authenticated" to "authenticated", 0 policies changed — ci/security_contract.json's diff shows each. The live core-RLS check now expects no anon privileges on the core tables. ci/assert-anon-boundary.sql (named in 0205's TESTS header) fails before 0205 and passes after.
+
+Deploy: staging 0205 → code; production 0205 → merge. Check after: the live page (Share live link) and the line-up page still open while signed out.
+
+## 211.2.261021 — The security contract: every release checks permissions and privacy, without exceptions
+
+Owner (Oct 21): "each version needs to check [RLS security and integrity] without compromise." Before this, CI checked each migration's wording, that every table had row-level security on, and exactly pinned the rules of 12 core tables — but a migration could loosen a rule on any of the other ~48 tables, add a member-writable table without the approved-accounts rule (0197 was only a written note), or make a privileged function callable by signed-out visitors, and nothing would fail. Measured today: 47 tables refuse a signed-out visitor outright, 12 return nothing, none showed a row; no anon-callable privileged function is exploitable — but only because every migration so far happened to be careful.
+
+**ci/check_security_contract.py — runs in both chain checks (local and GitHub), against the database built from every migration:**
+1. every table has row-level security ON (no exceptions);
+2. every access rule on EVERY table (132) matches ci/security_contract.json exactly — name, command, roles, USING, WITH CHECK;
+3. every privilege signed-out visitors and members hold on tables (36), and who can EXECUTE each privileged function (195), matches the snapshot — so nothing becomes publicly callable unless the snapshot records it;
+4. every SECURITY DEFINER function pins its search_path (no exceptions);
+5. every table members can write carries the approved-accounts rule (guard_active_account), except the two recorded exceptions (profiles, notifications).
+Any difference fails the build and prints exactly what changed; recording it is a deliberate `--update`, so the snapshot's diff shows, in the release, every permission that moved. Proven: a probe "anyone reads every round" rule fails it ("policy ADDED … using true"), and so does a member-writable table without the rule.
+
+**Every security-touching migration names its own test (from 0205).** ci/check_migration_authorization.py: a migration that changes privileged functions, grants, policies, row-level security or triggers must carry `-- TESTS: ci/assert-….sql`, and that test must exist and run in both chain checks. Proven on a probe migration.
+
+Note for the first GitHub run: the snapshot was recorded on the local chain database; GitHub builds from Supabase's image. The existing core-RLS check compares the same way and passes in both, so they should match — if GitHub reports grant differences, they'll be listed exactly and reconciled in the next release.
+
+No migration. Deploy: code only.
+
+## 211.1.261021 — Scramble
+
+The Scramble format, end to end (owner-approved mock and decisions, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole.
+
+**Creating.** "Scramble" under Stroke play (every team on one leaderboard) and under Match play → Team (team v team) — the family decides how teams compete. Settings: team size 2 / 3 / 4; handicaps USGA allowance or gross only; drive requirement none / ×2 / ×3 / ×4 (default none). Review label, saved draft, state inventory.
+
+**Setup → Teams.** Balanced teams, snake-drafted by course handicap, as even as possible within 2–4 (10 players → 4, 3, 3); each team's handicap breakdown ("4.2 × 25% = 1.1 … 7.44, rounded to 7"); Move to… for any player; plain messages until setup is complete. Saving also sets tee groups, so scoring permissions and markers work as for alternate shot.
+
+**Scoring.** One row per team with its team handicap; strokes allotted hole by hole by stroke index (lib/game-shape dotStrokes → scrambleTeamHandicapFor, the one place a team handicap is worked out from a game); "Whose drive?" chips with counts and "needs 2 more — can no longer make it", only when a requirement is set; saved through alternate shot's path (on the phone first, retried offline, primary-device and reset rules) via save_scramble_score_fenced.
+
+**Results.** The game screen's leaderboard (net or gross to par, ties shared) or matches ("Team 1 2 UP thru 9"); the recap ("Team 2 wins the scramble — net 54", each player's "Your team (Team 2) finished 1st, net 54", the final leaderboard "net 54 (63 − 9)") in the app, on the shared image and in the round email, word for word; the public live page (0204 adds the scramble settings to its feed). All from lib/scramble-game — one implementation.
+
+**Never individual.** Scramble scores never post as anyone's round (post_game_rounds) and never feed individual statistics (lib/round-rules).
+
+Tests: lib/scramble.test.ts (USGA examples), scramble-teams, scramble-render (results, view, Teams screen, recap), game type coverage, create-game format (19 shapes), messy data. staging_seed_scramble.sql creates four test games on staging.
+
+Deploy: staging 0204 (and 0203) → code; production 0204 → merge.
+
+## 211.0.261021 — Scramble foundations (not yet selectable)
+
+The groundwork for the Scramble format (owner-approved mock, Oct 20): every player hits, the team picks the best shot, everyone plays from there — one score per team per hole. Owner decisions: team sizes 2, 3 and 4; one leaderboard or team v team (both); an optional drive requirement (off by default); handicap strokes hole by hole; no betting. Nothing is visible to members yet — the format isn't offered in the game picker until the screens are built (next releases).
+
+**Engine (lib/scramble.ts).** Team handicap from the USGA's recommended scramble allowances (Rules of Handicapping, Appendix C: 4 players 25/20/15/10%, 3 players 30/20/10%, 2 players 35/15%, lowest course handicap to highest, unrounded, only the total rounded) — reproduces the USGA's worked example (13.65 → 14); plus handicaps and gross-only handled; strokes allotted hole by hole by stroke index with the app's one allocator; the leaderboard ranked to par with shared ties; team v team match play (decided when a lead can't be caught); drive counts with "can no longer make it". lib/scramble.test.ts.
+
+**Database (0203).** games.scramble_team_size / scramble_mode / scramble_handicap / scramble_min_drives; game_alt_shot_scores.drive_key; save_scramble_score_fenced — a team's hole score and drive, saved through alternate shot's safeguards (score-reset fence, primary scoring device) and permission rules, for teams of 2–4, with the drive checked against the team. ci/assert-scramble.sql.
+
+Not yet registered as a game type: the game-type coverage test requires a format's label, creation and setup screen before it may be listed — that comes with the screens.
+
+Deploy: staging 0203 → code; production 0203 → merge. No visible change.
+
 ## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
 
 **Admin sees every club (0202).** Player admin listed Jigar Shukla in LEMG but not PA-NJ golfers, which he runs. The rules for CHANGING memberships already allowed system admins in every club; the rules for READING clubs and memberships never had the same exception, so five Admin screens silently showed only the owner's own clubs — Player admin (memberships, its add-to-club list), Admin → Users (admit-to-club list), Club reports (club picker), Clubs oversight (test-club markers) and course reviews (club names) — and removing someone from a club the owner isn't in silently did nothing. Now system admins can read every club and membership (matching what they can change); members still see only their own clubs. Pending clubs show by name, marked "(pending)". ci/assert-admin-reads-clubs.sql — fails on the old rules ("a system admin cannot see a club they are not in"); the live security baseline records the two rules' new wording.

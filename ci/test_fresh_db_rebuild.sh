@@ -159,6 +159,21 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-notification-links.sql"
 
 # 0202: system admins read every club and membership.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-admin-reads-clubs.sql"
+
+# 0203: scramble team scores.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-scramble.sql"
+
+# 0205: signed-out visitors — no tables, only the live-link functions.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-anon-boundary.sql"
+
+# 0206: members' privileges match their row rules; approved-accounts rule everywhere members write.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-member-privileges.sql"
+
+# 0207: the access-rule review's fixes.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-policy-review.sql"
+
+# 211.5: CROSS-CLUB ISOLATION — a Club B member reads / changes / deletes / adds nothing in Club A (24 tables).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-club-isolation.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys
@@ -182,6 +197,10 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.
 # The daily course-check claim (0156): budget, remainder, idling, ageing, oldest-first, the cap,
 # retention of last-known values, and the permission boundary.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-api-checks.sql"
+
+# 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot
+# (ci/security_contract.json). A difference fails the build; recording it is a deliberate --update.
+python3 "$ROOT/ci/check_security_contract.py" "$DB_URL"
 
 # 0164: the WHOLE monitor script against a PostgREST-shaped ledger stub backed by this database and
 # a stub provider. Every exit path must leave a recorded outcome: a clean week, a mid-run daily

@@ -164,7 +164,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 187 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 197 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -355,6 +355,16 @@ Total: 187 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0200_support_visit_notice.sql
 - [ ] 0201_club_notification_links.sql
 - [ ] 0202_admin_reads_clubs.sql
+- [ ] 0203_scramble.sql
+- [ ] 0204_live_scramble.sql
+- [ ] 0205_anon_boundary.sql
+- [ ] 0206_member_privileges.sql
+- [ ] 0207_policy_review_fixes.sql
+- [ ] 0208_player_cards_server_only.sql
+- [ ] 0209_scramble_team_handicap.sql
+- [ ] 0210_scramble_handicap_methods.sql
+- [ ] 0211_scramble_lineup_live.sql
+- [ ] 0212_cup_scramble.sql
 
 <!-- NOTES:START -->
 

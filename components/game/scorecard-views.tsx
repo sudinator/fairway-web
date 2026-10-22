@@ -1,4 +1,6 @@
 "use client";
+import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
+import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { altShotDrivers } from "@/lib/alt-shot";
@@ -45,7 +47,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides, scrambleTeamHandicapFor } from "@/lib/game-shape";
 import { randomTeeGroups, teamGroupSlotChoices, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -78,7 +80,7 @@ import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
-export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, onSetScrambleScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
   readOnly?: boolean;
   game: Game; players: Player[];
   /** Every player in the game. `players` is filtered by tee group for DISPLAY; stroke bases
@@ -90,6 +92,8 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
   altShotScores?: AltShotScoreRow[];
   onSetAltShotScore?: (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null) => void;
+  /** 211.1: scramble — a team's hole score and whose drive (null keeps none). */
+  onSetScrambleScore?: (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null, driveKey: string | null) => void;
   teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
   onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
   onMarkOut?: (p: Player) => void;
@@ -121,11 +125,12 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   // draw a duplicate blue set.
   // Drives the blue course-handicap dots and the per-player course-Stableford column. Alternate
   // shot records no individual score, so both describe something that never happened.
-  const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot";
+  // 212.1: nor does a scramble (one ball per team — only the team's strokes exist).
+  const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot" && game.game_type !== "scramble";
   const indRecvFor = (p: Player, si: number | null) => fullStrokes(game, p, si);
   // ONE source and ONE colour per stroke basis, shared with the personal card (185.0).
   const BASIS_COLOR: Record<string, string> = {
-    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent, team: C.basisOpponent,
   };
   // Each basis owns a fixed vertical slot down the LEFT EDGE of the cell — top, middle, bottom —
   // rather than stacking from the top. With three bases an 8px stack bunched them in the corner and
@@ -136,6 +141,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
     group_low: { top: "50%", transform: "translateY(-50%)" },
     course: { bottom: 4 },
     alt_side: { top: 4 },
+    team: { top: 4 },
   };
   const cellSets = (p: Player, si: number | null) =>
     // A set with only `gives` still draws — as a hollow glyph. Filtering on strokes alone meant the
@@ -167,6 +173,25 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
       if (rest.length && out.length) out.push({ type: "divider" });
       rest.forEach((p) => out.push({ type: "player", p }));
       return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
+    }
+    // SCRAMBLE (211.1): one ball per TEAM — each team in this group is one row, scores from game_alt_shot_scores.
+    if (gt === "scramble" && Array.isArray(game.foursomes)) {
+      const allTeams = scrambleTeamsOf(game.foursomes as never, cupSideNames(game));
+      const out: Col[] = [];
+      for (const f of game.foursomes) {
+        if (![...f.a, ...f.b].some((uid) => ps.some((p) => pkey(p) === uid))) continue;
+        for (const which of ["a", "b"] as const) {
+          const members = (f[which] || []).map((uid) => strokePool.find((p) => pkey(p) === uid)).filter((p): p is Player => !!p);
+          if (!members.length) continue;
+          const teamName = allTeams.find((t) => t.groupId === f.id && t.side === which)?.name ?? "Team";
+          const gross = canonicalAltShotGross(altShotScores, f.id, which, meta.length, null);
+          if (out.length) out.push({ type: "divider" });
+          out.push({ type: "player", p: { ...members[0], display_name: teamName, scores: gross },
+            altSide: { name: teamName, memberIds: members.map((m) => m.id), memberNames: members.map((m) => m.display_name),
+              sideCh: scrambleTeamHandicapFor(game, strokePool, pkey(members[0])), receiving: false, matchStrokes: 0, foursomeId: f.id, side: which } });
+        }
+      }
+      if (out.length) return out;
     }
     // Alternate shot is one ball per side. Canonical scores now live in game_alt_shot_scores;
     // historical duplicated partner rows are read only as a backward-compatible fallback.
@@ -455,7 +480,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
           // four-player card that is wrong for three of them (641032 read "v Michael"). The per-player
           // header lines below name each player's own opponent; those stay specific.
           const GENERIC: Record<string, string> = {
-            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side",
+            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side", team: "team hcp",
           };
           const seen = new Map<string, string>();
           for (const p of players) for (const m of meta) for (const r of strokeSets(game, p, m.si, strokePool)) if (!seen.has(r.key)) seen.set(r.key, GENERIC[r.key] ?? r.label);
@@ -511,8 +536,10 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                   <>
                     <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>
                     <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => shortOf(n)).join(" / ")}</div>
-                    <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div>
-                    <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>
+                    {game.game_type !== "scramble" ? <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div> : null}
+                    {game.game_type === "scramble"
+                      ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}>{game.scramble_handicap === "gross" ? "gross" : `team hcp ${c.altSide.sideCh ?? "–"}`}</div>
+                      : <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>}
                   </>
                 ) : (
                   <>
@@ -588,7 +615,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
         };
         return (
           <HoleScoreModal
-            title={`${sideCol?.altSide ? `${sideCol.altSide.name} · playing hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
+            title={`${sideCol?.altSide ? `${sideCol.altSide.name} · ${game.game_type === "scramble" ? "team" : "playing"} hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
             par={m.par}
             si={m.si ?? null}
             yardage={ydsAt(edit.holeIdx, m.yards)}
@@ -603,10 +630,28 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             showPenalties={!sideCol?.altSide}
             scoreLocked={scoreLocked}
             lockedByName={markerName}
-            onPatch={(patch) => { if (sideCol?.altSide && edit.alt && onSetAltShotScore) { onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null); } else if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
+            onPatch={(patch) => { if (sideCol?.altSide && edit.alt && game.game_type === "scramble" && onSetScrambleScore) { onSetScrambleScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null, scrambleDriveAt(altShotScores, edit.alt.foursomeId, edit.alt.side, edit.holeIdx)); } else if (sideCol?.altSide && edit.alt && onSetAltShotScore) { onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null); } else if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
             onNext={scoreLocked ? () => { const ni = edit.holeIdx + 1; if (ni < meta.length) setEdit({ playerId: p.id, holeIdx: ni }); else setEdit(null); } : goNext}
             onClose={() => setEdit(null)}
-            belowPicker={<ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
+            belowPicker={game.game_type === "scramble" && sideCol?.altSide && edit.alt && game.scramble_min_drives && onSetScrambleScore ? (() => {
+              const team = sideCol.altSide!; const alt = edit.alt!;
+              const keys = team.memberIds.map((id) => { const q = strokePool.find((x) => x.id === id); return q ? pkey(q) : id; });
+              const drives = Array.from({ length: meta.length }, (_, hi) => scrambleDriveAt(altShotScores, alt.foursomeId, alt.side, hi));
+              const tally = driveTally(drives, keys, game.scramble_min_drives ?? null, meta.length);
+              const current = drives[edit.holeIdx];
+              return (
+                <div data-scramble-drives style={{ marginTop: 10 }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>WHOSE DRIVE?</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                    {keys.map((k, ki) => (
+                      <button key={k} type="button" onClick={() => onSetScrambleScore(alt.foursomeId, alt.side, edit.holeIdx, gross ?? null, current === k ? null : k)}
+                        style={{ ...btn(current === k), padding: "8px 12px", fontSize: 12 }}>{shortOf(team.memberNames[ki])} {tally.counts[k] ?? 0}{current === k ? " ✓" : ""}</button>
+                    ))}
+                  </div>
+                  {tally.needs.length ? <div style={{ color: C.gold, fontSize: 11.5, marginTop: 6 }}>{tally.needs.map((x) => `${shortOf(team.memberNames[keys.indexOf(x.player)])} needs ${x.more} more${x.short ? " — can no longer make it" : ""}`).join(" · ")} · {tally.needs[0].holesLeft} holes left</div> : null}
+                </div>
+              );
+            })() : <ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
           />
         );
       })()}
@@ -647,7 +692,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   let units: Unit[];
   const sh = shapeOf(game);
-  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");   // 212.5: + a Ryder Cup scramble
   const scoringStarted = players.some((p) => (p.scores || []).some((x) => x != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
   if (sh.usesFoursomes && foursomes.length && !teamGroupsOwnStructure) {
     units = foursomes.map((f, i) => ({
@@ -794,16 +839,19 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
   randomizing: boolean;
 }) {
   const teams = game.teams!;
+  // 212.5: players per side in each group — 2 for four-ball / alternate shot / trifecta; a Ryder Cup scramble
+  // session's own size (2, 3 or 4)
+  const perSide = game.game_type === "scramble" ? Number(game.scramble_team_size) || 2 : 2;
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   const byKey = (key: string) => players.find((p) => pkey(p) === key) || null;
   const ph = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
   const label = (p: Player) => `${p.display_name} · PH ${ph(p)}`;
   const assignedGroups = players.map((p) => p.tee_group).filter((g): g is number => g != null);
   const maxExisting = assignedGroups.length ? Math.max(...assignedGroups) : 0;
-  const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / 2));
+  const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / perSide));
   const unassigned = players.filter((p) => p.tee_group == null && !p.no_show);
   const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter((group) =>
-    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === 2),
+    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === perSide),
   ).length;
   const scoringStarted = players.some((p) => (p.scores || []).some((score) => score != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
 
@@ -832,7 +880,9 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <Eyebrow>GROUPS · BUILD EACH MATCH</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
-        Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
+        {game.game_type === "scramble"
+          ? <>Each group is one match: its {teams[0].name} players are one scramble team, its {teams[1].name} players the other — exactly {perSide} of each.</>
+          : <>Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players.</>} Team membership stays visible while you build the match.
       </div>
       {game.game_type === "trifecta" ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Once four players are selected, choose the two Singles matchups inside that group.</div> : null}
       {scoringStarted ? <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>Groups and Trifecta Singles matchups are locked because scoring has started.</div> : null}
@@ -860,14 +910,14 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
 
       {Array.from({ length: groupCount }, (_, i) => i + 1).map((group) => {
         const sides = teams.map((t) => players.filter((p) => p.team === t.key && p.tee_group === group && !p.no_show));
-        const ready = sides.every((side) => side.length === 2);
-        const extras = sides.flatMap((side) => side.slice(2));
+        const ready = sides.every((side) => side.length === perSide);
+        const extras = sides.flatMap((side) => side.slice(perSide));
         const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
-            <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{selectFor(t.key, group, 0)}{selectFor(t.key, group, 1)}</div>
+            <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/{perSide} selected</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{Array.from({ length: perSide }, (_, slot) => <React.Fragment key={slot}>{selectFor(t.key, group, slot)}</React.Fragment>)}</div>
           </div>)}
           {extras.map((p) => <button key={p.id} disabled={scoringStarted} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11, opacity: scoringStarted ? .62 : 1 }}>Move extra player {p.display_name} to unassigned</button>)}
           {game.game_type === "alt_shot" && ready && f ? <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
@@ -954,4 +1004,9 @@ export function ShareControl({ game, onShare, token, path = "live", title, blurb
       )}
     </div>
   );
+}
+
+/** 211.1: whose drive a scramble team used on a hole (null when none recorded). */
+function scrambleDriveAt(rows: AltShotScoreRow[], foursomeId: string, side: AltShotScoreSide, holeIdx: number): string | null {
+  return rows.find((r) => r.foursome_id === foursomeId && r.side === side && r.hole_index === holeIdx)?.drive_key ?? null;
 }

@@ -93,4 +93,14 @@ check("another player's score locks it too",
 
 console.log(`\n=== game-setup-policy.test ===\nPASS ${pass}  FAIL ${fail}`);
 if (failures.length) { console.log(failures.join("\n")); process.exit(1); }
+// 212.2 — a SCRAMBLE: once team scoring starts, players' own cards are still empty, but scoring HAS started
+{
+  const sg = { id: "s", game_type: "scramble", status: "active", alt_shot_scoring_started_at: "2026-10-21T10:00:00Z", foursomes: [], holes_meta: [] } as never;
+  const sp = { id: "p1", user_id: "u1", display_name: "Raj", scores: Array(18).fill(null) } as never;
+  const d = decideSetupChange({ game: sg, players: [sp], action: { type: "remove_player", player: sp } as never });
+  if (d.decision === "allow") throw new Error("removing a scramble player after team scoring started was silently allowed");
+  if (!String((d as { reason?: string }).reason || "").includes("scramble team scoring")) throw new Error(`the message should name scramble team scoring (got ${JSON.stringify(d)})`);
+  const before = decideSetupChange({ game: { ...(sg as object), alt_shot_scoring_started_at: null } as never, players: [sp], action: { type: "remove_player", player: sp } as never });
+  if (before.decision === "block") throw new Error(`before team scoring starts, removing a player isn't blocked (got ${JSON.stringify(before)})`);
+}
 console.log("All assertions passed.");

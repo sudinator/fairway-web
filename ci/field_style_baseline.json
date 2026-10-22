@@ -1,0 +1,17 @@
+{
+ "components/contests-view.tsx": 8,
+ "components/course-history.tsx": 1,
+ "components/game/scorecard-views.tsx": 1,
+ "components/groups.tsx": 1,
+ "components/lineup-view.tsx": 1,
+ "components/manage.tsx": 2,
+ "components/manage/courses.tsx": 1,
+ "components/money.tsx": 5,
+ "components/organizer.tsx": 1,
+ "components/player-card.tsx": 1,
+ "components/round-setup.tsx": 1,
+ "components/tee-times.tsx": 2,
+ "components/tournaments.tsx": 1,
+ "components/ui.tsx": 2,
+ "components/yardage-backfill.tsx": 1
+}

@@ -238,6 +238,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState("Saturday Morning");
   const [format, setFormat] = useState<CompetitionSession["format"]>("fourball");
+  const [scrambleSize, setScrambleSize] = useState<2 | 3 | 4>(2);   // 212.3: players per team in a scramble session
   const [playDate, setPlayDate] = useState(today());
   const [plannedMatches, setPlannedMatches] = useState("3");
   const [pointsPerMatch, setPointsPerMatch] = useState("1");
@@ -309,6 +310,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     const values = {
       name: sessionName.trim() || competitionFormatLabel(format), format, play_date: playDate,
       points_per_match: points, planned_match_count: count,
+      scramble_team_size: format === "scramble" ? scrambleSize : null,   // 212.3 (0212)
     };
     const { error } = editingSessionId
       ? await supabase.from("competition_sessions").update(values).eq("id", editingSessionId).eq("competition_id", competition.id)
@@ -319,7 +321,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   };
 
   const editPlannedSession = (session: CompetitionSession) => {
-    setSessionName(session.name); setFormat(session.format); setPlayDate(session.play_date);
+    setSessionName(session.name); setFormat(session.format); setPlayDate(session.play_date); setScrambleSize(((session.scramble_team_size ?? 2) as 2 | 3 | 4));
     setPlannedMatches(String(session.format === "trifecta" ? session.planned_match_count / 3 : session.planned_match_count)); setPointsPerMatch(String(session.points_per_match));
     setEditingSessionId(session.id); setAdding(true); setErr(null);
   };
@@ -332,7 +334,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       gameType: session.format,
       teamNames: { A: competition.team_a_name, B: competition.team_b_name },
       participantTeams,
-      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match) },
+      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, scrambleTeamSize: session.format === "scramble" ? (session.scramble_team_size ?? 2) : undefined, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match) },
     });
   };
 
@@ -495,7 +497,16 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       {adding ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 12 }}>
         <label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>SESSION NAME</label><input value={sessionName} onChange={(e) => setSessionName(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} />
         <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 12 }}>FORMAT</label>
-        <select disabled={!!editingSession?.game_id} value={format} onChange={(e) => setFormat(e.target.value as CompetitionSession["format"])} style={{ ...inputStyle, marginTop: 6, opacity: editingSession?.game_id ? .65 : 1 }}><option value="fourball">Four-Ball</option><option value="alt_shot">Alternate Shot</option><option value="match">Singles</option><option value="trifecta">Trifecta</option></select>
+        <select disabled={!!editingSession?.game_id} value={format} onChange={(e) => setFormat(e.target.value as CompetitionSession["format"])} style={{ ...inputStyle, marginTop: 6, opacity: editingSession?.game_id ? .65 : 1 }}><option value="fourball">Four-Ball</option><option value="alt_shot">Alternate Shot</option><option value="match">Singles</option><option value="trifecta">Trifecta</option><option value="scramble">Scramble</option></select>
+        {format === "scramble" ? (
+          <div style={{ marginTop: 12 }}>
+            <label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>PLAYERS PER TEAM</label>
+            <select disabled={!!editingSession?.game_id} aria-label="Players per team" value={scrambleSize} onChange={(e) => setScrambleSize(Number(e.target.value) as 2 | 3 | 4)} style={{ ...inputStyle, marginTop: 6 }}>
+              <option value={2}>2 v 2</option><option value={3}>3 v 3</option><option value={4}>4 v 4</option>
+            </select>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Every match is one scramble team from each side, both with this many players — team v team, hole by hole, with team handicaps.</div>
+          </div>
+        ) : null}
         <div style={{ marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>DATE</label><ShortDateInput value={playDate} onChange={setPlayDate} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>{format === "trifecta" ? "FOURSOMES" : "MATCHES"}<input inputMode="numeric" value={plannedMatches} onChange={(e) => setPlannedMatches(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>POINTS EACH<input inputMode="decimal" value={pointsPerMatch} onChange={(e) => setPointsPerMatch(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label></div>
         <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 10 }}>A halved match splits its value equally. Save every planned session, review the total, then lock the schedule before play.</div>

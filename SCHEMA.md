@@ -1,3 +1,43 @@
+## 212.3 — Cup scramble (0212)
+
+competition_sessions.format + 'scramble'; competition_sessions.scramble_team_size 2–4; guard_competition_game_structure checks Cup scramble (match mode, team ≤ size), trigger fires on scramble_mode too; get_live_competition game block carries scramble_mode/handicap/allowance/team_size, foursomes carry a_hcp/b_hcp.
+
+## 212.1 — Scramble on the line-up and live feeds (0211)
+
+get_live_lineup adds scramble_mode, scramble_handicap, scramble_allowance, scramble_team_size; get_live_scorecard adds scramble_team_size.
+
+## 211.9 — Scramble handicap methods (0210)
+
+games.scramble_handicap: usga | agreed (gross legacy); games.scramble_allowance jsonb {"<size>": [pct…]} lowest first, absent = USGA; team size 1 = captains only (always agreed); get_live_scorecard game block carries scramble_allowance.
+
+## 211.8 — Scramble team handicaps (0209)
+
+games.scramble_team_size 1–4 (1 = one app player per team); games.foursomes[].a_hcp / b_hcp — entered team handicap (null = calculated); save_scramble_side_score accepts one-player teams only when scramble_team_size = 1; get_live_scorecard foursomes carry a_hcp / b_hcp.
+
+## 211.6 — Player cards server-only (0208)
+
+player_cards: player_cards_read_own (select own); member writes revoked; written by /api/member-stats (service role).
+
+## 211.5 — Policy review fixes (0207)
+
+game_players guests_added_by_players / guests_removed_by_players (plays_with_guest, not after end); member_badges read-only (member_badges_read_own); activity_log_insert_by_meaning; log_club_deleted trigger on groups (action club_deleted).
+
+## 211.4 — Member privileges (0206)
+
+Non-core tables: authenticated privileges only where a permissive rule for that command exists (SELECT also where any write rule exists); guard_active_account on every member-writable table except profiles, notifications, push_subscriptions, daily_active, feedback; default privileges revoke tables from authenticated; can_decide_signup not callable by members.
+
+## 211.3 — anon boundary (0205)
+
+anon: no privileges on public tables; EXECUTE only on get_live_scorecard / get_live_competition / get_live_lineup among SECURITY DEFINER functions; default privileges revoke anon.
+
+## 211.1 — Live scramble (0204)
+
+get_live_scorecard's game block adds scramble_mode and scramble_handicap.
+
+## 211.0 — Scramble (0203)
+
+games.scramble_team_size (2–4), scramble_mode (field | match), scramble_handicap (usga | gross), scramble_min_drives. game_alt_shot_scores.drive_key. save_scramble_score_fenced(game, version, foursome, side, hole, strokes, drive) — authenticated; save_scramble_side_score not callable directly.
+
 ## 210.12 — System admins read every club (0202)
 
 groups_select_member / group_members_select_visible gain OR is_admin().

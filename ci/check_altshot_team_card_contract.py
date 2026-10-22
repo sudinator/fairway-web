@@ -7,7 +7,8 @@ seg = Path('components/game/segment-views.tsx').read_text(encoding='utf-8')
 checks = {
     'alternate shot collapses duplicated partner rows into side columns': 'renders exactly TWO scoring entities: the two sides' in score and 'const makeSide = (ids: string[], which: "a" | "b")' in score,
     'alternate shot card names the team not the clicked player': 'altSide: { name: teamName' in score and 'sideCol.altSide.name' in score,
-    'alternate shot card shows side playing handicap': 'playing hcp {c.altSide.sideCh' in score and 'playing hcp ${sideCol.altSide.sideCh' in score,
+    # 212.4: a scramble team shows "team hcp" instead; alternate shot keeps "playing hcp" in both places
+    'alternate shot card shows side playing handicap': 'playing hcp {c.altSide.sideCh' in score and '"team" : "playing"} hcp ${sideCol.altSide.sideCh' in score,
     'alternate shot score cells show side net rather than Stableford points': 'c.altSide && gross != null && gross > 0' in score and '!c.altSide && gross != null && gross > 0' in score,
     'alternate shot modal hides individual stat entry': 'showFairway={!sideCol?.altSide}' in score and 'showPutts={!sideCol?.altSide}' in score and 'showPenalties={!sideCol?.altSide}' in score,
     'alternate shot modal writes only the side score': 'if (sideCol?.altSide && edit.alt && onSetAltShotScore)' in score and 'onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null)' in score,

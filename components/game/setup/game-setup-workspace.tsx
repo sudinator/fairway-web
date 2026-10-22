@@ -1,12 +1,15 @@
 "use client";
 
+import { SCRAMBLE_METHOD_LABEL, type ScrambleMethod } from "@/lib/scramble-method";
+import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
+import { scrambleSetupProblem, scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
 import React from "react";
 import { gameTypeLabel } from "@/lib/game-create";
 import { ShareLineupModal } from "@/components/share-card";
 import type { CourseTee } from "@/lib/courses";
 import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
-import { pkey, shapeOf } from "@/lib/game-shape";
+import { pkey, shapeOf, scrambleMethodOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import { courseLabel, type Course } from "@/lib/courses";
 import { ShareControl } from "@/components/game/scorecard-views";
@@ -29,6 +32,8 @@ export type GameSetupWorkspaceProps = {
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
+  /** 211.1: save a scramble's teams (games.foursomes + tee groups). */
+  onSetScrambleTeams?: (groups: ScrambleGroup[]) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onSetLegConfig?: (cfg: LegConfig) => void;
@@ -63,6 +68,7 @@ export function GameSetupWorkspace({
   onChangeCourse,
   onSetTeeGroup,
   onSetTeamGroupSlot,
+  onSetScrambleTeams,
   onSetAltShotFirstDriver,
   onSetTrifectaPairing,
   onSetLegConfig,
@@ -109,11 +115,17 @@ export function GameSetupWorkspace({
   const cGrouped = players.filter((p) => p.tee_group != null).length;
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
-  const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
-  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+  // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
+  const isScramble = game.game_type === "scramble" && !usesTeams;   // 212.5: a Ryder Cup scramble uses Teams + Groups
+  const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field",
+    { size: (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? 1 : null, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed" }) : null;
+  const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
+  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");
+  // 212.5: players per side in each group — 2, or a Ryder Cup scramble session's size
+  const perSide = game.game_type === "scramble" ? Number((game as { scramble_team_size?: number | null }).scramble_team_size) || 2 : 2;
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
   const showMatchupsTab = usesMatchups && game.game_type !== "trifecta";
-  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === 2 && f.b.length === 2);
+  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === perSide && f.b.length === perSide);
   const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));
   const groupsDone = teamGroupFormat ? (teamGroupsValid && altDriversDone) : usesFoursomes || (total > 0 && cGrouped === total);
   const structureDone = teamsDone && matchupsDone && groupsDone;
@@ -129,7 +141,9 @@ export function GameSetupWorkspace({
   React.useEffect(() => setDateEdit(String((game as any).played_at || "").slice(0, 10)), [(game as any).played_at]);
   React.useEffect(() => {
     if (game.game_type === "trifecta" && setupTab === "matchups") onSetupTabChange("groups");
-  }, [game.game_type, onSetupTabChange, setupTab]);
+    // 211.7: a "teams" tab on a format without two global teams (scramble) shows its own editor instead.
+    else if (setupTab === "teams" && !usesTeams && showMatchupsTab) onSetupTabChange("matchups");
+  }, [game.game_type, onSetupTabChange, setupTab, usesTeams, showMatchupsTab]);
 
   const stepDefs = [
     { key: "details", label: "Game", done: !!game.name && !!game.course },
@@ -139,12 +153,17 @@ export function GameSetupWorkspace({
     { key: "review", label: "Review", done: allDone },
   ] as const;
 
+  // 211.7: the Teams step opens on the editor THIS format uses. It always opened "teams" — the two-team editor —
+  // so a scramble (whose teams are built in its own editor, the matchups slot) landed on the wrong one.
+  const firstStructureTab = usesTeams ? "teams" : showMatchupsTab ? "matchups" : "groups";
   const openSection = (key: typeof stepDefs[number]["key"]) => {
-    if (key === "structure") onSetupTabChange("teams");
+    if (key === "structure") onSetupTabChange(firstStructureTab);
     else onSetupTabChange(key);
   };
 
-  const structureSummary = usesTeams
+  const structureSummary = isScramble
+    ? (scrambleProblem ?? `${scrambleTeamsOf(foursomes as never).length} teams · ${(game as { scramble_mode?: string | null }).scramble_mode === "match" ? "team v team" : "one leaderboard"}`)
+    : usesTeams
     ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped`
     : usesMatchups
       ? `${cPlaced}/${total} matched · ${cGrouped}/${total} grouped`
@@ -153,7 +172,7 @@ export function GameSetupWorkspace({
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
-    { key: "format" as const, title: "Format", sub: `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "format" as const, title: "Format", sub: game.game_type === "scramble" ? `Scramble · ${usesTeams ? `Ryder Cup · ${perSide} v ${perSide}` : (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];
@@ -290,7 +309,7 @@ export function GameSetupWorkspace({
         <>
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {usesTeams && <button onClick={() => onSetupTabChange("teams")} style={{ ...btn(setupTab === "teams"), flex: 1, fontSize: 12 }}>Teams</button>}
-            {showMatchupsTab && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
+            {showMatchupsTab && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>{isScramble ? "Teams" : "Matchups"}</button>}
             {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
           {setupTab === "teams" && (isCompetitionGame ? (
@@ -309,7 +328,9 @@ export function GameSetupWorkspace({
             </div>
           ) : <OrganizerPanel section="teams" {...organizerPanelProps} />)}
           {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
-          {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
+          {setupTab === "matchups" && (isScramble
+            ? <div style={cardStyle}><ScrambleTeamsBuilder game={game} players={players} readOnly={anyScores || !onSetScrambleTeams} onSave={(g) => onSetScrambleTeams?.(g)} /></div>
+            : <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>)}
         </>
       )}
 
@@ -343,7 +364,7 @@ export function GameSetupWorkspace({
             {[
               [playersDone, "All players have tees and handicaps set"],
               [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
-              [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
+              [matchupsDone, isScramble ? (scrambleProblem ?? "Teams are complete") : usesMatchups ? "Matchups are complete" : "Matchups are not required"],
               [groupsDone, teamGroupFormat ? (game.game_type === "alt_shot" ? "Teams, groups and first tee players are set" : "Teams and groups define each Four-Ball match") : usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
             ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
           </div>

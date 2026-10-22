@@ -22,8 +22,6 @@ import { CoursesLibrary } from "@/components/manage/courses";
 import { ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
 import { MoneyTab } from "@/components/money";
 import { TeeTimes } from "@/components/tee-times";
-import { syncBadges } from "@/lib/badge-sync";
-import { syncPlayerCard } from "@/lib/card-sync";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -599,10 +597,11 @@ export function Home({ session }: { session: any }) {
   useEffect(() => {
     if (!user?.id || !rounds.length) return;
     let alive = true;
-    syncBadges(supabase, user.id, rounds).then((res) => {
-      if (alive && (res.changed || res.removed)) setBadgeSync((v) => v + 1);
+    // 211.6: the SERVER works out badges and the player card from this member's rounds as the database holds
+    // them (lib/member-stats-server) — the phone sends no numbers, so neither can be overwritten by hand.
+    fetch("/api/member-stats", { method: "POST" }).then((r) => (r.ok ? r.json() : null)).then((res) => {
+      if (alive && res && (res.badgesChanged || res.badgesRemoved)) setBadgeSync((v) => v + 1);
     }).catch(() => {});
-    syncPlayerCard(supabase, user.id, rounds).catch(() => {});
     return () => { alive = false; };
   }, [rounds, user?.id]);
 

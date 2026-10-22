@@ -7,6 +7,7 @@ import type { Recap } from "@/lib/game-recap";
 import { fmtPoints } from "@/lib/game-results";
 import type { CupLine } from "@/lib/cup-standing";
 import { shortenedNote } from "@/lib/round-rules";
+import { scrambleRowValue } from "@/lib/scramble-game";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const sgn = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
@@ -42,6 +43,10 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
     ROW(m.halved ? `${esc(m.winners.join(" & "))} halved with ${esc(m.losers.join(" & "))}` : `${esc(m.winners.join(" & "))} <span style="color:#5d6f66">beat</span> ${esc(m.losers.join(" & "))}`, esc(m.result))).join("")));
   if (s.skins?.length) parts.push(H("SKINS") + TABLE(s.skins.filter((k) => k.skins > 0).map((k) => ROW(esc(k.name), `${fmtPoints(k.skins)} · holes ${k.holes.map((x) => x.n).join(", ")}`)).join("")));
   if (s.skinMatches?.rows.length) parts.push(H(s.skinMatches.title.toUpperCase()) + TABLE(s.skinMatches.rows.map((m) => ROW(`${esc(m.a.join(" & "))} vs ${esc(m.b.join(" & "))}`, `${fmtPoints(m.aSkins)}–${fmtPoints(m.bSkins)}`)).join("")));
+  // 211.1: a scramble's results — the recap card's wording (scrambleRowValue)
+  if (s.scramble) parts.push(H(s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`) + TABLE(s.scramble.mode === "match"
+    ? s.scramble.matches.map((m) => ROW(esc(m), "")).join("")
+    : s.scramble.rows.map((r) => ROW(`${esc(r.pos)} &nbsp;${esc(r.name)} <span style="color:#5d6f66;font-size:12px">${esc(r.members)}</span>`, esc(scrambleRowValue(r, s.scramble!.gross)))).join("")));
   if (s.leaderboard?.rows.length) parts.push(H(`LEADERBOARD · ${s.leaderboard.basis.toUpperCase()}`) + TABLE(s.leaderboard.rows.slice(0, 10).map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, String(x.item.score))).join("")));
   // 2. how the field played
   if (s.individualStats) {

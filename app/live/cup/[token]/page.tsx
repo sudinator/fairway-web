@@ -23,7 +23,7 @@ type LiveCup = {
 };
 
 const FORMAT_LABEL: Record<string, string> = {
-  fourball: "Four-Ball", alt_shot: "Alternate Shot", match: "Singles", trifecta: "Trifecta",
+  fourball: "Four-Ball", alt_shot: "Alternate Shot", match: "Singles", trifecta: "Trifecta", scramble: "Scramble",
 };
 /** What the viewer is actually watching, in one sentence per format. */
 const FORMAT_BLURB: Record<string, string> = {
@@ -31,6 +31,7 @@ const FORMAT_BLURB: Record<string, string> = {
   alt_shot: "One ball per side, partners alternating shots. One point per match.",
   match: "Singles: one player against one player, hole by hole. One point per match.",
   trifecta: "Two singles matches plus a team match inside every foursome \u2014 three points per group.",
+  scramble: "Every player hits, the team picks the best shot and everyone plays from there \u2014 one score per team, team v team with team handicaps. One point per match.",
 };
 const fmtPts = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ""));
 

@@ -5,7 +5,7 @@ import { buildClubReport, reportPeriods, completedRoundsNote } from "./club-repo
 import { buildRecap } from "./game-recap";
 import { matchOutcomes, memberRecord } from "./match-outcomes";
 import { gameContextFor } from "./round-email-server";
-import { isFullCard, isValidRound, handicapReading, holeScore, shortenedNote } from "./round-rules";
+import { isFullCard, isValidRound, handicapReading, holeScore, shortenedNote, countsForIndividualStats } from "./round-rules";
 
 /** Every number anywhere in a result is finite. */
 function finite(x: unknown, where: string): void {
@@ -84,4 +84,5 @@ for (const g of games) {
   ok(triRecap.highlights.shortened.some((x) => x.name === "Tri Two" && x.holes === 12), "Trifecta: the 12-hole player is named as shortened");
   for (const o of matchOutcomes(tri.game, tri.players)) ok([...o.a, ...o.b].every((p) => p.userId), "Trifecta outcomes: members only");
 }
+ok(!countsForIndividualStats("scramble") && !countsForIndividualStats("alt_shot") && countsForIndividualStats("stroke"), "scramble and alternate shot scores never become individual stats (211.1)");
 console.log("messy-data tests passed");

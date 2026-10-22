@@ -61,7 +61,12 @@ const sameFoursomeFamily = (game: Game, target: GameType): boolean => {
 };
 
 export function decideSetupChange({ game, players, action }: SetupPolicyContext): SetupDecision {
-  const altSideScoresStarted = game.game_type === "alt_shot" && !!game.alt_shot_scoring_started_at;
+  // 212.2: one-ball formats (alternate shot, scramble) record the side's / team's score, not the players' — so
+  // "scoring has started" is the side-scoring marker, and once it's set every player counts as having scores.
+  const altSideScoresStarted = (game.game_type === "alt_shot" || game.game_type === "scramble") && !!game.alt_shot_scoring_started_at;
+  const hasScores = (p: Player) => playerHasScores(p) || altSideScoresStarted;
+  const sideScoring = game.game_type === "scramble" ? "scramble team scoring" : "Alternate Shot side scoring";
+  const sides = game.game_type === "scramble" ? "teams" : "sides";
   const anyScores = gameHasScores(players) || altSideScoresStarted;
 
   // Metadata/visibility remain safe even after the competition has ended.
@@ -111,8 +116,8 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       return block("Players cannot be added after scoring starts in a match or team contest because that would change the competitive structure.");
     }
     case "remove_player": {
-      if (altSideScoresStarted) return block("Players are frozen once Alternate Shot side scoring begins. Reset scores before changing the sides.");
-      if (playerHasScores(action.player)) {
+      if (altSideScoresStarted) return block(`Players are frozen once ${sideScoring} begins. Reset scores before changing the ${sides}.`);
+      if (hasScores(action.player)) {
         return block(`${action.player.display_name} already has scores. Mark them No-show / Out instead so their played holes stay in the game.`);
       }
       return requireConfirm(
@@ -150,15 +155,15 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       );
     }
     case "set_team": {
-      if (altSideScoresStarted) return block("Teams are frozen once Alternate Shot side scoring begins. Reset scores before changing the sides.");
-      if (playerHasScores(action.player)) {
+      if (altSideScoresStarted) return block(`Teams are frozen once ${sideScoring} begins. Reset scores before changing the ${sides}.`);
+      if (hasScores(action.player)) {
         return block(`${action.player.display_name} already has scores. Team membership is frozen once that player's scoring begins.`);
       }
       return allow();
     }
     case "set_tee_group": {
-      if (altSideScoresStarted) return block("Groups are frozen once Alternate Shot side scoring begins. Reset scores before moving players.");
-      if (playerHasScores(action.player) || action.player.group_locked) {
+      if (altSideScoresStarted) return block(`Groups are frozen once ${sideScoring} begins. Reset scores before moving players.`);
+      if (hasScores(action.player) || action.player.group_locked) {
         return block(`${action.player.display_name}'s tee group is frozen because scoring has started for that player/group.`);
       }
       const targetLocked = action.group != null && players.some((p) => p.tee_group === action.group && p.group_locked);

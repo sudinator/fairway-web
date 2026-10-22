@@ -43,6 +43,10 @@ export type GameSetupDraft = {
     team2: string;
     /** 209.4: colours chosen with the names (optional — drafts saved earlier have none). */
     teamColors?: [string | null, string | null];
+    scrambleTeamSize?: 1 | 2 | 3 | 4;
+    scrambleHandicap?: "usga" | "gross" | "agreed";
+    scrambleMinDrives?: number | null;
+    scrambleAllowance?: Record<string, number[]> | null;
   };
   flights: {
     mode: "off" | "oneoff";
@@ -76,6 +80,10 @@ export type GameSetupDraftInput = {
   team1: string;
   team2: string;
   teamColors?: [string | null, string | null];
+  scrambleTeamSize?: 1 | 2 | 3 | 4;
+  scrambleHandicap?: "usga" | "gross" | "agreed";
+  scrambleMinDrives?: number | null;
+  scrambleAllowance?: Record<string, number[]> | null;
   flightMode: "off" | "oneoff";
   flightCount: number;
   flightTeeIdx: Record<string, number>;
@@ -109,7 +117,7 @@ export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
       skinsTeamStyle: i.skinsTeamStyle,
       skinsMode: i.skinsMode,
     },
-    structure: { team1: i.team1, team2: i.team2, teamColors: i.teamColors ?? [null, null] },
+    structure: { team1: i.team1, team2: i.team2, teamColors: i.teamColors ?? [null, null], scrambleTeamSize: i.scrambleTeamSize, scrambleHandicap: i.scrambleHandicap, scrambleMinDrives: i.scrambleMinDrives ?? null, scrambleAllowance: i.scrambleAllowance ?? null },
     flights: { mode: i.flightMode, count: i.flightCount, teeIdxByFlight: i.flightTeeIdx },
     tees: { playerOverrides: i.playerTeeOverrides },
   };
@@ -141,6 +149,7 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     team2: d.structure.team2,
     // 209.4: only when colours were chosen, so a draft without them is stored exactly as before.
     ...(d.structure.teamColors && (d.structure.teamColors[0] || d.structure.teamColors[1]) ? { teamColors: d.structure.teamColors } : {}),
+    ...(d.format.gameType === "scramble" ? { scrambleTeamSize: d.structure.scrambleTeamSize, scrambleHandicap: d.structure.scrambleHandicap, scrambleMinDrives: d.structure.scrambleMinDrives ?? null, scrambleAllowance: d.structure.scrambleAllowance ?? null } : {}),
     flightMode: d.flights.mode,
     flightCount: d.flights.count,
     flightTeeIdx: d.flights.teeIdxByFlight,
@@ -173,6 +182,7 @@ export function fromLegacySetupDraft(d: SetupDraft): GameSetupDraft {
     team1: d.team1,
     team2: d.team2,
     teamColors: d.teamColors ?? [null, null],
+    scrambleTeamSize: d.scrambleTeamSize, scrambleHandicap: d.scrambleHandicap, scrambleMinDrives: d.scrambleMinDrives ?? null, scrambleAllowance: d.scrambleAllowance ?? null,
     flightMode: d.flightMode === "oneoff" ? "oneoff" : "off",
     flightCount: d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3,
     flightTeeIdx: d.flightTeeIdx || {},
