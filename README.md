@@ -1,3 +1,7 @@
+## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
+
+Owner (Oct 22), from staging:
+
 ## 212.3.261021 — Scramble as a Ryder Cup session (0212)
 
 Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."

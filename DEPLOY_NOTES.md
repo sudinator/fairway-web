@@ -1,3 +1,17 @@
+## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
+
+Owner (Oct 22), from staging:
+
+**The line-up card didn't make sense for a scramble.** There are two line-up cards: the public line-up page (which had a scramble version since 212.1) and the line-up you share from the app (components/share-card), which still laid every game out by group with individual playing handicaps. Both now use ONE scramble line-up (components/game/scramble-lineup.tsx): by team (and by match for team v team); each player's own handicap shown as the input it is ("Index 3.8 → course hcp 4.2"); the method stated with the percentages actually used for each team size; under USGA each player's "× 25% = 1.1" and the sum line ("1.1 + 2.0 + 2.2 + 2.2 = 7.44 → 7"); under agreed the agreed number with players' handicaps for reference. Each team handicap is shown prominently in light text on the card's dark green. "Copy as text" says the same (scrambleLineupText).
+
+**Random scores (staging) didn't show in a scramble's results.** The 🎲 tool wrote individual scores to each player's own card — visible in the score history, but a scramble's (and alternate shot's) results read team / side scores. For one-ball formats it now writes team / side scores through the same fenced save as the scorecard, and for a scramble with a drive requirement records whose drive, round-robin.
+
+**Scorecard header:** a scramble team no longer shows the handicap twice ("playing hcp" and "team hcp") — just "team hcp"; the score-entry title says "team hcp".
+
+**"Protected Deployment – Vercel" on a shared staging link** is Vercel's Deployment Protection on the staging project (a Vercel login is required); production isn't protected that way. Not an app change — the owner can turn it off for staging, or use a protection-bypass link, in the Vercel project's settings.
+
+No migration. Deploy: code only.
+
 ## 212.3.261021 — Scramble as a Ryder Cup session (0212)
 
 Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."

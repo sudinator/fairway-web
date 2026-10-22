@@ -536,7 +536,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                   <>
                     <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>
                     <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => shortOf(n)).join(" / ")}</div>
-                    <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div>
+                    {game.game_type !== "scramble" ? <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div> : null}
                     {game.game_type === "scramble"
                       ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}>{game.scramble_handicap === "gross" ? "gross" : `team hcp ${c.altSide.sideCh ?? "–"}`}</div>
                       : <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>}
@@ -615,7 +615,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
         };
         return (
           <HoleScoreModal
-            title={`${sideCol?.altSide ? `${sideCol.altSide.name} · playing hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
+            title={`${sideCol?.altSide ? `${sideCol.altSide.name} · ${game.game_type === "scramble" ? "team" : "playing"} hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
             par={m.par}
             si={m.si ?? null}
             yardage={ydsAt(edit.holeIdx, m.yards)}

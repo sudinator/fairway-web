@@ -9,11 +9,8 @@ import { buildLineup, strokesPhrase, type LineupRow } from "@/lib/lineup";
 import { lineupTitle, fmtMatchDate } from "@/lib/lineup-meta";
 import { APP_VERSION } from "@/lib/app-version";
 import { tint } from "@/lib/team-tint";
-import { scrambleResults } from "@/lib/scramble-game";
-import { scrambleTeamHandicap, customAllowanceFor } from "@/lib/scramble";
-import { chBasis, pkey, scrambleMethodOf } from "@/lib/game-shape";
-import { SCRAMBLE_METHOD_LABEL, scrambleMethodText } from "@/lib/scramble-method";
 import type { Game, Player } from "@/lib/game-types";
+import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 
 // Where the "open the app" button leads depends on the platform, and the page must say the truth:
 //   ios-browser  — iOS gives web apps no way to claim their links, so a tap from WhatsApp always lands
@@ -186,60 +183,8 @@ function OpenAppButton({ code, platform }: { code?: string | null; platform: Lin
 }
 
 
-/** 212.1: the line-up for a scramble — each team, its players and its team handicap, and how it was worked out. */
+/** 212.4: the scramble line-up — the shared card (components/game/scramble-lineup), by team, inputs and method. */
 function ScrambleLineup({ data }: { data: any }) {
-  const game = { ...data, id: data.id ?? "lineup", game_type: "scramble", holes_meta: data.holes_meta || [], foursomes: data.foursomes || [] } as Game;
-  const players = (data.players || []).filter((p: any) => !p.no_show) as Player[];
-  const r = scrambleResults(game, players, []);
-  const method = scrambleMethodOf(game);
-  const captains = game.scramble_team_size === 1;
-  const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
-  const byKey = new Map(players.map((p) => [pkey(p), p]));
-  const groups = (game.foursomes || []) as unknown as { id: string; name: string; a: string[]; b: string[] }[];
-  return (
-    <>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP · SCRAMBLE</div>
-        <div style={{ fontSize: 21, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>{data.name || "Game"}</div>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 2 }}>{[data.course, fmtMatchDate(data.played_on) || data.played_at].filter(Boolean).join(" · ")}</div>
-        <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, marginTop: 8 }}>
-          {captains ? "Captains only · " : ""}{r.mode === "match" ? "Team v team" : "One leaderboard"} · {SCRAMBLE_METHOD_LABEL[method]}
-        </div>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.45 }}>{scrambleMethodText(method, captains ? 1 : 4)}</div>
-      </div>
-      {!r.teams.length ? <div style={{ color: C.sage, textAlign: "center", marginTop: 20 }}>The teams haven&apos;t been made yet.</div> : null}
-      {r.teams.map((t) => {
-        const g = groups.find((x) => x.id === t.groupId);
-        const keys = (g?.[t.side] || []) as string[];
-        const members = keys.map((k) => byKey.get(k)).filter((p): p is Player => !!p);
-        const chs = members.map((p) => Number(chBasis(p as never, game.course_par, nh >= 18 ? undefined : nh) ?? 0));
-        const th = method === "usga" && members.length >= 2 ? scrambleTeamHandicap(chs, false, customAllowanceFor(game.scramble_allowance, members.length)) : null;
-        const matchHead = r.mode === "match" && t.side === "a" ? g?.name : null;
-        return (
-          <React.Fragment key={t.key}>
-            {matchHead ? <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.6, fontWeight: 800, marginTop: 16 }}>{matchHead.toUpperCase()}</div> : null}
-            <div data-lineup-team style={{ background: C.cell, borderRadius: 10, padding: "8px 12px", marginTop: 8 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                <span style={{ color: C.green, fontSize: 15, fontWeight: 800 }}>{t.name}</span>
-                <span style={{ textAlign: "right" }}>
-                  <span style={{ color: C.green, fontSize: 19, fontWeight: 800, fontFamily: "Georgia, serif" }}>{method === "gross" ? "—" : t.handicap}</span>
-                  <span style={{ display: "block", color: "#676253", fontSize: 11, letterSpacing: 0.6 }}>TEAM HCP</span>
-                </span>
-              </div>
-              {members.map((p, i) => {
-                const part = th?.parts.find((x) => x.index === i);
-                return (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", color: "#676253", fontSize: 12.5, marginTop: 4 }}>
-                    <span style={{ color: C.green, fontWeight: 700 }}>{p.display_name}{captains ? " · captain" : ""}</span>
-                    <span>{method === "usga" && part ? `${chs[i].toFixed(1)} × ${Math.round(part.pct * 100)}% = ${part.counts.toFixed(1)}` : method === "agreed" && i === 0 ? "agreed" : ""}</span>
-                  </div>
-                );
-              })}
-              {th ? <div style={{ color: "#676253", fontSize: 11, marginTop: 4 }}>{th.raw.toFixed(2)}, rounded to {th.total}</div> : null}
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </>
-  );
+  const game = { ...data, id: data.id ?? "lineup", game_type: "scramble", holes_meta: data.holes_meta || [], foursomes: data.foursomes || [], played_at: data.played_on || data.played_at } as Game;
+  return <ScrambleLineupCard game={game} players={(data.players || []) as Player[]} />;
 }

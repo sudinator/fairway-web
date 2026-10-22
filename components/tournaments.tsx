@@ -2574,6 +2574,28 @@ function GameRoom({
     if (!allowSetupChange({ type: "set_handicap", player: players[0] })) return "Blocked.";
     const holes = (game.holes_meta || []).map((h) => ({ par: h.par }));
     let n = 0;
+    // 212.4: one-ball formats (scramble, alternate shot) score the TEAM / SIDE, not the players — random scores
+    // go to the team-score store through the same fenced save as the scorecard (they used to land on the players'
+    // own cards: visible in the score history, invisible in the results). A scramble with a drive requirement
+    // also records whose drive, round-robin through the team.
+    if (game.game_type === "scramble" || game.game_type === "alt_shot") {
+      for (const f of game.foursomes || []) for (const side of ["a", "b"] as const) {
+        const members = (f[side] || []) as string[];
+        if (!members.length) continue;
+        const existing = canonicalAltShotGross(altShotScores, f.id, side, holes.length, null);
+        const next = autoScores(existing, holes, through);
+        for (let i = 0; i < Math.min(through, holes.length); i++) {
+          if (existing[i] != null || next[i] == null) continue;
+          const { error } = game.game_type === "scramble"
+            ? await supabase.rpc("save_scramble_score_fenced", { p_game: game.id, p_version: game.scoring_version ?? 0, p_foursome_id: f.id, p_side: side, p_hole_index: i, p_strokes: next[i], p_drive_key: game.scramble_min_drives ? members[i % members.length] : null })
+            : await supabase.rpc("save_alt_shot_score_fenced", { p_game: game.id, p_version: game.scoring_version ?? 0, p_foursome_id: f.id, p_side: side, p_hole_index: i, p_strokes: next[i] });
+          if (error) throw new Error(error.message);
+        }
+        n++;
+      }
+      await load();
+      return `Scored ${n} ${game.game_type === "scramble" ? "team" : "side"}${n === 1 ? "" : "s"} through hole ${through}.`;
+    }
     for (const p of players) {
       if (p.no_show) continue;
       const next = autoScores(p.scores as (number | null)[] | null, holes, through);
