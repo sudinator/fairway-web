@@ -1,8 +1,9 @@
 "use client";
+import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
-import { cupScrambleMatches, type ScrambleGroup } from "@/lib/scramble-teams";
+import { cupScrambleMatches, scrambleTeamsOf, cupSideNames, type ScrambleGroup } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
@@ -3097,8 +3098,9 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
-    const altDrafts = game.game_type === "alt_shot" ? loadAltShotDrafts(game.id).length : 0;
-    if (altDrafts > 0) { alert(`${altDrafts} Alternate Shot score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before ending the game.`); return; }
+    // 212.11: a scramble's team scores use the same offline store as alternate shot's side scores
+    const altDrafts = game.game_type === "alt_shot" || game.game_type === "scramble" ? loadAltShotDrafts(game.id).length : 0;
+    if (altDrafts > 0) { alert(`${altDrafts} ${game.game_type === "scramble" ? "team" : "Alternate Shot"} score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before ending the game.`); return; }
     const conflicts = altShotConflictHoles();
     if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
     // One database transaction: end the game, post every player's round, and freeze running clocks.
@@ -3115,7 +3117,10 @@ function GameRoom({
   // Pre-conclusion completeness: list what's missing for the players being locked.
   const finishListFmt = (a: number[]) => FG.finishListFmt(a);
   const computeFinishGaps = (scope: Player[]): FinishGap[] => {
-    if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return FG.computeFinishGaps(scope, game?.holes_meta || []);
+    if (!game || (game.game_type !== "alt_shot" && game.game_type !== "scramble") || !Array.isArray(game.foursomes)) return FG.computeFinishGaps(scope, game?.holes_meta || []);
+    // 212.11: a scramble's scores are its TEAMS' (players' own cards are always empty) — it said "no scores entered"
+    // for every player of a fully scored scramble
+    if (game.game_type === "scramble") return scrambleFinishGaps(game, altShotScores, new Set(scope.map((p) => pkey(p))));
     const scopeGroups = new Set(scope.map((p) => p.tee_group).filter((g): g is number => g != null));
     const gaps: FinishGap[] = [];
     for (const f of game.foursomes) {

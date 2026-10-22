@@ -1,3 +1,19 @@
+## 212.13.261022 — Scramble recap: net, gross and net to par for every round
+
+Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+## 212.12.261022 — Scramble recap: unfinished rounds show the scores themselves
+
+Owner (Oct 22): for a round that wasn't finished, show the net and gross scores themselves, net first — "49 net (67 gross, -9 thru 15)" — rather than "net -9 (67 − 18 strokes, thru 15)", which made players do the subtraction. Full rounds keep "net -18 (72 − 18 strokes)". The headline and each player's line read the same way; teams are still ranked by net to par (fair when teams played different numbers of holes). lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+## 212.11.261022 — Scramble Teams screen: one column of players; ending a scramble
+
+Owner (Oct 22, staging):
+
+## 212.10.261022 — Scramble recap: strokes actually taken; net to par for unfinished rounds
+
+Owner (Oct 22, staging game 109487 — ended without all 18 holes): the leaderboard read "Team 3 · 67 gross thru 15 · -9", but the recap read "net 49 (67 − 22)". The net (49) was right — strokes are taken hole by hole, so through 15 holes the team had received only the strokes on those 15 holes — but the recap's working used the full 18-hole team handicap (22), so 67 − 22 didn't equal 49. And the headline and personal lines compared raw net totals, which can't be compared between teams that played different numbers of holes.
+
 ## 212.9.261022 — Every field uses the one field style; two documented exceptions
 
 Owner (Oct 22), the fields the 212.0 guard found:

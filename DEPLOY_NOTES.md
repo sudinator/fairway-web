@@ -1,3 +1,37 @@
+## 212.13.261022 — Scramble recap: net, gross and net to par for every round
+
+Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+No migration. Deploy: code only (includes 212.12).
+
+## 212.12.261022 — Scramble recap: unfinished rounds show the scores themselves
+
+Owner (Oct 22): for a round that wasn't finished, show the net and gross scores themselves, net first — "49 net (67 gross, -9 thru 15)" — rather than "net -9 (67 − 18 strokes, thru 15)", which made players do the subtraction. Full rounds keep "net -18 (72 − 18 strokes)". The headline and each player's line read the same way; teams are still ranked by net to par (fair when teams played different numbers of holes). lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+No migration. Deploy: code only (includes 212.11).
+
+## 212.11.261022 — Scramble Teams screen: one column of players; ending a scramble
+
+Owner (Oct 22, staging):
+
+**The Teams screen, in the owner's layout:** every player in ONE column — name, course handicap, and a team selector on the right (No team · Team 1 … · New team; a full team can't be picked) — with the teams summarised below (players, and the team handicap by the method: USGA working, or the agreed box). Empty teams disappear when their last player moves. "Make balanced teams of 2 / 3 / 4" stays as a shortcut. (Replaces "Pick teams myself" / "Add to…" / "Move to…".) A Ryder Cup scramble still builds its matches in Setup → Groups.
+
+**Ending a scramble said "no scores entered" for every player.** The end-of-game check read team scores only for alternate shot; a scramble fell through to players' own cards, always empty. It now checks each TEAM (lib/scramble-game scrambleFinishGaps — "Team 2: holes 17, 18"); the offline-upload check before ending covers scramble's team scores too.
+
+Tests: the new layout (one column, New team, the selector shows the team, an emptied team disappears, full teams can't be picked); ending a scramble (fully scored: nothing missing; a team missing holes named with them).
+
+No migration. Deploy: code only (includes 212.10).
+
+## 212.10.261022 — Scramble recap: strokes actually taken; net to par for unfinished rounds
+
+Owner (Oct 22, staging game 109487 — ended without all 18 holes): the leaderboard read "Team 3 · 67 gross thru 15 · -9", but the recap read "net 49 (67 − 22)". The net (49) was right — strokes are taken hole by hole, so through 15 holes the team had received only the strokes on those 15 holes — but the recap's working used the full 18-hole team handicap (22), so 67 − 22 didn't equal 49. And the headline and personal lines compared raw net totals, which can't be compared between teams that played different numbers of holes.
+
+- **Rows:** net to par with the strokes actually taken — "net -9 (67 − 18 strokes, thru 15)"; a full round "net -18 (72 − 18 strokes)" (lib/scramble-game scrambleRowValue — the app's recap, the shared image and the round email read it word for word).
+- **Headline and personal lines:** to par, the leaderboard's basis — "Team 3 wins the scramble — net -9 (thru 15)", "Your team (Team 3) finished 1st, net -9 (thru 15)" (scrambleScoreText).
+- Test: a team with a team handicap of 22 stopping after 15 holes — strokes taken through 15, the row adds up, the headline says thru 15.
+
+No migration. Deploy: code only (includes 212.9).
+
 ## 212.9.261022 — Every field uses the one field style; two documented exceptions
 
 Owner (Oct 22), the fields the 212.0 guard found:

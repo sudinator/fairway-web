@@ -10,7 +10,7 @@ import type { Game, Player } from "@/lib/game-types";
 
 import { buildHighlights, type Highlights } from "@/lib/game-highlights";
 import { buildRecapSections, andList, type RecapSections } from "@/lib/game-recap-sections";
-import { scrambleResults } from "@/lib/scramble-game";
+import { scrambleResults, scrambleScoreText } from "@/lib/scramble-game";
 
 export type Recap = {
   highlights: Highlights;         // the shared sections (top 3, net birdies, group, course)
@@ -57,12 +57,15 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
     }
     const scored = r.board.filter((b) => b.thru > 0);
     const lead = scored.filter((b) => b.rank === 1);
-    const basis = r.gross ? "gross" : "net";
+    // 212.10: to par, with "thru N" for an unfinished round — the leaderboard's own basis (raw net totals can't be
+    // compared between teams that played different numbers of holes)
+    const nhAll = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
+    const scoreOf = (b: { grossToPar: number; netToPar: number; thru: number; net: number; gross: number }) => scrambleScoreText(r.gross ? b.grossToPar : b.netToPar, b.thru, nhAll, r.gross, { net: b.net, gross: b.gross });
     const headline = !scored.length ? "Scramble — no scores yet"
-      : lead.length > 1 ? `${andList(lead.map((b) => b.name))} tie — ${basis} ${r.gross ? lead[0].gross : lead[0].net}`
-      : `${lead[0].name} wins the scramble — ${basis} ${r.gross ? lead[0].gross : lead[0].net}`;
+      : lead.length > 1 ? `${andList(lead.map((b) => b.name))} tie — ${scoreOf(lead[0])}`
+      : `${lead[0].name} wins the scramble — ${scoreOf(lead[0])}`;
     const ord = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
-    live.forEach((p) => { const t = teamOf(p); const b = t && r.board.find((x) => x.key === t.key); if (b && b.thru > 0) personal[pkey(p)] = `Your team (${b.name}) finished ${b.pos.startsWith("T") ? "tied " : ""}${ord(b.rank)}, ${basis} ${r.gross ? b.gross : b.net}`; });
+    live.forEach((p) => { const t = teamOf(p); const b = t && r.board.find((x) => x.key === t.key); if (b && b.thru > 0) personal[pkey(p)] = `Your team (${b.name}) finished ${b.pos.startsWith("T") ? "tied " : ""}${ord(b.rank)}, ${scoreOf(b)}`; });
     return { headline, endedEarly: false, notes, personal, signature: sig, winner: lead.length === 1 ? lead[0].name : null };
   }
 

@@ -8,7 +8,7 @@ import { RecapBody } from "@/components/game/recap-body";
 import { ScrambleSettings } from "@/components/game/scramble-settings";
 import { strokeSets } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
-import { scrambleRowValue } from "@/lib/scramble-game";
+import { scrambleRowValue, scrambleFinishGaps } from "@/lib/scramble-game";
 import type { Game, Player } from "@/lib/game-types";
 
 const par = [4, 5, 3, 4, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 4, 3, 5, 4], si = [7, 3, 17, 1, 11, 15, 5, 9, 13, 8, 2, 18, 4, 12, 6, 16, 10, 14];
@@ -61,16 +61,16 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
 // the recap
 {
   const rc = buildRecap(game({ status: "ended" }), players, rows as never);
-  ok(rc.headline === "Team 2 wins the scramble — net 54", `recap headline (got ${rc.headline})`);
-  ok(rc.personal["u-Amit"] === "Your team (Team 2) finished 1st, net 54" && rc.personal["u-Raj"] === "Your team (Team 1) finished 2nd, net 58", `personal lines (got ${JSON.stringify(rc.personal)})`);
+  ok(rc.headline === "Team 2 wins the scramble — 54 net (63 gross, -18)", `recap headline (got ${rc.headline})`);
+  ok(rc.personal["u-Amit"] === "Your team (Team 2) finished 1st, 54 net (63 gross, -18)" && rc.personal["u-Raj"] === "Your team (Team 1) finished 2nd, 58 net (65 gross, -14)", `personal lines (got ${JSON.stringify(rc.personal)})`);
   ok(rc.sections.individualStats === false && rc.sections.scramble?.rows.length === 2, "scramble section; no individual stats");
-  ok(rc.sections.scramble?.rows[0].pos === "1" && scrambleRowValue(rc.sections.scramble!.rows[0], false) === "net 54 (63 − 9)", "row wording: net 54 (63 − 9)");
+  ok(rc.sections.scramble?.rows[0].pos === "1" && scrambleRowValue(rc.sections.scramble!.rows[0], false) === "54 net (63 gross, -18)", "row wording: 54 net (63 gross, -18)");
   const g = buildRecap(game({ status: "ended", scramble_handicap: "gross" }), players, rows as never);
-  ok(g.headline === "Team 2 wins the scramble — gross 63", `gross headline (got ${g.headline})`);
+  ok(g.headline === "Team 2 wins the scramble — 63 gross (-9)", `gross headline (got ${g.headline})`);
   const empty = buildRecap(game({ status: "ended" }), players, []);
   ok(empty.headline === "Scramble — no scores yet", `no scores yet (got ${empty.headline})`);
   const t = renderScreen(<RecapBody game={game({ status: "ended" })} recap={rc} mode="share" />);
-  ok((t.el.querySelector("[data-recap-scramble]")?.textContent || "").includes("net 54 (63 − 9)"), "the recap shows the scramble leaderboard");
+  ok((t.el.querySelector("[data-recap-scramble]")?.textContent || "").includes("54 net (63 gross, -18)"), "the recap shows the scramble leaderboard");
   t.unmount();
 }
 // 211.7 — Setup → Format: a scramble's own settings
@@ -108,23 +108,28 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   input.value = "9"; input.dispatchEvent(new Event("focusout", { bubbles: true }));
   ok(saved && saved[0].a_hcp === 9 && saved[1].a_hcp === 6, `typing 9 saves Team 1's agreed handicap (got ${JSON.stringify(saved)})`);
   tb.unmount();
-  // pick teams myself: empty teams, then Add to… from "Not on a team yet"
-  let picked: any = null;
-  const pk = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: [] })} players={players} readOnly={false} onSave={(g) => { picked = g; }} />);
-  (Array.from(pk.el.querySelectorAll("button")).find((b) => b.textContent === "Pick teams myself") as HTMLButtonElement).click();
-  ok(Array.isArray(picked) && picked.length === 2 && picked.every((g: any) => !g.a.length), `pick teams myself: two empty teams for eight players (got ${JSON.stringify(picked)?.slice(0, 120)})`);
-  pk.unmount();
-  let added: any = null;
-  const ad = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: picked })} players={players} readOnly={false} onSave={(g) => { added = g; }} />);
-  ok(!!ad.el.querySelector("[data-scramble-unplaced]") && (ad.el.textContent || "").includes("NOT ON A TEAM YET"), "everyone is listed as not on a team yet");
-  const sel = ad.el.querySelector('select[aria-label="Add Raj to a team"]') as HTMLSelectElement;
-  sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true }));
-  ok(added && added[1].a.includes("u-Raj") && !added[0].a.includes("u-Raj"), `Add to… Team 2 puts Raj on Team 2 (got ${JSON.stringify(added)?.slice(0, 160)})`);
-  ad.unmount();
+  // 212.11 — the owner's layout: every player in one column with a team selector; the teams summarised below
+  let placed: any = null;
+  const pg = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: [] })} players={players} readOnly={false} onSave={(g) => { placed = g; }} />);
+  ok(pg.el.querySelectorAll("[data-scramble-player]").length === players.length, "every player is listed in one column");
+  const rajSel = pg.el.querySelector('select[aria-label="Team for Raj"]') as HTMLSelectElement;
+  ok(Array.from(rajSel.options).map((o) => o.textContent).join("|") === "No team|New team", `no teams yet: No team / New team (got ${Array.from(rajSel.options).map((o) => o.textContent)})`);
+  rajSel.value = "new"; rajSel.dispatchEvent(new Event("change", { bubbles: true }));
+  ok(placed && placed.length === 1 && placed[0].a.join() === "u-Raj", `New team puts Raj on a new team (got ${JSON.stringify(placed)})`);
+  pg.unmount();
+  let moved: any = null;
+  const twoTeams = [{ id: "t1", name: "Team 1", a: ["u-Raj", "u-Nihar"], b: [] }, { id: "t2", name: "Team 2", a: ["u-Karan"], b: [] }];
+  const mv = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: twoTeams })} players={players} readOnly={false} onSave={(g) => { moved = g; }} />);
+  ok((mv.el.querySelector('select[aria-label="Team for Raj"]') as HTMLSelectElement).value === "0", "a player's selector shows their team");
+  const ks = mv.el.querySelector('select[aria-label="Team for Karan"]') as HTMLSelectElement;
+  ks.value = "0"; ks.dispatchEvent(new Event("change", { bubbles: true }));
+  ok(moved && moved.length === 1 && moved[0].a.join() === "u-Raj,u-Nihar,u-Karan", `moving Team 2's only player removes the empty team (got ${JSON.stringify(moved)})`);
+  ok(!!mv.el.querySelector('[data-scramble-team="Team 1"]') && (mv.el.textContent || "").includes("TEAMS"), "the teams are summarised below the players");
+  mv.unmount();
   const full = [{ id: "t1", name: "Team 1", a: ["u-Raj", "u-Nihar", "u-Karan", "u-Sam"], b: [] }, { id: "t2", name: "Team 2", a: ["u-Amit", "u-Vikram", "u-Probir"], b: [] }];
   const fu = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: full })} players={players} readOnly={false} onSave={() => {}} />);
-  const opts = Array.from((fu.el.querySelector('select[aria-label="Add Hp to a team"]') as HTMLSelectElement).options).map((o) => o.textContent);
-  ok(!opts.some((o) => (o || "").startsWith("Team 1")) && opts.some((o) => (o || "").startsWith("Team 2")), `a full team (4) isn't offered in Add to… (got ${opts})`);
+  const opts = Array.from((fu.el.querySelector('select[aria-label="Team for Hp"]') as HTMLSelectElement).options).map((o) => o.textContent || "");
+  ok(!opts.some((o) => o.startsWith("Team 1")) && opts.some((o) => o.startsWith("Team 2")), `a full team (4) can't be picked (got ${opts})`);
   ok((fu.el.textContent || "").includes("Teams of different sizes: Team 1 has 4 players"), "mixed sizes are noted");
   fu.unmount();
 }
@@ -138,5 +143,21 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const total = sets.reduce((a, ss) => a + ss[0].strokes, 0);
   ok(total === 9, `the team's 9 strokes across 18 holes, not the first player's ~25 (got ${total})`);
   ok(sets.every((ss) => ss[0].strokes <= 1), "no hole gets two strokes at a team handicap of 9");
+}
+// 212.10 — an UNFINISHED round (owner, staging game 109487): team handicap 22, 15 holes played. The row shows the
+// strokes actually taken on those 15 holes (not the 18-hole 22), the arithmetic adds up, and everything reads to par.
+{
+  const hiTeam = players.filter((p) => ["Sam", "Hp", "Probir", "Karan"].includes(p.display_name));   // course hcps 22.4, 24.8, 16.9, 14.6
+  const pg = game({ status: "ended", scramble_handicap: "agreed", foursomes: [{ id: "t1", name: "Team 1", a: hiTeam.map((p) => p.user_id), b: [], a_hcp: 22 }] });
+  const pr = red.slice(0, 15).map((st, i) => ({ game_id: "g", foursome_id: "t1", side: "a" as const, hole_index: i, strokes: st }));
+  const rc = buildRecap(pg, hiTeam, pr as never);
+  const row = rc.sections.scramble!.rows[0];
+  const takenOn15 = holes.slice(0, 15).reduce((n, h) => n + (h.si <= 22 - 18 ? 2 : 1), 0);   // 22 strokes: 1 on every hole, a 2nd on SI 1–4
+  ok(row.gross - row.net === takenOn15, `strokes taken through 15 = ${takenOn15}, not the 18-hole 22 (got ${row.gross - row.net})`);
+  const v = scrambleRowValue(row, false);
+  const tp = row.toPar < 0 ? `-${-row.toPar}` : row.toPar === 0 ? "E" : `+${row.toPar}`;
+  ok(v === `${row.net} net (${row.gross} gross, ${tp} thru 15)`, `unfinished: "49 net (67 gross, -9 thru 15)" style (got ${v})`);
+  ok(rc.headline === `Team 1 wins the scramble — ${row.net} net (${row.gross} gross, ${tp} thru 15)`, `the headline reads the same (got ${rc.headline})`);
+  ok(scrambleRowValue({ ...row, thru: 18, holes: 18 }, false) === `${row.net} net (${row.gross} gross, ${tp})`, "a full round: net, gross and net to par");
 }
 report("scramble screens");

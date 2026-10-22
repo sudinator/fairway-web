@@ -27,7 +27,7 @@ export type RecapSections = {
   pairs?: { gross: Ranked<{ names: string[]; score: number }>; net: Ranked<{ names: string[]; score: number }> };
   individualStats: boolean;      // false for alternate shot (one ball per pair) and scramble (one per team)
   /** 211.1: a scramble's final leaderboard, or its matches. */
-  scramble?: { mode: "field" | "match"; gross: boolean; rows: { pos: string; name: string; members: string; gross: number; handicap: number; net: number; toPar: number; thru: number }[]; matches: string[] };
+  scramble?: { mode: "field" | "match"; gross: boolean; rows: { pos: string; name: string; members: string; gross: number; handicap: number; net: number; toPar: number; thru: number; holes?: number }[]; matches: string[] };
   tiles: Tile[];
 };
 
@@ -80,7 +80,7 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
     out.individualStats = false;
     out.scramble = { mode: r.mode, gross: r.gross, matches: r.matches.map((m) => `${m.line} (${m.a.name} v ${m.b.name})`),
       rows: r.board.filter((b) => b.thru > 0).map((b) => ({ pos: b.pos, name: b.name, members: (r.teams.find((x) => x.key === b.key)?.memberNames || []).join(", "),
-        gross: b.gross, handicap: b.handicap, net: b.net, toPar: r.gross ? b.grossToPar : b.netToPar, thru: b.thru })) };
+        gross: b.gross, handicap: b.handicap, net: b.net, toPar: r.gross ? b.grossToPar : b.netToPar, thru: b.thru, holes: Array.isArray(game.holes_meta) ? game.holes_meta.length : 18 })) };
     out.sub = r.mode === "match" ? `Team v team scramble · ${r.matches.length} match${r.matches.length === 1 ? "" : "es"}` : `${r.teams.length} teams · ${r.gross ? "gross" : "net, USGA scramble allowance"}`;
     return out;
   }
