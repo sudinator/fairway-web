@@ -27,6 +27,15 @@ jobs:
           BNN_PRODUCTION_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
           BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
         run: node ci/check_live_migration_parity.mjs production
+      # 212.8: the full security contract on production, read-only — every access rule, permission and privileged
+      # function matches ci/security_contract.json (a change made by hand in the dashboard fails, naming it)
+      - name: Security contract on production
+        env:
+          BNN_PRODUCTION_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
+          BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node ci/fetch_security_contract_state.mjs production > /tmp/production-contract.json
+          python3 ci/check_security_contract.py --state-json /tmp/production-contract.json
       - name: Open an issue when it fails
         if: failure()
         uses: actions/github-script@v7
@@ -36,4 +45,4 @@ jobs:
             const open = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: 'security' });
             if (open.data.some((i) => i.title === title)) return;
             await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, labels: ['security'],
-              body: `The nightly check found a public table on production with Row-Level Security off, or one not created by any migration. See the run log for the table name: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+              body: `The nightly check found a public table on production with Row-Level Security off, one not created by any migration, or a rule / permission that differs from the security contract (212.8). See the run log for the table name: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });

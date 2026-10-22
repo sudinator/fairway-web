@@ -8,6 +8,7 @@ import {
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { roundStatCompleteness, statHoleList } from "@/lib/round-stats";
+import type { TeamRound } from "@/lib/team-rounds";
 
 export function RoundsList({ rounds, onOpen }: { rounds: Round[]; onOpen: (r: Round) => void }) {
   if (!rounds.length)
@@ -51,6 +52,31 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
         <span style={{ color: C.cream, fontWeight: 700, marginLeft: 8 }}>{toParStr(diffOf(r))}</span>
       </div>
       <div style={{ background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 13 }}>{stablefordDisplay(r)}</div>
+    </div>
+  );
+}
+
+
+/**
+ * 212.7: team rounds (scramble / alternate shot) — played, but never a personal round, so listed separately and
+ * never in the Dashboard's statistics. Tapping one opens its game.
+ */
+export function TeamRoundsList({ items, onOpenGame }: { items: TeamRound[]; onOpenGame: (gameId: string) => void }) {
+  if (!items.length) return null;
+  return (
+    <div data-team-rounds style={{ marginTop: 18 }}>
+      <Eyebrow>TEAM ROUNDS · SCRAMBLE &amp; ALTERNATE SHOT</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>One score per team or side — they count as rounds played, not in your personal stats.</div>
+      {items.map((t) => (
+        <div key={t.gameId} onClick={() => onOpenGame(t.gameId)} data-team-round
+          style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
+          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
+            {t.course}
+            <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginLeft: 8 }}>{t.format === "scramble" ? "SCRAMBLE" : "ALT SHOT"}</span>
+          </div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(t.date)} · {t.team} · {t.holes} holes{t.result ? ` · ${t.result}` : ""}</div>
+        </div>
+      ))}
     </div>
   );
 }

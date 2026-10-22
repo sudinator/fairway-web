@@ -174,6 +174,12 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-policy-review.sql"
 
 # 211.5: CROSS-CLUB ISOLATION — a Club B member reads / changes / deletes / adds nothing in Club A (24 tables).
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-club-isolation.sql"
+
+# 0213: team rounds count as played (Season Wrapped, the team-round email).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-team-rounds.sql"
+
+# 0214: the security contract's state, server only.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-security-contract-state.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

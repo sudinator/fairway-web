@@ -97,3 +97,12 @@ jobs:
           BNN_PRODUCTION_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
           BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
         run: node ci/check_live_migration_parity.mjs production
+
+      # 212.8: the security contract on production, read-only (migrations are applied to production before merging)
+      - name: Security contract on production
+        env:
+          BNN_PRODUCTION_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
+          BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node ci/fetch_security_contract_state.mjs production > /tmp/production-contract.json
+          python3 ci/check_security_contract.py --state-json /tmp/production-contract.json

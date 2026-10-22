@@ -59,6 +59,11 @@ Reference implementation: `components/game/scorecard-views.tsx`. Copy it rather 
 read as a filled-in slot, not as a sheet of paper. One definition covers every field in the app;
 do not set a field background at a call site.
 
+**Field-style exceptions (owner, Oct 22 2026 — 212.9).** Every input, menu and text box uses `inputStyle`; ci/check_field_style.py fails the build on any other, except these two, each marked in the code with `data-field-exception` and named in the guard:
+- **`score-picker`** — the score-entry number picker (`components/ui.tsx`, the hole score menu): compact and centred, white tile, dark text, cream when highlighted. Score entry is its own surface family; the owner reviewed it and kept it as is. **Don't flag it again.**
+- **`date-overlay`** — the invisible native date input laid over the styled date button (`components/ui.tsx`): opacity 0, never seen; the visible button carries the style.
+A field may adjust *layout* only — width, flex, alignment, margins, a compact size — never its background, text colour or border.
+
 **3 · The outline of a pick control.**
 An unselected choice chip is `background: transparent` with a `1.5px solid C.cream` border and a
 `C.cream` label. Selected keeps its solid identity colour with `#0E241B` text.

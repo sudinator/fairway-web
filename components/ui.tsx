@@ -370,7 +370,7 @@ export function ShortDateInput({ value, onChange, max }: { value: string; onChan
         <span style={{ color: value ? C.ink : C.faint }}>{fmt(value)}</span>
         <span aria-hidden style={{ color: C.faint, fontSize: 12 }}>▾</span>
       </div>
-      <input aria-label="Pick date" type="date" value={value} max={max} onChange={(e) => onChange(e.target.value)}
+      <input data-field-exception="date-overlay" aria-label="Pick date" type="date" value={value} max={max} onChange={(e) => onChange(e.target.value)}
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, border: "none", padding: 0, margin: 0, cursor: "pointer", background: "transparent" }} />
     </div>
   );
@@ -433,7 +433,9 @@ export function NumPicker({ value, from, to, onChange, width = 46, dash = true, 
     opts.sort((a, b) => a - b);
   }
   return (
-    <select
+    // DOCUMENTED EXCEPTION (owner, Oct 22 2026): the score-entry number picker keeps its own compact look — score
+    // entry is its own surface family. Reviewed and kept; see DISPLAY_RULES.md §2 "Field-style exceptions".
+    <select data-field-exception="score-picker"
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value === "" ? null : parseInt(e.target.value, 10))}
       style={{

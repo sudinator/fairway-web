@@ -32,7 +32,7 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
         <span style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>{active.name}{active.role === "admin" ? " ★" : ""}</span>
       ) : (
         <select value={activeGroupId || groups[0].id} onChange={(e) => onChange(e.target.value)}
-          style={{ background: C.card, border: `1px solid ${C.borderCard}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
+          style={{ ...inputStyle, width: "auto", maxWidth: 180, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
         </select>
       )}

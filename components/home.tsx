@@ -27,7 +27,8 @@ import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
 import { diagEnabled } from "@/lib/debuglog";
 import { Dashboard } from "@/components/dashboard";
-import { RoundsList } from "@/components/rounds-list";
+import { RoundsList, TeamRoundsList } from "@/components/rounds-list";
+import { loadTeamRounds, type TeamRound } from "@/lib/team-rounds";
 import { GroupsPanel } from "@/components/groups";
 import { InstallHint } from "@/components/install-hint";
 import { PullToRefresh } from "@/components/pull-to-refresh";
@@ -229,6 +230,15 @@ export function Home({ session }: { session: any }) {
   // already-linked game. One-shot, cleared when we leave the Games tab (like money).
   const [gameSeed, setGameSeed] = useState<GameSeed | null>(null);
   const [openGameId, setOpenGameId] = useState<string | null>(null);
+  // 212.7: the member's team rounds (scramble / alternate shot) — listed under their rounds, not in their stats
+  const [teamRounds, setTeamRounds] = useState<TeamRound[]>([]);
+  useEffect(() => {
+    const uid = session?.user?.id as string | undefined;   // (the `user` const is defined further down)
+    if (!uid || tab !== "rounds") return;
+    let live = true;
+    loadTeamRounds(createClient(), uid).then((x) => { if (live) setTeamRounds(x); }).catch(() => {});
+    return () => { live = false; };
+  }, [session?.user?.id, tab]);
   const [openGameReturnTab, setOpenGameReturnTab] = useState<"admin" | null>(null);
   useEffect(() => { if (tab !== "games") { setGameSeed(null); setOpenGameId(null); setOpenGameReturnTab(null); } }, [tab]);
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
@@ -974,6 +984,7 @@ export function Home({ session }: { session: any }) {
           <>
           <SeasonWrappedEntry rounds={rounds} userId={user.id} name={displayName} variant="rounds" />
           <RoundsList rounds={rounds} onOpen={setViewing} />
+          <TeamRoundsList items={teamRounds} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
           </>
         )}
       </div>

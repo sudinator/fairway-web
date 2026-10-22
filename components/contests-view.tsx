@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
-import { btn, Eyebrow, BottomSheet, Avatar } from "@/components/ui";
+import { btn, Eyebrow, BottomSheet, Avatar, inputStyle } from "@/components/ui";
 import {
   Contest, ContestEntry, ContestKind, ContestUnit,
   contestLeaderboard, contestDefaults, fmtContestValue, ftInToInches,
@@ -333,10 +333,7 @@ function LogEntrySheet({ ctx, players, userId, myName, canLogOthers, onClose, on
   );
 }
 
-const inp: React.CSSProperties = {
-  width: "100%", boxSizing: "border-box", background: C.greenLight, border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 10, color: C.cream, fontSize: 16, padding: "10px 12px", outline: "none",
-};
+const inp: React.CSSProperties = { ...inputStyle };   // 212.9: the one field style (DISPLAY_RULES.md §2)
 
 // ---- contextual chip shown inside the (light) hole score-entry modal ----
 // Self-contained: fetches this game's contests that apply to `hole`, shows the current leader, and logs
@@ -399,7 +396,7 @@ function InlineLog({ contest, hole, players, userId, myName, canLogOthers, onSav
   const [who, setWho] = useState("me"); const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
   const guests = players.filter((p) => !p.user_id);
   const members = players.filter((p) => p.user_id && p.user_id !== userId);
-  const li: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #CFE3D4", borderRadius: 8, color: C.cream, fontSize: 16, padding: "8px 10px", outline: "none" };
+  const li: React.CSSProperties = { ...inputStyle, padding: "8px 12px" };   // 212.9: was cream text on white — unreadable
 
   const save = async () => {
     const value = isFtIn ? ftInToInches(Number(feet) || 0, Number(inches) || 0) : Number(num);

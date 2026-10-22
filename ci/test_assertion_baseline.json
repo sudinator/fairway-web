@@ -1,5 +1,5 @@
 {
-  "total": 439587,
+  "total": 439598,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -60,6 +60,7 @@
     "stroke rounding": 24,
     "sync/column tests": 6,
     "team colour dot": 10,
+    "team rounds": 11,
     "trifecta card render": 8,
     "trifecta results row": 20
   }

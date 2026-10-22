@@ -42,6 +42,7 @@
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",
+    "lib/team-rounds.test.ts",
     "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",
     "components/team-colour-dot.tsx",

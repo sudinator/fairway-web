@@ -4,6 +4,5 @@
   "components/game/organizer-panel.tsx": 2,
   "components/money.tsx": 7,
   "components/player-card.tsx": 1,
-  "components/tournaments.tsx": 1,
-  "components/yardage-backfill.tsx": 1
+  "components/tournaments.tsx": 1
 }

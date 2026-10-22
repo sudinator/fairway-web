@@ -1,3 +1,48 @@
+## 212.9.261022 — Every field uses the one field style; two documented exceptions
+
+Owner (Oct 22), the fields the 212.0 guard found:
+
+**Readability bugs fixed:** the contest-logging fields in the score-entry pop-up (closest to pin, longest drive — feet, inches, distance, player) and the yardage-backfill cells had **cream text on a white background**, almost invisible. Now the shared style: dark ink on the field fill.
+
+**Brought in line (DISPLAY_RULES.md §2 — `inputStyle`, layout-only adjustments):** contests' entry fields and player menu; course history "Reason for restoring"; the live-link box; the club switcher (compact); the public line-up "Find your name" search (keeps its pill shape); the admin game-repair note; Admin → Clubs "Merge into"; Admin → Game "Reassign organizer"; the organizer's handicap-index box; the player-card note.
+
+**Already correct (my guard's miscount):** nine fields used the shared style directly or a style built on it (money, course searches, tee-time dates). The guard now recognises every correct form.
+
+**Two documented exceptions** (owner), marked in the code (`data-field-exception`), named in the guard, and written up in DISPLAY_RULES.md §2 "Field-style exceptions": the score-entry number picker (reviewed and kept — score entry is its own surface family; don't flag it again), and the invisible native date input under the date button.
+
+**ci/check_field_style.py** is now strict: no allowance for old fields — any other self-styled field fails the build. Spacing: 8 fewer off-scale values; the lower baseline is recorded.
+
+No migration. Deploy: code only.
+
+## 212.8.261022 — Security contract on production; server-route audit; storage rules (0214)
+
+Owner (Oct 22): finish the security work.
+
+**The security contract now checks PRODUCTION.** It checked only the database built from migrations, so a rule or permission changed by hand in production's dashboard went unseen. 0214 adds security_contract_state() — server only, read-only — reporting exactly what the contract checks; the contract check reads this ONE function locally, in GitHub's fresh database, and on production: nightly (production-security.yml — a difference fails the job and opens a GitHub issue naming it) and on every pull request (ci.yml's production job). ci/fetch_security_contract_state.mjs fetches it with the server key; ci/check_security_contract.py --state-json compares. Proven: identical to the previous queries on the same database (132 rules, 45 permissions, 199 functions); a simulated hand edit on production ("expenses delete rule now true", "anon can read expenses") is named.
+
+**Storage in the contract.** Avatars are the only stored files; their rules are right (anyone can view; only the member adds, replaces or deletes their own; images only, 512 KB) — and now watched: the 4 storage rules and each bucket's public / size / type settings are in the report and the snapshot. Proven: a loosened upload rule and removed limits are named.
+
+**Server-route audit.** Nine routes use the server key (which bypasses row-level security): each has a sound gate — the job / webhook secret (round-emails, push), a signed link that only turns emails off (unsubscribe), or the signed-in member with their own data or the right role (member-stats, push test, game completed, course checks, course apply, account merge); the four acting-on-behalf functions (merge_accounts_as, apply_course_freshness_selected_as, remember_course_declines_as, record_course_freshness_checked) are server-only and check the actor's authority. No gap found. ci/check_server_routes.py (new, in the guards) keeps every future route to it: a recognised gate, and the signed-in user as the actor — never an id from the request.
+
+**Deploy note:** apply 0214 to production BEFORE opening the pull request's checks (its production job now reads security_contract_state()).
+
+Deploy: staging 0214 → code; production 0214 → merge.
+
+## 212.7.261021 — Team rounds count as played: Season Wrapped, round history, recap email (0213)
+
+Owner (Oct 22). Scramble and alternate shot record one score per team / side, never a personal round — so a member's scrambles and alternate-shot games were invisible in Season Wrapped (a scramble-only member wouldn't even get the notification), their round history and the round email.
+
+**A team round** (lib/team-rounds.ts, and its database twin team_rounds_in_year — the same rule): a member in a FINISHED scramble or alternate-shot game whose team / side scored 9+ holes; older alternate-shot games that kept the scores on the players' own cards count too. Played — never in a personal statistic.
+
+- **Season Wrapped:** the headline's rounds, holes and courses include team rounds ("including 3 team rounds (scramble / alternate shot) — played, not in your personal stats"); every personal-statistic card unchanged; the floor still gates the statistics (they need personal rounds). The notification, the admin preview and the club totals (send_season_wrapped, season_wrapped_preview, season_club_stats) count personal + team rounds.
+- **Round history:** a "Team rounds · scramble & alternate shot" list under the member's rounds — date, course, format, team or partner, result ("1st of 4", "Reds won 2&1") — tapping one opens the game. Not in the Dashboard's statistics.
+- **The team-round email:** the game's recap (recapEmailHtml, the app's recap word for word) with the member's own line, from the round-email job, on the round email's rules — opted in, active, owner-only until opened to everyone, 1 hour to 7 days after the game ends, never twice (team_round_email_log; due_team_round_emails / record_team_round_email, server only). "Open the game" uses the game's code (lib/app-links).
+- 0213 classifies the new log for account merges (moves with the account, like the round-email log).
+
+Tests: ci/assert-team-rounds.sql (9+ holes count, 5 don't; older alternate shot counts; a scramble-only member is in Season Wrapped; the email due once; server only); lib/team-rounds.test.ts (the rule, results, Cup names, Season Wrapped headline with personal cards unchanged, the email and its link).
+
+Deploy: staging 0213 → code; production 0213 → merge.
+
 ## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
 
 Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."

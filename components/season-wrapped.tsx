@@ -4,6 +4,7 @@
 // definition, so the summary can never disagree with the Dashboard. Entry points: a Dashboard card
 // (Dec 31 – Jan 31, until the account opens it), a row per finished season in Rounds, the Dec 31 notification (/?wrapped=YYYY),
 // and on staging a permanent preview.
+import { loadTeamRounds } from "@/lib/team-rounds";
 import { fetchAllIn } from "@/lib/fetch-all";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, type Round } from "@/lib/golf";
@@ -47,7 +48,10 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
     });
   } catch { /* the club card is optional */ }
   const playedWithMost = playedWith[0] ? { name: playedWith[0].name, rounds: playedWith[0].games } : null;
-  return buildSeasonSummary({ year, name, rounds, matches, clubs, playedWithMost });
+  // 212.7: scramble / alternate-shot rounds count as played (lib/team-rounds)
+  let teamRounds: { date: string; course: string; holes: number }[] = [];
+  try { teamRounds = await loadTeamRounds(supabase, userId); } catch { /* optional — the season still builds */ }
+  return buildSeasonSummary({ year, name, rounds, matches, clubs, playedWithMost, teamRounds });
 }
 
 export function SeasonWrappedModal({ year, rounds, userId, name, onClose }: { year: number; rounds: Round[]; userId: string; name: string; onClose: () => void }) {

@@ -1,3 +1,11 @@
+## 212.8 — security_contract_state (0214)
+
+security_contract_state() — server only: rls_off, policies, table_grants, definer_execute, definer_no_search_path, writable_without_guard, storage_policies, buckets.
+
+## 212.7 — Team rounds (0213)
+
+team_rounds_in_year(p_year) (internal); send_season_wrapped / season_wrapped_preview / season_club_stats count personal + team rounds; team_round_email_log (server only, merge rule move); due_team_round_emails / record_team_round_email (server only).
+
 ## 212.3 — Cup scramble (0212)
 
 competition_sessions.format + 'scramble'; competition_sessions.scramble_team_size 2–4; guard_competition_game_structure checks Cup scramble (match mode, team ≤ size), trigger fires on scramble_mode too; get_live_competition game block carries scramble_mode/handicap/allowance/team_size, foursomes carry a_hcp/b_hcp.

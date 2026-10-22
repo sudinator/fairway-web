@@ -1,3 +1,15 @@
+## 212.9.261022 — Every field uses the one field style; two documented exceptions
+
+Owner (Oct 22), the fields the 212.0 guard found:
+
+## 212.8.261022 — Security contract on production; server-route audit; storage rules (0214)
+
+Owner (Oct 22): finish the security work.
+
+## 212.7.261021 — Team rounds count as played: Season Wrapped, round history, recap email (0213)
+
+Owner (Oct 22). Scramble and alternate shot record one score per team / side, never a personal round — so a member's scrambles and alternate-shot games were invisible in Season Wrapped (a scramble-only member wouldn't even get the notification), their round history and the round email.
+
 ## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
 
 Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."

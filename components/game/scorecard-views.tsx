@@ -993,7 +993,7 @@ export function ShareControl({ game, onShare, token, path = "live", title, blurb
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
-              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.borderGreen}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
+              style={{ ...inputStyle, flex: 1, width: "auto", padding: "8px 12px", fontSize: 12 }} />
             <button onClick={copy} style={{ ...btn(true), fontSize: 12, padding: "8px 12px" }}>{copied ? "Copied" : "Copy"}</button>
           </div>
           <button disabled={busy} onClick={() => toggle(false)}

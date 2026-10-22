@@ -3505,7 +3505,7 @@ function GameRoom({
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ color: C.sage, fontSize: 12 }}>Reassign organizer:</span>
             <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}
-              style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+              style={{ ...inputStyle, width: "auto", fontSize: 12, padding: "4px 10px" }}>
               <option value="">Select player…</option>
               {players.filter((p) => p.user_id).map((p) => (
                 <option key={p.user_id} value={p.user_id as string}>{p.display_name}</option>

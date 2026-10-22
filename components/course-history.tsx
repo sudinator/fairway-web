@@ -6,7 +6,7 @@
 import { fetchAll } from "@/lib/fetch-all";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
-import { btn } from "@/components/ui";
+import { btn, inputStyle } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { buildFreshnessDiff } from "@/lib/course-diff";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
@@ -75,7 +75,7 @@ export function CourseHistory({ courseId, clubs, canRestore, onRestored }: { cou
                 {diff && diff.hasChanges ? <FreshnessDiffList diff={diff} maxHeight={220} /> : <div style={{ color: C.sage, fontSize: 12 }}>{prev ? "No rating, slope, yardage, tee or hole changes from the previous version." : "The first recorded version."}</div>}
                 {canRestore && v.version !== current && (
                   <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for restoring" style={{ flex: 1, minWidth: 160, background: C.green, color: C.cream, border: `1px solid ${C.greenMid}`, borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
+                    <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for restoring" style={{ ...inputStyle, flex: 1, minWidth: 160, width: "auto", padding: "8px 12px", fontSize: 13 }} />
                     <button type="button" disabled={busy} onClick={() => void restore(v)} style={{ ...btn(true), fontSize: 12 }}>{busy ? "Restoring…" : "Restore this version"}</button>
                   </div>
                 )}
