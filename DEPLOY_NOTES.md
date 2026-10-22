@@ -1,3 +1,28 @@
+## 212.15.261022 — Scramble leaderboards laid out as tables
+
+Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".
+
+- **The final leaderboard (recap, shared image)** is a table: Pos · Team · **Net** (biggest — the ranking) · Gross · ± ("thru 15" under it for an unfinished round), with the members on a full-width line under each team.
+- **The game-screen leaderboard:** the members on a full-width line too, instead of wrapping inside the Team column.
+- The recap's format name reads "Scramble".
+(The round email keeps its one-line wording.) Checked by screenshot at phone width.
+
+No migration. Deploy: code only (includes 212.14).
+
+## 212.14.261022 — The scramble scorecard, rebuilt
+
+Owner (Oct 22): "the team members are crunched in a small part of the screen and the score takes up more than half of it." A scramble used the scorecard's per-player layout — a one-line team header ("Raj / Nihar / Karan / Sam · team hcp 7") and a thumb-high box per hole, eighteen times over (about eight phone screens), with a "net Stableford" legend that doesn't apply.
+
+**Now its own card** (components/game/scorecard-views, scrambleBody — inside the same scorecard, so the score editor, drive chips, saving and permissions are unchanged):
+- **a header per team** — name (or Cup side), team handicap, every member on their own line with their course handicap, and the running score ("Thru 12 · 43 gross · 38 net (-9)"); team v team side by side;
+- **a compact table** — Hole · Par · SI · a score column per team — each cell with the team's stroke dots, the net in the corner and, when drives are tracked, whose drive; tapping opens the score editor;
+- **Out / In / Total** with gross and net; the legend "dots = team strokes · colour = net v par".
+About a screen and a half for 18 holes. Checked by screenshot at phone width (one team; team v team with drives).
+
+Test: the card replaces the per-player layout; every member and the team handicap in the header; 18 cells and Out / In / Total; no Stableford legend; tapping a cell opens the editor for that hole.
+
+No migration. Deploy: code only (includes 212.13).
+
 ## 212.13.261022 — Scramble recap: net, gross and net to par for every round
 
 Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.

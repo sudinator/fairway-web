@@ -1,3 +1,11 @@
+## 212.15.261022 — Scramble leaderboards laid out as tables
+
+Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".
+
+## 212.14.261022 — The scramble scorecard, rebuilt
+
+Owner (Oct 22): "the team members are crunched in a small part of the screen and the score takes up more than half of it." A scramble used the scorecard's per-player layout — a one-line team header ("Raj / Nihar / Karan / Sam · team hcp 7") and a thumb-high box per hole, eighteen times over (about eight phone screens), with a "net Stableford" legend that doesn't apply.
+
 ## 212.13.261022 — Scramble recap: net, gross and net to par for every round
 
 Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.

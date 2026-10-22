@@ -39,14 +39,18 @@ export function ScrambleView({ game, players, altShotScores }: { game: Game; pla
             <tbody>{r.board.map((row) => {
               const t = r.teams.find((x) => x.key === row.key)!;
               return (
-                <tr key={row.key}>
+                <React.Fragment key={row.key}>
+                <tr>
                   <td style={{ ...td, textAlign: "left", color: C.gold, fontWeight: 800 }}>{row.pos}</td>
-                  <td style={{ ...td, textAlign: "left" }}><b>{row.name}</b><div style={{ color: C.sage, fontSize: 11 }}>{t.memberNames.join(", ")}</div></td>
+                  <td style={{ ...td, textAlign: "left" }}><b>{row.name}</b></td>
                   <td style={td}>{row.thru || "—"}</td>
                   <td style={td}>{row.thru ? row.gross : "—"}</td>
                   {r.gross ? null : <td style={td}>{row.handicap}</td>}
                   <td style={{ ...td, fontWeight: 800 }}>{row.thru ? toPar(r.gross ? row.grossToPar : row.netToPar) : "—"}</td>
                 </tr>
+                {/* 212.15: the members on a full-width line, so names don't wrap into a narrow column */}
+                <tr><td /><td colSpan={r.gross ? 4 : 5} style={{ color: C.sage, fontSize: 12, paddingBottom: 8, textAlign: "left" }}>{t.memberNames.join(" · ")}</td></tr>
+                </React.Fragment>
               );
             })}</tbody>
           </table>

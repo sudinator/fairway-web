@@ -3,7 +3,6 @@
 // can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
-import { scrambleRowValue } from "@/lib/scramble-game";
 import { shortenedNote } from "@/lib/round-rules";
 import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
@@ -14,7 +13,8 @@ import type { Recap } from "@/lib/game-recap";
 import type { Game } from "@/lib/game-types";
 
 export type RecapContest = { label: string; hole: number; name: string; value: string };
-const FORMAT: Record<string, string> = { match: "Singles", fourball: "Four-ball", alt_shot: "Alternate shot", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
+const FORMAT: Record<string, string> = { match: "Singles", fourball: "Four-ball", alt_shot: "Alternate shot", scramble: "Scramble", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
+const SCR_COLS = "24px minmax(0, 1fr) 44px 44px 48px";   // 212.15: the scramble leaderboard's columns
 const S = {
   eye: { color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 800 } as React.CSSProperties,
   th: { color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, marginBottom: 4 } as React.CSSProperties,
@@ -117,11 +117,34 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
           <div style={S.th}>{s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`}</div>
           {s.scramble.mode === "match"
             ? s.scramble.matches.map((m, i) => <div key={i} style={S.row}><span style={S.name}>{m}</span></div>)
-            : s.scramble.rows.map((r, i) => (
-              <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span>
-                <span style={S.name}>{r.name}<span style={{ color: C.sage, fontSize: 11, display: "block" }}>{r.members}</span></span>
-                <span style={S.num}>{scrambleRowValue(r, s.scramble!.gross)}</span></div>
-            ))}
+            : (
+              // 212.15 (owner): a leaderboard table — net (the ranking) biggest, gross and ± in their own short
+              // columns, and the members on a full-width line, so names don't wrap into a sliver
+              <div data-recap-scramble-board>
+                <div style={{ display: "grid", gridTemplateColumns: SCR_COLS, gap: 6, color: C.sage, fontSize: 11, fontWeight: 700, paddingBottom: 4 }}>
+                  <span>Pos</span><span>Team</span>
+                  {s.scramble.gross ? <span style={{ textAlign: "right", gridColumn: "span 2" }}>Gross</span> : <><span style={{ textAlign: "right" }}>Net</span><span style={{ textAlign: "right" }}>Gross</span></>}
+                  <span style={{ textAlign: "right" }}>±</span>
+                </div>
+                {s.scramble.rows.map((r, i) => {
+                  const pm = r.toPar === 0 ? "E" : r.toPar > 0 ? `+${r.toPar}` : String(r.toPar);
+                  const thru = r.holes != null && r.thru < r.holes ? r.thru : null;
+                  return (
+                    <div key={i} data-recap-scramble-row style={{ borderTop: `1px solid ${C.borderGreen}`, paddingTop: 8, paddingBottom: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: SCR_COLS, gap: 6, alignItems: "baseline" }}>
+                        <span style={{ color: C.gold, fontSize: 15, fontWeight: 800 }}>{r.pos}</span>
+                        <span style={{ color: C.cream, fontSize: 15, fontWeight: 800, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                        {s.scramble!.gross
+                          ? <span style={{ textAlign: "right", gridColumn: "span 2", color: C.cream, fontSize: 20, fontWeight: 800 }}>{r.gross}</span>
+                          : <><span style={{ textAlign: "right", color: C.cream, fontSize: 20, fontWeight: 800 }}>{r.net}</span><span style={{ textAlign: "right", color: C.sage, fontSize: 14 }}>{r.gross}</span></>}
+                        <span style={{ textAlign: "right", color: C.cream, fontSize: 14, fontWeight: 700 }}>{pm}{thru != null ? <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 500 }}>thru {thru}</span> : null}</span>
+                      </div>
+                      <div style={{ color: C.sage, fontSize: 12, marginTop: 2, marginLeft: 30, lineHeight: 1.4 }}>{r.members.split(", ").join(" · ")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
         </div>
       ) : null}
       {s.leaderboard && !s.flights?.length ? (

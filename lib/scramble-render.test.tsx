@@ -1,11 +1,13 @@
 /** 211.1 — scramble results, the results view and the Teams screen. */
 import { renderScreen, ok, report } from "./screen-harness";
 import * as React from "react";
+import { act } from "react";
 import { scrambleResults } from "@/lib/scramble-game";
 import { ScrambleView } from "@/components/game/scramble-view";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { RecapBody } from "@/components/game/recap-body";
 import { ScrambleSettings } from "@/components/game/scramble-settings";
+import { GroupScorecard } from "@/components/game/scorecard-views";
 import { strokeSets } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
 import { scrambleRowValue, scrambleFinishGaps } from "@/lib/scramble-game";
@@ -34,7 +36,7 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
 {
   const t = renderScreen(<ScrambleView game={game()} players={players} altShotScores={rows as never} />);
   const txt = t.el.textContent || "";
-  ok(!!t.el.querySelector("[data-scramble-board]") && txt.includes("SCRAMBLE · LEADERBOARD · NET") && txt.includes("Raj, Nihar, Karan, Sam"), "leaderboard with team members");
+  ok(!!t.el.querySelector("[data-scramble-board]") && txt.includes("SCRAMBLE · LEADERBOARD · NET") && txt.includes("Raj · Nihar · Karan · Sam"), "leaderboard with team members");
   ok(txt.includes("don't count as anyone's individual round"), "says scramble scores aren't individual rounds");
   t.unmount();
   const tm = renderScreen(<ScrambleView game={mg} players={players} altShotScores={[]} />);
@@ -70,7 +72,11 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const empty = buildRecap(game({ status: "ended" }), players, []);
   ok(empty.headline === "Scramble — no scores yet", `no scores yet (got ${empty.headline})`);
   const t = renderScreen(<RecapBody game={game({ status: "ended" })} recap={rc} mode="share" />);
-  ok((t.el.querySelector("[data-recap-scramble]")?.textContent || "").includes("54 net (63 gross, -18)"), "the recap shows the scramble leaderboard");
+  // 212.15: the final leaderboard is a table — net (biggest), gross, ± — with the members on a full-width line
+  const rowsEl = Array.from(t.el.querySelectorAll("[data-recap-scramble-row]"));
+  const first = rowsEl[0]?.textContent || "";
+  ok(rowsEl.length === 2 && first.includes("Team 2") && first.includes("54") && first.includes("63") && first.includes("-18"), `the final leaderboard: Team 2 · 54 · 63 · -18 (got ${first})`);
+  ok(first.includes("Amit · Vikram · Probir · Hp"), `the members on their own line (got ${first})`);
   t.unmount();
 }
 // 211.7 — Setup → Format: a scramble's own settings
@@ -159,5 +165,22 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   ok(v === `${row.net} net (${row.gross} gross, ${tp} thru 15)`, `unfinished: "49 net (67 gross, -9 thru 15)" style (got ${v})`);
   ok(rc.headline === `Team 1 wins the scramble — ${row.net} net (${row.gross} gross, ${tp} thru 15)`, `the headline reads the same (got ${rc.headline})`);
   ok(scrambleRowValue({ ...row, thru: 18, holes: 18 }, false) === `${row.net} net (${row.gross} gross, ${tp})`, "a full round: net, gross and net to par");
+}
+// 212.14 — the scramble scorecard (owner): team headers and a compact table, not the per-player layout
+{
+  const g4 = game({ foursomes: [groups[0]] });
+  const four = players.filter((p) => groups[0].a.includes(p.user_id!)).map((p) => ({ ...p, tee_group: 1 })) as Player[];
+  const sc = renderScreen(<GroupScorecard game={g4} players={four} allPlayers={four} user={{ id: "u-Raj" } as never} isMarker markerName={null} onTakeOver={() => {}} onRelease={() => {}} onSetHole={() => {}}
+    altShotScores={rows.filter((r) => r.foursome_id === "team-1") as never} />);
+  const txt = sc.el.textContent || "";
+  ok(!!sc.el.querySelector("[data-scramble-card]") && sc.el.querySelectorAll("[data-scramble-team-header]").length === 1, "the scramble card with one team header");
+  ok(["Raj", "Nihar", "Karan", "Sam"].every((n) => txt.includes(n)) && txt.includes("Team hcp 7"), "every member and the team handicap in the header");
+  ok(sc.el.querySelectorAll("[data-scramble-cell]").length === 18 && txt.includes("OUT") && txt.includes("IN") && txt.includes("TOTAL"), "18 compact cells; Out / In / Total");
+  ok(!txt.includes("Stableford"), "no Stableford legend on a scramble");
+  const before = (sc.el.textContent || "").length;
+  act(() => { (sc.el.querySelectorAll("[data-scramble-cell]")[4] as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+  const after = document.body.textContent || "";
+  ok(after.length > before && /Hole\s*5/.test(after), `tapping a cell opens the score editor for that hole (${after.slice(-200)})`);
+  sc.unmount();
 }
 report("scramble screens");
