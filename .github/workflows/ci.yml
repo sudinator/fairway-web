@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  packages: read   # 212.16: signed-in downloads of the Supabase images from ghcr.io (see "Sign in to the container registry")
 
 jobs:
   verify:
@@ -49,6 +50,11 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends postgresql-client
           fi
+
+      # 212.16: sign in to GitHub's container registry with the run's own token — anonymous image downloads are the ones
+      # rate-limited ("toomanyrequests"); signed-in downloads have far more headroom. No secret needed.
+      - name: Sign in to the container registry (Supabase images)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Rebuild a fresh Supabase database from committed migrations
         run: bash ci/test_fresh_db_rebuild.sh

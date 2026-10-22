@@ -1,3 +1,7 @@
+## 212.17.261022 — CI: the fresh-database rebuild survives registry rate limits
+
+GitHub's fresh-database check kept failing before a single migration ran: GitHub's container registry (ghcr.io) rate-limited the download of the Supabase database image ("toomanyrequests"), and the Supabase CLI retries only twice (4s, 8s).
+
 ## 212.16.261022 — Design sweep: 21 fixes across the recent screens; a design gallery
 
 Owner (Oct 22): "these are basic design choices that you should be proactively looking to implement rather than me having to constantly point them out." Every screen built recently was photographed at phone width and reviewed as a member would see it.

@@ -30,7 +30,22 @@ trap cleanup EXIT
 
 cd "$TMP"
 supabase init >/dev/null
-supabase db start
+# 212.16: GitHub's container registry (ghcr.io) rate-limits image downloads ("toomanyrequests"), and the Supabase CLI
+# retries only twice (4s, 8s) before giving up — so the rebuild failed before a single migration ran. Retry the START
+# patiently (15s, 30s, 60s, 120s); downloaded layers stay cached, so each attempt continues where the last stopped.
+# Only a registry rate limit is retried: any other failure (a migration error, say) fails at once, as it should.
+attempt=1
+until supabase db start 2>&1 | tee /tmp/supabase-db-start.log; [ "${PIPESTATUS[0]}" -eq 0 ]; do
+  if ! grep -qiE "toomanyrequests|rate limit|429" /tmp/supabase-db-start.log || [ "$attempt" -ge 5 ]; then
+    echo "supabase db start failed (attempt $attempt)" >&2
+    exit 1
+  fi
+  wait_s=$(( 15 * (1 << (attempt - 1)) )); [ "$wait_s" -gt 120 ] && wait_s=120
+  echo "Container registry rate limit — waiting ${wait_s}s, then retrying (attempt $((attempt + 1)) of 5)"
+  supabase stop --no-backup >/dev/null 2>&1 || true
+  sleep "$wait_s"
+  attempt=$((attempt + 1))
+done
 DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/fresh_db_bootstrap.sql" >/dev/null
