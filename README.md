@@ -1,3 +1,7 @@
+## 212.18.261022 — Insights and Your courses (0215)
+
+Owner (Oct 2026, placed Oct 22): personal analysis from data BNN already records.
+
 ## 212.17.261022 — CI: the fresh-database rebuild survives registry rate limits
 
 GitHub's fresh-database check kept failing before a single migration ran: GitHub's container registry (ghcr.io) rate-limited the download of the Supabase database image ("toomanyrequests"), and the Supabase CLI retries only twice (4s, 8s).

@@ -20,6 +20,11 @@ import { TeamRoundsList } from "@/components/rounds-list";
 import { SeasonCardView } from "@/components/season-story";
 import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
+import { InsightsCard, InsightsScreen } from "@/components/insights";
+import { YourCourses, CourseDetail } from "@/components/your-courses";
+import { computeInsights } from "@/lib/insights";
+import { yourCourses } from "@/lib/your-courses";
+import { round as mkRound, PARS as RP, SIS as RS } from "@/lib/test-fixtures/messy-rounds";
 
 const outDir = process.argv[2] || "/tmp/design-gallery";
 fs.mkdirSync(outDir, { recursive: true });
@@ -69,6 +74,18 @@ add("12-team-rounds", <TeamRoundsList items={[
 add("13-season-headline", <SeasonCardView card={{ kind: "headline", rounds: 27, holes: 462, hours: null, courses: 9, teamRounds: 3 } as never} name="Amit" year={2026} />);
 const rc = buildRecap(ended, players(), fieldRows as never);
 shots["14-team-round-email"] = teamRoundEmail({ format: "scramble", course: "Oak Hollow", recap: rc, personalLine: rc.personal["u4"] ?? null, firstName: "Amit", gameUrl: "https://example.com/?tab=games&game=109487", unsubscribeUrl: "https://example.com/u" }).html;
+
+// 212.18 — Insights and Your courses: a realistic season (bogeys on the hardest holes, a double or two, a strong finish)
+const seasonRounds = Array.from({ length: 16 }, (_, k) => mkRound(`r${k}`, `2026-${String(4 + Math.floor(k / 3)).padStart(2, "0")}-${String(3 + (k % 3) * 9).padStart(2, "0")}`,
+  RP.map((p, i) => p + (RS[i] <= 6 ? (k % 3 === 0 && i === 3 ? 3 : 1) : RS[i] >= 13 ? 0 : (i + k) % 4 === 0 ? 1 : 0) - (i >= 15 && k % 2 === 0 ? 1 : 0)),
+  { course: k % 4 === 0 ? "Fairmount CC" : "Oak Hollow" }, (i) => ({ putts: (i + k) % 7 === 0 ? 3 : 2 })));
+add("15-insights-card", <InsightsCard rounds={seasonRounds} />);
+add("16-insights-card-new", <InsightsCard rounds={seasonRounds.slice(0, 3)} />);
+add("17-insights-screen", <InsightsScreen ins={computeInsights(seasonRounds)} onClose={noop} />);
+add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () => null} />);
+const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;
+add("19-course-detail", <div style={{ background: "#1B5A46", borderRadius: 12, paddingTop: 12 }}><CourseDetail c={oakRec} loadField={async () => null}
+  initialField={{ enough: true, rounds: 41, holes: oakRec.holes.map((h) => ({ hole: h.hole, par: h.par, avg_to_par: Math.round((h.hole === 4 ? 0.9 : h.hole === 13 ? 1.6 : h.avgToPar * 0.8 + 0.3) * 10) / 10 })) }} /></div>);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

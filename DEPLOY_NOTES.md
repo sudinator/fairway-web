@@ -1,3 +1,24 @@
+## 212.18.261022 — Insights and Your courses (0215)
+
+Owner (Oct 2026, placed Oct 22): personal analysis from data BNN already records.
+
+**Insights** (lib/insights.ts; components/insights.tsx). A dashboard card right after the handicap — the two strongest findings, a bold headline and a plain detail — and "See all insights" opens the full screen: what stands out (problems, then strengths, then general figures, by shots a round); against par per hole by hole type, difficulty (stroke index) and stretch of the round; consistency (within 3 of handicap; what blow-up holes cost; three-putts). From the last 20 valid rounds (lib/round-rules: 9+ holes), nothing until 5, no finding from fewer than 20 holes.
+**Findings compare each hole with what the member's own game predicts** — the round's score over par spread across the holes the way handicap strokes are — because everyone drops more shots on the hardest holes; a raw comparison always "found" them. A player who pars everything gets no invented leak; a constructed +12 season shows the hardest holes 1.1 a hole worse than predicted (about 6.9 shots a round). The screen shows both: against par, and "vs your game".
+
+**Your courses** (lib/your-courses.ts; components/your-courses.tsx), at the top of the Courses tab: each course played, most first — rounds, best and average gross (complete 18-hole rounds only), last played. Tap one: nemesis hole and best hole (their averages), and hole by hole your average against par beside the CLUB's — your figure red where you're half a shot or more worse than the club there, green where better.
+
+**0215 course_field_averages:** the club's hole averages at a course — members can't read each other's hole scores, so only averages leave the database, nothing unless 5 rounds by 3 members (3 scores per hole), last two years, the club's own active members only. Tested: averages only, the threshold, another club / a suspended member refused, not callable signed out.
+
+Tests: lib/insights.test.ts (messy rounds — lib/test-fixtures/messy-rounds.ts — known answers, the window, the course record, no handicap), lib/insights-render.test.tsx, ci/assert-course-field.sql. Design gallery: 5 new screens, reviewed at phone width.
+
+**Before it reaches production:** run docs/sql/data_profile.sql on production (standing rule for statistics).
+
+**Also: Insights reads handicaps through the one rule.** A guard (check_handicap_single_source) caught a direct read of the stored course handicap, which would ignore a manual one (0153); and the scoring rule treats no handicap as scratch (0) — right for a game, wrong for an analysis — so lib/game-shape gains chBasisOrNull ("no handicap" is none). The expected-score spread uses the one stroke allocator (lib/golf allocateStrokes, by stroke-index rank) — another guard caught a hand-written allocation. Tests: a manual handicap used as entered; no handicap → no after-handicap findings.
+
+**CI: the Supabase images are kept between runs.** GitHub's container registry kept rate-limiting the image downloads (the retries got the database image, then the CLI needed realtime too). The workflow now restores a saved copy of the images (actions/cache, keyed on the pinned CLI 2.101.0 — keep in step), saves them after the first successful run, and the rebuild retries up to 8 times.
+
+Deploy: staging 0215 → code; production 0215 → merge.
+
 ## 212.17.261022 — CI: the fresh-database rebuild survives registry rate limits
 
 GitHub's fresh-database check kept failing before a single migration ran: GitHub's container registry (ghcr.io) rate-limited the download of the Supabase database image ("toomanyrequests"), and the Supabase CLI retries only twice (4s, 8s).

@@ -28,6 +28,7 @@ import { RoundDetail } from "@/components/round-detail";
 import { diagEnabled } from "@/lib/debuglog";
 import { Dashboard } from "@/components/dashboard";
 import { RoundsList, TeamRoundsList } from "@/components/rounds-list";
+import { YourCourses } from "@/components/your-courses";
 import { loadTeamRounds, type TeamRound } from "@/lib/team-rounds";
 import { GroupsPanel } from "@/components/groups";
 import { InstallHint } from "@/components/install-hint";
@@ -941,7 +942,11 @@ export function Home({ session }: { session: any }) {
               setRounds((current) => current.map((r) => r.id === nextRound.id ? nextRound : r));
             }} />
         ) : tab === "courses" && activeGroup ? (
-          <CoursesLibrary user={user} activeGroupId={activeGroup.id} />
+          <>
+            {/* 212.18: your record at each course you've played, above the club's course library */}
+            <YourCourses rounds={rounds} groupId={activeGroup.id} />
+            <CoursesLibrary user={user} activeGroupId={activeGroup.id} />
+          </>
         ) : tab === "players" && activeGroup ? (
           <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
         ) : tab === "groups" ? (

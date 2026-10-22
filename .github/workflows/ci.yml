@@ -53,11 +53,39 @@ jobs:
 
       # 212.16: sign in to GitHub's container registry with the run's own token — anonymous image downloads are the ones
       # rate-limited ("toomanyrequests"); signed-in downloads have far more headroom. No secret needed.
+      # 212.18: keep the Supabase images between runs — the registry (ghcr.io) rate-limits downloads, and the CLI needs
+      # several images (postgres, realtime …). Keyed on the pinned CLI version above (2.101.0): the same images every run,
+      # re-saved automatically when the CLI is upgraded. KEEP THE KEY'S VERSION IN STEP WITH `version:` ABOVE.
+      - name: Restore the saved Supabase images
+        id: sbimages
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: supabase-images-${{ runner.os }}-cli-2.101.0
+
+      - name: Load the saved Supabase images
+        if: steps.sbimages.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-images.tar
+
       - name: Sign in to the container registry (Supabase images)
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Rebuild a fresh Supabase database from committed migrations
         run: bash ci/test_fresh_db_rebuild.sh
+
+      - name: Save the Supabase images for later runs
+        id: sbsave
+        if: steps.sbimages.outputs.cache-hit != 'true'
+        run: |
+          imgs=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E 'supabase/' | grep -v '<none>' || true)
+          if [ -n "$imgs" ]; then docker save $imgs -o /tmp/supabase-images.tar && ls -la /tmp/supabase-images.tar && echo "saved=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Store the saved Supabase images
+        if: steps.sbsave.outputs.saved == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: supabase-images-${{ runner.os }}-cli-2.101.0
 
       # The VAPID public key is NOT a secret — it ships to every browser in public/sw.js.
       # It is set here so `prebuild` can run its drift check instead of skipping it. Absence

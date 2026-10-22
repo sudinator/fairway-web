@@ -1,3 +1,7 @@
+## 212.18 — course_field_averages (0215)
+
+course_field_averages(p_group uuid, p_course text) → jsonb {enough, rounds, players, holes[{hole, par, avg_to_par, n}]} — averages only; ≥5 rounds by ≥3 members, ≥3 per hole; last 2 years; the club's active members only.
+
 ## 212.8 — security_contract_state (0214)
 
 security_contract_state() — server only: rls_off, policies, table_grants, definer_execute, definer_no_search_path, writable_without_guard, storage_policies, buckets.

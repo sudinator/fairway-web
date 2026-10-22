@@ -76,6 +76,7 @@
   "clear_my_notifications()": "authenticated",
   "club_pending_signups(uuid)": "authenticated",
   "course_api_status(text[])": "authenticated",
+  "course_field_averages(uuid,text)": "authenticated",
   "course_owner_groups(uuid)": "authenticated",
   "course_review_detail(uuid)": "authenticated",
   "course_tee_usage(uuid,integer)": "authenticated",

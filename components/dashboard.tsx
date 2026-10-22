@@ -1,5 +1,6 @@
 "use client";
 
+import { InsightsCard } from "@/components/insights";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -362,6 +363,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </div>
         </div>
       )}
+
+      {/* 212.18: the two strongest findings, right after the handicap — the full screen one tap away */}
+      <InsightsCard rounds={rounds} />
 
       {diffTrend.length >= 2 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
