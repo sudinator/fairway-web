@@ -1,3 +1,30 @@
+## 212.2.261021 — Scramble end-to-end check: fixes
+
+Owner asked for a full end-to-end check. Method: every app file and database function that treats alternate shot specially (the closest format — one score per side, same score table) was checked for scramble (21 files, 10 functions), then the journey traced from creating a game to the season. Fixed:
+
+1. **Setup rules counted a scramble mid-round as unscored.** lib/game-setup-policy judged "scoring has started" from players' own cards (empty in a scramble) plus alternate shot's side-scoring marker only. Now the marker counts for scramble too, and once set every player counts as having scores — so removing a player, changing teams or moving groups mid-round is blocked or confirmed as for alternate shot, with the message naming "scramble team scoring". (The setup screens themselves already locked correctly.)
+2. **One-ball formats counted nowhere in the club report.** Since alternate shot moved to the canonical side-score store (0140), its players' own cards are empty — so alternate shot AND scramble counted no game, round or attendance (side scores fed rivalries only). Now each player carries their side's / team's card: the round counts for games, rounds and attendance, and still feeds no individual statistic; older alternate-shot games (scores on players' cards) keep counting.
+3. **Scorecard view showed nothing under the card for a scramble** — other team formats show their results there; now the scramble leaderboard / matches.
+4. **Admin screens showed the raw key "scramble"** — now "Scramble".
+
+Checked and right: score resets clear team scores for any format; deleting a game removes its team scores; match length can't change once a team score exists; the primary-device rule guards the team-score table; no betting is offered on a scramble; the share-my-card buttons stay hidden (no individual card exists — the recap is the shareable result); results code for other formats is never reached by a scramble.
+
+Tests: setup rules (blocked once team scoring starts, with the scramble wording; not blocked before); club report (a scramble and an alternate-shot game count 6 rounds, no best gross).
+
+No migration. Deploy: code only.
+
+## 212.1.261021 — Scramble: team strokes only; the line-up card and live scorecard show teams (0211)
+
+**Team handicaps weren't the strokes being drawn (owner).** A 12 handicap's team showed a stroke on every hole and two on several. The team handicap was calculated correctly, but the scorecard's stroke sets (lib/game-shape strokeSets) had no scramble case, so the team's row fell through to the default — the FIRST player's own course handicap — and a second check also drew individual course-handicap dots and a Stableford column. In a scramble nobody plays their own ball: now the only strokes shown are the team's ("your team"), from the one team-handicap calculation, on the group card and the personal card alike (which kept its own copy of the stroke-basis list — now the shared type). Test: a team whose first player is 24.8 shows its 9 team strokes, not 25 — fails on 212.0.
+
+**The line-up card shows a scramble's teams** — the method in setup's words, each team with its players and team handicap, each player's "course hcp × % = counts" under USGA (with the game's own percentages and each team's own size), "agreed" under agreed handicaps, the captain under captains only, grouped by match for team v team. No individual playing handicaps.
+
+**The live scorecard shows a card per team** — hole-by-hole gross, the team's strokes, net and the team handicap — instead of empty player cards; the leaderboard and the cards share one calculation.
+
+0211: get_live_lineup carries the scramble settings (method, percentages, captains only); get_live_scorecard adds captains only. Both stay public by token.
+
+Deploy: staging 0211 → code; production 0211 → merge.
+
 ## 212.0.261021 — Scramble teams made in setup, any mix of 2–4; standard fields
 
 Owner (Oct 21). A scramble no longer has one team size chosen up front — that "size" was only a default for balancing, and once teams were picked by hand or numbers didn't divide evenly it became a rule the screen either fought or ignored (Team 1 accepted any number of players).

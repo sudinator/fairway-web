@@ -39,7 +39,7 @@ type LiveGame = {
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
   /** 211.1 (0204): a scramble's competition and handicap — absent on older feeds. */
-  scramble_mode?: "field" | "match" | null; scramble_handicap?: "usga" | "gross" | "agreed" | null;
+  scramble_mode?: "field" | "match" | null; scramble_handicap?: "usga" | "gross" | "agreed" | null; scramble_team_size?: number | null;
 };
 type LiveData = {
   game: LiveGame; players: LivePlayer[];
@@ -395,7 +395,14 @@ function Scorecard({ data }: { data: LiveData }) {
       <SkinsCarry game={game} players={players} meta={meta} allowance={allowance} />
 
       <SectionTitle>Scorecards</SectionTitle>
-      {game.game_type === "alt_shot" ? altSides.map((sd) => (
+      {game.game_type === "scramble" ? liveScrambleTeams(data).map((t) => {
+        // 212.1: one card per TEAM — players record no score of their own in a scramble. The team's strokes come
+        // from its team handicap, allotted by stroke index (lib/golf allocateStrokes), never a player's own.
+        const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si ?? null, par: m.par })), t.handicap);
+        const st = computeSideStat(t.scores, meta.map((m) => alloc[m.n] || 0), meta);
+        return <SideRow key={t.key} title={`${t.name} · ${t.members.join(", ")}`} colorDot={C.sage} stat={st} meta={meta}
+          right={st.thru ? String(st.gross) : "\u2014"} status={game.scramble_handicap === "gross" ? "gross" : `team hcp ${t.handicap}`} />;
+      }) : game.game_type === "alt_shot" ? altSides.map((sd) => (
         <SideRow key={sd.key} title={sd.title} colorDot={sd.color} stat={sd.stat} meta={meta}
           right={sd.stat.thru ? String(sd.stat.gross) : "\u2014"}
           status={sd.ch != null ? `side hcp ${Math.round(sd.ch)}` : ""} />
@@ -743,24 +750,30 @@ function SkinsCarry({ game, players, meta, allowance }: { game: LiveGame; player
 
 
 /** 211.1: a scramble on the live page — the same engine as the app (lib/scramble): the leaderboard or the matches. */
-function LiveScramble({ data }: { data: LiveData }) {
+/** 212.1: a scramble's teams on the live page — ONE calculation for the leaderboard and the team cards. */
+function liveScrambleTeams(data: LiveData) {
   const { game, players, foursomes } = data;
   const meta = game.holes_meta || [];
-  const gross = game.scramble_handicap === "gross";
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+  const method = scrambleMethodOf(game as never);
   let n = 0;
-  const teams = foursomes.flatMap((f) => (["a", "b"] as const).flatMap((side) => {
+  return foursomes.flatMap((f) => (["a", "b"] as const).flatMap((side) => {
     const ids = (f[side] || []).filter(Boolean) as string[];
     if (!ids.length) return [];
     n++;
-    const method = scrambleMethodOf(game as never);
     const th = scrambleTeamHandicap(ids.map((id) => byId[id]?.ch ?? 0), false, customAllowanceFor((game as { scramble_allowance?: unknown }).scramble_allowance, ids.length));
-    // 211.8 (0209): a team handicap the organizer entered wins over the calculated one, as in the app
     const entered = f[side === "a" ? "a_hcp" : "b_hcp"];
     const handicap = method === "gross" ? 0 : method === "agreed" ? (typeof entered === "number" ? entered : 0) : th?.total ?? 0;
     return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
       scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
   }));
+}
+
+function LiveScramble({ data }: { data: LiveData }) {
+  const { game, foursomes } = data;
+  const meta = game.holes_meta || [];
+  const gross = game.scramble_handicap === "gross";
+  const teams = liveScrambleTeams(data);
   const toPar = (x: number) => (x === 0 ? "E" : x > 0 ? `+${x}` : String(x));
   if (!teams.length) return null;
   if (game.scramble_mode === "match") {

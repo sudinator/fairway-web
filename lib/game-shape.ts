@@ -311,7 +311,7 @@ export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): n
 // Every surface renders from this function, so a dot cannot exist without a basis and a label, and
 // the same basis is the same colour everywhere. `dotStrokes`/`fullStrokes` remain for callers that
 // only need one number; both are expressible through this.
-export type StrokeBasisKey = "course" | "opponent" | "group_low" | "alt_side";
+export type StrokeBasisKey = "course" | "opponent" | "group_low" | "alt_side" | "team";
 export type StrokeSet = {
   key: StrokeBasisKey;
   /** Strokes this player RECEIVES on this hole under this basis. */
@@ -384,6 +384,12 @@ export function strokeSets(
 
   // Alternate shot: one ball per side, so there is no individual score to give a course-handicap
   // dot any meaning here. The side handicap is a pair basis with SIDES instead of players.
+  // 212.1: a scramble's ONLY strokes are the team's (USGA allowance or agreed) — nobody plays their own ball, so a
+  // player's own course handicap is meaningless here. Without this case the default below drew the first player's
+  // personal strokes on the team's row (a 12 handicap showed a stroke on every hole and two on some).
+  if (basis === "scramble_team") {
+    return [{ key: "team", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your team" }];
+  }
   if (basis === "alt_shot_side") {
     return [{ key: "alt_side", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your side" }];
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { StrokeBasisKey } from "@/lib/game-shape";
 import React, { useState } from "react";
 import {
   C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate, roundHoleCount, expectedNineDifferential } from "@/lib/golf";
@@ -494,7 +495,7 @@ export type EntryHole = {
    * ONE source: a dot cannot be drawn without a basis and a written label (185.0). Optional so
    * legacy callers that only supply recv/indRecv still render their single set.
    */
-  sets?: { key: "course" | "opponent" | "group_low" | "alt_side"; strokes: number; gives: number; label: string }[];
+  sets?: { key: StrokeBasisKey; strokes: number; gives: number; label: string }[];   // 212.1: the shared type (it had its own copy)
   recv: number; // handicap strokes received on this hole (relative/match basis for match & trifecta)
   indRecv?: number; // individual (full playing handicap) strokes — low-net / Stableford side game
   gives?: number; // strokes GIVEN on this hole (match play, lower-handicap player)
@@ -636,7 +637,7 @@ export function strokeGlyph(key: string, color: string, gives = false, i: number
   const BOX: React.CSSProperties = {
     width: 8, height: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", lineHeight: 0,
   };
-  if (key === "opponent" || key === "alt_side") {
+  if (key === "opponent" || key === "alt_side" || key === "team") {
     return (
       <span key={i} style={BOX}>
         <svg width={8} height={7} viewBox="0 0 8 7" style={{ display: "block" }} aria-hidden>
@@ -711,7 +712,7 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
   // cream, where the old C.dot was 3.00:1 and C.indivDot only 1.83:1 — the second set was barely
   // visible on this card at all.
   const BASIS_COLOR: Record<string, string> = {
-    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent, team: C.basisOpponent,
   };
   /** The sets this hole actually draws, in basis order, skipping ones with nothing to show. */
   const setsOf = (h: EntryHole) => (h.sets && h.sets.length

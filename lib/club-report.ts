@@ -8,7 +8,8 @@
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { allocateStrokes } from "@/lib/golf";
-import { chBasis } from "@/lib/game-shape";
+import { chBasis, pkey } from "@/lib/game-shape";
+import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { buildHighlights } from "@/lib/game-highlights";
 import { matchOutcomes } from "@/lib/match-outcomes";
 import { isValidRound, isFull18 as isFull18Card, isFullCard, handicapReading, countsForIndividualStats, holeScore } from "@/lib/round-rules";
@@ -77,7 +78,20 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
     // Alternate shot: the scores belong to the PAIR — the round counts (games, rounds, attendance, rivalries)
     // but feeds no individual scoring statistic. (210.2)
     const individual = countsForIndividualStats(game.game_type);
-    for (const p of players) {
+    // 212.2: in a one-ball format (alternate shot, scramble) the score lives with the side / team (canonical store),
+    // and players' own cards are empty — so each player carries their side's card. The round then counts (games,
+    // rounds, attendance) but feeds no individual statistic (`individual` is false for these formats).
+    const oneBall = game.game_type === "alt_shot" || game.game_type === "scramble";
+    const cardOf = (p: Player): (number | null)[] => {
+      if (!oneBall) return p.scores as (number | null)[];
+      const k = pkey(p);
+      const f = (game.foursomes || []).find((x) => x.a.includes(k) || x.b.includes(k));
+      const side = f ? canonicalAltShotGross(altScores, f.id, f.a.includes(k) ? "a" : "b", nh, null) : [];
+      // older alternate-shot games (before the canonical store, 0140) kept the scores on the players' own cards
+      return side.some((x) => x != null) ? side : (p.scores as (number | null)[]);
+    };
+    for (const p0 of players) {
+      const p = oneBall ? ({ ...p0, scores: cardOf(p0) } as Player) : p0;
       if (!isRound(p, nh)) continue;
       rounds++;
       if (!isFullCard(p.scores, nh)) shortenedRounds++;

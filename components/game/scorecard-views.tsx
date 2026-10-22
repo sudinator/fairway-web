@@ -125,11 +125,12 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   // draw a duplicate blue set.
   // Drives the blue course-handicap dots and the per-player course-Stableford column. Alternate
   // shot records no individual score, so both describe something that never happened.
-  const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot";
+  // 212.1: nor does a scramble (one ball per team — only the team's strokes exist).
+  const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot" && game.game_type !== "scramble";
   const indRecvFor = (p: Player, si: number | null) => fullStrokes(game, p, si);
   // ONE source and ONE colour per stroke basis, shared with the personal card (185.0).
   const BASIS_COLOR: Record<string, string> = {
-    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent, team: C.basisOpponent,
   };
   // Each basis owns a fixed vertical slot down the LEFT EDGE of the cell — top, middle, bottom —
   // rather than stacking from the top. With three bases an 8px stack bunched them in the corner and
@@ -140,6 +141,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
     group_low: { top: "50%", transform: "translateY(-50%)" },
     course: { bottom: 4 },
     alt_side: { top: 4 },
+    team: { top: 4 },
   };
   const cellSets = (p: Player, si: number | null) =>
     // A set with only `gives` still draws — as a hollow glyph. Filtering on strokes alone meant the
@@ -478,7 +480,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
           // four-player card that is wrong for three of them (641032 read "v Michael"). The per-player
           // header lines below name each player's own opponent; those stay specific.
           const GENERIC: Record<string, string> = {
-            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side",
+            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side", team: "team hcp",
           };
           const seen = new Map<string, string>();
           for (const p of players) for (const m of meta) for (const r of strokeSets(game, p, m.si, strokePool)) if (!seen.has(r.key)) seen.set(r.key, GENERIC[r.key] ?? r.label);

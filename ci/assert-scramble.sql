@@ -62,6 +62,10 @@ begin
   update public.games set scramble_allowance = '{"4": [30, 20, 15, 10]}' where id = gid;
   begin update public.games set scramble_allowance = '[1,2]' where id = gid; ok := false; exception when check_violation then ok := true; end;
   if not ok then raise exception 'a malformed allowance was accepted'; end if;
+  -- 0211: both public feeds carry the scramble settings
+  if pg_get_functiondef('public.get_live_lineup(text)'::regprocedure) not like '%scramble_allowance%' or pg_get_functiondef('public.get_live_scorecard(text)'::regprocedure) not like '%scramble_team_size%' then
+    raise exception 'the line-up or live feed lacks the scramble settings';
+  end if;
   -- only scramble games (as that alternate-shot game's organizer, who passes the fence — so the format check decides)
   perform set_config('request.jwt.claim.sub', a1, true);
   perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000d1');

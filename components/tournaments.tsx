@@ -3822,6 +3822,8 @@ function GameRoom({
           />
           {/* 204.0: this group's Results card, directly under the scorecard — same component as the
               Results tab, header and pair boxes suppressed (the scorecard already names the group). */}
+          {/* 212.2: a scramble's leaderboard (or matches) under the card, as the other team formats show theirs */}
+          {game.game_type === "scramble" && <ScrambleView game={game} players={players} altShotScores={altShotScores} />}
           {(game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (() => {
             const keys = new Set(cardPlayers.map((p) => pkey(p)));
             const mineF = (game.foursomes || []).find((f) => f.a.some((k) => keys.has(k)) || f.b.some((k) => keys.has(k)));

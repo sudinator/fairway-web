@@ -86,4 +86,22 @@ const wrap = (title: string, note: string, html: string) =>
   const card = s.el.querySelector("[data-lineup-row]")?.parentElement as HTMLElement | null;
   if (card) writeFileSync(".testout-screens/lineup-group-card.html", wrap("Per-group card (201.0)", "the real ShareLineupModal's image card for Group 1 — what 'Share this group' exports. One foursome per image.", card.outerHTML));
 }
+// 212.1 — a SCRAMBLE line-up shows teams and TEAM handicaps, never individual playing handicaps
+{
+  const holes = Array.from({ length: 18 }, (_, k) => ({ n: k + 1, par: 4, si: k + 1 }));
+  const mk = (id: string, name: string, ch: number) => ({ id, user_id: id, display_name: name, course_handicap: ch, course_handicap_source: "manual", handicap_index: ch, no_show: false });
+  const payload = {
+    ended: false, id: "g", code: "1", name: "Saturday Scramble", course: "Oak", played_on: "2026-10-25", game_type: "scramble", status: "active", course_par: 72, holes_meta: holes,
+    scramble_mode: "field", scramble_handicap: "usga", scramble_allowance: null, scramble_team_size: null,
+    foursomes: [{ id: "t1", name: "Team 1", a: ["p4", "p1", "p2", "p3"], b: [] }, { id: "t2", name: "Team 2", a: ["p5", "p6"], b: [] }],
+    players: [mk("p1", "Raj", 4.2), mk("p2", "Nihar", 9.8), mk("p3", "Karan", 14.6), mk("p4", "Sam", 22.4), mk("p5", "Amit", 6.1), mk("p6", "Vikram", 11.3)],
+  };
+  const sc = renderScreen(<LiveLineupView data={payload} err={null} />);
+  const txt = sc.el.textContent || "";
+  ok(txt.includes("LINE-UP · SCRAMBLE") && sc.el.querySelectorAll("[data-lineup-team]").length === 2, "a scramble line-up lists its two teams");
+  ok(txt.includes("7.44, rounded to 7") && txt.includes("4.2 × 25% = 1.1") && txt.includes("22.4 × 10% = 2.2"), `team of 4: the USGA breakdown, whoever is listed first (${txt.slice(0, 260)})`);
+  ok(txt.includes("Team 2") && txt.includes("6.1 × 35%"), "team of 2: its own percentages (35 / 15)");
+  ok(!txt.includes("PLAYING HCP") && !txt.includes("COURSE HCP"), "no individual playing handicaps on a scramble line-up");
+  sc.unmount();
+}
 report("lineup renders");

@@ -1158,7 +1158,7 @@ function AdminGamesOversight({ onOpenGame }: { onOpenGame: (gameId: string) => v
 
   const formatLabel = (value: string) => ({
     stableford: "Stableford", stroke: "Stroke Play", match: "Singles Match", fourball: "Four-Ball",
-    alt_shot: "Alternate Shot", trifecta: "Trifecta", skins: "Skins",
+    alt_shot: "Alternate Shot", scramble: "Scramble", trifecta: "Trifecta", skins: "Skins",
   }[value] || value.replaceAll("_", " "));
 
   return (

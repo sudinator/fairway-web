@@ -6,6 +6,7 @@ import { ScrambleView } from "@/components/game/scramble-view";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { RecapBody } from "@/components/game/recap-body";
 import { ScrambleSettings } from "@/components/game/scramble-settings";
+import { strokeSets } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
 import { scrambleRowValue } from "@/lib/scramble-game";
 import type { Game, Player } from "@/lib/game-types";
@@ -126,5 +127,16 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   ok(!opts.some((o) => (o || "").startsWith("Team 1")) && opts.some((o) => (o || "").startsWith("Team 2")), `a full team (4) isn't offered in Add to… (got ${opts})`);
   ok((fu.el.textContent || "").includes("Teams of different sizes: Team 1 has 4 players"), "mixed sizes are noted");
   fu.unmount();
+}
+// 212.1 — the team's strokes, never a player's own: a team whose FIRST player is a 24.8 used to show that
+// player's ~25 strokes (one on every hole, two on several). The team's handicap here is 9.
+{
+  const hiFirst = game({ foursomes: [{ id: "t1", name: "Team 1", a: ["u-Hp", "u-Amit", "u-Vikram", "u-Probir"], b: [] }] });
+  const first = players.find((p) => p.display_name === "Hp")!;
+  const sets = holes.map((h) => strokeSets(hiFirst as never, first as never, h.si, players as never));
+  ok(sets.every((ss) => ss.length === 1 && ss[0].key === "team"), `only the team's strokes are drawn — no personal course-handicap set (got ${JSON.stringify(sets[0])})`);
+  const total = sets.reduce((a, ss) => a + ss[0].strokes, 0);
+  ok(total === 9, `the team's 9 strokes across 18 holes, not the first player's ~25 (got ${total})`);
+  ok(sets.every((ss) => ss[0].strokes <= 1), "no hole gets two strokes at a team handicap of 9");
 }
 report("scramble screens");

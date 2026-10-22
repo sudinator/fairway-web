@@ -1,3 +1,7 @@
+## 212.1 — Scramble on the line-up and live feeds (0211)
+
+get_live_lineup adds scramble_mode, scramble_handicap, scramble_allowance, scramble_team_size; get_live_scorecard adds scramble_team_size.
+
 ## 211.9 — Scramble handicap methods (0210)
 
 games.scramble_handicap: usga | agreed (gross legacy); games.scramble_allowance jsonb {"<size>": [pct…]} lowest first, absent = USGA; team size 1 = captains only (always agreed); get_live_scorecard game block carries scramble_allowance.
