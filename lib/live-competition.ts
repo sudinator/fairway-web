@@ -66,7 +66,11 @@ export function liveCupSessionScore(s: LiveCupSession): LiveCupSessionScore {
 
   const byId: Record<string, LiveScoringPlayer> = Object.fromEntries(s.players.map((p) => [p.id, p]));
   const legs: LiveLeg[] = liveLegs(
-    { game_type: s.game.game_type, allowance_pct: s.game.allowance_pct, team_score_mode: s.game.team_score_mode, course_par: s.game.course_par },
+    // 212.6: a scramble's settings must reach the engine — without them every Cup scramble was scored as USGA
+    // with the standard percentages on the live page (agreed handicaps and custom percentages ignored).
+    { game_type: s.game.game_type, allowance_pct: s.game.allowance_pct, team_score_mode: s.game.team_score_mode, course_par: s.game.course_par,
+      scramble_handicap: (s.game as { scramble_handicap?: string | null }).scramble_handicap, scramble_team_size: (s.game as { scramble_team_size?: number | null }).scramble_team_size,
+      scramble_allowance: (s.game as { scramble_allowance?: unknown }).scramble_allowance } as never,
     byId, s.pairings, s.foursomes, meta, s.game.allowance_pct ?? 100, s.alt_shot_scores || [],
   );
 

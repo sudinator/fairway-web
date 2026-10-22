@@ -1,3 +1,15 @@
+## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
+
+Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."
+
+**lib/scramble-simulation.test.tsx (in CI):** 240 seeded random games through the real code — one leaderboard and team v team; teams of 2, 3, 4 and mixed; captains only; USGA default and custom percentages, agreed handicaps (some blank); plus handicaps; drive requirements; Ryder Cup 2 v 2, 3 v 3, 4 v 4; partial and full rounds — each checked against an INDEPENDENT calculation in the test: team handicaps; strokes on the card (team only, totalling the handicap, on the right holes); leaderboard (net = gross − strokes, order, shared ties); match lead and closeout; Ryder Cup points (app = live page, a decided match worth 1); live page, line-up and recap agreeing; club-report rounds; drive tallies. 24,622 checks. A one-off 1,500-game run with another seed: 158,522 checks.
+
+**Found and fixed:**
+1. **Plus-handicap teams showed no strokes on the card** (the leaderboard was right). The card's team strokes came from a give-only allocator; now the engine's own signed allocation — a plus team gives strokes back on the easiest holes, drawn with the hollow "you give a stroke" mark.
+2. **The Cup live page ignored a scramble's handicap method.** liveCupSessionScore handed the engine a cut-down game (type, allowance, mode, par), dropping the scramble settings — so every Cup scramble was scored there as USGA with the standard percentages, and agreed handicaps or custom percentages gave different leads than the app. The settings now pass through.
+
+No migration. Deploy: code only.
+
 ## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
 
 Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.

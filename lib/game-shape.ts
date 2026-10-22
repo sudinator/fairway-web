@@ -241,8 +241,15 @@ export function dotStrokes(
   // SCRAMBLE (211.1). One ball per TEAM, so the team has one handicap (USGA scramble allowances) and its strokes
   // fall on the holes its stroke index gives — every player on the team shows the same dots.
   if (basis === "scramble_team") {
+    // 212.6: the engine's own allocation (lib/golf allocateStrokes, as the leaderboard uses) — signed, so a PLUS team
+    // gives strokes back on the easiest holes (matchStrokesFor only gives, so a plus team's card showed none).
     const total = scrambleTeamHandicapFor(game, allPlayers, key);
-    return total == null ? 0 : matchStrokesFor(total, si, allocHoles(game));
+    if (total == null || si == null) return 0;
+    const holes = allocHoles(game);
+    if (!holes) return 0;
+    const alloc = allocateStrokes(holes as never, total);
+    const hole = holes.find((h) => h.stroke_index === si);
+    return hole ? alloc[hole.hole_number] || 0 : 0;
   }
 
   // ALTERNATE SHOT. One ball per side, so the SIDE has one handicap — 50% of the two partners'
@@ -391,7 +398,8 @@ export function strokeSets(
   // player's own course handicap is meaningless here. Without this case the default below drew the first player's
   // personal strokes on the team's row (a 12 handicap showed a stroke on every hole and two on some).
   if (basis === "scramble_team") {
-    return [{ key: "team", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your team" }];
+    const n = dotStrokes(game, p, si, allPlayers);   // signed: negative = a plus team gives a stroke back here
+    return [{ key: "team", strokes: Math.max(0, n), gives: Math.max(0, -n), label: "your team" }];
   }
   if (basis === "alt_shot_side") {
     return [{ key: "alt_side", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your side" }];

@@ -1,3 +1,7 @@
+## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
+
+Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."
+
 ## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
 
 Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.
