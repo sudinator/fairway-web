@@ -1,3 +1,4 @@
+
 ## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
 
 Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."
@@ -241,6 +242,7 @@ The groundwork for the Scramble format (owner-approved mock, Oct 20): every play
 Not yet registered as a game type: the game-type coverage test requires a format's label, creation and setup screen before it may be listed — that comes with the screens.
 
 Deploy: staging 0203 → code; production 0203 → merge. No visible change.
+
 
 ## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
 
