@@ -1,3 +1,7 @@
+## 212.3.261021 — Scramble as a Ryder Cup session (0212)
+
+Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."
+
 ## 212.2.261021 — Scramble end-to-end check: fixes
 
 Owner asked for a full end-to-end check. Method: every app file and database function that treats alternate shot specially (the closest format — one score per side, same score table) was checked for scramble (21 files, 10 functions), then the journey traced from creating a game to the season. Fixed:

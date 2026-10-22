@@ -43,7 +43,7 @@ export type GamePayloadOpts = {
   sideContestsEnabled?: boolean;
   /** 211.1: scramble — team size 2–4, handicap USGA allowance or gross, optional drive requirement; the mode
    *  (one leaderboard or team v team) follows the family it was created under. */
-  scramble?: { teamSize: 1 | null;   // 212.0: 1 = captains only; null = teams made in setup (any mix of 2–4)
+  scramble?: { cupTeams?: boolean; teamSize: 1 | 2 | 3 | 4 | null;   // 212.0: 1 = captains only; null = teams made in setup (any mix of 2–4)
  handicap: "usga" | "gross" | "agreed"; minDrives: number | null; mode: "field" | "match"; allowance?: Record<string, number[]> | null };
 };
 
@@ -100,6 +100,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     pairings: [],
     teams:
       ((o.gameType === "match" || o.gameType === "skins") && o.teamMode) || o.gameType === "fourball" || o.gameType === "alt_shot" || o.gameType === "trifecta"
+        || (o.gameType === "scramble" && !!o.scramble?.cupTeams)   // 212.3: a Ryder Cup scramble keeps the Cup's two teams
         ? [
             { key: "A", name: o.team1.trim() || "Team 1", ...(o.teamColors?.[0] ? { color: o.teamColors[0] } : {}) },
             { key: "B", name: o.team2.trim() || "Team 2", ...(o.teamColors?.[1] ? { color: o.teamColors[1] } : {}) },

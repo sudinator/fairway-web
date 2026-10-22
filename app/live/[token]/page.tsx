@@ -15,7 +15,8 @@ import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@
 import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
-import { scrambleTeamHandicap, scrambleLeaderboard, scrambleMatch, customAllowanceFor } from "@/lib/scramble";
+import { scrambleLeaderboard, scrambleMatch } from "@/lib/scramble";
+import { liveScrambleTeamHandicap } from "@/lib/live-scramble";
 import { scrambleMethodOf } from "@/lib/game-shape";
 import type { TrifectaRowSide } from "@/lib/golf";
 
@@ -755,15 +756,13 @@ function liveScrambleTeams(data: LiveData) {
   const { game, players, foursomes } = data;
   const meta = game.holes_meta || [];
   const byId = Object.fromEntries(players.map((p) => [p.id, p]));
-  const method = scrambleMethodOf(game as never);
   let n = 0;
   return foursomes.flatMap((f) => (["a", "b"] as const).flatMap((side) => {
     const ids = (f[side] || []).filter(Boolean) as string[];
     if (!ids.length) return [];
     n++;
-    const th = scrambleTeamHandicap(ids.map((id) => byId[id]?.ch ?? 0), false, customAllowanceFor((game as { scramble_allowance?: unknown }).scramble_allowance, ids.length));
-    const entered = f[side === "a" ? "a_hcp" : "b_hcp"];
-    const handicap = method === "gross" ? 0 : method === "agreed" ? (typeof entered === "number" ? entered : 0) : th?.total ?? 0;
+    // 212.3: the shared live rule (lib/live-scramble) — the Cup live page uses the same one
+    const handicap = liveScrambleTeamHandicap(game as never, ids.map((id) => byId[id]?.ch ?? 0), f[side === "a" ? "a_hcp" : "b_hcp"]);
     return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
       scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
   }));

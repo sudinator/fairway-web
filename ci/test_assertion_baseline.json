@@ -1,5 +1,5 @@
 {
-  "total": 439569,
+  "total": 439580,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -21,6 +21,7 @@
     "course ordering": 4,
     "create-game format": 12,
     "cup on the recap": 8,
+    "cup scramble": 11,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,

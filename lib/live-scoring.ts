@@ -11,6 +11,8 @@
  * disagrees with the app. Those disagreements are findings for the parity test to report, not
  * things to quietly fix during an extraction.
  */
+import { scrambleMatchProgress } from "./scramble";
+import { liveScrambleTeamHandicap } from "./live-scramble";
 import { strokeSets } from "./game-shape";
 import { altShotSides } from "./game-shape";
 import { readAltShotSideScores } from "./alt-shot-scores";
@@ -95,7 +97,7 @@ export function liveLegs(
   game: LiveScoringGame,
   byId: Record<string, LiveScoringPlayer>,
   pairings: { a: string | null; b: string | null }[],
-  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[],
+  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[]; a_hcp?: number | null; b_hcp?: number | null }[],
   meta: LiveScoringMeta[],
   allowance: number,
   altShotScores: LiveAltShotScore[] = [],
@@ -155,6 +157,22 @@ export function liveLegs(
       .filter((x): x is LiveLeg => x != null);
   }
 
+  // SCRAMBLE (212.3): one ball per TEAM — each team's handicap by the game's method (lib/live-scramble, the app's
+  // rule), its canonical team scores, and the scramble engine's running lead through the shared closeout.
+  if (game.game_type === "scramble") {
+    return foursomes
+      .filter((f) => f.a.filter(Boolean).length && f.b.filter(Boolean).length)
+      .map((f) => {
+        const aIds = f.a.filter(Boolean) as string[], bIds = f.b.filter(Boolean) as string[];
+        const chs = (ids: string[]) => ids.map((id) => byId[id]?.ch ?? 0);
+        const aH = liveScrambleTeamHandicap(game as never, chs(aIds), f.a_hcp), bH = liveScrambleTeamHandicap(game as never, chs(bIds), f.b_hcp);
+        const progress = scrambleMatchProgress(m as never,
+          { scores: canonicalAltShotGross(altShotScores as never, f.id, "a", holes, null), handicap: aH },
+          { scores: canonicalAltShotGross(altShotScores as never, f.id, "b", holes, null), handicap: bH });
+        return fromProgress(progress, aIds, bIds, "team");
+      });
+  }
+
   if (game.game_type === "trifecta") {
     const mode = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
     const out: LiveLeg[] = [];
@@ -186,7 +204,7 @@ export function liveStrokeSets(
   game: LiveScoringGame & { course_par: number | null },
   byId: Record<string, LiveScoringPlayer & { display_name?: string | null }>,
   pairings: { a: string | null; b: string | null }[],
-  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[],
+  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[]; a_hcp?: number | null; b_hcp?: number | null }[],
   meta: LiveScoringMeta[],
   playerId: string,
   si: number | null,

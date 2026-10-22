@@ -18,7 +18,7 @@ import { liveLegs, type LiveAltShotScore, type LiveLeg, type LiveScoringGame, ty
 export type LiveCupSession = {
   id: string;
   name: string;
-  format: "fourball" | "alt_shot" | "match" | "trifecta";
+  format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble";
   session_order: number;
   play_date: string | null;
   points_per_match: number;

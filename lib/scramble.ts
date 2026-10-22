@@ -125,3 +125,19 @@ export function customAllowanceFor(allowance: unknown, n: number): number[] | nu
   if (!Array.isArray(v) || v.length !== n || !v.every((x) => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 100)) return null;
   return v.map((x) => x / 100);
 }
+
+/**
+ * 212.3: team v team as a hole-by-hole running lead (team A's view; null where either team hasn't scored) — the shape
+ * the Ryder Cup's shared closeout (lib/golf matchCloseoutStatus) reads for every format, so a scramble session's
+ * results ("2&1", "AS") read exactly like the others'. Each team's strokes from its own handicap, by stroke index.
+ */
+export function scrambleMatchProgress(holesMeta: Hole[], a: { scores: unknown[]; handicap: number }, b: { scores: unknown[]; handicap: number }): (number | null)[] {
+  const ca = scrambleCard(holesMeta, a.scores, a.handicap), cb = scrambleCard(holesMeta, b.scores, b.handicap);
+  let lead = 0;
+  return holesMeta.map((_, i) => {
+    const x = ca.holes[i].net, y = cb.holes[i].net;
+    if (x == null || y == null) return null;
+    if (x < y) lead++; else if (y < x) lead--;
+    return lead;
+  });
+}

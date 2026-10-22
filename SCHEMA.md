@@ -1,3 +1,7 @@
+## 212.3 — Cup scramble (0212)
+
+competition_sessions.format + 'scramble'; competition_sessions.scramble_team_size 2–4; guard_competition_game_structure checks Cup scramble (match mode, team ≤ size), trigger fires on scramble_mode too; get_live_competition game block carries scramble_mode/handicap/allowance/team_size, foursomes carry a_hcp/b_hcp.
+
 ## 212.1 — Scramble on the line-up and live feeds (0211)
 
 get_live_lineup adds scramble_mode, scramble_handicap, scramble_allowance, scramble_team_size; get_live_scorecard adds scramble_team_size.

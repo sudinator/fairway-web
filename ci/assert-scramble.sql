@@ -78,4 +78,25 @@ begin
   if has_function_privilege('authenticated', 'public.save_scramble_side_score(uuid,text,text,integer,integer,text)', 'execute') then raise exception 'app users can skip the fence'; end if;
   raise notice 'SCRAMBLE_PASS team scores and drives saved through the fence; 3- and 4-player teams; one-player teams only when set up that way; foreign drives, other teams, one-player teams and non-scramble games refused';
 end $$;
+-- 0212: a Ryder Cup scramble session — team v team, no team larger than the session's size
+do $$
+declare cg uuid := '20300000-0000-0000-0000-0000000000c9'; cp uuid := '20300000-0000-0000-0000-0000000000f9'; gm uuid := '20300000-0000-0000-0000-0000000000a9';
+        o uuid := '20300000-0000-0000-0000-000000000001'; ok boolean;
+begin
+  insert into public.groups(id, name, status, created_by) values (cg, 'Cup Club 212', 'active', o);
+  insert into public.competitions(id, group_id, name, start_date, created_by, team_a_name, team_b_name) values (cp, cg, 'Cup 212', current_date, o, 'Reds', 'Blues');
+  insert into public.games(id, code, name, course, holes_meta, game_type, status, created_by, group_id, scramble_mode, scramble_team_size, teams, foursomes) values
+    (gm, '212212', 'Cup scramble', 'C', '[]', 'scramble', 'active', o, cg, 'match', 2, '[{"key":"A","name":"Reds"},{"key":"B","name":"Blues"}]', '[]');
+  insert into public.competition_sessions(competition_id, name, format, session_order, play_date, scramble_team_size, game_id) values (cp, 'Saturday scramble', 'scramble', 1, current_date, 2, gm);
+  -- 2 v 2 is fine
+  update public.games set foursomes = '[{"id":"m1","name":"Match 1","a":["x1","x2"],"b":["y1","y2"]}]' where id = gm;
+  -- a team of 3 in a session of 2 is refused
+  begin update public.games set foursomes = '[{"id":"m1","name":"Match 1","a":["x1","x2","x3"],"b":["y1","y2"]}]' where id = gm; ok := false;
+  exception when others then ok := sqlerrm like '%2 players each%'; end;
+  if not ok then raise exception 'a 3-player team was accepted in a Ryder Cup scramble session of 2'; end if;
+  -- a Cup scramble is team v team
+  begin update public.games set scramble_mode = 'field' where id = gm; ok := false; exception when others then ok := sqlerrm like '%team v team%'; end;
+  if not ok then raise exception 'a Ryder Cup scramble was switched to one leaderboard'; end if;
+  raise notice 'CUP_SCRAMBLE_PASS a Cup scramble session: 2 v 2 accepted; a team of 3 and leaderboard mode refused';
+end $$;
 rollback;

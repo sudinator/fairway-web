@@ -98,7 +98,7 @@ export type GameSeed = {
     competitionId: string;
     name: string;
     sessionOrder: number;
-    format: "fourball" | "alt_shot" | "match" | "trifecta";
+    format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble"; scrambleTeamSize?: number;
     playDate: string;
     pointsPerMatch: number;
   };

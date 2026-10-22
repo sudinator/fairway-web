@@ -1,3 +1,17 @@
+## 212.3.261021 — Scramble as a Ryder Cup session (0212)
+
+Owner (Oct 21): "we should absolutely offer scramble in Ryder Cup … it has to be the same number of players in a team facing off against the opponent."
+
+**A scramble session** is a set of team v team matches — one scramble team from each Cup side, both with the session's number of players (2 v 2 by default; 3 v 3 or 4 v 4) — hole by hole with team handicaps (USGA allowance with the game's percentages, or agreed). Points as other sessions: a win 1, a halve ½ each.
+
+- **Cup → Add a session:** format Scramble, "Players per team" 2 / 3 / 4.
+- **Set up this session's game:** created as a team v team scramble keeping the Cup's two teams; the form shows "RYDER CUP · 2 V 2" instead of who's on the app; handicap method and percentages as usual.
+- **Setup → Teams:** "Make balanced matches" — each Cup side snake-drafted by course handicap into teams of exactly N, paired Match 1, 2, … (Team A's team on side a); "Pick matches myself"; Add to… / Move to… only offer a player their own Cup side, where there's room; each team is labelled by its Cup side. Setup is complete only when every match is exactly N v N ("Match 1: Blues have 1 of 2 players").
+- **Points everywhere from one engine:** the app's Cup scoring (lib/competition scoreCompetitionGame — standings, session recap, Cup box) and the Cup live page (lib/live-scoring liveLegs) both use the scramble engine's running lead (scrambleMatchProgress) through the shared closeout, so results read like other sessions' ("2&1", "AS"); team handicaps by the one method rule (app) and its feed twin (lib/live-scramble, also now used by the scramble live page). Test: the same match scored by both agrees.
+- **0212:** competition_sessions.format accepts 'scramble' and has scramble_team_size (2–4); guard_competition_game_structure — a Cup scramble is team v team and no team is larger than the session's size (its trigger now also fires when scramble_mode changes — it didn't, caught by the test); get_live_competition carries the scramble settings and entered team handicaps.
+
+Deploy: staging 0212 → code; production 0212 → merge.
+
 ## 212.2.261021 — Scramble end-to-end check: fixes
 
 Owner asked for a full end-to-end check. Method: every app file and database function that treats alternate shot specially (the closest format — one score per side, same score table) was checked for scramble (21 files, 10 functions), then the journey traced from creating a game to the season. Fixed:

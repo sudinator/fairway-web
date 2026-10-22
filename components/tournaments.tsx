@@ -319,12 +319,14 @@ function CreateGame({
   const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   // 211.1: scramble settings — the mode (one leaderboard / team v team) follows fmtFamily.
-  const [scrambleTeamSize, setScrambleTeamSize] = useState<1 | 2 | 3 | 4>(4);
+  // 212.3: a Ryder Cup scramble session fixes the team size (both teams in every match)
+  const cupScrambleSize = seed?.competitionSession?.format === "scramble" ? ((seed.competitionSession.scrambleTeamSize ?? 2) as 2 | 3 | 4) : null;
+  const [scrambleTeamSize, setScrambleTeamSize] = useState<1 | 2 | 3 | 4>(cupScrambleSize ?? 4);
   const [scrambleHandicap, setScrambleHandicap] = useState<"usga" | "gross" | "agreed">("usga");
   const [scrambleMinDrives, setScrambleMinDrives] = useState<number | null>(null);
   const [scrambleAllowance, setScrambleAllowance] = useState<ScrambleAllowance | null>(null);   // 211.9: null = USGA's
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
-  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" ? "match" : "stroke");
+  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" || (seed?.gameType === "scramble" && !!seed?.competitionSession) ? "match" : "stroke");
   const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
   const [teamMode, setTeamMode] = useState(seed?.gameType === "match");
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
@@ -683,7 +685,7 @@ function CreateGame({
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
-        scramble: gameType === "scramble" ? { teamSize: scrambleTeamSize === 1 ? 1 : null, handicap: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
+        scramble: gameType === "scramble" ? { cupTeams: !!cupScrambleSize, teamSize: cupScrambleSize ?? (scrambleTeamSize === 1 ? 1 : null), handicap: scrambleTeamSize === 1 && !cupScrambleSize ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: cupScrambleSize || fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
@@ -1186,12 +1188,19 @@ function CreateGame({
         </div>
         {gameType === "scramble" && (
           <div data-scramble-settings style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            {cupScrambleSize ? (
+              <>
+                <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>RYDER CUP · {cupScrambleSize} V {cupScrambleSize}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Every match is one scramble team from each side, {cupScrambleSize} players each — team v team, hole by hole. Make the matches in Setup → Teams.</div>
+              </>
+            ) : (<>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>WHO&apos;S ON THE APP</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
               <button onClick={() => setScrambleTeamSize(4)} style={{ ...btn(scrambleTeamSize !== 1), flex: 1, fontSize: 13 }}>Every player</button>
               <button onClick={() => { setScrambleTeamSize(1); setScrambleHandicap("agreed"); }} style={{ ...btn(scrambleTeamSize === 1), flex: 1, fontSize: 13 }}>Captains only</button>
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleTeamSize === 1 ? "Each team is represented by its captain, who enters the team's score — the teammates play outside the app." : "Make the teams in Setup → Teams: balanced teams of 2, 3 or 4, or pick them yourself. Teams may differ in size."}</div>
+            </>)}
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               {OFFERED_METHODS.map((m) => <button key={m} disabled={m === "usga" && scrambleTeamSize === 1} onClick={() => setScrambleHandicap(m)} style={{ ...btn(scrambleHandicap === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && scrambleTeamSize === 1 ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
