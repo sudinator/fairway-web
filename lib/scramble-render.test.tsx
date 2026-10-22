@@ -109,7 +109,10 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   let saved: any = null;
   const tb = renderScreen(<ScrambleTeamsBuilder game={cg} players={two} readOnly={false} onSave={(g) => { saved = g; }} />);
   const txt = tb.el.textContent || "";
-  ok(txt.includes("Captains only") && txt.includes("Raj · captain") && txt.includes("Scratch (no handicap entered)") && txt.includes("Team handicap 6"), `captains only on the Teams screen (${txt.slice(0, 200)})`);
+  // 212.16: while editable, each agreed handicap is the box itself (no second gold label); the captain note once
+  const box = (n: number) => (tb.el.querySelector(`input[aria-label="Team ${n} team handicap"]`) as HTMLInputElement)?.value;
+  ok(txt.includes("Captains only") && txt.includes("Raj · captain") && box(1) === "" && box(2) === "6" && !txt.includes("Team handicap 6"), `captains only: Team 1 blank (scratch), Team 2's box holds 6 (got ${box(1)} / ${box(2)})`);
+  ok(!Array.from(tb.el.querySelectorAll("[data-scramble-team]")).some((c) => (c.textContent || "").includes("outside the app")) && (tb.el.querySelector("summary")?.textContent || "").includes("outside the app"), "the captain note appears once, at the top — not on every card");
   const input = tb.el.querySelector('input[aria-label="Team 1 team handicap"]') as HTMLInputElement;
   input.value = "9"; input.dispatchEvent(new Event("focusout", { bubbles: true }));
   ok(saved && saved[0].a_hcp === 9 && saved[1].a_hcp === 6, `typing 9 saves Team 1's agreed handicap (got ${JSON.stringify(saved)})`);
@@ -136,7 +139,7 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   const fu = renderScreen(<ScrambleTeamsBuilder game={game({ foursomes: full })} players={players} readOnly={false} onSave={() => {}} />);
   const opts = Array.from((fu.el.querySelector('select[aria-label="Team for Hp"]') as HTMLSelectElement).options).map((o) => o.textContent || "");
   ok(!opts.some((o) => o.startsWith("Team 1")) && opts.some((o) => o.startsWith("Team 2")), `a full team (4) can't be picked (got ${opts})`);
-  ok((fu.el.textContent || "").includes("Teams of different sizes: Team 1 has 4 players"), "mixed sizes are noted");
+  ok((fu.el.textContent || "").includes("Teams of different sizes (Team 1: 4, Team 2: 3)"), "mixed sizes are noted, every team named");
   fu.unmount();
 }
 // 212.1 — the team's strokes, never a player's own: a team whose FIRST player is a 24.8 used to show that

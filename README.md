@@ -1,3 +1,7 @@
+## 212.16.261022 — Design sweep: 21 fixes across the recent screens; a design gallery
+
+Owner (Oct 22): "these are basic design choices that you should be proactively looking to implement rather than me having to constantly point them out." Every screen built recently was photographed at phone width and reviewed as a member would see it.
+
 ## 212.15.261022 — Scramble leaderboards laid out as tables
 
 Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".

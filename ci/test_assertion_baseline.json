@@ -1,5 +1,5 @@
 {
-  "total": 439611,
+  "total": 439613,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -35,7 +35,7 @@
     "head-to-head errors": 3,
     "hole result consistency": 981,
     "legs": 30,
-    "lineup renders": 36,
+    "lineup renders": 37,
     "live cup parity": 49,
     "manual course handicap": 17,
     "manual handicap simulation": 76807,
@@ -48,7 +48,7 @@
     "player-scoring": 63,
     "round stat completeness": 8,
     "scoring matrix": 3698,
-    "scramble screens": 50,
+    "scramble screens": 51,
     "scramble simulation": 1,
     "screen render": 67,
     "season entry": 6,

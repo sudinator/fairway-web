@@ -1,4 +1,5 @@
 "use client";
+import { scrambleResults } from "@/lib/scramble-game";
 import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
 import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
@@ -361,12 +362,18 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                   );
                 })}
                 <div style={{ color: C.sage, fontSize: 12, marginTop: 6, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 6 }}>
-                  {t.thru ? <>Thru {t.thru} · <b style={{ color: C.cream }}>{t.g}</b> gross · <b style={{ color: C.cream }}>{t.net}</b> net ({toPar(t.toPar)})</> : "Not started"}
+                  {/* 212.16: two deliberate lines (one wrapped awkwardly at phone width) */}
+                  {t.thru ? <><div>Thru {t.thru}</div><div><b style={{ color: C.cream }}>{t.g}</b> gross · <b style={{ color: C.cream }}>{t.net}</b> net ({toPar(t.toPar)})</div></> : "Not started"}
                 </div>
               </div>
             );
           })}
         </div>
+        {/* 212.16: team v team — the match status first (the leaderboard's own calculation) */}
+        {game.scramble_mode === "match" && teams.length === 2 ? (() => {
+          const m = scrambleResults(game, strokePool as never, altShotScores as never).matches.find((x) => x.groupId === teams[0].altSide!.foursomeId);
+          return m ? <div data-scramble-match-status style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginBottom: 10, color: C.cream, fontSize: 16, fontWeight: 800, textAlign: "center" }}>{m.line}</div> : null;
+        })() : null}
         <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>dots = team strokes · colour = net v par{game.scramble_min_drives ? " · initials = whose drive" : ""}</div>
         {/* the table */}
         <div style={{ display: "grid", gridTemplateColumns: grid, gap: 6, color: C.sage, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
@@ -929,7 +936,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
+export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -998,7 +1005,9 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(false), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
           {randomizing ? "Building…" : "🎲 Build even groups"}
         </button>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards." : randomizeReason}</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? (game.game_type === "scramble"
+          ? `Both buttons make teams of exactly ${perSide} from each side with handicaps spread evenly, one match per group. A starting point — captains can still move anyone afterwards.`
+          : "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards.") : randomizeReason}</div>
       </div> : null}
 
       <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>
@@ -1017,7 +1026,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         const extras = sides.flatMap((side) => side.slice(perSide));
         const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? `✓ READY · ${perSide} v ${perSide}` : `NEEDS ${Math.max(0, 2 * perSide - sides.reduce((n, s) => n + Math.min(perSide, s.length), 0))} MORE`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
             <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/{perSide} selected</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{Array.from({ length: perSide }, (_, slot) => <React.Fragment key={slot}>{selectFor(t.key, group, slot)}</React.Fragment>)}</div>

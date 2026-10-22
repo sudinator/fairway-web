@@ -81,15 +81,27 @@ export function ScrambleLineupCard({ game, players, title }: { game: Game; playe
               </span>
             </div>
             <div style={{ padding: "8px 12px" }}>
-              {t.lines.map((l, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginTop: 4 }}>
-                  <span style={{ color: C.cream, fontWeight: 700 }}>{l.name}{captains ? " · captain" : ""}</span>
-                  <span style={{ color: C.sage, textAlign: "right" }}>
-                    {l.index != null ? `Index ${f1(l.index)} → ` : ""}course hcp {f1(l.ch)}
-                    {l.pct != null && l.counts != null ? <span style={{ color: C.cream }}> × {Math.round(l.pct * 100)}% = {f1(l.counts)}</span> : null}
-                  </span>
-                </div>
-              ))}
+              {/* 212.16: aligned columns under a heading row (it was one long run of text per player) */}
+              {(() => {
+                const usga = t.lines.some((l) => l.pct != null);
+                const cols = usga ? "minmax(0, 1fr) 44px 52px 40px 44px" : "minmax(0, 1fr) 52px 60px";
+                const num: React.CSSProperties = { textAlign: "right" };
+                return (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: cols, gap: 6, color: C.sage, fontSize: 11, fontWeight: 700, marginTop: 4 }}>
+                      <span /><span style={num}>Index</span><span style={num}>Course</span>{usga ? <><span style={num}>%</span><span style={num}>Counts</span></> : null}
+                    </div>
+                    {t.lines.map((l, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: cols, gap: 6, fontSize: 13, marginTop: 4, alignItems: "baseline" }}>
+                        <span style={{ color: C.cream, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}{captains ? " · captain" : ""}</span>
+                        <span style={{ ...num, color: C.sage }}>{l.index != null ? f1(l.index) : "–"}</span>
+                        <span style={{ ...num, color: C.cream }}>{f1(l.ch)}</span>
+                        {usga ? <><span style={{ ...num, color: C.sage }}>{l.pct != null ? `${Math.round(l.pct * 100)}%` : ""}</span><span style={{ ...num, color: C.cream, fontWeight: 700 }}>{l.counts != null ? f1(l.counts) : ""}</span></> : null}
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
               {t.raw != null ? (
                 <div style={{ color: C.sage, fontSize: 11.5, marginTop: 6, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 6 }}>
                   {t.lines.map((l) => f1(l.counts ?? 0)).join(" + ")} = {t.raw.toFixed(2)} → <b style={{ color: C.cream }}>{t.handicap}</b>

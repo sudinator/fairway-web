@@ -76,7 +76,11 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
       <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 700 }}>
         {captains ? "Captains only" : "Teams of 2 to 4"} · {mode === "match" ? "team v team" : "one leaderboard"} · {SCRAMBLE_METHOD_LABEL[method]}
       </div>
-      <div data-scramble-method style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 4 }}>{scrambleMethodText(method, captains ? 1 : 4)}</div>
+      {/* 212.16: one line; the full explanation on a tap (it pushed every control down five lines) */}
+      <details data-scramble-method style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
+        <summary style={{ cursor: "pointer" }}>{captains ? "Each captain enters their team's score — teammates play outside the app." : method === "agreed" ? "Enter each team's agreed handicap below." : "Team handicaps are worked out from the players' course handicaps."} <span style={{ color: C.gold }}>How?</span></summary>
+        <div style={{ marginTop: 4 }}>{scrambleMethodText(method, captains ? 1 : 4)}</div>
+      </details>
 
       {!readOnly ? (captains ? (
         <button disabled={busy || !live.length} onClick={() => balance(1)} style={{ ...btn(!groups.length), width: "100%", marginTop: 10, fontSize: 13 }}>{groups.length ? "Remake: a team for each captain" : "A team for each captain"}</button>
@@ -103,10 +107,10 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
               </span>
               {readOnly ? <span style={{ color: C.cream, fontSize: 13 }}>{at >= 0 ? slots[at].name : "No team"}</span> : (
                 <select aria-label={`Team for ${p.display_name}`} disabled={busy} value={at >= 0 ? String(at) : ""} onChange={(e) => place(k, e.target.value)}
-                  style={{ ...inputStyle, width: "auto", minWidth: 120, padding: "8px 12px", fontSize: 13 }}>
+                  style={{ ...inputStyle, width: 150, flexShrink: 0, padding: "8px 12px", fontSize: 13 }}>
                   <option value="">No team</option>
                   {slots.map((t, si) => (si !== at && t.members.length >= maxPer ? null
-                    : <option key={si} value={si}>{t.name}{t.matchName ? ` (${t.matchName})` : ""}{t.members.length ? ` · ${t.members.length}` : ""}</option>))}
+                    : <option key={si} value={si}>{t.name}{t.matchName ? ` (${t.matchName})` : ""}{si !== at && t.members.length ? ` · ${t.members.length} player${t.members.length === 1 ? "" : "s"}` : ""}</option>))}
                   {at === -1 || slots[at]?.members.length > 1 ? <option value="new">New team</option> : null}
                 </select>
               )}
@@ -117,7 +121,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
 
       {/* SUMMARY — the teams, below */}
       {slots.some((t) => t.members.length) ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 16 }}>TEAMS</div> : null}
-      {mixed ? <div data-scramble-mixed style={{ color: C.sage, fontSize: 11.5, marginTop: 4 }}>Teams of different sizes: {slots.filter((t) => t.members.length && t.members.length !== Math.min(...sizes)).map((t) => `${t.name} has ${t.members.length} players`).join(", ")}. Each uses the percentages for its own size.</div> : null}
+      {mixed ? <div data-scramble-mixed style={{ color: C.sage, fontSize: 11.5, marginTop: 4 }}>Teams of different sizes ({slots.filter((t) => t.members.length).map((t) => `${t.name}: ${t.members.length}`).join(", ")}) — each uses the percentages for its own size.</div> : null}
       {slots.map((t) => {
         if (!t.members.length) return null;
         const members = t.members.map((k) => byKey.get(k)).filter((p): p is Player => !!p);
@@ -129,7 +133,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
             <div data-scramble-team={t.name} style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                 <span style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{t.name}{!captains ? <span style={{ color: C.sage, fontWeight: 500, fontSize: 12 }}> · {members.length} player{members.length === 1 ? "" : "s"}{members.length >= maxPer ? " (full)" : ""}</span> : null}</span>
-                <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{shown}</span>
+                {method === "agreed" && !readOnly ? null : <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{shown}</span>}
               </div>
               {members.map((p, i) => {
                 const part = th?.parts.find((x) => x.index === i);
@@ -141,7 +145,6 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
                 );
               })}
               {th ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{th.raw.toFixed(2)}, rounded to {th.total}</div> : null}
-              {captains ? <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Enters the team&apos;s score — the teammates play outside the app.</div> : null}
               {method === "agreed" && !readOnly ? (
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: C.sage }}>
                   Agreed team handicap

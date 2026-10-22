@@ -1,3 +1,23 @@
+## 212.16.261022 — Design sweep: 21 fixes across the recent screens; a design gallery
+
+Owner (Oct 22): "these are basic design choices that you should be proactively looking to implement rather than me having to constantly point them out." Every screen built recently was photographed at phone width and reviewed as a member would see it.
+
+**New: the design gallery** — lib/design-gallery.tsx renders 14 recent screens with realistic sample data; `npm run gallery` (scripts/design-gallery.mjs) photographs them at 390px. HANDOFF rule: every new or changed screen gets an entry and is reviewed this way before it ships.
+
+**Fixed (21):**
+- Teams screen: a one-line explanation with the detail behind "How?" (it was five lines above every control); the selector reads "Team 1" (counts only in the menu); fixed-width selectors; the mixed-sizes note names every team; captains only — the note once at the top, not on every card, and one handicap box per team (no second gold label).
+- Format settings: a one-line explanation; % beside every percentage box (they read as strokes); a value changed from the USGA's labelled in gold ("changed · USGA 25%"); drive buttons "2 each / 3 each / 4 each" on one line.
+- Ryder Cup scramble groups — two real bugs: the counter assumed 2 per side ("NEEDS 0 PLAYERS" at 2 of 3 each — now "NEEDS 2 MORE"), and the explanation described pairs and Trifecta singles (now what the scramble buttons do).
+- Scorecard (team v team): the match status above the table ("Blues won 6&4"); each team's score on two deliberate lines.
+- Game-screen matches: each card named ("MATCH 1").
+- Recap matches: match name, result, and both teams' players (it was one bare line).
+- Line-up card: the working in aligned columns — Index · Course · % · Counts.
+- Team rounds: "TEAM ROUNDS" heading (it wrapped); the result bold on the right.
+- Season Wrapped headline: the team-round line smaller and positive ("including 3 scramble & alternate-shot rounds").
+- Team-round / round email: the scramble leaderboard as the app's table (Pos · Team · Net · Gross · ±, members on their own row), and named matches with players.
+
+No migration. Deploy: code only (includes 212.15).
+
 ## 212.15.261022 — Scramble leaderboards laid out as tables
 
 Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".

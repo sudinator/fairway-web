@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "212.15.261022",
+  "version": "212.16.261022",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/check-vapid-key.mjs && node scripts/write-version.mjs",
@@ -19,7 +19,8 @@
     "test:staging": "node ci/integration/staging.mjs",
     "ci:staging": "npm run ci && npm run test:staging",
     "lint:hooks": "eslint app components lib --max-warnings=0",
-    "test:game-recovery": "node ci/test-game-score-recovery.cjs && node ci/test-game-reset.cjs"
+    "test:game-recovery": "node ci/test-game-score-recovery.cjs && node ci/test-game-reset.cjs",
+    "gallery": "node scripts/design-gallery.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

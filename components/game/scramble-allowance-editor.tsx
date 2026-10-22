@@ -35,10 +35,14 @@ export function ScrambleAllowanceEditor({ value, onChange, disabled }: {
               return (
                 <label key={`${n}-${i}-${v}`} style={{ flex: 1, color: C.sage, fontSize: 11 }}>
                   {pos}
-                  <input aria-label={`Team of ${n}: ${pos} course handicap percent`} inputMode="numeric" defaultValue={v} disabled={disabled}
-                    onBlur={(e) => { if (Number(e.currentTarget.value) !== v) set(n, i, e.currentTarget.value); }}
-                    style={{ ...inputStyle, marginTop: 4 }} />
-                  <span style={{ display: "block", marginTop: 2 }}>USGA {usgaOf(n)[i]}%</span>
+                  {/* 212.16: a % beside the number (it read as strokes); a value changed from the USGA's is labelled in gold below */}
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                    <input aria-label={`Team of ${n}: ${pos} course handicap percent`} inputMode="numeric" defaultValue={v} disabled={disabled}
+                      onBlur={(e) => { if (Number(e.currentTarget.value) !== v) set(n, i, e.currentTarget.value); }}
+                      style={{ ...inputStyle, minWidth: 0 }} />
+                    <span style={{ color: C.cream, fontSize: 13 }}>%</span>
+                  </span>
+                  <span data-allowance-changed={v !== usgaOf(n)[i] ? "" : undefined} style={{ display: "block", marginTop: 2, color: v !== usgaOf(n)[i] ? C.gold : undefined, fontWeight: v !== usgaOf(n)[i] ? 700 : undefined }}>{v !== usgaOf(n)[i] ? `changed · USGA ${usgaOf(n)[i]}%` : `USGA ${usgaOf(n)[i]}%`}</span>
                 </label>
               );
             })}

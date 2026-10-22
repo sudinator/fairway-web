@@ -65,16 +65,20 @@ export function TeamRoundsList({ items, onOpenGame }: { items: TeamRound[]; onOp
   if (!items.length) return null;
   return (
     <div data-team-rounds style={{ marginTop: 18 }}>
-      <Eyebrow>TEAM ROUNDS · SCRAMBLE &amp; ALTERNATE SHOT</Eyebrow>
+      <Eyebrow>TEAM ROUNDS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>One score per team or side — they count as rounds played, not in your personal stats.</div>
       {items.map((t) => (
         <div key={t.gameId} onClick={() => onOpenGame(t.gameId)} data-team-round
           style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
-          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
-            {t.course}
-            <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginLeft: 8 }}>{t.format === "scramble" ? "SCRAMBLE" : "ALT SHOT"}</span>
+          {/* 212.16: the result — what people look for — bold on the right */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ color: C.cream, fontWeight: 700, fontSize: 15, flex: 1, minWidth: 0 }}>
+              {t.course}
+              <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginLeft: 8 }}>{t.format === "scramble" ? "SCRAMBLE" : "ALT SHOT"}</span>
+            </span>
+            {t.result ? <span data-team-round-result style={{ color: C.cream, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap" }}>{t.result}</span> : null}
           </div>
-          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(t.date)} · {t.team} · {t.holes} holes{t.result ? ` · ${t.result}` : ""}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(t.date)} · {t.team} · {t.holes} holes</div>
         </div>
       ))}
     </div>

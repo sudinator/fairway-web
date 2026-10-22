@@ -22,10 +22,11 @@ export function ScrambleView({ game, players, altShotScores }: { game: Game; pla
           <Eyebrow>SCRAMBLE · TEAM V TEAM{r.gross ? " · GROSS" : ""}</Eyebrow>
           {r.matches.map((m) => (
             <div key={m.groupId} data-scramble-match style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{m.line}</div>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{m.name.toUpperCase()}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15, marginTop: 2 }}>{m.line}</div>
               {[m.a, m.b].map((t) => (
                 <div key={t.key} style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-                  <b style={{ color: C.cream }}>{t.name}</b> · {t.memberNames.join(", ")}{r.gross ? "" : ` · team hcp ${t.handicap}`}
+                  <b style={{ color: C.cream }}>{t.name}</b> · {t.memberNames.join(" · ")}{r.gross ? "" : ` · team hcp ${t.handicap}`}
                 </div>
               ))}
             </div>

@@ -50,7 +50,7 @@ function SeasonForm({ points, label, lowerBetter = true }: { points: { date: str
 
 export function SeasonCardView({ card, name, year }: { card: SeasonCard; name: string; year: number }) {
   switch (card.kind) {
-    case "headline": return (<><Eyebrow>{year} · {name.toUpperCase()}</Eyebrow><Big>{card.rounds} rounds</Big><Line>{card.holes.toLocaleString()} holes at {card.courses} course{card.courses === 1 ? "" : "s"}{card.hours != null ? ` · ${card.hours} hours on the course` : ""}</Line>{card.teamRounds ? <Line>including {card.teamRounds} team round{card.teamRounds === 1 ? "" : "s"} (scramble / alternate shot) — played, not in your personal stats</Line> : null}</>);
+    case "headline": return (<><Eyebrow>{year} · {name.toUpperCase()}</Eyebrow><Big>{card.rounds} rounds</Big><Line>{card.holes.toLocaleString()} holes at {card.courses} course{card.courses === 1 ? "" : "s"}{card.hours != null ? ` · ${card.hours} hours on the course` : ""}</Line>{card.teamRounds ? <div style={{ color: C.sage, fontSize: 14, marginTop: 6 }}>including {card.teamRounds} scramble &amp; alternate-shot round{card.teamRounds === 1 ? "" : "s"}</div> : null}</>);
     case "index": return card.start == null && card.establishedOn ? (
       <><Eyebrow>HANDICAP INDEX</Eyebrow><Big>{card.end ?? "—"}</Big><Line>Established at <b style={{ color: C.gold }}>{card.establishedAt}</b> on {fmtMatchDate(card.establishedOn.slice(0, 10))}, after your 20th round</Line>{card.low != null && card.series.length > 1 && <Line dim>Since then: low {card.low}{card.lowDate ? ` on ${fmtMatchDate(card.lowDate.slice(0, 10))}` : ""}</Line>}<SeasonForm points={card.diffs} label="differentials" /></>
     ) : card.start == null ? (

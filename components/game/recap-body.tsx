@@ -116,7 +116,15 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
         <div style={S.box} data-recap-scramble>
           <div style={S.th}>{s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`}</div>
           {s.scramble.mode === "match"
-            ? s.scramble.matches.map((m, i) => <div key={i} style={S.row}><span style={S.name}>{m}</span></div>)
+            ? s.scramble.matches.map((m, i) => (
+              // 212.16: the match name, its result, and who played (it was one bare line)
+              <div key={i} data-recap-scramble-match style={{ borderTop: `1px solid ${C.borderGreen}`, paddingTop: 8, paddingBottom: 8 }}>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{m.name.toUpperCase()}</div>
+                <div style={{ color: C.cream, fontSize: 16, fontWeight: 800, marginTop: 2 }}>{m.line}</div>
+                <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{m.a}</div>
+                <div style={{ color: C.sage, fontSize: 12 }}>{m.b}</div>
+              </div>
+            ))
             : (
               // 212.15 (owner): a leaderboard table — net (the ranking) biggest, gross and ± in their own short
               // columns, and the members on a full-width line, so names don't wrap into a sliver
