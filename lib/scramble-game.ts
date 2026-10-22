@@ -5,7 +5,7 @@ import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { pkey, scrambleTeamHandicapFor, scrambleMethodOf } from "@/lib/game-shape";
 import { scrambleLeaderboard, scrambleMatch, scrambleCard, type LeaderboardRow, type ScrambleMatch } from "@/lib/scramble";
-import { scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
+import { scrambleTeamsOf, cupSideNames, type ScrambleGroup } from "@/lib/scramble-teams";
 
 export type ScrambleTeamResult = { key: string; name: string; groupId: string; side: "a" | "b"; memberNames: string[]; handicap: number; scores: (number | null)[] };
 export type ScrambleResults = {
@@ -21,7 +21,7 @@ export function scrambleResults(game: Game, players: Player[], rows: AltShotScor
   const mode = game.scramble_mode === "match" ? "match" : "field";
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
   const byKey = new Map(players.map((p) => [pkey(p), p]));
-  const teams: ScrambleTeamResult[] = scrambleTeamsOf(groups).map((t) => ({
+  const teams: ScrambleTeamResult[] = scrambleTeamsOf(groups, cupSideNames(game)).map((t) => ({
     key: `${t.groupId}:${t.side}`, name: t.name, groupId: t.groupId, side: t.side,
     memberNames: t.members.map((k) => byKey.get(k)?.display_name ?? "?"),
     handicap: scrambleTeamHandicapFor(game, players, t.members[0]) ?? 0,

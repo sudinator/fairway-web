@@ -82,9 +82,15 @@ for (const gt of GAME_TYPES) {
     skinsTeamStyle: "best_ball" as const, teamScoreMode: "best_ball" as const, strokeBasis: "net" as const,
     skinsMode: "carryover" as const, flightsSupported: false, flightMode: "off" as const,
   };
+  // a normal scramble (no Cup) supplies no teams, and its shape doesn't use them
+  {
+    const plain = buildGamePayload({ ...opts, gameType: "scramble" } as never) as Record<string, unknown>;
+    ok("scramble (not a Ryder Cup): no teams in the payload, and the shape doesn't use them", !Array.isArray(plain.teams) && !shapeOf({ game_type: "scramble", teams: null, foursomes: [] } as never).usesTeams);
+  }
   for (const gt of GAME_TYPES) {
     const shape = shapeOf({ game_type: gt, teams: [{ id: "a", name: "A" }, { id: "b", name: "B" }] as never, foursomes: [] });
-    const payload = buildGamePayload({ ...opts, gameType: gt } as never) as Record<string, unknown>;
+    // 212.5: a scramble uses teams only as a Ryder Cup session (the Cup's two teams) — so check the Cup payload
+    const payload = buildGamePayload({ ...opts, gameType: gt, ...(gt === "scramble" ? { scramble: { cupTeams: true, teamSize: 2, handicap: "usga", minDrives: null, mode: "match" } } : {}) } as never) as Record<string, unknown>;
     if (shape.usesTeams) {
       ok(`${gt}: shape uses teams, so the payload supplies them`, Array.isArray(payload.teams));
     }

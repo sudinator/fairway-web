@@ -2,7 +2,7 @@
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
-import type { ScrambleGroup } from "@/lib/scramble-teams";
+import { cupScrambleMatches, type ScrambleGroup } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
@@ -2477,7 +2477,7 @@ function GameRoom({
 
   const syncTeamPlayFoursomes = async (nextPlayers: Player[]) => {
     if (!game || !Array.isArray(game.teams) || game.teams.length !== 2) return;
-    if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta") return;
+    if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble") return;
     const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the groups — please try again."); return; }
@@ -2674,7 +2674,39 @@ function GameRoom({
   const randomizeDecision = game ? setupDecision({ type: "randomize_groups" }) : { decision: "block", reason: "Game is not loaded." } as SetupDecision;
   const canRandomize = randomizeDecision.decision !== "block";
   const randomizeReason = randomizeDecision.decision === "block" ? randomizeDecision.reason : "";
+  // 212.5: a Ryder Cup scramble — both group buttons build teams of EXACTLY the session's size from each Cup side
+  // (snake-drafted by course handicap, lib/scramble-teams cupScrambleMatches), team i of each side in Group i, and
+  // save groups + matches in one transaction, as the other Cup team formats do.
+  const buildCupScrambleGroups = async () => {
+    if (!game || game.game_type !== "scramble" || !Array.isArray(game.teams) || game.teams.length !== 2) return;
+    if (!canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
+    const size = (Number(game.scramble_team_size) || 2) as 2 | 3 | 4;
+    const live = players.filter((p) => !p.no_show);
+    const side = (k: string) => live.filter((p) => p.team === k).map((p) => ({ key: p.id, ch: Number(chBasis(p, game.course_par, game.holes_meta?.length) ?? 0) }));
+    const matches = cupScrambleMatches(side(game.teams[0].key), side(game.teams[1].key), size);
+    const groupOf = new Map<string, number>();
+    matches.forEach((m, i) => [...m.a, ...m.b].forEach((id) => groupOf.set(id, i + 1)));
+    const overflow = live.filter((p) => !groupOf.has(p.id)).map((p) => p.id);
+    const nextPlayers = players.map((p) => p.no_show ? p : ({ ...p, tee_group: groupOf.get(p.id) ?? null }));
+    setPlayers(nextPlayers);
+    setGroupOverflow(overflow);
+    setRandomizing(true);
+    try {
+      const payload = live.map((p) => ({ player: p.id, group: groupOf.get(p.id) ?? null }));
+      const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
+      const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [], p_groups: payload, p_foursomes: next });
+      if (error) throw error;
+      await load();
+    } catch {
+      notifyError("Couldn't build the matches — please try again.");
+      await load();
+    } finally {
+      setRandomizing(false);
+    }
+  };
+
   const randomizeGroups = async () => {
+    if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
     const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     let assignments: { playerId: string; group: number }[];
@@ -2724,6 +2756,7 @@ function GameRoom({
   // foursome so the two singles fall strong v strong and weak v weak. Captains edit afterwards as
   // with any built structure.
   const balanceMatchups = async () => {
+    if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
     const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     if (!teamFormat) return;

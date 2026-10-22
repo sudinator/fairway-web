@@ -7,7 +7,7 @@ import React from "react";
 import { C } from "@/lib/golf";
 import { chBasis, pkey, scrambleMethodOf } from "@/lib/game-shape";
 import { scrambleTeamHandicap, customAllowanceFor, SCRAMBLE_ALLOWANCES } from "@/lib/scramble";
-import { scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
+import { scrambleTeamsOf, cupSideNames, type ScrambleGroup } from "@/lib/scramble-teams";
 import { SCRAMBLE_METHOD_LABEL } from "@/lib/scramble-method";
 import { fmtMatchDate } from "@/lib/lineup-meta";
 import type { Game, Player } from "@/lib/game-types";
@@ -21,7 +21,7 @@ export function scrambleLineupTeams(game: Game, players: Player[]): LineupTeam[]
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
   const byKey = new Map(players.filter((p) => !p.no_show).map((p) => [pkey(p), p]));
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
-  return scrambleTeamsOf(groups).map((t) => {
+  return scrambleTeamsOf(groups, cupSideNames(game)).map((t) => {
     const members = t.members.map((k) => byKey.get(k)).filter((p): p is Player => !!p);
     const chs = members.map((p) => Number(chBasis(p as never, game.course_par, nh >= 18 ? undefined : nh) ?? 0));
     const th = method === "usga" && members.length >= 2 ? scrambleTeamHandicap(chs, false, customAllowanceFor(game.scramble_allowance, members.length)) : null;

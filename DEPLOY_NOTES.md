@@ -1,3 +1,22 @@
+## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
+
+Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.
+
+**What was wrong.** Four-ball, alternate shot and trifecta pick each match's players in Setup → Groups (the slot builder — per group, N menus per Cup side, matches derived from the groups). 212.3 gave a Cup scramble a separate editor in a different tab — a second, different way to do the same thing, with one-line rows (name, working, a "Match 1 · Reds" menu) too wide for a phone.
+
+**Now a Ryder Cup scramble is a team-group format like the others:**
+- lib/game-shape — a scramble with the Cup's two teams uses Teams + Groups (a normal scramble keeps its Teams editor);
+- the slot builder (scorecard-views TeamGroupsBuilder) takes N per side — 2, 3 or 4, the session's size: N menus per side, "ready" at N v N, "Each group is one match: its Reds players are one scramble team, its Blues players the other — exactly N of each"; its menus wrap on a phone;
+- groups become matches as for the others (syncTeamPlayFoursomes → deriveTeamFoursomesFromGroups); setup complete at N v N in every group;
+- "⚖️ Build balanced matchups" / "🎲 Build even groups" build teams of exactly N from each side (snake-drafted by course handicap) — team i of each side in Group i — saved with the matches in one transaction (apply_game_structure);
+- the control center reads "Scramble · Ryder Cup · 3 v 3 · USGA allowance";
+- a Cup scramble's sides are named by the Cup ("Reds", "Blues") — scorecard, results ("Reds 2 UP thru 12"), recap, line-up, live pages (scrambleTeamsOf / cupSideNames).
+212.3's separate Cup branch in the scramble Teams editor is removed (one way to build Cup matches). Normal scramble Teams screen: each player's Add to… / Move to… menu on its own full-width line, so rows fit a phone.
+
+Tests: the setup flow for a Cup scramble 3 v 3 (format line; Teams & groups → Groups shows the slot builder with three menus per side, not the Teams editor); Cup side names in results; game type coverage (a scramble supplies teams only as a Cup session).
+
+No migration. Deploy: code only.
+
 ## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
 
 Owner (Oct 22), from staging:

@@ -116,14 +116,16 @@ export function GameSetupWorkspace({
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
   // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
-  const isScramble = game.game_type === "scramble";
+  const isScramble = game.game_type === "scramble" && !usesTeams;   // 212.5: a Ryder Cup scramble uses Teams + Groups
   const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field",
     { size: (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? 1 : null, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed" }) : null;
   const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
-  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");
+  // 212.5: players per side in each group — 2, or a Ryder Cup scramble session's size
+  const perSide = game.game_type === "scramble" ? Number((game as { scramble_team_size?: number | null }).scramble_team_size) || 2 : 2;
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
   const showMatchupsTab = usesMatchups && game.game_type !== "trifecta";
-  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === 2 && f.b.length === 2);
+  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === perSide && f.b.length === perSide);
   const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));
   const groupsDone = teamGroupFormat ? (teamGroupsValid && altDriversDone) : usesFoursomes || (total > 0 && cGrouped === total);
   const structureDone = teamsDone && matchupsDone && groupsDone;
@@ -170,7 +172,7 @@ export function GameSetupWorkspace({
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
-    { key: "format" as const, title: "Format", sub: isScramble ? `Scramble · ${(game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "format" as const, title: "Format", sub: game.game_type === "scramble" ? `Scramble · ${usesTeams ? `Ryder Cup · ${perSide} v ${perSide}` : (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];

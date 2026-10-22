@@ -1,10 +1,9 @@
 /** 212.3 — Scramble as a Ryder Cup session: matches, exact sizes, and the app's and live page's scoring agreeing. */
-import { renderScreen, ok, report } from "./screen-harness";
-import * as React from "react";
+import { ok, report } from "./screen-harness";
 import { cupScrambleMatches, scrambleSetupProblem } from "@/lib/scramble-teams";
 import { scoreCompetitionGame } from "@/lib/competition";
+import { scrambleResults } from "@/lib/scramble-game";
 import { liveCupSessionScore } from "@/lib/live-competition";
-import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import type { Game, Player } from "@/lib/game-types";
 
 // matches: each side into teams of exactly 2, paired
@@ -34,17 +33,10 @@ ok(am.thru === 12 && am.thru === lm.thru && am.lead === lm.lead, `app and live p
 // team handicaps: Reds 4.2×35% + 22.4×15% = 1.47 + 3.36 = 4.83 → 5; Blues 9.8×35% + 14.6×15% = 3.43 + 2.19 = 5.62 → 6
 ok(typeof am.lead === "number", "a lead is reported");
 
-// Setup → Teams in a Cup: "Ryder Cup · 2 v 2", balanced matches, own side only
+// 212.5: in a Ryder Cup scramble the sides are the Cup's teams, not "Team 1 / Team 2"
 {
-  let saved: any = null;
-  const cupGame = { ...game, foursomes: [{ id: "m1", name: "Match 1", a: ["a1"], b: [] }] } as unknown as Game;
-  const t = renderScreen(<ScrambleTeamsBuilder game={cupGame} players={appPlayers} readOnly={false} onSave={(g) => { saved = g; }} />);
-  const txt = t.el.textContent || "";
-  ok(txt.includes("Ryder Cup · 2 v 2") && txt.includes("Reds"), `the Cup header and side names (${txt.slice(0, 120)})`);
-  const opts = Array.from((t.el.querySelector('select[aria-label="Add b1 to a team"]') as HTMLSelectElement).options).map((o) => o.textContent || "");
-  ok(opts.some((o) => o.includes("Blues")) && !opts.some((o) => o.includes("Reds")), `a Blues player can only join the Blues side (got ${opts})`);
-  (Array.from(t.el.querySelectorAll("button")).find((b) => b.textContent === "Rebalance the matches") as HTMLButtonElement).click();
-  ok(saved && saved.length === 1 && saved[0].a.length === 2 && saved[0].b.length === 2 && saved[0].a.every((k: string) => k.startsWith("a")), `balanced matches: one 2 v 2, Reds on side a (got ${JSON.stringify(saved)})`);
-  t.unmount();
+  const r = scrambleResults(game, appPlayers, rows as never);
+  ok(r.teams.map((t) => t.name).join(",") === "Reds,Blues", `sides named by the Cup (got ${r.teams.map((t) => t.name)})`);
+  ok(/^(Reds|Blues) \d+ UP thru 12$|^All square thru 12$/.test(r.matches[0].line), `the match line names the Cup team (got ${r.matches[0].line})`);
 }
 report("cup scramble");

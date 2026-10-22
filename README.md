@@ -1,3 +1,7 @@
+## 212.5.261021 — Ryder Cup scramble: pick each match's players like the other team formats
+
+Owner (Oct 22): "for Scramble I am supposed to be able to choose team members. It should be the same as 4 ball or alt shot or trifecta for team selection." And the Cup scramble team screen didn't fit an upright phone.
+
 ## 212.4.261021 — Scramble line-up by team, with inputs and method; random scores for one-ball formats
 
 Owner (Oct 22), from staging:

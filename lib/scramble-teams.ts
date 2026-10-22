@@ -46,7 +46,7 @@ export function balanceScrambleTeams(players: TeamPlayer[], size: 1 | 2 | 3 | 4,
 }
 
 /** Every team as { group, side, members } — the leaderboard and the scorecard read teams this way. */
-export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined): { groupId: string; side: "a" | "b"; name: string; members: string[]; hcp: number | null }[] {
+export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined, sideNames?: [string, string] | null): { groupId: string; side: "a" | "b"; name: string; members: string[]; hcp: number | null }[] {
   const out: { groupId: string; side: "a" | "b"; name: string; members: string[]; hcp: number | null }[] = [];
   let n = 0;
   for (const g of groups || []) for (const side of ["a", "b"] as const) {
@@ -54,7 +54,8 @@ export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined): { g
     if (!members.length) continue;
     n++;
     const h = g[side === "a" ? "a_hcp" : "b_hcp"];
-    out.push({ groupId: g.id, side, name: `Team ${n}`, members, hcp: typeof h === "number" && Number.isFinite(h) ? h : null });
+    // 212.5: a Ryder Cup scramble's sides are the Cup's teams ("Reds", "Blues") — each group is one match
+    out.push({ groupId: g.id, side, name: sideNames ? sideNames[side === "a" ? 0 : 1] : `Team ${n}`, members, hcp: typeof h === "number" && Number.isFinite(h) ? h : null });
   }
   return out;
 }
@@ -98,4 +99,10 @@ export function cupScrambleMatches(sideA: TeamPlayer[], sideB: TeamPlayer[], siz
   };
   const a = teamsOf(sideA), b = teamsOf(sideB);
   return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => ({ id: `match-${i + 1}`, name: `Match ${i + 1}`, a: a[i] || [], b: b[i] || [] }));
+}
+
+/** 212.5: the Cup's two team names when a scramble game has them (a Ryder Cup session), else null. */
+export function cupSideNames(game: { teams?: unknown }): [string, string] | null {
+  const t = Array.isArray(game.teams) ? (game.teams as { key?: string; name?: string }[]) : [];
+  return t.length === 2 ? [t[0]?.name || "Team A", t[1]?.name || "Team B"] : null;
 }

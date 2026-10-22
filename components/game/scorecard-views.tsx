@@ -1,5 +1,5 @@
 "use client";
-import { scrambleTeamsOf } from "@/lib/scramble-teams";
+import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
 import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -176,7 +176,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
     }
     // SCRAMBLE (211.1): one ball per TEAM — each team in this group is one row, scores from game_alt_shot_scores.
     if (gt === "scramble" && Array.isArray(game.foursomes)) {
-      const allTeams = scrambleTeamsOf(game.foursomes as never);
+      const allTeams = scrambleTeamsOf(game.foursomes as never, cupSideNames(game));
       const out: Col[] = [];
       for (const f of game.foursomes) {
         if (![...f.a, ...f.b].some((uid) => ps.some((p) => pkey(p) === uid))) continue;
@@ -692,7 +692,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   let units: Unit[];
   const sh = shapeOf(game);
-  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");   // 212.5: + a Ryder Cup scramble
   const scoringStarted = players.some((p) => (p.scores || []).some((x) => x != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
   if (sh.usesFoursomes && foursomes.length && !teamGroupsOwnStructure) {
     units = foursomes.map((f, i) => ({
@@ -839,16 +839,19 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
   randomizing: boolean;
 }) {
   const teams = game.teams!;
+  // 212.5: players per side in each group — 2 for four-ball / alternate shot / trifecta; a Ryder Cup scramble
+  // session's own size (2, 3 or 4)
+  const perSide = game.game_type === "scramble" ? Number(game.scramble_team_size) || 2 : 2;
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   const byKey = (key: string) => players.find((p) => pkey(p) === key) || null;
   const ph = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
   const label = (p: Player) => `${p.display_name} · PH ${ph(p)}`;
   const assignedGroups = players.map((p) => p.tee_group).filter((g): g is number => g != null);
   const maxExisting = assignedGroups.length ? Math.max(...assignedGroups) : 0;
-  const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / 2));
+  const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / perSide));
   const unassigned = players.filter((p) => p.tee_group == null && !p.no_show);
   const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter((group) =>
-    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === 2),
+    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === perSide),
   ).length;
   const scoringStarted = players.some((p) => (p.scores || []).some((score) => score != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
 
@@ -877,7 +880,9 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <Eyebrow>GROUPS · BUILD EACH MATCH</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
-        Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
+        {game.game_type === "scramble"
+          ? <>Each group is one match: its {teams[0].name} players are one scramble team, its {teams[1].name} players the other — exactly {perSide} of each.</>
+          : <>Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players.</>} Team membership stays visible while you build the match.
       </div>
       {game.game_type === "trifecta" ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Once four players are selected, choose the two Singles matchups inside that group.</div> : null}
       {scoringStarted ? <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>Groups and Trifecta Singles matchups are locked because scoring has started.</div> : null}
@@ -905,14 +910,14 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
 
       {Array.from({ length: groupCount }, (_, i) => i + 1).map((group) => {
         const sides = teams.map((t) => players.filter((p) => p.team === t.key && p.tee_group === group && !p.no_show));
-        const ready = sides.every((side) => side.length === 2);
-        const extras = sides.flatMap((side) => side.slice(2));
+        const ready = sides.every((side) => side.length === perSide);
+        const extras = sides.flatMap((side) => side.slice(perSide));
         const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
-            <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{selectFor(t.key, group, 0)}{selectFor(t.key, group, 1)}</div>
+            <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/{perSide} selected</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{Array.from({ length: perSide }, (_, slot) => <React.Fragment key={slot}>{selectFor(t.key, group, slot)}</React.Fragment>)}</div>
           </div>)}
           {extras.map((p) => <button key={p.id} disabled={scoringStarted} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11, opacity: scoringStarted ? .62 : 1 }}>Move extra player {p.display_name} to unassigned</button>)}
           {game.game_type === "alt_shot" && ready && f ? <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>

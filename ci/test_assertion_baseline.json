@@ -1,5 +1,5 @@
 {
-  "total": 439585,
+  "total": 439586,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -21,12 +21,12 @@
     "course ordering": 4,
     "create-game format": 12,
     "cup on the recap": 8,
-    "cup scramble": 11,
+    "cup scramble": 10,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
     "format rules": 34,
-    "game type coverage": 100,
+    "game type coverage": 102,
     "game-create": 64,
     "game-utils": 21,
     "golf/computeBetting tests": 53,

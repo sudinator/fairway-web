@@ -17,6 +17,7 @@ import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { scrambleLeaderboard, scrambleMatch } from "@/lib/scramble";
 import { liveScrambleTeamHandicap } from "@/lib/live-scramble";
+import { cupSideNames } from "@/lib/scramble-teams";
 import { scrambleMethodOf } from "@/lib/game-shape";
 import type { TrifectaRowSide } from "@/lib/golf";
 
@@ -763,7 +764,8 @@ function liveScrambleTeams(data: LiveData) {
     n++;
     // 212.3: the shared live rule (lib/live-scramble) — the Cup live page uses the same one
     const handicap = liveScrambleTeamHandicap(game as never, ids.map((id) => byId[id]?.ch ?? 0), f[side === "a" ? "a_hcp" : "b_hcp"]);
-    return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
+    const cup = cupSideNames(game as never);   // 212.5: a Ryder Cup scramble's sides are the Cup's teams
+    return [{ key: `${f.id}:${side}`, groupId: f.id, side, name: cup ? cup[side === "a" ? 0 : 1] : `Team ${n}`, members: ids.map((id) => byId[id]?.display_name ?? "?"), handicap,
       scores: canonicalAltShotGross((data.alt_shot_scores || []) as never, f.id, side, meta.length, null) }];
   }));
 }

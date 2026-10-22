@@ -62,11 +62,14 @@ export function shapeOf(game: ShapeGame): GameShape {
   // Alternate Shot games always have two global teams; legacy games without them retain
   // their historical local-foursome matchup structure for backward compatibility.
   const usesTeams =
-    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot");
+    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot"
+      // 212.5: a Ryder Cup scramble has the Cup's two teams; its matches are built from groups, like four-ball
+      || gt === "scramble");
   const usesMatchups =
     gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null)
-    // 211.1: scramble teams (2–4 players each) are built in setup's Teams editor, which sits in the matchups slot.
-    || gt === "scramble";
+    // 211.1: scramble teams (2–4 players each) are built in setup's Teams editor, which sits in the matchups slot —
+    // except a Ryder Cup scramble (two teams), built in Groups like the other Cup team formats (212.5).
+    || (gt === "scramble" && !teams2);
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"

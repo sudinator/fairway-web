@@ -98,4 +98,27 @@ function click(container: HTMLElement, label: string, exact = false) {
   v.unmount();
 }
 
+// 212.5 — a RYDER CUP scramble picks each match's players like four-ball / alternate shot / trifecta: Setup → Groups,
+// N slots per Cup side (here 3 v 3), not scramble's separate Teams editor.
+{
+  const cg = { ...game, game_type: "scramble", teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }], foursomes: [], scramble_team_size: 3, scramble_mode: "match", scramble_handicap: "usga" } as unknown as Game;
+  const cp = Array.from({ length: 6 }, (_, k) => ({ ...players[k % players.length], id: `cp${k}`, user_id: `cu${k}`, display_name: `P${k}`, team: k < 3 ? "A" : "B", tee_group: null, no_show: false })) as Player[];
+  function CupHarness() {
+    const [tab, setTab] = React.useState<SetupTab>("overview");
+    return <GameSetupWorkspace game={cg} players={cp} setupTab={tab} onSetupTabChange={setTab} organizerPanelProps={{} as any} onSetGameDate={async()=>{}}
+      courseOptions={[]} onChangeCourse={async()=>{}} onSetTeeGroup={async()=>{}} onSetTeamGroupSlot={async()=>{}} onSetScrambleTeams={async()=>{}}
+      getTeeGroupPolicy={()=>({ blocked:false })} onRandomizeGroups={async()=>{}} onBalanceMatchups={async()=>{}} canRandomize randomizeReason=""
+      randomizing={false} groupOverflow={[]} isCompetitionGame />;
+  }
+  const v = renderToDom(<CupHarness />);
+  ok(text(v.container).includes("Ryder Cup · 3 v 3"), "control center: the format reads Ryder Cup · 3 v 3");
+  click(v.container, "Teams & groups");
+  click(v.container, "Groups");
+  const shown = text(v.container);
+  ok(shown.includes("exactly 3 of each") && !v.container.querySelector("[data-scramble-teams]"), `Groups: the slot builder, 3 per side — not the scramble Teams editor (${shown.slice(0, 160)})`);
+  const reds = v.container.querySelectorAll('select[aria-label^="Group 1 Reds player"]').length, blues = v.container.querySelectorAll('select[aria-label^="Group 1 Blues player"]').length;
+  ok(reds === 3 && blues === 3, `three menus per side in Group 1 (Reds ${reds}, Blues ${blues})`);
+  v.unmount();
+}
+
 report("game setup workspace navigation");
