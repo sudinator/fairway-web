@@ -1,3 +1,19 @@
+## 212.26.261023 — Fix: a full storage area made every score backup fail silently, and entered scores vanished
+
+Found with the 212.25 save trace (owner, Oct 23, staging): "tap … scorer yes", then "save try 1–4: not saved" with no "held" or "sending", then "refresh: … no phone backup" for every player. The save sends what is in the phone's backup; the backup write was failing — the site's storage area (about 5 MB, separate per site) was full — and the error was swallowed, so the writer found nothing to send and the next refresh showed the database's empty card.
+
+**Why it filled:** every new device identity (a fresh install, a takeover, an unrecognised relaunch) copied all earlier identities' score backups into a recovery archive that only grew, and left those backups in place, where they can never be read again (pending work is isolated by device token). Staging, with many test games, deploys and relaunches, filled first; active members on production would have followed in time.
+
+**The fix:**
+- **lib/scoring-device:** the recovery archive (the runaway growth — repeated full copies) keeps its 3 newest entries from the last 30 days; tidyScoringStorage() also removes game snapshots not opened for 30 days, and another identity's backup only when its own timestamp is over 30 days old — never while recent, since another tab or a phone that scored offline may resume it (ci/test-scoring-device caught a first version that removed them) — run after every successful device claim.
+- **lib/draft saveGameScores:** a failed backup write tidies the storage and retries; if it still fails, it is flagged (backupWriteFailed), not swallowed.
+- **The save path (components/tournaments):** each entry is also kept in memory — the writer sends from it when the phone's backup is missing, and a refresh keeps it until confirmed; a plain warning shows at the TOP of the scorecard when backups can't be stored (the bottom status bar can be hidden by the navigation).
+- The staging SAVE TRACE stays for one more round to confirm the fix ("sending … sent: OK").
+
+Tests: lib/storage-tidy.test.ts — a FULL storage area packed with what staging accumulated: the backup succeeds after tidying, the archive is capped at 3, old snapshots go, an unfixable failure is flagged, and the writer sends from memory; the score-recovery and reset suites (the real refresh and save code) pass.
+
+No migration. Deploy: staging first, confirm, then production (it carries 212.20–212.25 too).
+
 ## 212.25.261023 — Diagnostic: a save trace on staging
 
 Owner (Oct 23, staging game 564332): in stroke play, entered scores showed, then vanished ~10 s later. The staging API logs show no save_game_score_bundle call at all — the app never sent them — and no status message was seen. The database's save works (tested on a migration-built database: the score is stored).

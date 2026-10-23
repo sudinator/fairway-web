@@ -1,4 +1,4 @@
-import { scoringStorage } from "./scoring-device";
+import { scoringStorage, tidyScoringStorage } from "./scoring-device";
 // In-progress round draft, stored in the browser's localStorage.
 // localStorage writes are SYNCHRONOUS — they complete before the phone can lock
 // or the tab can be evicted, so an in-progress round survives a lock or refresh
@@ -181,6 +181,8 @@ function gameScoreKey(gameId: string, playerId: string) {
   return `bnn_game_scores_${gameId}_${playerId}`;
 }
 
+/** 212.26: set when a score backup couldn't be written even after tidying (the save then goes from memory). */
+export let backupWriteFailed = false;
 export function saveGameScores(
   gameId: string,
   playerId: string,
@@ -203,7 +205,11 @@ export function saveGameScores(
         if (existing && (existing.scores || []).some((s) => s != null)) return;
       }
     }
-    scoringStorage().setItem(gameScoreKey(gameId, playerId), JSON.stringify({ scoringVersion: scoringVersion ?? loadGameScores(gameId, playerId)?.scoringVersion, at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data }));
+    const value = JSON.stringify({ scoringVersion: scoringVersion ?? loadGameScores(gameId, playerId)?.scoringVersion, at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data });
+    // 212.26: a full storage area made this throw, silently — the backup never existed, nothing was sent and the
+    // entry vanished. Tidy the storage and retry once; if it still fails, report it (the writer then sends from memory).
+    try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); }
+    catch { tidyScoringStorage(); try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); } catch (e) { backupWriteFailed = true; throw e; } }
   } catch {}
 }
 

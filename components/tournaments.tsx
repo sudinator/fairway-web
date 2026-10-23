@@ -78,7 +78,7 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, typ
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles, backupWriteFailed } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1565,6 +1565,9 @@ function GameRoom({
   const loadRequestRef = React.useRef(0);
   const recoveryReadyRef = React.useRef(false);
   const scoreWriterRef = React.useRef<ReturnType<typeof createGameScoreWriter> | null>(null);
+  // 212.26: the latest entry per row, in MEMORY — used when the phone's backup couldn't be written (a full storage
+  // area made every backup fail silently: the writer found "nothing to send" and the next refresh wiped the entry)
+  const memBackupRef = React.useRef(new Map<string, { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }>());
   const resettingRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
   gameRef.current = game;
@@ -1855,7 +1858,8 @@ function GameRoom({
     trace(`refresh: scorer ${isPrimaryScoringDevice() ? "yes" : "NO — phone entries ignored"} · ready ${recoveryReadyRef.current ? "yes" : "no"}`);
     for (const p of ps) {
       if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
-      let backup = loadGameScores(gameId, p.id);
+      // 212.26: the phone's backup, else this session's memory copy — an entry not yet confirmed must survive a refresh
+      let backup = loadGameScores(gameId, p.id) ?? (memBackupRef.current.has(p.id) ? { ...memBackupRef.current.get(p.id)!, at: Date.now(), scoringVersion: safeGame.scoring_version ?? 0 } : null);
       if (!backup) trace(`refresh: ${String(p.display_name || "")} — no phone backup`);
       if (backup && (((backup.scoringVersion ?? 0) !== (safeGame.scoring_version ?? 0)) || (resetAt && backup.at < resetAt))) {
         trace(`refresh: ${String(p.display_name || "")} — phone backup DISCARDED (version ${backup.scoringVersion ?? 0} v ${safeGame.scoring_version ?? 0}${resetAt && backup.at < resetAt ? ", older than reset" : ""})`);
@@ -2092,7 +2096,7 @@ function GameRoom({
   }, [user.id]);
   // Shared writer serializes each row and acknowledges only confirmed writes.
   if (!scoreWriterRef.current) scoreWriterRef.current = createGameScoreWriter({
-    backup: rowId => loadGameScores(gameIdRef.current, rowId),
+    backup: rowId => loadGameScores(gameIdRef.current, rowId) ?? (memBackupRef.current.get(rowId) as never) ?? null,
     watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
@@ -2205,6 +2209,8 @@ function GameRoom({
       const b = loadGameScores(gid, rowId);
       return b ? bundleOf(b as any) : bundleOf(firstBody);
     };
+    memBackupRef.current.set(rowId, bundleOf(firstBody) as never);   // 212.26
+    if (!loadGameScores(gid, rowId)) trace("phone backup missing — sending from memory");
     for (let n = 0; n < 4; n++) {
       if (!isPrimaryScoringDevice()) return;
       setSyncState(n === 0 ? "saving" : "retry");
@@ -3547,6 +3553,12 @@ function GameRoom({
         </div>
       )}
 
+      {/* 212.26: the phone couldn't store a backup — say so where it can be seen (the bottom bar can be hidden) */}
+      {backupWriteFailed && roomTab === "play" ? (
+        <div data-backup-warning style={{ background: C.gold, color: C.green, borderRadius: 10, padding: "8px 12px", margin: "8px 0", fontSize: 13, fontWeight: 700 }}>
+          This phone couldn&apos;t store a backup of your scores, so they&apos;re being sent straight to BNN. Keep a connection until they show as saved.
+        </div>
+      ) : null}
       {/* 212.25: the save trace — staging only (lib/save-trace) */}
       {isStagingClient() && roomTab === "play" ? <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", left: 8, right: 8, zIndex: 80, maxHeight: "38vh", overflowY: "auto" }}><SaveTraceView /></div> : null}
 

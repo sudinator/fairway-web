@@ -1,3 +1,7 @@
+## 212.26.261023 — Fix: a full storage area made every score backup fail silently, and entered scores vanished
+
+Found with the 212.25 save trace (owner, Oct 23, staging): "tap … scorer yes", then "save try 1–4: not saved" with no "held" or "sending", then "refresh: … no phone backup" for every player. The save sends what is in the phone's backup; the backup write was failing — the site's storage area (about 5 MB, separate per site) was full — and the error was swallowed, so the writer found nothing to send and the next refresh showed the database's empty card.
+
 ## 212.25.261023 — Diagnostic: a save trace on staging
 
 Owner (Oct 23, staging game 564332): in stroke play, entered scores showed, then vanished ~10 s later. The staging API logs show no save_game_score_bundle call at all — the app never sent them — and no status message was seen. The database's save works (tested on a migration-built database: the score is stored).

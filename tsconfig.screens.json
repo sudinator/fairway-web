@@ -47,6 +47,7 @@
     "lib/insights-render.test.tsx",
     "lib/tee-yardage.test.tsx",
     "lib/segments-scheme.test.tsx",
+    "lib/storage-tidy.test.ts",
     "lib/design-gallery.tsx",
     "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",
