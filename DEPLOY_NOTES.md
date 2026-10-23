@@ -1,3 +1,11 @@
+## 212.32.261023 — Fix: a test that failed at random on GitHub (212.31's push failed)
+
+212.31's pull request check failed in lib/storage-tidy: "an exact duplicate under an old identity is removed". The app code is unchanged from 212.30 (byte-identical); the TEST stamped the backup and its "exact duplicate" with two separate clock reads. On a fast machine both land in the same millisecond; on GitHub's runner the clock ticked between them, so the copy was not exact and the tidy rightly kept it. Present since 212.30 — it passed there by luck. Reproduced by running the test on a clock that moves 1 ms per read: the old test fails with the CI message, the fixed test (one timestamp for the pair) passes.
+
+**Guard (lessons become guards):** ci/test-ticking-clock.cjs runs every unit and screen suite (130) again on that ticking clock, in `npm run ci` right after the tests (~36 s). All other suites already pass that way, so storage-tidy was the only timing-dependent test. Negative-tested: with the old storage-tidy test it fails, naming the suite.
+
+Includes 212.31 (stroke play leaderboard on par pace; many-tabs storage test). No migration. Deploy: code only.
+
 ## 212.31.261023 — Fix: stroke play leaderboard sorted on raw totals, not score to par
 
 Owner (Oct 23, production game 494730): Nihar was "leading" at E thru 1 (net 3) while Amit was second at -5 thru 3 (net 6) — the board sorted on the raw net total (3 < 6), so whoever had played fewest holes looked best. The score column was right; the order was not. The same sort was copied into the public live page.

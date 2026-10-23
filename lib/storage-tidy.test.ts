@@ -68,8 +68,11 @@ __setScoringIdentityForTest("u", "cur");
 ls.clear();
 const B = (scores: (number | null)[], at: number) => JSON.stringify({ at, scores, putts: [], fairways: [], penalties: [], sand: [] });
 const day = 86400e3;
-ls.setItem("bnn_device_scores:u:cur:bnn_game_scores_g1_p", B([4, 5], Date.now()));
-ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g1_p", B([4, 5], Date.now()));                                  // exact duplicate
+// 212.31: ONE timestamp for the pair. Two separate Date.now() reads could land in different milliseconds on a slow CI
+// runner, making the "exact duplicate" not exact — the tidy then rightly kept it and this test failed (GitHub, Oct 23).
+const AT = Date.now();
+ls.setItem("bnn_device_scores:u:cur:bnn_game_scores_g1_p", B([4, 5], AT));
+ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g1_p", B([4, 5], AT));                                  // exact duplicate
 ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g2_p", B([4, 5], Date.now() - 5 * day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g2_p", B([4, 5], Date.now() - 5 * day)); // uploaded, 5 days
 ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g3_p", B([4, 6], Date.now() - 5 * day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g3_p", B([4, null], Date.now() - 5 * day)); // NOT uploaded
 ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g4_p", B([4, 5], Date.now() - day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g4_p", B([4, 5], Date.now() - day));     // uploaded, 1 day
