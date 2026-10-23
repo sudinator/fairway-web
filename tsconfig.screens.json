@@ -48,6 +48,7 @@
     "lib/tee-yardage.test.tsx",
     "lib/segments-scheme.test.tsx",
     "lib/storage-tidy.test.ts",
+    "lib/save-trace-toggle.test.tsx",
     "lib/design-gallery.tsx",
     "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",

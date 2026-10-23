@@ -17,3 +17,12 @@ export function trace(msg: string) {
 export const traceLines = () => lines;
 export const traceVersion = () => version;
 export const subscribeTrace = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };
+
+const FLAG = "bnn_save_trace_on";
+export function saveTraceEnabled(): boolean {
+  try { return typeof window !== "undefined" && window.localStorage.getItem(FLAG) === "1"; } catch { return false; }
+}
+export function setSaveTraceEnabled(on: boolean) {
+  try { if (on) window.localStorage.setItem(FLAG, "1"); else window.localStorage.removeItem(FLAG); } catch { /* best effort */ }
+  version++; subs.forEach((f) => f());
+}

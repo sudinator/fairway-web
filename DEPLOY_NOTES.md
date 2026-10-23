@@ -1,3 +1,13 @@
+## 212.27.261023 — The score-save trace is a switch in Admin → Diagnostics
+
+Owner (Oct 23): keep the save trace (it found the 212.26 storage bug) but make it something to switch on and off, in Admin → Diagnostics.
+
+- **Admin → Diagnostics → "Score-save trace": On / Off** — per device, OFF by default, on any site (staging or production); only Admin reaches the switch, so members never see it. The game screen shows the trace panel only while it's on (it was always shown on staging). The trace records quietly regardless, so switching it on shows the latest events.
+- lib/save-trace: saveTraceEnabled / setSaveTraceEnabled; components/save-trace-view: SaveTraceToggle, useSaveTraceOn.
+Tests: lib/save-trace-toggle.test.tsx (off by default; on and remembered; off again). Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.26).
+
 ## 212.26.261023 — Fix: a full storage area made every score backup fail silently, and entered scores vanished
 
 Found with the 212.25 save trace (owner, Oct 23, staging): "tap … scorer yes", then "save try 1–4: not saved" with no "held" or "sending", then "refresh: … no phone backup" for every player. The save sends what is in the phone's backup; the backup write was failing — the site's storage area (about 5 MB, separate per site) was full — and the error was swallowed, so the writer found nothing to send and the next refresh showed the database's empty card.

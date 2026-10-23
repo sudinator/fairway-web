@@ -1,6 +1,6 @@
 "use client";
 import { trace } from "@/lib/save-trace";
-import { SaveTraceView } from "@/components/save-trace-view";
+import { SaveTraceView, useSaveTraceOn } from "@/components/save-trace-view";
 import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
@@ -1567,6 +1567,7 @@ function GameRoom({
   const scoreWriterRef = React.useRef<ReturnType<typeof createGameScoreWriter> | null>(null);
   // 212.26: the latest entry per row, in MEMORY — used when the phone's backup couldn't be written (a full storage
   // area made every backup fail silently: the writer found "nothing to send" and the next refresh wiped the entry)
+  const saveTraceOn = useSaveTraceOn();   // 212.27: Admin → Diagnostics switch
   const memBackupRef = React.useRef(new Map<string, { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }>());
   const resettingRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
@@ -3559,8 +3560,8 @@ function GameRoom({
           This phone couldn&apos;t store a backup of your scores, so they&apos;re being sent straight to BNN. Keep a connection until they show as saved.
         </div>
       ) : null}
-      {/* 212.25: the save trace — staging only (lib/save-trace) */}
-      {isStagingClient() && roomTab === "play" ? <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", left: 8, right: 8, zIndex: 80, maxHeight: "38vh", overflowY: "auto" }}><SaveTraceView /></div> : null}
+      {/* 212.25 / 212.27: the save trace — when switched on in Admin → Diagnostics (lib/save-trace) */}
+      {saveTraceOn && roomTab === "play" ? <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", left: 8, right: 8, zIndex: 80, maxHeight: "38vh", overflowY: "auto" }}><SaveTraceView /></div> : null}
 
       {(syncState !== "idle" || pendingHoles > 0) && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", zIndex: 60, padding: "0 12px", pointerEvents: "none" }}>

@@ -23,6 +23,7 @@ import { teamRoundEmail } from "@/lib/team-round-email";
 import { InsightsCard, InsightsScreen } from "@/components/insights";
 import { YourCourses, CourseDetail } from "@/components/your-courses";
 import { IndivSegmentChoice } from "@/components/game/segment-views";
+import { SaveTraceToggle } from "@/components/save-trace-view";
 import { computeInsights } from "@/lib/insights";
 import { yourCourses } from "@/lib/your-courses";
 import { round as mkRound, PARS as RP, SIS as RS } from "@/lib/test-fixtures/messy-rounds";
@@ -99,6 +100,9 @@ add("19-course-detail", <div style={{ background: "#1B5A46", borderRadius: 12, p
 // 212.24 — the segment choice for an individual game, and for a TGC money game
 add("21-segment-choice", <div><IndivSegmentChoice game={{ ...base, game_type: "stableford", leg_config: { scheme: "nines", metric: "pts", points: {} } } as unknown as Game} moneyGame={false} onSave={noop} />
   <IndivSegmentChoice game={{ ...base, game_type: "stableford" } as unknown as Game} moneyGame onSave={noop} /></div>);
+
+// 212.27 — the score-save trace switch (Admin → Diagnostics)
+add("22-save-trace-toggle", <SaveTraceToggle />);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);
