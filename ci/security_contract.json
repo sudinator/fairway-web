@@ -73,7 +73,6 @@
   "claim_group_marker(uuid)": "authenticated",
   "claim_marker(uuid)": "authenticated",
   "claim_scoring_device(uuid,uuid,boolean)": "authenticated",
-  "clear_my_notifications()": "authenticated",
   "club_pending_signups(uuid)": "authenticated",
   "course_api_status(text[])": "authenticated",
   "course_field_averages(uuid,text)": "authenticated",

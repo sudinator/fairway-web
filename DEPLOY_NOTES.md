@@ -1,3 +1,15 @@
+## 212.19.261022 — Production matches the migrations: three hand-made functions retired (0216)
+
+The production security check (212.8) found three differences on production:
+- **create_group_invite / redeem_group_invite** — the original one-time invite functions, made by hand on production before migrations and never captured in one (0015 mentions them). Redeeming already goes through begin_account (0189); creating a one-time link now uses create_group_invite_multi with 1 use and 30 days — the same behaviour, admins only (components/groups.tsx).
+- **clear_my_notifications** — created by 0094, no longer callable on production, no longer used by the app.
+
+0216 retires all three (removed on production; nothing to remove on a migration-built database), so production and the migrations match exactly. The recorded security contract changes by one line (clear_my_notifications removed). `drop function` without cascade refuses if anything still depends on one, so an unexpected dependency would stop 0216 harmlessly. Test: ci/assert-retired-functions.sql.
+
+**Order:** apply 0216 to production, then merge promptly — until the merge, production's 212.6 "one-time link" button errors (multi-use links work).
+
+Deploy: staging 0216 → code; production 0213–0216 → merge. Includes 212.18.
+
 ## 212.18.261022 — Insights and Your courses (0215)
 
 Owner (Oct 2026, placed Oct 22): personal analysis from data BNN already records.

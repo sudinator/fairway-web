@@ -208,10 +208,14 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     try {
       let code = "";
       if (linkKind === "once") {
-        const { data, error } = await supabase.rpc("create_group_invite", {
-          group_uuid: active.id,
+        // 212.19: a one-time link is a 30-day, single-use code from the migration-built function. The old
+        // create_group_invite was made by hand on production before migrations and never captured in one — the
+        // production security check found it; 0216 retires it.
+        const { data, error } = await supabase.rpc("create_group_invite_multi", {
+          invite_group: active.id,
           invite_role: "member",
-          valid_days: 30,
+          hours: 720,
+          uses: 1,
         });
         if (error) throw error;
         code = String(data || "");
