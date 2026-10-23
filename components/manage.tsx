@@ -1,6 +1,7 @@
 "use client";
 
 import { SaveTraceToggle } from "@/components/save-trace-view";
+import { StorageMeter } from "@/components/storage-meter";
 import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
@@ -2790,7 +2791,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "friction": title = "Friction review"; panel = <AdminFrictionReview />; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
-      case "diagnostics": title = "Diagnostics"; panel = <><SaveTraceToggle /><RoundSaveDiag /></>; break;   // 212.27: + the score-save trace switch
+      case "diagnostics": title = "Diagnostics"; panel = <><StorageMeter /><SaveTraceToggle /><RoundSaveDiag /></>; break;   // 212.27 / 212.28: storage meter + the score-save trace switch
       case "clubreports": title = "Club reports"; panel = <AdminClubReport />; break;
       case "clubrequests": title = "Club requests"; panel = <AdminClubRequests user={user} onCount={setClubReqCount} />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
@@ -2845,7 +2846,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="⛳" name="Course data" cap="API verification, pending updates, corrections awaiting approval" onClick={() => setView("coursedata")} />
             <Card icon="🚩" name="Sandbaggers" cap="Entered index vs scoring (18+ rounds)" onClick={() => setView("sandbaggers")} />
             <Card icon="📋" name="Club reports" cap="Preview a club's report for any period" onClick={() => setView("clubreports")} />
-            <Card icon="🩺" name="Diagnostics" cap="Score-save trace, round-save log" onClick={() => setView("diagnostics")} />
+            <Card icon="🩺" name="Diagnostics" cap="Phone storage, score-save trace, round-save log" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
           </>)}
         </>

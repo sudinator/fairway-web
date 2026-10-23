@@ -3,7 +3,9 @@
 import { ok, report } from "./screen-harness";
 import { saveGameScores, loadGameScores } from "./draft";
 import * as D from "./draft";
-import { tidyScoringStorage } from "./scoring-device";
+import { tidyScoringStorage, storageWriteFailed, scoringStorage } from "./scoring-device";
+import { saveAltShotDraft } from "./alt-shot-side-scores";
+import { measureStorage } from "@/components/storage-meter";
 import { createGameScoreWriter } from "./game-score-sync";
 
 const ls = window.localStorage;
@@ -41,6 +43,30 @@ ls.clear(); LIMIT = 10;
 saveGameScores("g", "q", bundle, true, undefined, 0);
 ok(D.backupWriteFailed === true && loadGameScores("g", "q") == null, "nothing can be freed: the failure is flagged for the on-screen warning");
 LIMIT = Infinity; St.prototype.setItem = realSet;
+
+// 212.28 — synced game backups over 30 days old go; unsynced or recent ones stay
+ls.clear();
+const old = Date.now() - 45 * 86400e3, row = (scores: (number | null)[], at: number) => JSON.stringify({ at, scores, putts: [], fairways: [], penalties: [], sand: [] });
+const ss = scoringStorage();   // backups are written under the device identity, as the app does
+ss.setItem("bnn_game_scores_gOld_p", row([4, 5], old)); ss.setItem("bnn_game_wm_gOld_p", row([4, 5], old));          // synced, old
+ss.setItem("bnn_game_scores_gPend_p", row([4, 6], old)); ss.setItem("bnn_game_wm_gPend_p", row([4, null], old));      // old, NOT synced
+ss.setItem("bnn_game_scores_gNew_p", row([4, 5], Date.now())); ss.setItem("bnn_game_wm_gNew_p", row([4, 5], Date.now())); // synced, recent
+tidyScoringStorage();
+ok(ss.getItem("bnn_game_scores_gOld_p") == null && ss.getItem("bnn_game_wm_gOld_p") == null, "a synced game backup over 30 days old is removed (with its confirmed copy)");
+ok(ss.getItem("bnn_game_scores_gPend_p") != null, "an old backup with scores NOT yet uploaded is kept");
+ok(ss.getItem("bnn_game_scores_gNew_p") != null, "a recent synced backup is kept");
+
+// 212.28 — a team-score draft on a full storage area doesn't throw (the score is still sent), and is flagged
+LIMIT = 10; St.prototype.setItem = function (this: globalThis.Storage, k: string, v: string) { if (k.length + v.length > LIMIT) { const e = new Error("QuotaExceededError"); e.name = "QuotaExceededError"; throw e; } return realSet.call(this, k, v); };
+let threwDraft = false;
+try { saveAltShotDraft("g", { foursomeId: "t1", side: "a", holeIndex: 0, strokes: 4, at: Date.now(), scoringVersion: 0 } as never); } catch { threwDraft = true; }
+ok(!threwDraft && storageWriteFailed(), "a team-score draft on a full storage area: no throw (the score is still sent), and flagged for the warning");
+St.prototype.setItem = realSet; LIMIT = Infinity;
+
+// the storage meter's figures
+ls.clear(); ls.setItem("bnn_game_scores_x_y", "a".repeat(100)); ls.setItem("bnn_game_snap_z", "b".repeat(50)); ls.setItem("other", "c");
+const rep = measureStorage(ls);
+ok(rep.items === 3 && rep.kinds[0].label === "Score backups" && rep.bytes === ((19 + 100) + (15 + 50) + (5 + 1)) * 2, `the storage meter adds up (got ${rep.bytes} bytes, ${rep.kinds.map((k) => k.label)})`);
 
 // 3. the writer sends from MEMORY when the backup is missing (it used to find "nothing to send")
 (async () => {

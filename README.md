@@ -1,3 +1,11 @@
+## 212.29.261023 — Fix: Reset scores was undone by the in-memory copy (212.26 regression)
+
+Owner (Oct 23, production): "I can no longer reset scores under Manage game — the entered scores persist."
+
+## 212.28.261023 — Storage audit: two more unbounded stores fixed; phone storage meter; database size report
+
+Owner (Oct 23): after the 212.26 storage bug — "are we close to getting to memory full anywhere else?"
+
 ## 212.27.261023 — The score-save trace is a switch in Admin → Diagnostics
 
 Owner (Oct 23): keep the save trace (it found the 212.26 storage bug) but make it something to switch on and off, in Admin → Diagnostics.

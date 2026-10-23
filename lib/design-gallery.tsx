@@ -24,6 +24,7 @@ import { InsightsCard, InsightsScreen } from "@/components/insights";
 import { YourCourses, CourseDetail } from "@/components/your-courses";
 import { IndivSegmentChoice } from "@/components/game/segment-views";
 import { SaveTraceToggle } from "@/components/save-trace-view";
+import { StorageMeter } from "@/components/storage-meter";
 import { computeInsights } from "@/lib/insights";
 import { yourCourses } from "@/lib/your-courses";
 import { round as mkRound, PARS as RP, SIS as RS } from "@/lib/test-fixtures/messy-rounds";
@@ -103,6 +104,9 @@ add("21-segment-choice", <div><IndivSegmentChoice game={{ ...base, game_type: "s
 
 // 212.27 — the score-save trace switch (Admin → Diagnostics)
 add("22-save-trace-toggle", <SaveTraceToggle />);
+
+// 212.28 — Admin → Diagnostics: phone storage
+add("23-storage-meter", <StorageMeter sample={{ bytes: 1_310_000, items: 214, kinds: [{ label: "Score backups", bytes: 620_000 }, { label: "Game copies for offline use", bytes: 410_000 }, { label: "Recovery archive", bytes: 180_000 }, { label: "Settings & other", bytes: 100_000 }] }} />);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

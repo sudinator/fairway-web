@@ -45,7 +45,7 @@ function room(server,opts={}){
   if(opts.duringRead){const fn=opts.duringRead;opts.duringRead=null;fn(scoreRevisionRef);}
   const response=table==='games'?{data:{id:'g',holes_meta:[{n:1,par:4},{n:2,par:4}],scores_reset_at:opts.resetAt,scoring_version:opts.version??0}}:table==='game_players'?{data:copy(server),error:opts.failRead?{message:'denied'}:null}:table==='rounds'?{count:0}:{data:[]};return Promise.resolve(response).then(resolve,reject);
  },update(){throw Error('load must not upload')}};return q;}};
- const env={trace:()=>{},memBackupRef:{current:new Map()},isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
+ const env={trace:()=>{},memBackupRef:{current:opts.mem||new Map()},isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
  return{load:Function(...Object.keys(env),code)(...Object.values(env)),state};
 }
 function seed(b=local,w=base){window.localStorage.clear();draft.saveGameScores('g','p',b,true,100);if(w)draft.saveSyncedWatermark('g','p',w);}
@@ -77,5 +77,22 @@ t=writer();t.paused=true;assert.equal(await t.w.write('p'),false);assert.equal(t
 assert.ok(source.includes('p_stats_only: locked'));assert.ok(source.includes('p_version: backup?.scoringVersion'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
 seed();r=room([{id:'p',user_id:'u',...base}],{viewer:true});await r.load();assert.deepEqual(r.state.players[0].scores,base.scores,'viewer shows server, not stale local backup');assert.deepEqual(draft.loadGameScores('g','p').scores,local.scores,'viewer preserves pending recovery');assert.deepEqual(draft.loadSyncedWatermark('g','p').scores,base.scores,'viewer never acknowledges pending work');
 adapterTest=adapter('reset');assert.equal(await adapterTest.send('p',{scores:[4]},false),false);assert.equal(adapterTest.version,7,'original durable version, not new game version');assert.equal(adapterTest.resetEvents,1);assert.equal(adapterTest.env.recoveryReadyRef.current,false);
-console.log('PASS: actual load + sync helpers: corrections/deletions/all stats, remote edits, legacy, cold launch, denied/thrown/late reads, reset, rejected writes, marker permissions, concurrent writes and queue freshness');dom.window.close();
+// 212.29 (owner, Oct 23, production): Reset scores must not be undone by the in-memory copy of an unsent entry
+{
+  window.localStorage.clear();
+  // an entry held in memory from BEFORE the reset (version 0); the reset bumped the game to version 1 and cleared the server
+  const before=new Map([['p',{...copy(local),scores:[7,7],at:50,scoringVersion:0}]]);
+  let a=room([{id:'p',user_id:'u',...bundle([null,null],[null,null],[null,null],[0,0],[false,false])}],{version:1,resetAt:new Date(100).toISOString(),mem:before});
+  await a.load();
+  assert.deepEqual(a.state.players[0].scores,[null,null],'a pre-reset entry held in memory must NOT come back after Reset scores');
+  assert.equal(before.size,0,'the pre-reset memory copy is discarded');
+  // an unsent entry made AFTER the reset (current version, later time) survives a refresh
+  window.localStorage.clear();
+  const after=new Map([['p',{...copy(local),scores:[4,null],at:Date.now(),scoringVersion:1}]]);
+  a=room([{id:'p',user_id:'u',...bundle([null,null],[null,null],[null,null],[0,0],[false,false])}],{version:1,resetAt:new Date(100).toISOString(),mem:after});
+  await a.load();
+  assert.deepEqual(a.state.players[0].scores,[4,null],'an unsent entry made after the reset survives a refresh');
+  
+}
+console.log('PASS: actual load + sync helpers: reset not undone by the memory copy (212.29), corrections/deletions/all stats, remote edits, legacy, cold launch, denied/thrown/late reads, reset, rejected writes, marker permissions, concurrent writes and queue freshness');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

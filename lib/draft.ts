@@ -1,4 +1,4 @@
-import { scoringStorage, tidyScoringStorage } from "./scoring-device";
+import { scoringStorage, tidyScoringStorage, noteStorageWriteFailure, registerStorageTidy } from "./scoring-device";
 // In-progress round draft, stored in the browser's localStorage.
 // localStorage writes are SYNCHRONOUS — they complete before the phone can lock
 // or the tab can be evicted, so an in-progress round survives a lock or refresh
@@ -209,7 +209,7 @@ export function saveGameScores(
     // 212.26: a full storage area made this throw, silently — the backup never existed, nothing was sent and the
     // entry vanished. Tidy the storage and retry once; if it still fails, report it (the writer then sends from memory).
     try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); }
-    catch { tidyScoringStorage(); try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); } catch (e) { backupWriteFailed = true; throw e; } }
+    catch { tidyScoringStorage(); try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); } catch (e) { backupWriteFailed = true; noteStorageWriteFailure(); throw e; } }
   } catch {}
 }
 
@@ -449,3 +449,30 @@ export function shouldResumeGame(serverStatus: string | null | undefined, snapsh
   const status = serverStatus !== undefined ? serverStatus : snapshotStatus;
   return status !== "ended";                                     // active (or unknown offline) → resume; ended → don't
 }
+
+
+// 212.28 — a game's score backups stayed on the phone forever (cleared only by a course change, match-length change,
+// reset or delete — never when the game ended): one backup and one confirmed copy per player per game scored. The
+// storage tidy removes a pair once it is FULLY SYNCED (nothing pending) and over 30 days old; anything not yet
+// uploaded is never touched.
+const SYNCED_BACKUP_DAYS = 30;
+export function tidySyncedGameBackups(): number {
+  if (typeof window === "undefined") return 0;
+  const st = scoringStorage();
+  const cutoff = Date.now() - SYNCED_BACKUP_DAYS * 86400000;
+  const keys = Array.from({ length: st.length }, (_, i) => st.key(i)).filter((k): k is string => !!k && k.startsWith("bnn_game_scores_"));
+  let removed = 0;
+  for (const k of keys) {
+    try {
+      const b = JSON.parse(st.getItem(k) || "null");
+      if (!b || typeof b.at !== "number" || b.at >= cutoff) continue;
+      const wk = "bnn_game_wm_" + k.slice("bnn_game_scores_".length);
+      const wmRaw = st.getItem(wk);
+      const wm = wmRaw ? JSON.parse(wmRaw) : null;
+      if (!wm || rowPendingHoles(b, wm) !== 0) continue;   // unsynced work stays
+      st.removeItem(k); st.removeItem(wk); removed += 2;
+    } catch { /* leave it */ }
+  }
+  return removed;
+}
+registerStorageTidy(tidySyncedGameBackups);

@@ -1,3 +1,31 @@
+## 212.29.261023 — Fix: Reset scores was undone by the in-memory copy (212.26 regression)
+
+Owner (Oct 23, production): "I can no longer reset scores under Manage game — the entered scores persist."
+
+**Cause (introduced in 212.26):** each entry is also kept in memory, so a score is still sent if the phone's backup can't be stored. Reset scores cleared the phone's backups and the database, but not that memory copy — and a refresh stamped the memory copy with the game's CURRENT scoring version, so it passed the check meant to reject pre-reset entries. The old scores came back on screen and were sent again.
+
+**Fix (components/tournaments):** each memory entry records the scoring version and time it was made; a refresh (and the writer) use it only if that version is still current and it was made after any reset — otherwise it is discarded. Every reset path clears it (Reset scores, course change, match-length change, delete game, a reset made on another device), and it is dropped once the score is confirmed saved.
+Tests: ci/test-game-score-recovery (the real refresh code: a pre-reset memory entry does NOT come back; an unsent post-reset entry survives); ci/test-game-reset (the real Reset scores code clears the memory copy); the device suite passes.
+
+No migration. Deploy: code only — URGENT for production (includes 212.28).
+
+## 212.28.261023 — Storage audit: two more unbounded stores fixed; phone storage meter; database size report
+
+Owner (Oct 23): after the 212.26 storage bug — "are we close to getting to memory full anywhere else?"
+
+**Audited every place the app stores data on the phone** (~25 writes). Fixed keys are bounded (diagnostics log capped at 400; AI counter, boot cache, session and settings are single small values). The offline app copies (service worker) are cleared on every release. Found and fixed:
+1. **Team-score drafts (scramble / alternate shot) could stop a save:** a full storage area made the draft write THROW, so the team score was never sent — the 212.26 bug class on another path. Now it tidies and retries; if it still fails it is reported and the score is still sent (the draft is only the offline backup).
+2. **A game's score backups were never removed when the game ended** — one backup and one confirmed copy per player per game scored, forever. The storage tidy now removes a pair once fully synced (nothing pending) and over 30 days old; unsent scores are never touched.
+- One storage-failure flag (lib/scoring-device noteStorageWriteFailure / storageWriteFailed) for every backup kind; the scorecard's top warning shows for either.
+
+**Admin → Diagnostics → Phone storage:** how much BNN keeps on this phone against the ~5 MB allowance, by kind, with "Tidy now".
+**ci/check_storage_writes.py (new guard):** every function that stores a score backup must tidy, retry and report a failed write — it fails the build if that handling is removed (proven).
+**docs/sql/storage_report.sql:** read-only — the database's size, its 15 largest tables, and the always-growing tables (activity log, notifications, money audit, email log, holes) over the last 30 days.
+
+Tests: lib/storage-tidy.test.ts (14): synced old backups removed, unsynced and recent kept, a team-score draft on a full area doesn't throw and is flagged, the meter adds up; the device, recovery and reset suites pass. Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.27).
+
 ## 212.27.261023 — The score-save trace is a switch in Admin → Diagnostics
 
 Owner (Oct 23): keep the save trace (it found the 212.26 storage bug) but make it something to switch on and off, in Admin → Diagnostics.
