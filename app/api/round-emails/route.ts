@@ -3,6 +3,9 @@
 // week, members who receive them — the owner only until opened to everyone). Unchanged rounds are never sent
 // twice; a changed one goes out as "Updated:". Every attempt is logged. Without the Gmail keys (e.g. staging)
 // it does nothing.
+import { fetchAll } from "@/lib/fetch-all";
+import { teamRoundEmail } from "@/lib/team-round-email";
+import { buildRecap } from "@/lib/game-recap";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
@@ -33,11 +36,13 @@ export async function POST(req: Request) {
   if (!user || !pass) return NextResponse.json({ ok: true, reports, skipped: "email not configured here" });
   const mail = nodemailer.createTransport({ service: "gmail", auth: { user, pass: pass.replace(/\s+/g, "") } });
   const clubEmails = await sendClubReportEmails(db, mail, user, appUrl);
+  // 212.7: team rounds (scramble / alternate shot) — the game's recap, since no personal round exists
+  const teamEmails = await sendTeamRoundEmails(db, mail, user, appUrl);
 
   // bounded: function returns at most p_limit (20)
   const { data: due, error } = await db.rpc("due_round_emails", { p_limit: 20 });
-  if (error) return NextResponse.json({ error: error.message, reports, clubEmails }, { status: 502 });
-  if (!due?.length) return NextResponse.json({ ok: true, sent: 0, reports, clubEmails });
+  if (error) return NextResponse.json({ error: error.message, reports, clubEmails, teamEmails }, { status: 502 });
+  if (!due?.length) return NextResponse.json({ ok: true, sent: 0, reports, clubEmails, teamEmails });
   let sent = 0, unchanged = 0, failed = 0;
 
   for (const d of due as { round_id: string; user_id: string; email: string; display_name: string | null; game_id: string | null; last_fingerprint: string | null; ever_sent: boolean }[]) {
@@ -85,7 +90,7 @@ export async function POST(req: Request) {
       await db.rpc("record_round_email", { p_round: d.round_id, p_user: d.user_id, p_fingerprint: null, p_kind: d.ever_sent ? "update" : "summary", p_status: "failed", p_error: err instanceof Error ? err.message : String(err) });
     }
   }
-  return NextResponse.json({ ok: true, sent, unchanged, failed, reports, clubEmails });
+  return NextResponse.json({ ok: true, sent, unchanged, failed, reports, clubEmails, teamEmails });
 }
 
 /** Build and publish queued club reports (snapshot = the report as published; members are notified once). */
@@ -124,4 +129,33 @@ async function sendClubReportEmails(db: SupabaseClient, mail: ReturnType<typeof 
     }
   }
   return { sent, failed };
+}
+
+/** 212.7: the recap email for team rounds that are due (due_team_round_emails — the round email's rules). */
+async function sendTeamRoundEmails(db: SupabaseClient, mail: ReturnType<typeof nodemailer.createTransport>, from: string, appUrl: string): Promise<{ sent: number; skipped: number; failed: number }> {
+  let sent = 0, skipped = 0, failed = 0;
+  // bounded: function returns at most p_limit (20)
+  const { data: due } = await db.rpc("due_team_round_emails", { p_limit: 20 });
+  for (const d of (due || []) as { game_id: string; user_id: string; email: string; display_name: string | null }[]) {
+    try {
+      const [{ data: game }, players, rows] = await Promise.all([
+        db.from("games").select("*").eq("id", d.game_id).maybeSingle(),
+        fetchAll<any>((f, t) => db.from("game_players").select("*").eq("game_id", d.game_id).order("id").range(f, t)),
+        fetchAll<any>((f, t) => db.from("game_alt_shot_scores").select("*").eq("game_id", d.game_id).order("hole_index").range(f, t)),
+      ]);
+      if (!game) { skipped++; await db.rpc("record_team_round_email", { p_game: d.game_id, p_user: d.user_id, p_status: "skipped", p_error: "game not found" }); continue; }
+      const recap = buildRecap(game as any, players as any, rows as any);
+      const me = (players as any[]).find((p) => p.user_id === d.user_id);
+      const unsubscribeUrl = `${appUrl}/api/round-emails/unsubscribe?u=${d.user_id}&t=${unsubscribeToken(d.user_id)}`;
+      const e = teamRoundEmail({ format: (game as any).game_type, course: (game as any).course || "", recap, personalLine: me ? recap.personal[me.user_id ?? me.id] ?? null : null,
+        firstName: (d.display_name || "").split(" ")[0] || null, gameUrl: `${appUrl}/?tab=games&game=${(game as any).code}`, unsubscribeUrl });   // the game's 6-digit code (lib/app-links)
+      await mail.sendMail({ from: `Birdie Num Num <${from}>`, to: d.email, subject: e.subject, html: e.html, text: e.text, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
+      await db.rpc("record_team_round_email", { p_game: d.game_id, p_user: d.user_id, p_status: "sent" });
+      sent++;
+    } catch (err) {
+      failed++;
+      await db.rpc("record_team_round_email", { p_game: d.game_id, p_user: d.user_id, p_status: "failed", p_error: String((err as Error)?.message || err).slice(0, 300) });
+    }
+  }
+  return { sent, skipped, failed };
 }

@@ -45,11 +45,15 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
       <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
         {OFFERED_METHODS.map((m) => <button key={m} disabled={locked || busy || (m === "usga" && captains)} onClick={() => hcp !== m && save({ scramble_handicap: m }, false)} style={{ ...btn(hcp === m), flex: 1, minWidth: 100, fontSize: 13, opacity: m === "usga" && captains ? 0.5 : 1 }}>{SCRAMBLE_METHOD_LABEL[m]}</button>)}
       </div>
-      <div data-scramble-method style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleMethodText(hcp, size)}</div>
+      {/* 212.16: one line; the full explanation on a tap */}
+      <details data-scramble-method style={{ color: C.sage, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>
+        <summary style={{ cursor: "pointer" }}>{hcp === "agreed" ? "You enter each team's handicap in Setup → Teams." : "Each team's handicap: a percentage of each player's course handicap."} <span style={{ color: C.gold }}>How?</span></summary>
+        <div style={{ marginTop: 4 }}>{scrambleMethodText(hcp, size)}</div>
+      </details>
       {hcp === "usga" && !captains ? <ScrambleAllowanceEditor value={game.scramble_allowance} disabled={locked || busy} onChange={(next) => save({ scramble_allowance: next }, false)} /> : null}
       <div style={label}>DRIVE REQUIREMENT</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-        {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} disabled={locked || busy} onClick={() => n !== drives && save({ scramble_min_drives: n }, false)} style={{ ...btn(drives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `Each ×${n}` : "None"}</button>)}
+        {([null, 2, 3, 4] as const).map((n) => <button key={String(n)} disabled={locked || busy} onClick={() => n !== drives && save({ scramble_min_drives: n }, false)} style={{ ...btn(drives === n), flex: 1, minWidth: 70, fontSize: 13 }}>{n ? `${n} each` : "None"}</button>)}
       </div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Switching between every player and captains only, or how teams compete, clears the teams. To play a different format, create a new game.</div>
     </div>

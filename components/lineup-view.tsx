@@ -1,4 +1,5 @@
 "use client";
+import { inputStyle } from "@/components/ui";
 import { teamColour } from "@/lib/game-colors";
 // Presentational half of the live line-up page (201.0): everything after the fetch. Kept apart from
 // the route so it can be mounted in the render harness with a fixture payload and looked at before
@@ -100,7 +101,7 @@ export function LiveLineupView({ data, err, platform = "other", teamStyle = "ban
       </div>
 
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find your name" inputMode="search"
-        style={{ width: "100%", boxSizing: "border-box", marginTop: 14, padding: "11px 20px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)", color: C.cream, fontSize: 15 }} />
+        style={{ ...inputStyle, marginTop: 14, padding: "11px 20px", borderRadius: 999 }} />
 
       {Array.from(groups.entries()).map(([gname, grows]) => (
         <div key={gname} style={{ marginTop: 14 }}>

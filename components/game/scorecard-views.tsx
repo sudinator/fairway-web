@@ -1,4 +1,5 @@
 "use client";
+import { scrambleResults } from "@/lib/scramble-game";
 import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
 import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
@@ -305,6 +306,113 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
     }
   }, [playerOrder.length]);
 
+
+  // 212.14 (owner): a SCRAMBLE's card — one header per team (name, team handicap, every member with their course
+  // handicap, the running score) and a compact table (Hole · Par · SI · one score column per team; Out / In / Total).
+  // It used the per-player layout: a crunched one-line team header and a thumb-high box per hole, 18 times over.
+  // Cells open the same score editor (drives, saving and permissions unchanged).
+  const scrambleBody = () => {
+    const teams = cols.filter((c): c is Extract<typeof c, { type: "player" }> => c.type === "player" && !!c.altSide);
+    const canEdit = (c: (typeof teams)[number]) => !readOnly && (isMarker || c.altSide!.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id));
+    const toPar = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : String(n));
+    const tot = (c: (typeof teams)[number], from: number, to: number) => {
+      let g = 0, net = 0, par = 0, thru = 0;
+      for (let k = from; k <= to && k < meta.length; k++) {
+        const v = c.p.scores?.[k] ?? null;
+        if (v != null && v > 0) { g += v; net += v - recvFor(c.p, meta[k].si); par += meta[k].par; thru++; }
+      }
+      return { g, net, toPar: net - par, thru };
+    };
+    const driveOf = (c: (typeof teams)[number], k: number) => {
+      const key = altShotScores.find((r) => r.foursome_id === c.altSide!.foursomeId && r.side === c.altSide!.side && r.hole_index === k)?.drive_key;
+      const who = key ? strokePool.find((x) => pkey(x) === key) : null;
+      return who ? shortOf(who.display_name) : null;
+    };
+    const grid = `40px 32px 32px repeat(${teams.length}, minmax(0, 1fr))`;
+    const subRow = (label: string, from: number, to: number) => (
+      <div key={label} style={{ display: "grid", gridTemplateColumns: grid, gap: 6, alignItems: "center", marginTop: 6, marginBottom: 6 }}>
+        <span style={{ gridColumn: "span 3", color: C.gold, fontSize: 12, fontWeight: 800, letterSpacing: 1 }}>{label}</span>
+        {teams.map((c) => { const t = tot(c, from, to); return (
+          <div key={c.p.id} style={{ background: C.greenLight, borderRadius: 8, padding: "4px 10px", textAlign: "center" }}>
+            <span style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>{t.thru ? t.g : "—"}</span>
+            {t.thru ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700, marginLeft: 6 }}>net {t.net}</span> : null}
+          </div>
+        ); })}
+      </div>
+    );
+    return (
+      <div data-scramble-card>
+        {/* one header per team */}
+        <div style={{ display: "grid", gridTemplateColumns: teams.length > 1 ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 10 }}>
+          {teams.map((c) => {
+            const t = tot(c, 0, meta.length - 1);
+            return (
+              <div key={c.p.id} data-scramble-team-header style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ color: C.cream, fontSize: 16, fontWeight: 800 }}>{c.altSide!.name}</span>
+                  <span style={{ color: C.gold, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{game.scramble_handicap === "gross" ? "gross" : `Team hcp ${c.altSide!.sideCh ?? "–"}`}</span>
+                </div>
+                {c.altSide!.memberIds.map((id, mi) => {
+                  const m = strokePool.find((x) => x.id === id);
+                  return (
+                    <div key={id} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4, fontSize: 13 }}>
+                      <span style={{ color: C.cream }}>{c.altSide!.memberNames[mi]}</span>
+                      {m ? <span style={{ color: C.sage }}>{Number(chBasis(m, game.course_par, meta.length) ?? 0).toFixed(1)}</span> : null}
+                    </div>
+                  );
+                })}
+                <div style={{ color: C.sage, fontSize: 12, marginTop: 6, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 6 }}>
+                  {/* 212.16: two deliberate lines (one wrapped awkwardly at phone width) */}
+                  {t.thru ? <><div>Thru {t.thru}</div><div><b style={{ color: C.cream }}>{t.g}</b> gross · <b style={{ color: C.cream }}>{t.net}</b> net ({toPar(t.toPar)})</div></> : "Not started"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* 212.16: team v team — the match status first (the leaderboard's own calculation) */}
+        {game.scramble_mode === "match" && teams.length === 2 ? (() => {
+          const m = scrambleResults(game, strokePool as never, altShotScores as never).matches.find((x) => x.groupId === teams[0].altSide!.foursomeId);
+          return m ? <div data-scramble-match-status style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginBottom: 10, color: C.cream, fontSize: 16, fontWeight: 800, textAlign: "center" }}>{m.line}</div> : null;
+        })() : null}
+        <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>dots = team strokes · colour = net v par{game.scramble_min_drives ? " · initials = whose drive" : ""}</div>
+        {/* the table */}
+        <div style={{ display: "grid", gridTemplateColumns: grid, gap: 6, color: C.sage, fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+          <span>Hole</span><span>Par</span><span>SI</span>
+          {teams.map((c) => <span key={c.p.id} style={{ textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teams.length > 1 ? c.altSide!.name : "Score"}</span>)}
+        </div>
+        {meta.map((m, k) => (
+          <React.Fragment key={k}>
+            <div id={`grphole-${k}`} style={{ display: "grid", gridTemplateColumns: grid, gap: 6, alignItems: "center", marginBottom: 6 }}>
+              <span style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>{m.n}</span>
+              <span style={{ color: C.cream, fontSize: 13 }}>{m.par}</span>
+              <span style={{ color: C.sage, fontSize: 12 }}>{m.si ?? "–"}</span>
+              {teams.map((c) => {
+                const gross = c.p.scores?.[k] ?? null, recv = recvFor(c.p, m.si), drive = game.scramble_min_drives ? driveOf(c, k) : null;
+                const editable = canEdit(c);
+                return (
+                  <div key={c.p.id} data-scramble-cell onClick={editable ? () => { setEdit({ playerId: c.p.id, holeIdx: k, alt: { foursomeId: c.altSide!.foursomeId, side: c.altSide!.side } }); } : undefined}
+                    style={{ position: "relative", background: C.cell, borderRadius: 8, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: editable ? "pointer" : "default" }}>
+                    {cellSets(c.p, m.si).map((r) => (
+                      <div key={r.key} style={{ position: "absolute", left: 5, top: 4, display: "flex", gap: 2 }}>
+                        {Array.from({ length: Math.min(Math.max(r.strokes, r.gives), 2) }).map((_, d) => strokeGlyph(r.key, BASIS_COLOR[r.key], r.strokes === 0 && r.gives > 0, d))}
+                      </div>
+                    ))}
+                    <span style={{ fontSize: 20, fontWeight: 800, color: gross != null && gross > 0 ? netColor(gross, recv, m.par) : "#C7C2B0" }}>{gross != null && gross > 0 ? gross : "·"}</span>
+                    {gross != null && gross > 0 ? <span style={{ position: "absolute", right: 6, bottom: 3, color: C.faint, fontSize: 11, fontWeight: 700 }}>net {gross - recv}</span> : null}
+                    {drive ? <span style={{ position: "absolute", left: 6, bottom: 3, color: C.ink, fontSize: 11, fontWeight: 700 }}>{drive}</span> : null}
+                  </div>
+                );
+              })}
+            </div>
+            {meta.length >= 18 && k === 8 ? subRow("OUT", 0, 8) : null}
+            {meta.length >= 18 && k === 17 ? subRow("IN", 9, 17) : null}
+          </React.Fragment>
+        ))}
+        {subRow("TOTAL", 0, meta.length - 1)}
+      </div>
+    );
+  };
+
   const holeCard = (i: number) => {
     const m = meta[i];
     return (
@@ -463,6 +571,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
           <button onClick={onTakeOver} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Keep score</button>
         </div>
       )}
+      {game.game_type === "scramble" ? scrambleBody() : (<>
       <div style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <span style={{ color: "#7FD0A0", fontSize: 11 }}>● under</span>
         <span style={{ color: "#6FA8DC", fontSize: 11 }}>● par</span>
@@ -576,6 +685,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
         nodes.push(summaryCard("TOT", 0, meta.length - 1));
         return nodes;
       })()}
+      </>)}
 
       {!readOnly && edit && (() => {
         const p = players.find((x) => x.id === edit.playerId);
@@ -826,7 +936,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
+export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -895,7 +1005,9 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(false), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
           {randomizing ? "Building…" : "🎲 Build even groups"}
         </button>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards." : randomizeReason}</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? (game.game_type === "scramble"
+          ? `Both buttons make teams of exactly ${perSide} from each side with handicaps spread evenly, one match per group. A starting point — captains can still move anyone afterwards.`
+          : "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards.") : randomizeReason}</div>
       </div> : null}
 
       <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>
@@ -914,7 +1026,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         const extras = sides.flatMap((side) => side.slice(perSide));
         const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? `✓ READY · ${perSide} v ${perSide}` : `NEEDS ${Math.max(0, 2 * perSide - sides.reduce((n, s) => n + Math.min(perSide, s.length), 0))} MORE`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
             <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/{perSide} selected</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{Array.from({ length: perSide }, (_, slot) => <React.Fragment key={slot}>{selectFor(t.key, group, slot)}</React.Fragment>)}</div>
@@ -993,7 +1105,7 @@ export function ShareControl({ game, onShare, token, path = "live", title, blurb
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
-              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.borderGreen}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
+              style={{ ...inputStyle, flex: 1, width: "auto", padding: "8px 12px", fontSize: 12 }} />
             <button onClick={copy} style={{ ...btn(true), fontSize: 12, padding: "8px 12px" }}>{copied ? "Copied" : "Copy"}</button>
           </div>
           <button disabled={busy} onClick={() => toggle(false)}

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """211.2 — THE SECURITY CONTRACT (owner, Oct 21 2026: "every version needs to check this without compromise").
 
-Runs against a database built from EVERY migration (the fresh-chain CI database), and checks the real state:
+Runs against a database built from EVERY migration (the fresh-chain CI database) — and, from 212.8, against PRODUCTION
+(read-only, nightly and on every pull request) — reading public.security_contract_state() (0214), and checks:
   1. every public table has row-level security ON;
   2. every access rule (policy) on EVERY table matches ci/security_contract.json exactly — name, command, roles,
      USING and WITH CHECK;
@@ -47,6 +48,19 @@ def state(db):
             "and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = 'guard_active_account') order by 1")],
     }
 
+def state_from_function(db=None, json_path=None):
+    """212.8: the state as public.security_contract_state() reports it (0214) — from a database (psql), or from a JSON
+    file fetched from production by ci/check_production_security_contract.mjs (server key, read-only)."""
+    if json_path:
+        raw = json.loads(pathlib.Path(json_path).read_text())
+    else:
+        out = subprocess.run(["psql", db, "-X", "-tA", "-c", "select public.security_contract_state()"], capture_output=True, text=True)
+        if out.returncode: sys.exit(f"security contract: security_contract_state() failed: {out.stderr.strip()}")
+        raw = json.loads(out.stdout.strip())
+    return {"rls_off": raw["rls_off"], "policies": raw["policies"], "table_grants": raw["table_grants"], "definer_execute": raw["definer_execute"],
+            "definer_no_search_path": raw["definer_no_search_path"], "writable_without_guard": raw["writable_without_guard"],
+            "storage_policies": raw.get("storage_policies", {}), "buckets": raw.get("buckets", {})}
+
 def diff(label, old, new):
     out = []
     for k in sorted(set(old) | set(new)):
@@ -56,9 +70,14 @@ def diff(label, old, new):
     return out
 
 def main():
-    if len(sys.argv) < 2: sys.exit("usage: check_security_contract.py <db_url> [--update]")
-    db, update = sys.argv[1], "--update" in sys.argv
-    s = state(db)
+    if len(sys.argv) < 2: sys.exit("usage: check_security_contract.py <db_url> | --state-json <file>  [--update]")
+    update = "--update" in sys.argv
+    if sys.argv[1] == "--state-json":
+        # 212.8: production, fetched read-only with the server key (ci/fetch_security_contract_state.mjs)
+        if update: sys.exit("security contract: the snapshot is recorded from the migrated database, never from production")
+        s = state_from_function(json_path=sys.argv[2])
+    else:
+        s = state_from_function(db=sys.argv[1])   # 212.8: the one report — public.security_contract_state() (0214)
     hard = []
     if s["rls_off"]: hard.append("tables with row-level security OFF: " + ", ".join(s["rls_off"]))
     if s["definer_no_search_path"]: hard.append("SECURITY DEFINER functions without a fixed search_path: " + ", ".join(s["definer_no_search_path"]))
@@ -66,13 +85,15 @@ def main():
     if unguarded: hard.append("tables members can write without the approved-accounts rule (guard_active_account): " + ", ".join(unguarded))
     if hard:
         print("SECURITY CONTRACT: FAIL — rules with no exceptions:"); print("\n".join("  ✗ " + h for h in hard)); sys.exit(1)
-    snap = {"policies": s["policies"], "table_grants": s["table_grants"], "definer_execute": s["definer_execute"], "guard_exceptions": GUARD_EXCEPTIONS}
+    snap = {"policies": s["policies"], "table_grants": s["table_grants"], "definer_execute": s["definer_execute"], "guard_exceptions": GUARD_EXCEPTIONS,
+            "storage_policies": s["storage_policies"], "buckets": s["buckets"]}
     if update:
         SNAP.write_text(json.dumps(snap, indent=1, sort_keys=True) + "\n")
         print(f"security contract: snapshot written — {len(s['policies'])} policies, {len(s['table_grants'])} table grants, {len(s['definer_execute'])} privileged functions"); return
     if not SNAP.exists(): sys.exit("security contract: no snapshot — run with --update once, and review it")
     old = json.loads(SNAP.read_text())
-    changes = diff("policy", old["policies"], s["policies"]) + diff("table grant", old["table_grants"], s["table_grants"]) + diff("function EXECUTE", old["definer_execute"], s["definer_execute"])
+    changes = diff("policy", old["policies"], s["policies"]) + diff("table grant", old["table_grants"], s["table_grants"]) + diff("function EXECUTE", old["definer_execute"], s["definer_execute"]) \
+        + diff("storage rule", old.get("storage_policies", {}), s["storage_policies"]) + diff("storage bucket", old.get("buckets", {}), s["buckets"])
     if changes:
         print("SECURITY CONTRACT: FAIL — permissions differ from the recorded snapshot (ci/security_contract.json):")
         print("\n".join(changes))

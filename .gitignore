@@ -22,3 +22,6 @@ CHANGES.md
 .course-detail/
 .freshness-build/
 .freshness-tsconfig.json
+
+# 212.16: design gallery screenshots (npm run gallery)
+.design-gallery/

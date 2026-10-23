@@ -131,6 +131,18 @@ export const chBasis = (
   return holeCount != null && holeCount > 0 && holeCount <= 9 ? base / 2 : base;
 };
 
+/**
+ * 212.18: chBasis for STATISTICS — the same rule, but a player with no handicap at all (no manual figure, no index to
+ * derive from, no stored course handicap) is "no handicap" (null), never 0. chBasis returns 0 there because a game
+ * needs a figure for everyone; an analysis must not treat a player with no handicap as a scratch golfer.
+ */
+export const chBasisOrNull = (p: Parameters<typeof chBasis>[0], coursePar: number | null | undefined, holeCount?: number | null): number | null => {
+  const has = (p.course_handicap_source === "manual" && p.course_handicap != null)
+    || (p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null)
+    || p.course_handicap != null;
+  return has ? chBasis(p, coursePar, holeCount) : null;
+};
+
 // Orange stroke dots a player RECEIVES on a hole. This MUST match the basis the
 // game's net scoring uses, so the dots can never disagree with the result:
 //   • match           — relative to the opponent (lower of the pair plays scratch)

@@ -101,15 +101,17 @@ const wrap = (title: string, note: string, html: string) =>
   const sc = renderScreen(<LiveLineupView data={payload} err={null} />);
   const txt = sc.el.textContent || "";
   ok(sc.el.querySelectorAll("[data-lineup-team]").length === 2 && txt.includes("Team 1") && txt.includes("Team 2"), "by team: two team cards");
-  ok(txt.includes("Index 3.8 → course hcp 4.2") && txt.includes("Index 20.2 → course hcp 22.4"), `each player's own handicap shown as an input (${txt.slice(0, 300)})`);
-  ok(txt.includes("course hcp 4.2 × 25% = 1.1") && txt.includes("course hcp 22.4 × 10% = 2.2"), "the USGA working per player, lowest first");
+  // 212.16: aligned columns — Index · Course · % · Counts — under a heading row
+  ok(txt.includes("IndexCourse%Counts"), `the column headings (${txt.slice(0, 300)})`);
+  ok(txt.includes("Raj3.84.2") && txt.includes("Sam20.222.4"), "each player's own handicap as an input: index, then course handicap");
+  ok(txt.includes("Raj3.84.225%1.1") && txt.includes("Sam20.222.410%2.2"), "the USGA working per player, lowest first");
   ok(txt.includes("1.1 + 2.0 + 2.2 + 2.2 = 7.44 → 7"), "the sum line to the team handicap");
   ok(txt.includes("teams of 2: 35 / 15%") && txt.includes("teams of 4: 25 / 20 / 15 / 10%"), "the method, with the percentages actually used for each team size");
   ok(!txt.includes("PLAYING HCP") && !txt.includes("COURSE HCP"), "no individual playing-handicap layout");
   sc.unmount();
   const ag = renderScreen(<LiveLineupView data={{ ...payload, scramble_handicap: "agreed", foursomes: [{ ...payload.foursomes[0], a_hcp: 9 }, payload.foursomes[1]] }} err={null} />);
   const at = ag.el.textContent || "";
-  ok(at.includes("Agreed handicaps") && at.includes("Agreed team handicap: 9") && at.includes("course hcp 4.2"), "agreed: the agreed number, players' handicaps for reference");
+  ok(at.includes("Agreed handicaps") && at.includes("Agreed team handicap: 9") && at.includes("Raj3.84.2") && !at.includes("Counts"), "agreed: the agreed number, players' handicaps for reference (no percentages)");
   ag.unmount();
   const share = renderScreen(<ShareLineupModal game={{ ...payload, played_at: payload.played_on }} players={payload.players} onClose={() => {}} />);
   const st = share.el.textContent || "";

@@ -351,7 +351,7 @@ export function YardageBackfill() {
                           {Array.from({ length: holesCount }, (_, hi) => (
                             <div key={hi} style={{ width: 42, textAlign: "center" }}>
                               <div style={{ color: C.sage, fontSize: 11 }}>{hi + 1}</div>
-                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12, border: `1px solid ${C.borderCard}`, borderRadius: 6, color: C.cream, background: "#fff" }} />
+                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12 }} />
                             </div>
                           ))}
                         </div>

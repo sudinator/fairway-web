@@ -1,3 +1,51 @@
+## 212.18.261022 — Insights and Your courses (0215)
+
+Owner (Oct 2026, placed Oct 22): personal analysis from data BNN already records.
+
+## 212.17.261022 — CI: the fresh-database rebuild survives registry rate limits
+
+GitHub's fresh-database check kept failing before a single migration ran: GitHub's container registry (ghcr.io) rate-limited the download of the Supabase database image ("toomanyrequests"), and the Supabase CLI retries only twice (4s, 8s).
+
+## 212.16.261022 — Design sweep: 21 fixes across the recent screens; a design gallery
+
+Owner (Oct 22): "these are basic design choices that you should be proactively looking to implement rather than me having to constantly point them out." Every screen built recently was photographed at phone width and reviewed as a member would see it.
+
+## 212.15.261022 — Scramble leaderboards laid out as tables
+
+Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".
+
+## 212.14.261022 — The scramble scorecard, rebuilt
+
+Owner (Oct 22): "the team members are crunched in a small part of the screen and the score takes up more than half of it." A scramble used the scorecard's per-player layout — a one-line team header ("Raj / Nihar / Karan / Sam · team hcp 7") and a thumb-high box per hole, eighteen times over (about eight phone screens), with a "net Stableford" legend that doesn't apply.
+
+## 212.13.261022 — Scramble recap: net, gross and net to par for every round
+
+Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+## 212.12.261022 — Scramble recap: unfinished rounds show the scores themselves
+
+Owner (Oct 22): for a round that wasn't finished, show the net and gross scores themselves, net first — "49 net (67 gross, -9 thru 15)" — rather than "net -9 (67 − 18 strokes, thru 15)", which made players do the subtraction. Full rounds keep "net -18 (72 − 18 strokes)". The headline and each player's line read the same way; teams are still ranked by net to par (fair when teams played different numbers of holes). lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+## 212.11.261022 — Scramble Teams screen: one column of players; ending a scramble
+
+Owner (Oct 22, staging):
+
+## 212.10.261022 — Scramble recap: strokes actually taken; net to par for unfinished rounds
+
+Owner (Oct 22, staging game 109487 — ended without all 18 holes): the leaderboard read "Team 3 · 67 gross thru 15 · -9", but the recap read "net 49 (67 − 22)". The net (49) was right — strokes are taken hole by hole, so through 15 holes the team had received only the strokes on those 15 holes — but the recap's working used the full 18-hole team handicap (22), so 67 − 22 didn't equal 49. And the headline and personal lines compared raw net totals, which can't be compared between teams that played different numbers of holes.
+
+## 212.9.261022 — Every field uses the one field style; two documented exceptions
+
+Owner (Oct 22), the fields the 212.0 guard found:
+
+## 212.8.261022 — Security contract on production; server-route audit; storage rules (0214)
+
+Owner (Oct 22): finish the security work.
+
+## 212.7.261021 — Team rounds count as played: Season Wrapped, round history, recap email (0213)
+
+Owner (Oct 22). Scramble and alternate shot record one score per team / side, never a personal round — so a member's scrambles and alternate-shot games were invisible in Season Wrapped (a scramble-only member wouldn't even get the notification), their round history and the round email.
+
 ## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
 
 Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."

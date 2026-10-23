@@ -7,7 +7,6 @@ import type { Recap } from "@/lib/game-recap";
 import { fmtPoints } from "@/lib/game-results";
 import type { CupLine } from "@/lib/cup-standing";
 import { shortenedNote } from "@/lib/round-rules";
-import { scrambleRowValue } from "@/lib/scramble-game";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const sgn = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
@@ -31,6 +30,23 @@ const ROW = (l: string, r: string, strong = false) => `<tr><td style="padding:5p
 const TABLE = (rows: string) => `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">${rows}</table>`;
 
 /** The group's recap as email HTML, in the recap card's order. */
+/** 212.16: the scramble leaderboard as the app shows it — Pos · Team · Net · Gross · ±, members on their own row —
+ *  in plain table markup, which email clients render reliably. */
+function SCR_TABLE(rows: { pos: string; name: string; members: string; gross: number; net: number; toPar: number; thru: number; holes?: number }[], gross: boolean): string {
+  const pm = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : String(n));
+  const th = (t: string, right = true) => `<td style="color:#5d6f66;font-size:11px;font-weight:700;padding:4px 4px;${right ? "text-align:right" : ""}">${t}</td>`;
+  const head = `<tr>${th("Pos", false)}${th("Team", false)}${gross ? th("Gross") : th("Net") + th("Gross")}${th("±")}</tr>`;
+  const body = rows.map((r) => {
+    const thru = r.holes != null && r.thru < r.holes ? `<div style="color:#5d6f66;font-size:11px;font-weight:400">thru ${r.thru}</div>` : "";
+    const cells = gross
+      ? `<td style="text-align:right;font-size:18px;font-weight:800;padding:6px 4px 0">${r.gross}</td>`
+      : `<td style="text-align:right;font-size:18px;font-weight:800;padding:6px 4px 0">${r.net}</td><td style="text-align:right;color:#5d6f66;font-size:14px;padding:6px 4px 0">${r.gross}</td>`;
+    return `<tr style="border-top:1px solid #e3e7e3"><td style="color:#8a6d1a;font-weight:800;padding:6px 4px 0;width:24px">${esc(r.pos)}</td><td style="font-weight:800;padding:6px 4px 0">${esc(r.name)}</td>${cells}<td style="text-align:right;font-weight:700;padding:6px 4px 0">${pm(r.toPar)}${thru}</td></tr>`
+      + `<tr><td></td><td colspan="${gross ? 3 : 4}" style="color:#5d6f66;font-size:12px;padding:0 4px 8px">${esc(r.members.split(", ").join(" · "))}</td></tr>`;
+  }).join("");
+  return `<table role="presentation" style="width:100%;border-collapse:collapse;margin-top:6px">${head}${body}</table>`;
+}
+
 export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
   const h = r.highlights, s = r.sections, parts: string[] = [];
   // 0. a Cup session: the Cup's standing after it (209.5 — same wording as the recap card)
@@ -43,10 +59,10 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
     ROW(m.halved ? `${esc(m.winners.join(" & "))} halved with ${esc(m.losers.join(" & "))}` : `${esc(m.winners.join(" & "))} <span style="color:#5d6f66">beat</span> ${esc(m.losers.join(" & "))}`, esc(m.result))).join("")));
   if (s.skins?.length) parts.push(H("SKINS") + TABLE(s.skins.filter((k) => k.skins > 0).map((k) => ROW(esc(k.name), `${fmtPoints(k.skins)} · holes ${k.holes.map((x) => x.n).join(", ")}`)).join("")));
   if (s.skinMatches?.rows.length) parts.push(H(s.skinMatches.title.toUpperCase()) + TABLE(s.skinMatches.rows.map((m) => ROW(`${esc(m.a.join(" & "))} vs ${esc(m.b.join(" & "))}`, `${fmtPoints(m.aSkins)}–${fmtPoints(m.bSkins)}`)).join("")));
-  // 211.1: a scramble's results — the recap card's wording (scrambleRowValue)
+  // 211.1 / 212.16: a scramble's results — the app's leaderboard table (SCR_TABLE) and named matches
   if (s.scramble) parts.push(H(s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`) + TABLE(s.scramble.mode === "match"
-    ? s.scramble.matches.map((m) => ROW(esc(m), "")).join("")
-    : s.scramble.rows.map((r) => ROW(`${esc(r.pos)} &nbsp;${esc(r.name)} <span style="color:#5d6f66;font-size:12px">${esc(r.members)}</span>`, esc(scrambleRowValue(r, s.scramble!.gross)))).join("")));
+    ? s.scramble.matches.map((m) => ROW(`${esc(m.name)} · ${esc(m.line)}<div style="color:#5d6f66;font-size:12px">${esc(m.a)}<br>${esc(m.b)}</div>`, "")).join("")
+    : SCR_TABLE(s.scramble.rows, s.scramble.gross)));
   if (s.leaderboard?.rows.length) parts.push(H(`LEADERBOARD · ${s.leaderboard.basis.toUpperCase()}`) + TABLE(s.leaderboard.rows.slice(0, 10).map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, String(x.item.score))).join("")));
   // 2. how the field played
   if (s.individualStats) {

@@ -2629,7 +2629,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                 </>
               ) : null}
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional note (e.g. 'v1.135 in-progress inflation bug')"
-                style={{ width: "100%", background: C.green, border: `1px solid ${C.borderGreen}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px", marginBottom: 8, fontFamily: "inherit" }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {isCluster ? (
                   <>
@@ -3092,7 +3092,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: C.greenLight, borderRadius: 8, padding: 8 }}>
                 <span style={{ color: C.sage, fontSize: 12 }}>Merge into:</span>
                 <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)}
-                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                  style={{ ...inputStyle, width: "auto", fontSize: 12, padding: "4px 10px" }}>
                   <option value="">Select target…</option>
                   {(rows || []).filter((r) => r.group_id !== g.group_id).map((r) => (
                     <option key={r.group_id} value={r.group_id}>{r.name}</option>

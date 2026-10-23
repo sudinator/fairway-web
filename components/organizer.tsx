@@ -5,7 +5,7 @@ import { write } from "@/lib/db-write";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } from "@/lib/flights";
-import { Avatar } from "@/components/ui";
+import { Avatar, inputStyle } from "@/components/ui";
 
 // ---- Desktop-only Organizer console. Opens an existing game (created on any device) and lets
 // the organizer set it up on a wide screen: flights now (Phase 1), matchups/field next. It reads
@@ -305,7 +305,7 @@ const S: Record<string, React.CSSProperties> = {
   chipName: { color: C.ink, fontWeight: 700, fontSize: 13, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   tag: { fontSize: 11, fontWeight: 800, color: "#06251A", borderRadius: 6, padding: "2px 7px" },
   pill: { fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", border: "1.5px solid", cursor: "pointer" },
-  idxInput: { width: 74, background: C.greenMid, border: "1px solid rgba(255,255,255,.15)", borderRadius: 8, padding: "5px 8px", color: C.cream, fontSize: 12, textAlign: "center" },
+  idxInput: { ...inputStyle, width: 74, padding: "4px 10px", fontSize: 12, textAlign: "center" },   // 212.9: the one field style
   setBtn: { fontSize: 12, fontWeight: 800, background: C.gold, color: "#06251A", border: "none", borderRadius: 8, padding: "5px 12px", cursor: "pointer" },
   canvas: { padding: "16px 18px", maxHeight: "78vh", overflowY: "auto" },
   toolbar: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" },

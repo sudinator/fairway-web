@@ -46,6 +46,33 @@ export const scrambleTeamCard = (game: Game, t: ScrambleTeamResult) => scrambleC
 
 const toParText = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : String(n));
 /** The recap's wording for one scramble leaderboard row — the app's recap and the email read it word for word. */
-export function scrambleRowValue(r: { gross: number; handicap: number; net: number; toPar: number }, gross: boolean): string {
-  return gross ? `${r.gross} (${toParText(r.toPar)})` : `net ${r.net} (${r.gross} − ${r.handicap})`;
+export function scrambleRowValue(r: { gross: number; handicap: number; net: number; toPar: number; thru?: number; holes?: number }, gross: boolean): string {
+  // 212.10: net TO PAR (comparable however many holes a team played) and the strokes actually TAKEN on the holes
+  // played (gross − net) — not the 18-hole team handicap, which only all 18 holes use up.
+  // 212.13 (owner): every round shows the scores themselves, net first, then gross and net to par —
+  // "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)"
+  const thru = r.thru != null && r.holes != null && r.thru < r.holes ? ` thru ${r.thru}` : "";
+  return gross ? `${r.gross} gross (${toParText(r.toPar)}${thru})` : `${r.net} net (${r.gross} gross, ${toParText(r.toPar)}${thru})`;
+}
+/** 212.10: "net −9" / "gross +2", with "(thru 15)" when the round wasn't finished — for headlines and personal lines. */
+export function scrambleScoreText(toPar: number, thru: number, holes: number, gross: boolean, totals?: { net: number; gross: number }): string {
+  // 212.13: reads like its row — "54 net (63 gross, -18)", "49 net (67 gross, -9 thru 15)"
+  const t = thru < holes ? ` thru ${thru}` : "";
+  if (totals) return gross ? `${totals.gross} gross (${toParText(toPar)}${t})` : `${totals.net} net (${totals.gross} gross, ${toParText(toPar)}${t})`;
+  return `${gross ? "gross" : "net"} ${toParText(toPar)}${thru < holes ? ` (thru ${thru})` : ""}`;
+}
+
+/** 212.11: what's missing before a scramble ends — per TEAM (players' own cards are always empty in a scramble).
+ *  scopeKeys: only teams with a player in this scope (empty = every team). */
+export function scrambleFinishGaps(game: Game, rows: AltShotScoreRow[], scopeKeys: Set<string>): { name: string; noScores: boolean; missScores: number[]; missPutts: number[]; missFw: number[] }[] {
+  const holes = Array.isArray(game.holes_meta) ? game.holes_meta : [];
+  const gaps: { name: string; noScores: boolean; missScores: number[]; missPutts: number[]; missFw: number[] }[] = [];
+  for (const t of scrambleTeamsOf((game.foursomes || []) as unknown as ScrambleGroup[], cupSideNames(game))) {
+    if (scopeKeys.size && !t.members.some((k) => scopeKeys.has(k))) continue;
+    const gross = canonicalAltShotGross(rows, t.groupId, t.side, holes.length, null);
+    const entered = gross.filter((v) => v != null && v > 0).length;
+    const missScores = holes.filter((_, i) => gross[i] == null || (gross[i] ?? 0) <= 0).map((h) => h.n);
+    if (entered === 0 || missScores.length) gaps.push({ name: t.name, noScores: entered === 0, missScores: entered === 0 ? [] : missScores, missPutts: [], missFw: [] });
+  }
+  return gaps;
 }

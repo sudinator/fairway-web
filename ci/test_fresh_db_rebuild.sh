@@ -30,7 +30,23 @@ trap cleanup EXIT
 
 cd "$TMP"
 supabase init >/dev/null
-supabase db start
+# 212.16: GitHub's container registry (ghcr.io) rate-limits image downloads ("toomanyrequests"), and the Supabase CLI
+# retries only twice (4s, 8s) before giving up — so the rebuild failed before a single migration ran. Retry the START
+# patiently (15s, 30s, 60s, then 120s, up to 8 attempts — the CLI needs several images); downloaded layers stay cached,
+# so each attempt continues where the last stopped. 212.18: the workflow also keeps the images between runs.
+# Only a registry rate limit is retried: any other failure (a migration error, say) fails at once, as it should.
+attempt=1
+until supabase db start 2>&1 | tee /tmp/supabase-db-start.log; [ "${PIPESTATUS[0]}" -eq 0 ]; do
+  if ! grep -qiE "toomanyrequests|rate limit|429" /tmp/supabase-db-start.log || [ "$attempt" -ge 8 ]; then
+    echo "supabase db start failed (attempt $attempt)" >&2
+    exit 1
+  fi
+  wait_s=$(( 15 * (1 << (attempt - 1)) )); [ "$wait_s" -gt 120 ] && wait_s=120
+  echo "Container registry rate limit — waiting ${wait_s}s, then retrying (attempt $((attempt + 1)) of 8)"
+  supabase stop --no-backup >/dev/null 2>&1 || true
+  sleep "$wait_s"
+  attempt=$((attempt + 1))
+done
 DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/fresh_db_bootstrap.sql" >/dev/null
@@ -174,6 +190,15 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-policy-review.sql"
 
 # 211.5: CROSS-CLUB ISOLATION — a Club B member reads / changes / deletes / adds nothing in Club A (24 tables).
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-club-isolation.sql"
+
+# 0213: team rounds count as played (Season Wrapped, the team-round email).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-team-rounds.sql"
+
+# 0214: the security contract's state, server only.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-security-contract-state.sql"
+
+# 0215: club course averages — averages only, anonymous, own club only.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-field.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

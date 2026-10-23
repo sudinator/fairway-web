@@ -1,3 +1,157 @@
+## 212.18.261022 — Insights and Your courses (0215)
+
+Owner (Oct 2026, placed Oct 22): personal analysis from data BNN already records.
+
+**Insights** (lib/insights.ts; components/insights.tsx). A dashboard card right after the handicap — the two strongest findings, a bold headline and a plain detail — and "See all insights" opens the full screen: what stands out (problems, then strengths, then general figures, by shots a round); against par per hole by hole type, difficulty (stroke index) and stretch of the round; consistency (within 3 of handicap; what blow-up holes cost; three-putts). From the last 20 valid rounds (lib/round-rules: 9+ holes), nothing until 5, no finding from fewer than 20 holes.
+**Findings compare each hole with what the member's own game predicts** — the round's score over par spread across the holes the way handicap strokes are — because everyone drops more shots on the hardest holes; a raw comparison always "found" them. A player who pars everything gets no invented leak; a constructed +12 season shows the hardest holes 1.1 a hole worse than predicted (about 6.9 shots a round). The screen shows both: against par, and "vs your game".
+
+**Your courses** (lib/your-courses.ts; components/your-courses.tsx), at the top of the Courses tab: each course played, most first — rounds, best and average gross (complete 18-hole rounds only), last played. Tap one: nemesis hole and best hole (their averages), and hole by hole your average against par beside the CLUB's — your figure red where you're half a shot or more worse than the club there, green where better.
+
+**0215 course_field_averages:** the club's hole averages at a course — members can't read each other's hole scores, so only averages leave the database, nothing unless 5 rounds by 3 members (3 scores per hole), last two years, the club's own active members only. Tested: averages only, the threshold, another club / a suspended member refused, not callable signed out.
+
+Tests: lib/insights.test.ts (messy rounds — lib/test-fixtures/messy-rounds.ts — known answers, the window, the course record, no handicap), lib/insights-render.test.tsx, ci/assert-course-field.sql. Design gallery: 5 new screens, reviewed at phone width.
+
+**Before it reaches production:** run docs/sql/data_profile.sql on production (standing rule for statistics).
+
+**Also: Insights reads handicaps through the one rule.** A guard (check_handicap_single_source) caught a direct read of the stored course handicap, which would ignore a manual one (0153); and the scoring rule treats no handicap as scratch (0) — right for a game, wrong for an analysis — so lib/game-shape gains chBasisOrNull ("no handicap" is none). The expected-score spread uses the one stroke allocator (lib/golf allocateStrokes, by stroke-index rank) — another guard caught a hand-written allocation. Tests: a manual handicap used as entered; no handicap → no after-handicap findings.
+
+**CI: the Supabase images are kept between runs.** GitHub's container registry kept rate-limiting the image downloads (the retries got the database image, then the CLI needed realtime too). The workflow now restores a saved copy of the images (actions/cache, keyed on the pinned CLI 2.101.0 — keep in step), saves them after the first successful run, and the rebuild retries up to 8 times.
+
+Deploy: staging 0215 → code; production 0215 → merge.
+
+## 212.17.261022 — CI: the fresh-database rebuild survives registry rate limits
+
+GitHub's fresh-database check kept failing before a single migration ran: GitHub's container registry (ghcr.io) rate-limited the download of the Supabase database image ("toomanyrequests"), and the Supabase CLI retries only twice (4s, 8s).
+
+- **.github/workflows/ci.yml:** signs in to ghcr.io with the run's own token before the rebuild (anonymous downloads are the ones throttled); `packages: read` permission. No new secret.
+- **ci/test_fresh_db_rebuild.sh:** retries `supabase db start` patiently — 15s, 30s, 60s, 120s, up to 5 attempts; downloaded layers stay cached between attempts. Only a registry rate limit is retried; any other failure fails at once. Proven with a stand-in CLI: rate-limited twice then starts (3 attempts); a migration-style error fails at once (1 attempt); rate-limited every time gives up after 5.
+
+No app change. No migration. Deploy: code only (includes 212.16).
+
+## 212.16.261022 — Design sweep: 21 fixes across the recent screens; a design gallery
+
+Owner (Oct 22): "these are basic design choices that you should be proactively looking to implement rather than me having to constantly point them out." Every screen built recently was photographed at phone width and reviewed as a member would see it.
+
+**New: the design gallery** — lib/design-gallery.tsx renders 14 recent screens with realistic sample data; `npm run gallery` (scripts/design-gallery.mjs) photographs them at 390px. HANDOFF rule: every new or changed screen gets an entry and is reviewed this way before it ships.
+
+**Fixed (21):**
+- Teams screen: a one-line explanation with the detail behind "How?" (it was five lines above every control); the selector reads "Team 1" (counts only in the menu); fixed-width selectors; the mixed-sizes note names every team; captains only — the note once at the top, not on every card, and one handicap box per team (no second gold label).
+- Format settings: a one-line explanation; % beside every percentage box (they read as strokes); a value changed from the USGA's labelled in gold ("changed · USGA 25%"); drive buttons "2 each / 3 each / 4 each" on one line.
+- Ryder Cup scramble groups — two real bugs: the counter assumed 2 per side ("NEEDS 0 PLAYERS" at 2 of 3 each — now "NEEDS 2 MORE"), and the explanation described pairs and Trifecta singles (now what the scramble buttons do).
+- Scorecard (team v team): the match status above the table ("Blues won 6&4"); each team's score on two deliberate lines.
+- Game-screen matches: each card named ("MATCH 1").
+- Recap matches: match name, result, and both teams' players (it was one bare line).
+- Line-up card: the working in aligned columns — Index · Course · % · Counts.
+- Team rounds: "TEAM ROUNDS" heading (it wrapped); the result bold on the right.
+- Season Wrapped headline: the team-round line smaller and positive ("including 3 scramble & alternate-shot rounds").
+- Team-round / round email: the scramble leaderboard as the app's table (Pos · Team · Net · Gross · ±, members on their own row), and named matches with players.
+
+No migration. Deploy: code only (includes 212.15).
+
+## 212.15.261022 — Scramble leaderboards laid out as tables
+
+Owner (Oct 22): the final leaderboard's layout. In the recap, each row's score — "54 net (63 gross, -18)" in large type — took more than half the width, squeezing the team and its members into a narrow column; the subtitle showed the raw word "scramble".
+
+- **The final leaderboard (recap, shared image)** is a table: Pos · Team · **Net** (biggest — the ranking) · Gross · ± ("thru 15" under it for an unfinished round), with the members on a full-width line under each team.
+- **The game-screen leaderboard:** the members on a full-width line too, instead of wrapping inside the Team column.
+- The recap's format name reads "Scramble".
+(The round email keeps its one-line wording.) Checked by screenshot at phone width.
+
+No migration. Deploy: code only (includes 212.14).
+
+## 212.14.261022 — The scramble scorecard, rebuilt
+
+Owner (Oct 22): "the team members are crunched in a small part of the screen and the score takes up more than half of it." A scramble used the scorecard's per-player layout — a one-line team header ("Raj / Nihar / Karan / Sam · team hcp 7") and a thumb-high box per hole, eighteen times over (about eight phone screens), with a "net Stableford" legend that doesn't apply.
+
+**Now its own card** (components/game/scorecard-views, scrambleBody — inside the same scorecard, so the score editor, drive chips, saving and permissions are unchanged):
+- **a header per team** — name (or Cup side), team handicap, every member on their own line with their course handicap, and the running score ("Thru 12 · 43 gross · 38 net (-9)"); team v team side by side;
+- **a compact table** — Hole · Par · SI · a score column per team — each cell with the team's stroke dots, the net in the corner and, when drives are tracked, whose drive; tapping opens the score editor;
+- **Out / In / Total** with gross and net; the legend "dots = team strokes · colour = net v par".
+About a screen and a half for 18 holes. Checked by screenshot at phone width (one team; team v team with drives).
+
+Test: the card replaces the per-player layout; every member and the team handicap in the header; 18 cells and Out / In / Total; no Stableford legend; tapping a cell opens the editor for that hole.
+
+No migration. Deploy: code only (includes 212.13).
+
+## 212.13.261022 — Scramble recap: net, gross and net to par for every round
+
+Owner (Oct 22): every round reads the same way — net first, then gross and net to par — "54 net (63 gross, -18)"; an unfinished round adds how far it got — "49 net (67 gross, -9 thru 15)". The headline and each player's line read the same way; teams are ranked by net to par. lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+No migration. Deploy: code only (includes 212.12).
+
+## 212.12.261022 — Scramble recap: unfinished rounds show the scores themselves
+
+Owner (Oct 22): for a round that wasn't finished, show the net and gross scores themselves, net first — "49 net (67 gross, -9 thru 15)" — rather than "net -9 (67 − 18 strokes, thru 15)", which made players do the subtraction. Full rounds keep "net -18 (72 − 18 strokes)". The headline and each player's line read the same way; teams are still ranked by net to par (fair when teams played different numbers of holes). lib/scramble-game scrambleRowValue / scrambleScoreText — the app's recap, the shared image and the round email.
+
+No migration. Deploy: code only (includes 212.11).
+
+## 212.11.261022 — Scramble Teams screen: one column of players; ending a scramble
+
+Owner (Oct 22, staging):
+
+**The Teams screen, in the owner's layout:** every player in ONE column — name, course handicap, and a team selector on the right (No team · Team 1 … · New team; a full team can't be picked) — with the teams summarised below (players, and the team handicap by the method: USGA working, or the agreed box). Empty teams disappear when their last player moves. "Make balanced teams of 2 / 3 / 4" stays as a shortcut. (Replaces "Pick teams myself" / "Add to…" / "Move to…".) A Ryder Cup scramble still builds its matches in Setup → Groups.
+
+**Ending a scramble said "no scores entered" for every player.** The end-of-game check read team scores only for alternate shot; a scramble fell through to players' own cards, always empty. It now checks each TEAM (lib/scramble-game scrambleFinishGaps — "Team 2: holes 17, 18"); the offline-upload check before ending covers scramble's team scores too.
+
+Tests: the new layout (one column, New team, the selector shows the team, an emptied team disappears, full teams can't be picked); ending a scramble (fully scored: nothing missing; a team missing holes named with them).
+
+No migration. Deploy: code only (includes 212.10).
+
+## 212.10.261022 — Scramble recap: strokes actually taken; net to par for unfinished rounds
+
+Owner (Oct 22, staging game 109487 — ended without all 18 holes): the leaderboard read "Team 3 · 67 gross thru 15 · -9", but the recap read "net 49 (67 − 22)". The net (49) was right — strokes are taken hole by hole, so through 15 holes the team had received only the strokes on those 15 holes — but the recap's working used the full 18-hole team handicap (22), so 67 − 22 didn't equal 49. And the headline and personal lines compared raw net totals, which can't be compared between teams that played different numbers of holes.
+
+- **Rows:** net to par with the strokes actually taken — "net -9 (67 − 18 strokes, thru 15)"; a full round "net -18 (72 − 18 strokes)" (lib/scramble-game scrambleRowValue — the app's recap, the shared image and the round email read it word for word).
+- **Headline and personal lines:** to par, the leaderboard's basis — "Team 3 wins the scramble — net -9 (thru 15)", "Your team (Team 3) finished 1st, net -9 (thru 15)" (scrambleScoreText).
+- Test: a team with a team handicap of 22 stopping after 15 holes — strokes taken through 15, the row adds up, the headline says thru 15.
+
+No migration. Deploy: code only (includes 212.9).
+
+## 212.9.261022 — Every field uses the one field style; two documented exceptions
+
+Owner (Oct 22), the fields the 212.0 guard found:
+
+**Readability bugs fixed:** the contest-logging fields in the score-entry pop-up (closest to pin, longest drive — feet, inches, distance, player) and the yardage-backfill cells had **cream text on a white background**, almost invisible. Now the shared style: dark ink on the field fill.
+
+**Brought in line (DISPLAY_RULES.md §2 — `inputStyle`, layout-only adjustments):** contests' entry fields and player menu; course history "Reason for restoring"; the live-link box; the club switcher (compact); the public line-up "Find your name" search (keeps its pill shape); the admin game-repair note; Admin → Clubs "Merge into"; Admin → Game "Reassign organizer"; the organizer's handicap-index box; the player-card note.
+
+**Already correct (my guard's miscount):** nine fields used the shared style directly or a style built on it (money, course searches, tee-time dates). The guard now recognises every correct form.
+
+**Two documented exceptions** (owner), marked in the code (`data-field-exception`), named in the guard, and written up in DISPLAY_RULES.md §2 "Field-style exceptions": the score-entry number picker (reviewed and kept — score entry is its own surface family; don't flag it again), and the invisible native date input under the date button.
+
+**ci/check_field_style.py** is now strict: no allowance for old fields — any other self-styled field fails the build. Spacing: 8 fewer off-scale values; the lower baseline is recorded.
+
+No migration. Deploy: code only.
+
+## 212.8.261022 — Security contract on production; server-route audit; storage rules (0214)
+
+Owner (Oct 22): finish the security work.
+
+**The security contract now checks PRODUCTION.** It checked only the database built from migrations, so a rule or permission changed by hand in production's dashboard went unseen. 0214 adds security_contract_state() — server only, read-only — reporting exactly what the contract checks; the contract check reads this ONE function locally, in GitHub's fresh database, and on production: nightly (production-security.yml — a difference fails the job and opens a GitHub issue naming it) and on every pull request (ci.yml's production job). ci/fetch_security_contract_state.mjs fetches it with the server key; ci/check_security_contract.py --state-json compares. Proven: identical to the previous queries on the same database (132 rules, 45 permissions, 199 functions); a simulated hand edit on production ("expenses delete rule now true", "anon can read expenses") is named.
+
+**Storage in the contract.** Avatars are the only stored files; their rules are right (anyone can view; only the member adds, replaces or deletes their own; images only, 512 KB) — and now watched: the 4 storage rules and each bucket's public / size / type settings are in the report and the snapshot. Proven: a loosened upload rule and removed limits are named.
+
+**Server-route audit.** Nine routes use the server key (which bypasses row-level security): each has a sound gate — the job / webhook secret (round-emails, push), a signed link that only turns emails off (unsubscribe), or the signed-in member with their own data or the right role (member-stats, push test, game completed, course checks, course apply, account merge); the four acting-on-behalf functions (merge_accounts_as, apply_course_freshness_selected_as, remember_course_declines_as, record_course_freshness_checked) are server-only and check the actor's authority. No gap found. ci/check_server_routes.py (new, in the guards) keeps every future route to it: a recognised gate, and the signed-in user as the actor — never an id from the request.
+
+**Deploy note:** apply 0214 to production BEFORE opening the pull request's checks (its production job now reads security_contract_state()).
+
+Deploy: staging 0214 → code; production 0214 → merge.
+
+## 212.7.261021 — Team rounds count as played: Season Wrapped, round history, recap email (0213)
+
+Owner (Oct 22). Scramble and alternate shot record one score per team / side, never a personal round — so a member's scrambles and alternate-shot games were invisible in Season Wrapped (a scramble-only member wouldn't even get the notification), their round history and the round email.
+
+**A team round** (lib/team-rounds.ts, and its database twin team_rounds_in_year — the same rule): a member in a FINISHED scramble or alternate-shot game whose team / side scored 9+ holes; older alternate-shot games that kept the scores on the players' own cards count too. Played — never in a personal statistic.
+
+- **Season Wrapped:** the headline's rounds, holes and courses include team rounds ("including 3 team rounds (scramble / alternate shot) — played, not in your personal stats"); every personal-statistic card unchanged; the floor still gates the statistics (they need personal rounds). The notification, the admin preview and the club totals (send_season_wrapped, season_wrapped_preview, season_club_stats) count personal + team rounds.
+- **Round history:** a "Team rounds · scramble & alternate shot" list under the member's rounds — date, course, format, team or partner, result ("1st of 4", "Reds won 2&1") — tapping one opens the game. Not in the Dashboard's statistics.
+- **The team-round email:** the game's recap (recapEmailHtml, the app's recap word for word) with the member's own line, from the round-email job, on the round email's rules — opted in, active, owner-only until opened to everyone, 1 hour to 7 days after the game ends, never twice (team_round_email_log; due_team_round_emails / record_team_round_email, server only). "Open the game" uses the game's code (lib/app-links).
+- 0213 classifies the new log for account merges (moves with the account, like the round-email log).
+
+Tests: ci/assert-team-rounds.sql (9+ holes count, 5 don't; older alternate shot counts; a scramble-only member is in Season Wrapped; the email due once; server only); lib/team-rounds.test.ts (the rule, results, Cup names, Season Wrapped headline with personal cards unchanged, the email and its link).
+
+Deploy: staging 0213 → code; production 0213 → merge.
+
 ## 212.6.261021 — Scramble simulation: hundreds of games, two bugs found and fixed
 
 Owner (Oct 22): "run this version through simulated game tests for various combinations and confirm all works like it should."

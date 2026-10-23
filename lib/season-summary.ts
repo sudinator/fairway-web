@@ -19,10 +19,12 @@ export type SeasonInput = {
   /** Every club the golfer belongs to, with the club's rounds that year and the golfer's own (205.2). */
   clubs?: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[];
   playedWithMost?: { name: string; rounds: number } | null;
+  /** 212.7: scramble / alternate-shot rounds (lib/team-rounds) — counted as PLAYED, never in a personal statistic. */
+  teamRounds?: { date: string; course: string; holes: number }[];
 };
 
 export type SeasonCard =
-  | { kind: "headline"; rounds: number; holes: number; hours: number | null; courses: number }
+  | { kind: "headline"; rounds: number; holes: number; hours: number | null; courses: number; teamRounds?: number }
   | { kind: "index"; start: number | null; end: number | null; low: number | null; lowDate: string | null; series: { date: string; index: number }[];
       /** Build-up year: the index became "established" (20 differentials) on this date; start is null and the trend runs from here. */
       establishedOn: string | null; establishedAt: number | null;
@@ -59,18 +61,21 @@ export function buildSeasonSummary(input: SeasonInput): SeasonSummary {
   const season = all.filter((r) => inYear(r.played_at, year)).sort((a, b) => a.played_at.localeCompare(b.played_at));
   const cards: SeasonCard[] = [];
   const birdieCount = (rs: Round[]) => rs.reduce((n, r) => n + r.holes.filter((h) => h.strokes != null && h.strokes > 0 && h.strokes === h.par - 1).length, 0);
-  const courses = Array.from(new Set(season.map((r) => r.course)));
+  // 212.7: team rounds (scramble / alternate shot) this year — played, so they count in rounds, holes and courses
+  const team = (input.teamRounds || []).filter((t) => inYear(t.date, year));
+  const courses = Array.from(new Set([...season.map((r) => r.course), ...team.map((t) => t.course)]));
   const byCourse = new Map<string, number>(); for (const r of season) byCourse.set(r.course, (byCourse.get(r.course) || 0) + 1);
   const favouriteCourse = Array.from(byCourse.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
+  // The floor gates the PERSONAL statistics — they need personal rounds; the totals include team rounds.
   if (season.length < SEASON_FLOOR) {
-    cards.push({ kind: "short", rounds: season.length });
-    return { year, name, rounds: season.length, cards, share: { rounds: season.length, courses: courses.length, indexStart: null, indexEnd: null, bestDifferential: null, birdies: birdieCount(season), favouriteCourse, badges: 0 } };
+    cards.push({ kind: "short", rounds: season.length + team.length });
+    return { year, name, rounds: season.length + team.length, cards, share: { rounds: season.length + team.length, courses: courses.length, indexStart: null, indexEnd: null, bestDifferential: null, birdies: birdieCount(season), favouriteCourse, badges: 0 } };
   }
 
   // Headline
-  const holes = season.reduce((n, r) => n + r.holes.filter((h) => h.strokes != null && h.strokes > 0).length, 0);
-  cards.push({ kind: "headline", rounds: season.length, holes, hours: null, courses: courses.length });
+  const holes = season.reduce((n, r) => n + r.holes.filter((h) => h.strokes != null && h.strokes > 0).length, 0) + team.reduce((n, t) => n + t.holes, 0);
+  cards.push({ kind: "headline", rounds: season.length + team.length, holes, hours: null, courses: courses.length, ...(team.length ? { teamRounds: team.length } : {}) });
 
   // Index journey: the running index after each round of the season, using every round to date
   // (the best-8-of-20 window can reach back into the prior year — that is the rule, not a leak).
@@ -185,7 +190,7 @@ export function buildSeasonSummary(input: SeasonInput): SeasonSummary {
   cards.push({ kind: "closing", target });
 
   return {
-    year, name, rounds: season.length, cards,
-    share: { rounds: season.length, courses: courses.length, indexStart: start, indexEnd: end, bestDifferential: withDiff.length ? r1(withDiff.reduce((a, b) => (b.d < a.d ? b : a)).d) : null, birdies, favouriteCourse, badges: earned.length },
+    year, name, rounds: season.length + team.length, cards,
+    share: { rounds: season.length + team.length, courses: courses.length, indexStart: start, indexEnd: end, bestDifferential: withDiff.length ? r1(withDiff.reduce((a, b) => (b.d < a.d ? b : a)).d) : null, birdies, favouriteCourse, badges: earned.length },
   };
 }

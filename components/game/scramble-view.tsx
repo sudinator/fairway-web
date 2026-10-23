@@ -22,10 +22,11 @@ export function ScrambleView({ game, players, altShotScores }: { game: Game; pla
           <Eyebrow>SCRAMBLE · TEAM V TEAM{r.gross ? " · GROSS" : ""}</Eyebrow>
           {r.matches.map((m) => (
             <div key={m.groupId} data-scramble-match style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{m.line}</div>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{m.name.toUpperCase()}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15, marginTop: 2 }}>{m.line}</div>
               {[m.a, m.b].map((t) => (
                 <div key={t.key} style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-                  <b style={{ color: C.cream }}>{t.name}</b> · {t.memberNames.join(", ")}{r.gross ? "" : ` · team hcp ${t.handicap}`}
+                  <b style={{ color: C.cream }}>{t.name}</b> · {t.memberNames.join(" · ")}{r.gross ? "" : ` · team hcp ${t.handicap}`}
                 </div>
               ))}
             </div>
@@ -39,14 +40,18 @@ export function ScrambleView({ game, players, altShotScores }: { game: Game; pla
             <tbody>{r.board.map((row) => {
               const t = r.teams.find((x) => x.key === row.key)!;
               return (
-                <tr key={row.key}>
+                <React.Fragment key={row.key}>
+                <tr>
                   <td style={{ ...td, textAlign: "left", color: C.gold, fontWeight: 800 }}>{row.pos}</td>
-                  <td style={{ ...td, textAlign: "left" }}><b>{row.name}</b><div style={{ color: C.sage, fontSize: 11 }}>{t.memberNames.join(", ")}</div></td>
+                  <td style={{ ...td, textAlign: "left" }}><b>{row.name}</b></td>
                   <td style={td}>{row.thru || "—"}</td>
                   <td style={td}>{row.thru ? row.gross : "—"}</td>
                   {r.gross ? null : <td style={td}>{row.handicap}</td>}
                   <td style={{ ...td, fontWeight: 800 }}>{row.thru ? toPar(r.gross ? row.grossToPar : row.netToPar) : "—"}</td>
                 </tr>
+                {/* 212.15: the members on a full-width line, so names don't wrap into a narrow column */}
+                <tr><td /><td colSpan={r.gross ? 4 : 5} style={{ color: C.sage, fontSize: 12, paddingBottom: 8, textAlign: "left" }}>{t.memberNames.join(" · ")}</td></tr>
+                </React.Fragment>
               );
             })}</tbody>
           </table>

@@ -1,5 +1,5 @@
 {
-  "total": 439587,
+  "total": 439648,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -34,8 +34,10 @@
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
     "hole result consistency": 981,
+    "insights": 28,
+    "insights screens": 7,
     "legs": 30,
-    "lineup renders": 36,
+    "lineup renders": 37,
     "live cup parity": 49,
     "manual course handicap": 17,
     "manual handicap simulation": 76807,
@@ -48,7 +50,7 @@
     "player-scoring": 63,
     "round stat completeness": 8,
     "scoring matrix": 3698,
-    "scramble screens": 37,
+    "scramble screens": 51,
     "scramble simulation": 1,
     "screen render": 67,
     "season entry": 6,
@@ -60,6 +62,7 @@
     "stroke rounding": 24,
     "sync/column tests": 6,
     "team colour dot": 10,
+    "team rounds": 11,
     "trifecta card render": 8,
     "trifecta results row": 20
   }

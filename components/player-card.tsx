@@ -6,7 +6,7 @@ import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
 import { computeCardStats } from "@/lib/card";
 import { BADGE_BY_KEY } from "@/lib/badges";
-import { Avatar, Eyebrow, backdropDismiss } from "@/components/ui";
+import { Avatar, Eyebrow, backdropDismiss, inputStyle } from "@/components/ui";
 
 const supabase = createClient();
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
@@ -320,7 +320,7 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
             onChange={(e) => setMsg(e.target.value.slice(0, 140))}
             placeholder={`Optional note to ${first} — e.g. "Free for Saturday?"`}
             rows={2}
-            style={{ width: "100%", resize: "none", borderRadius: 8, border: `1px solid ${C.borderGreen}`, background: "#0e3a2c", color: C.cream, fontSize: 13, padding: "8px 10px", fontFamily: "inherit" }}
+            style={{ ...inputStyle, resize: "none", fontSize: 13, padding: "8px 12px", fontFamily: "inherit" }}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
             <div style={{ fontSize: 11, color: C.sage }}>{msg.length}/140{status === "too_soon" ? " · you already reached out recently" : status === "error" ? " · couldn't send" : ""}</div>
