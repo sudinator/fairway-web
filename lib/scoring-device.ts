@@ -53,7 +53,13 @@ function resumeBackups(oldToken: string | null) {
   if (!oldToken || oldToken === token) return;
   const storage = window.localStorage, oldPrefix = `${PREFIX}${userId}:${oldToken}:`;
   const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)!).filter(k => k.startsWith(oldPrefix));
-  for (const key of keys) storage.setItem(`${PREFIX}${userId}:${token}:${key.slice(oldPrefix.length)}`, storage.getItem(key)!);
+  // 212.29b: MOVE, not copy — the copy was kept under the old token, so every relaunch of the home-screen app
+  // duplicated every backup (owner, Oct 23: 8.7 MB of score backups on a staging phone). The old token is this same
+  // installation's previous session (the server accepted the resume); its work now lives under the new token.
+  for (const key of keys) {
+    storage.setItem(`${PREFIX}${userId}:${token}:${key.slice(oldPrefix.length)}`, storage.getItem(key)!);
+    storage.removeItem(key);
+  }
 }
 export function archiveScoringBackups(clear = false) {
   // Saving the archive must succeed before removing any working backup.
@@ -191,10 +197,26 @@ export function tidyScoringStorage(): number {
       if (k.startsWith("bnn_game_snap_")) {
         const at = JSON.parse(storage.getItem(k) || "{}")?.at;
         if (!at || at < cutoff) { storage.removeItem(k); removed++; }
-      } else if (k.startsWith(PREFIX) && token && !k.includes(`:${token}:`)) {
-        // another identity's backup: kept — it may be live pending work — UNLESS it is clearly abandoned: its own
-        // timestamp is over 30 days old (a backup without one is kept)
-        const at = (() => { try { return JSON.parse(storage.getItem(k) || "null")?.at; } catch { return undefined; } })();
+      } else if (k.startsWith(PREFIX) && token && userId && k.startsWith(`${PREFIX}${userId}:`) && !k.includes(`:${token}:`)) {
+        // another identity's backup. 212.29b: (1) an exact duplicate of the current identity's copy goes, whatever its
+        // age (resume used to copy, never move); (2) a FULLY UPLOADED game backup (its own confirmed copy matches)
+        // goes after 2 days; (3) otherwise kept — it may be live pending work — unless over 30 days old.
+        const rest = k.slice(`${PREFIX}${userId}:`.length);
+        const sub = rest.slice(rest.indexOf(":") + 1);   // the key within that identity
+        const mine = storage.getItem(`${PREFIX}${userId}:${token}:${sub}`);
+        const val = storage.getItem(k);
+        if (mine != null && mine === val) { storage.removeItem(k); removed++; continue; }
+        const parsed = (() => { try { return JSON.parse(val || "null"); } catch { return null; } })();
+        const at = parsed?.at;
+        if (sub.startsWith("bnn_game_scores_") && typeof at === "number" && at < Date.now() - 2 * 86400000) {
+          const tokenPart = rest.slice(0, rest.indexOf(":"));
+          const wmRaw = storage.getItem(`${PREFIX}${userId}:${tokenPart}:bnn_game_wm_${sub.slice("bnn_game_scores_".length)}`);
+          const wm = (() => { try { return JSON.parse(wmRaw || "null"); } catch { return null; } })();
+          const same = (a: unknown[] | undefined, b: unknown[] | undefined) => JSON.stringify(a || []) === JSON.stringify(b || []);
+          if (wm && ["scores", "putts", "fairways", "penalties", "sand"].every((c) => same(parsed?.[c], wm?.[c]))) {
+            storage.removeItem(k); storage.removeItem(`${PREFIX}${userId}:${tokenPart}:bnn_game_wm_${sub.slice("bnn_game_scores_".length)}`); removed += 2; continue;
+          }
+        }
         if (typeof at === "number" && at < cutoff) { storage.removeItem(k); removed++; }
       }
     } catch { /* leave it */ }
@@ -212,3 +234,6 @@ export function noteStorageWriteFailure() { storageFailed = true; listeners.forE
 const tidyHooks: (() => number)[] = [];
 export function registerStorageTidy(fn: () => number) { tidyHooks.push(fn); }
 export function runStorageTidyHooks(): number { return tidyHooks.reduce((n, f) => { try { return n + f(); } catch { return n; } }, 0); }
+
+/** Test hook only — set the settled identity the storage tidy measures "another identity" against. */
+export function __setScoringIdentityForTest(uid: string, tok: string) { userId = uid; token = tok; }

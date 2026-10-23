@@ -1,3 +1,13 @@
+## 212.30.261023 — Phone score backups were duplicated on every relaunch (8.7 MB); log retention (0217)
+
+**1. The phone storage meter found a third leak** (owner, Oct 23: staging phone at 9.4 MB, 8.7 MB of score backups). When the home-screen app relaunched and resumed, it COPIED every pending backup to the new device identity and never removed the old copies — so every relaunch duplicated everything. Fix (lib/scoring-device): resume MOVES the backups; the storage tidy removes an old identity's exact duplicates whatever their age, and its fully uploaded game backups after 2 days; work not yet uploaded is never removed (kept up to 30 days, as before). Tests: lib/storage-tidy (18) — duplicates removed, uploaded old copies removed, unsent and recent kept; the device suite passes with move semantics.
+
+**2. Log retention (0217, owner):** notifications, the activity log and the email logs are ARCHIVED, then removed from the live tables — notifications after 90 days (what members see today; 0095 deleted them outright), the activity log and the round / team-round / club-report email logs after 1 year. Rounds, scores, games and the money audit are never touched (owner). The archive is a separate schema the app's API cannot reach; run_log_retention() runs nightly ("log-retention", replacing "purge-old-notifications") and only the scheduler can run it. Test: ci/assert-log-retention.sql.
+
+**3. Phone diagnostics log keeps 180 days** (owner).
+
+Deploy: staging 0217 → code; production 0217 → merge (includes 212.29).
+
 ## 212.29.261023 — Fix: Reset scores was undone by the in-memory copy (212.26 regression)
 
 Owner (Oct 23, production): "I can no longer reset scores under Manage game — the entered scores persist."
