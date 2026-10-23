@@ -153,7 +153,7 @@ def main():
                 m=rx.search(st)
                 if m: target.add(m.group(1).lower())
 
-    created_functions=set(); created_relations=set(); created_types=set(); created_sequences=set(); policies=set(); columns=defaultdict(set)
+    created_functions=set(); created_relations=set(); created_types=set(); created_sequences=set(); policies=set(); columns=defaultdict(set); created_schemas=set()   # 212.30: CREATE SCHEMA names (0217 archive) — archive.x is schema.table, not table.column
     issues=[]; counts=defaultdict(int)
 
     for path,txt in source:
@@ -255,8 +255,12 @@ def main():
             # key like 'course_api_checks.claim' was being read as a column reference and reported as
             # a missing prior column (0156). The helper already existed; this check simply was not
             # using it.
+            for sm in re.finditer(r'create\s+schema\s+(?:if\s+not\s+exists\s+)?"?([A-Za-z_]\w*)', stmt, re.I):
+                created_schemas.add(sm.group(1).lower())
             for mm in QUALIFIED_COLUMN.finditer(mask_single_quoted(stmt)):
                 table, col = mm.group(1).lower(), mm.group(2).lower()
+                if table in created_schemas:
+                    continue   # schema.table (e.g. archive.notifications), not table.column
                 if table in created_relations and table in columns:
                     counts['column_dependencies'] += 1
                     if col not in columns[table]:

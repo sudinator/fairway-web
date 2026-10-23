@@ -32,6 +32,9 @@ export function dbg(ev: string, sid: string, d?: Record<string, any>): void {
     const arr: DiagEvent[] = raw ? JSON.parse(raw) : [];
     arr.push({ t: Date.now(), sid, ev, d });
     if (arr.length > MAX) arr.splice(0, arr.length - MAX);
+    // 212.30 (owner): the phone keeps 180 days of diagnostics history
+    const keepFrom = Date.now() - 180 * 86400000;
+    while (arr.length && typeof arr[0]?.t === "number" && arr[0].t < keepFrom) arr.shift();
     localStorage.setItem(LOG_KEY, JSON.stringify(arr));
   } catch { /* ignore */ }
 }

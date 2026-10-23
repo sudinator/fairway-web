@@ -3,7 +3,7 @@
 import { ok, report } from "./screen-harness";
 import { saveGameScores, loadGameScores } from "./draft";
 import * as D from "./draft";
-import { tidyScoringStorage, storageWriteFailed, scoringStorage } from "./scoring-device";
+import { tidyScoringStorage, storageWriteFailed, scoringStorage, __setScoringIdentityForTest } from "./scoring-device";
 import { saveAltShotDraft } from "./alt-shot-side-scores";
 import { measureStorage } from "@/components/storage-meter";
 import { createGameScoreWriter } from "./game-score-sync";
@@ -62,6 +62,23 @@ let threwDraft = false;
 try { saveAltShotDraft("g", { foursomeId: "t1", side: "a", holeIndex: 0, strokes: 4, at: Date.now(), scoringVersion: 0 } as never); } catch { threwDraft = true; }
 ok(!threwDraft && storageWriteFailed(), "a team-score draft on a full storage area: no throw (the score is still sent), and flagged for the warning");
 St.prototype.setItem = realSet; LIMIT = Infinity;
+
+// 212.29b — resume used to COPY every backup to each new identity (8.7 MB on a staging phone): duplicates go
+__setScoringIdentityForTest("u", "cur");
+ls.clear();
+const B = (scores: (number | null)[], at: number) => JSON.stringify({ at, scores, putts: [], fairways: [], penalties: [], sand: [] });
+const day = 86400e3;
+ls.setItem("bnn_device_scores:u:cur:bnn_game_scores_g1_p", B([4, 5], Date.now()));
+ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g1_p", B([4, 5], Date.now()));                                  // exact duplicate
+ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g2_p", B([4, 5], Date.now() - 5 * day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g2_p", B([4, 5], Date.now() - 5 * day)); // uploaded, 5 days
+ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g3_p", B([4, 6], Date.now() - 5 * day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g3_p", B([4, null], Date.now() - 5 * day)); // NOT uploaded
+ls.setItem("bnn_device_scores:u:old:bnn_game_scores_g4_p", B([4, 5], Date.now() - day)); ls.setItem("bnn_device_scores:u:old:bnn_game_wm_g4_p", B([4, 5], Date.now() - day));     // uploaded, 1 day
+tidyScoringStorage();
+ok(ls.getItem("bnn_device_scores:u:old:bnn_game_scores_g1_p") == null && ls.getItem("bnn_device_scores:u:cur:bnn_game_scores_g1_p") != null, "an exact duplicate under an old identity is removed; the current copy stays");
+ok(ls.getItem("bnn_device_scores:u:old:bnn_game_scores_g2_p") == null, "a fully uploaded old-identity backup over 2 days old is removed");
+ok(ls.getItem("bnn_device_scores:u:old:bnn_game_scores_g3_p") != null, "old-identity work NOT yet uploaded is kept");
+ok(ls.getItem("bnn_device_scores:u:old:bnn_game_scores_g4_p") != null, "a recent (1 day) uploaded old-identity backup is kept");
+__setScoringIdentityForTest("", "");
 
 // the storage meter's figures
 ls.clear(); ls.setItem("bnn_game_scores_x_y", "a".repeat(100)); ls.setItem("bnn_game_snap_z", "b".repeat(50)); ls.setItem("other", "c");
