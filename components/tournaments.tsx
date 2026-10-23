@@ -13,7 +13,7 @@ import { shortNamer } from "@/lib/short-names";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 import { autoScores, isStagingClient } from "@/lib/auto-score";
 import { useScoringDevice } from "@/components/scoring-device";
-import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
+import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked, storageWriteFailed } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -1568,7 +1568,12 @@ function GameRoom({
   // 212.26: the latest entry per row, in MEMORY — used when the phone's backup couldn't be written (a full storage
   // area made every backup fail silently: the writer found "nothing to send" and the next refresh wiped the entry)
   const saveTraceOn = useSaveTraceOn();   // 212.27: Admin → Diagnostics switch
-  const memBackupRef = React.useRef(new Map<string, { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }>());
+  // 212.29: each entry records the scoring version and time it was made — a RESET (which bumps the version) must
+  // discard it. 212.26 stamped it with the game's CURRENT version at refresh, so after Reset scores the old entries
+  // passed the reset check, came back on screen and were sent again (owner, Oct 23, production).
+  type MemEntry = { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number; scoringVersion: number };
+  const memBackupRef = React.useRef(new Map<string, MemEntry>());
+  const clearMemBackups = () => memBackupRef.current.clear();
   const resettingRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
   gameRef.current = game;
@@ -1860,7 +1865,10 @@ function GameRoom({
     for (const p of ps) {
       if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
       // 212.26: the phone's backup, else this session's memory copy — an entry not yet confirmed must survive a refresh
-      let backup = loadGameScores(gameId, p.id) ?? (memBackupRef.current.has(p.id) ? { ...memBackupRef.current.get(p.id)!, at: Date.now(), scoringVersion: safeGame.scoring_version ?? 0 } : null);
+      const mem = memBackupRef.current.get(p.id);
+      const memOk = !!mem && mem.scoringVersion === (safeGame.scoring_version ?? 0) && !(resetAt && mem.at < resetAt);
+      if (mem && !memOk) memBackupRef.current.delete(p.id);   // made before a reset: discarded, never resurrected
+      let backup = loadGameScores(gameId, p.id) ?? (memOk ? mem! : null);
       if (!backup) trace(`refresh: ${String(p.display_name || "")} — no phone backup`);
       if (backup && (((backup.scoringVersion ?? 0) !== (safeGame.scoring_version ?? 0)) || (resetAt && backup.at < resetAt))) {
         trace(`refresh: ${String(p.display_name || "")} — phone backup DISCARDED (version ${backup.scoringVersion ?? 0} v ${safeGame.scoring_version ?? 0}${resetAt && backup.at < resetAt ? ", older than reset" : ""})`);
@@ -1908,8 +1916,10 @@ function GameRoom({
         alert("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
       }
     };
+    const dropMem = () => clearMemBackups();   // 212.29: a reset made elsewhere — pre-reset entries are void
+    window.addEventListener("bnn-game-reset-rejected", dropMem);
     window.addEventListener("bnn-game-reset-rejected", reloadAfterReset);
-    return () => { alive = false; window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
+    return () => { alive = false; window.removeEventListener("bnn-game-reset-rejected", dropMem); window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
   }, [load]);
 
   useEffect(() => {
@@ -2097,7 +2107,12 @@ function GameRoom({
   }, [user.id]);
   // Shared writer serializes each row and acknowledges only confirmed writes.
   if (!scoreWriterRef.current) scoreWriterRef.current = createGameScoreWriter({
-    backup: rowId => loadGameScores(gameIdRef.current, rowId) ?? (memBackupRef.current.get(rowId) as never) ?? null,
+    backup: rowId => {
+      const b = loadGameScores(gameIdRef.current, rowId);
+      if (b) return b;
+      const m = memBackupRef.current.get(rowId);   // only an entry made under the CURRENT scoring version
+      return m && m.scoringVersion === (gameRef.current?.scoring_version ?? 0) ? (m as never) : null;
+    },
     watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
@@ -2210,7 +2225,7 @@ function GameRoom({
       const b = loadGameScores(gid, rowId);
       return b ? bundleOf(b as any) : bundleOf(firstBody);
     };
-    memBackupRef.current.set(rowId, bundleOf(firstBody) as never);   // 212.26
+    memBackupRef.current.set(rowId, { ...(bundleOf(firstBody) as any), at: Date.now(), scoringVersion: gameRef.current?.scoring_version ?? 0 });   // 212.26 / 212.29
     if (!loadGameScores(gid, rowId)) trace("phone backup missing — sending from memory");
     for (let n = 0; n < 4; n++) {
       if (!isPrimaryScoringDevice()) return;
@@ -2218,6 +2233,7 @@ function GameRoom({
       const okd = await pushRowCols(rowId, n === 0 ? bundleOf(firstBody) : freshest(), n === 0 ? clock : undefined);
       trace(`save try ${n + 1}: ${okd ? "saved" : "not saved"}`);
       if (okd) {
+        memBackupRef.current.delete(rowId);   // 212.29: confirmed — the memory copy is only for unsent entries
         setSyncState("synced");
         recomputePending();
         window.setTimeout(() => setSyncState((cur) => (cur === "synced" ? "idle" : cur)), 1600);
@@ -3004,7 +3020,7 @@ function GameRoom({
       p_game: game.id, p_course: course.name, p_course_par: par, p_holes_meta: holesMeta,
     });
     if (error) { alert(failureMessage("Couldn't change the course", error)); return; }
-    clearAllGameScores(game.id);
+    clearAllGameScores(game.id); clearMemBackups();
     setCourseTees(Array.isArray(course.tees) ? course.tees : []);
     // 208.5: an automatic "Format / Course / Date" name follows the new course (a typed name is kept).
     { const nextName = GC.refreshedAutoName(game as any, { course: course.name }); if (nextName) await supabase.from("games").update({ name: nextName }).eq("id", game.id); }
@@ -3067,7 +3083,7 @@ function GameRoom({
       p_holes_meta: nextHoles,
     });
     if (error) { alert(failureMessage("Couldn't change the number of holes", error)); return; }
-    clearAllGameScores(game.id);
+    clearAllGameScores(game.id); clearMemBackups();
     await load();
   };
 
@@ -3240,7 +3256,7 @@ function GameRoom({
       if (error) throw error;
       setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
       setMe((m) => (m ? { ...m, ...blank } : m));
-      clearAllGameScores(game.id);
+      clearAllGameScores(game.id); clearMemBackups();
       clearAllAltShotDrafts(game.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
     } catch (e) {
@@ -3277,7 +3293,7 @@ function GameRoom({
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${competitionLink ? " from its Ryder Cup session" : sameDay ? " (and its posted rounds)" : ""}` });
     // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
     // or active-game pointer that could resurface or boot straight back into it.
-    clearAllGameScores(game.id);
+    clearAllGameScores(game.id); clearMemBackups();
     clearActiveGame();
     onBack();
   };
@@ -3555,7 +3571,7 @@ function GameRoom({
       )}
 
       {/* 212.26: the phone couldn't store a backup — say so where it can be seen (the bottom bar can be hidden) */}
-      {backupWriteFailed && roomTab === "play" ? (
+      {(backupWriteFailed || storageWriteFailed()) && roomTab === "play" ? (
         <div data-backup-warning style={{ background: C.gold, color: C.green, borderRadius: 10, padding: "8px 12px", margin: "8px 0", fontSize: 13, fontWeight: 700 }}>
           This phone couldn&apos;t store a backup of your scores, so they&apos;re being sent straight to BNN. Keep a connection until they show as saved.
         </div>

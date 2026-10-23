@@ -1,4 +1,4 @@
-import { scoringStorage } from "./scoring-device";
+import { scoringStorage, tidyScoringStorage, noteStorageWriteFailure } from "./scoring-device";
 export type AltShotScoreSide = "a" | "b";
 
 export type AltShotScoreRow = {
@@ -72,7 +72,12 @@ export function saveAltShotDraft(gameId: string, draft: AltShotScoreDraft): void
   if (typeof localStorage === "undefined") return;
   const rows = loadAltShotDrafts(gameId).filter((d) => !(d.foursomeId === draft.foursomeId && d.side === draft.side && d.holeIndex === draft.holeIndex));
   rows.push(draft);
-  scoringStorage().setItem(key(gameId), JSON.stringify(rows));
+  // 212.28: a full storage area made this THROW — the team score was never sent (same class as 212.26). Tidy and
+  // retry; if it still fails, note it (the scorecard warns) and carry on — the score is still sent; the draft is only
+  // the offline backup.
+  const value = JSON.stringify(rows);
+  try { scoringStorage().setItem(key(gameId), value); }
+  catch { tidyScoringStorage(); try { scoringStorage().setItem(key(gameId), value); } catch { noteStorageWriteFailure(); } }
 }
 
 export function clearAltShotDraft(gameId: string, foursomeId: string, side: AltShotScoreSide, holeIndex: number): void {

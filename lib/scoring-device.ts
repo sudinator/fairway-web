@@ -199,5 +199,16 @@ export function tidyScoringStorage(): number {
       }
     } catch { /* leave it */ }
   }
+  removed += runStorageTidyHooks();   // 212.28: e.g. synced game backups over 30 days old (lib/draft)
   return removed;
 }
+
+// 212.28: one place to note that a backup could not be written even after tidying (score backups, team-score
+// drafts) — the scorecard shows a warning at the top; the score is still sent.
+let storageFailed = false;
+export const storageWriteFailed = () => storageFailed;
+export function noteStorageWriteFailure() { storageFailed = true; listeners.forEach((f) => f()); }
+// Extra tidy steps registered by modules that own their keys (lib/draft: synced game backups) — avoids an import cycle.
+const tidyHooks: (() => number)[] = [];
+export function registerStorageTidy(fn: () => number) { tidyHooks.push(fn); }
+export function runStorageTidyHooks(): number { return tidyHooks.reduce((n, f) => { try { return n + f(); } catch { return n; } }, 0); }
