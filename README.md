@@ -1,3 +1,11 @@
+## 212.32.261023 — Fix: a test that failed at random on GitHub (212.31's push failed)
+
+212.31's pull request check failed in lib/storage-tidy: "an exact duplicate under an old identity is removed". The app code is unchanged from 212.30 (byte-identical); the TEST stamped the backup and its "exact duplicate" with two separate clock reads. On a fast machine both land in the same millisecond; on GitHub's runner the clock ticked between them, so the copy was not exact and the tidy rightly kept it. Present since 212.30 — it passed there by luck. Reproduced by running the test on a clock that moves 1 ms per read: the old test fails with the CI message, the fixed test (one timestamp for the pair) passes.
+
+## 212.31.261023 — Fix: stroke play leaderboard sorted on raw totals, not score to par
+
+Owner (Oct 23, production game 494730): Nihar was "leading" at E thru 1 (net 3) while Amit was second at -5 thru 3 (net 6) — the board sorted on the raw net total (3 < 6), so whoever had played fewest holes looked best. The score column was right; the order was not. The same sort was copied into the public live page.
+
 ## 212.30.261023 — Phone score backups were duplicated on every relaunch (8.7 MB); log retention (0217)
 
 **1. The phone storage meter found a third leak** (owner, Oct 23: staging phone at 9.4 MB, 8.7 MB of score backups). When the home-screen app relaunched and resumed, it COPIED every pending backup to the new device identity and never removed the old copies — so every relaunch duplicated everything. Fix (lib/scoring-device): resume MOVES the backups; the storage tidy removes an old identity's exact duplicates whatever their age, and its fully uploaded game backups after 2 days; work not yet uploaded is never removed (kept up to 30 days, as before). Tests: lib/storage-tidy (18) — duplicates removed, uploaded old copies removed, unsent and recent kept; the device suite passes with move semantics.

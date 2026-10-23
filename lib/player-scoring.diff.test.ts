@@ -24,10 +24,21 @@ function compareAll(p: Player, game: Game | null, ctx: string) {
   if (game) {
     same("ouVal", OLD.ouVal(p, game), NEW.ouVal(p, game), ctx);
     same("strokeTotal", OLD.strokeTotal(p, game), NEW.strokeTotal(p, game), ctx);
-    same("rankVal", OLD.rankVal(p, game), NEW.rankVal(p, game), ctx);
+    // 212.31 (intended change): stroke play ranks on par pace — NEW = OLD total − par of the holes played.
+    if (game.game_type === "stroke") same("rankVal(stroke pace)", OLD.rankVal(p, game) === Infinity ? Infinity : OLD.rankVal(p, game) - OLD.parThru(p, game), NEW.rankVal(p, game), ctx);
+    else same("rankVal", OLD.rankVal(p, game), NEW.rankVal(p, game), ctx);
   }
 }
 function compareBoard(scope: Player[], game: Game, ctx: string) {
+  // 212.31: a stroke-play board is only expected to match the old order when every player has played the SAME
+  // holes (the end of a round) — then par pace and lowest total agree exactly. Mid-round boards are the fix itself.
+  if (game.game_type === "stroke") {
+    const played = (p: Player) => (p.scores || []).map((s) => (s != null && s > 0 ? 1 : 0)).join("");
+    if (new Set(scope.map(played)).size > 1) return;
+    same("sortLeaderboard(stroke, same holes)", OLD.sortLeaderboard(scope, game).filter((p) => NEW.playerThru(p) > 0).map((p) => NEW.rankVal(p, game)), NEW.sortLeaderboard(scope, game).filter((p) => NEW.playerThru(p) > 0).map((p) => NEW.rankVal(p, game)), ctx);
+    for (const p of scope) { same("posWithin", OLD.posWithin(p, scope, game), NEW.posWithin(p, scope, game), ctx); same("tiedWithin", OLD.tiedWithin(p, scope, game), NEW.tiedWithin(p, scope, game), ctx); }
+    return;
+  }
   same("sortLeaderboard", OLD.sortLeaderboard(scope, game).map((p) => p.id), NEW.sortLeaderboard(scope, game).map((p) => p.id), ctx);
   for (const p of scope) {
     same("posWithin", OLD.posWithin(p, scope, game), NEW.posWithin(p, scope, game), ctx);

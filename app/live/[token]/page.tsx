@@ -12,6 +12,7 @@ import {
   trifectaRowState,
 } from "@/lib/golf";
 import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
+import { strokePace } from "@/lib/player-scoring";
 import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
@@ -268,12 +269,15 @@ function Scorecard({ data }: { data: LiveData }) {
     return computeSkins(meta, sp, allowance).skinsByPlayer || {};
   }, [isSkins, players, meta, allowance]);
 
-  const metricOf = (p: LivePlayer) => isStab ? stats[p.id].points : isSkins ? (skinsByPlayer[p.id] || 0) : isStroke ? -(strokeNet ? stats[p.id].net : stats[p.id].gross) : -stats[p.id].toPar;
+  // 212.31: stroke play ranks on par pace (lib/player-scoring strokePace) — the app's rule, not raw totals.
+  const strokeMetric = (p: LivePlayer) => { const s = stats[p.id]; return -strokePace(strokeNet ? s.net : s.gross, s.gross - s.toPar, s.thru); };
+  const metricOf = (p: LivePlayer) => isStab ? stats[p.id].points : isSkins ? (skinsByPlayer[p.id] || 0) : isStroke ? strokeMetric(p) : -stats[p.id].toPar;
   const sortPlayers = (arr: LivePlayer[]) => [...arr].sort((a, b) => {
     const at = stats[a.id].thru, bt = stats[b.id].thru;
     if ((at > 0) !== (bt > 0)) return at > 0 ? -1 : 1;
     if (at === 0 && bt === 0) return a.display_name.localeCompare(b.display_name);
     const d = metricOf(b) - metricOf(a); if (d !== 0) return d;
+    if (isStroke && at !== bt) return bt - at;   // same pace: further round first, as in the app
     return a.display_name.localeCompare(b.display_name);
   });
 

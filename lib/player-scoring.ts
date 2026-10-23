@@ -79,20 +79,30 @@ export function strokeTotal(p: Player, game: Game | null): number {
   const strokeNet = game?.stroke_basis !== "gross";
   return strokeNet ? playerNet(p, game) : playerGross(p, game);
 }
-// The value a player is ranked by (lower = better): stroke total for stroke play, else order-of-finish.
+// 212.31 — stroke play ranks the way Stableford always has: against PAR PACE for the holes played, not on raw
+// totals (owner, Oct 23, game 494730: a player net 3 thru 1 at even was "leading" a player net 6 thru 3 at -5,
+// because 3 < 6). Stableford's ouVal is points against 2 a hole; stroke play is strokes against the par of the
+// holes played — the same rule the six-hole segments use (lib/segments). At the end of a round, when everyone
+// has played the same holes, the order is exactly the old lowest-total order. Shared with the public live page.
+export function strokePace(total: number, parPlayed: number, thru: number): number {
+  return thru === 0 ? Infinity : total - parPlayed;
+}
+// The value a player is ranked by (lower = better): strokes vs par pace for stroke play, else order-of-finish.
 export function rankVal(p: Player, game: Game | null): number {
   const isStroke = game?.game_type === "stroke";
-  return isStroke ? (playerThru(p) === 0 ? Infinity : strokeTotal(p, game)) : ouVal(p, game);
+  return isStroke ? strokePace(strokeTotal(p, game), parThru(p, game), playerThru(p)) : ouVal(p, game);
 }
 
 // ---- Leaderboard ordering (reuses rankVal / playerPoints) ----
-// Sorted standings: by rank value (lower better); non-stroke ties broken by raw points (higher first).
+// Sorted standings: by rank value (lower better). Ties on the same pace list the player further round first —
+// Stableford through raw points (more points at the same pace = more holes), stroke play through holes played.
+// Positions stay tied either way (posWithin / tiedWithin use the rank value only).
 export function sortLeaderboard(players: Player[], game: Game | null): Player[] {
   const isStroke = game?.game_type === "stroke";
   return [...players].sort((a, b) => {
     const d = rankVal(a, game) - rankVal(b, game);
     if (d !== 0) return d;
-    return isStroke ? 0 : playerPoints(b, game) - playerPoints(a, game);
+    return isStroke ? playerThru(b) - playerThru(a) : playerPoints(b, game) - playerPoints(a, game);
   });
 }
 // Position of p within a pool (1-based; players with a strictly better rank value count ahead).
