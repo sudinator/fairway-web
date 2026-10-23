@@ -2,6 +2,8 @@ import {
   playerHoles, playerPoints, playerThru, playerGross, playerNet, relToParStr, parThru, leaderName,
   ouVal, strokeTotal, rankVal, sortLeaderboard, posWithin, tiedWithin,
 } from "./player-scoring";
+import * as BASE from "./player-scoring.baseline";
+import { GAME_494730, PLAYERS_494730 } from "./game-494730.fixture";
 import type { Game, Player } from "./game-types";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -126,7 +128,8 @@ eq("name: trims whitespace", leaderName("  Bob  "), "Bob");
   eq("strokeTotal: gross basis", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: "gross" })), 10);
   eq("strokeTotal: net basis", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: "net" })), 8);
   eq("strokeTotal: default null -> net", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: null as unknown as "net" })), 8);
-  eq("rankVal: stroke+gross -> gross total", rankVal(mkPlayer([5, 5], { course_handicap: 0 }), mkGame({ game_type: "stroke", stroke_basis: "gross" })), 10);
+  // 212.31: stroke play ranks on par pace (strokes vs par of holes played), like Stableford — 5,5 on two par 4s = +2
+  eq("rankVal: stroke+gross -> gross vs par pace", rankVal(mkPlayer([5, 5], { course_handicap: 0 }), mkGame({ game_type: "stroke", stroke_basis: "gross" })), 2);
   eq("rankVal: stroke thru0 -> Infinity", rankVal(mkPlayer([], { course_handicap: 0 }), mkGame({ game_type: "stroke" })) === Infinity, true);
   eq("rankVal: stableford -> ouVal", rankVal(mkPlayer([4], { course_handicap: 0 }), mkGame({ game_type: "stableford" })), 0);
 }
@@ -156,6 +159,25 @@ eq("name: trims whitespace", leaderName("  Bob  "), "Bob");
   // two not-started players: both Infinity (comparator NaN) — document stable order
   const N2 = mkPlayer([], { id: "N2" });
   eq("sort: two Infinity stable", sortLeaderboard([N, N2], g).map((p) => p.id), ["N", "N2"]);
+}
+
+// ---- 212.31 — stroke play leaderboard ranks on par pace (owner, Oct 23) — REAL production game 494730 ----
+// The wrong answer the app gave (kept as the baseline's output): Nihar first on raw net 3, ahead of Amit's net 6 at -5.
+{
+  const gs = GAME_494730, ps = PLAYERS_494730, by = (id: string) => ps.find((p) => p.id === id)!;
+  eq("494730: OLD order was the bug", BASE.sortLeaderboard(ps, gs).filter((p) => playerThru(p) > 0).map((p) => p.id), ["nihar", "amit", "sanjay", "karan"]);
+  eq("494730: pace values (Amit -5, Sanjay E, Nihar E, Karan +1)", ["amit", "sanjay", "nihar", "karan"].map((id) => rankVal(by(id), gs)), [-5, 0, 0, 1]);
+  eq("494730: leaderboard order", sortLeaderboard(ps, gs).filter((p) => playerThru(p) > 0).map((p) => p.id), ["amit", "sanjay", "nihar", "karan"]);
+  eq("494730: positions 1, T2, T2, 4", ["amit", "sanjay", "nihar", "karan"].map((id) => [posWithin(by(id), ps, gs), tiedWithin(by(id), ps, gs)]), [[1, false], [2, true], [2, true], [4, false]]);
+  eq("494730: not-started players last", sortLeaderboard(ps, gs).slice(4).every((p) => playerThru(p) === 0), true);
+  const g4 = mkGame({ game_type: "stroke", stroke_basis: "gross" });
+  // same pace: further round listed first, still tied
+  const x = mkPlayer([4, 4], { id: "x", course_handicap: 0 }), y = mkPlayer([4, 4, 4, 4], { id: "y", course_handicap: 0 });
+  eq("stroke same pace: more holes first", sortLeaderboard([x, y], g4).map((p) => p.id), ["y", "x"]);
+  eq("stroke same pace: still tied", tiedWithin(x, [x, y], g4), true);
+  // full cards: identical to lowest total (end-of-round results unchanged)
+  const a = mkPlayer(Array(18).fill(5), { id: "a", course_handicap: 0 }), b = mkPlayer(Array(18).fill(4), { id: "b", course_handicap: 0 });
+  eq("stroke full cards: lowest total first", sortLeaderboard([a, b], g4).map((p) => p.id), ["b", "a"]);
 }
 
 console.log(`player-scoring: ${pass} passed, ${fail} failed`);

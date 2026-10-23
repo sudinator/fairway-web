@@ -1,5 +1,5 @@
 {
-  "total": 439687,
+  "total": 439695,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -47,7 +47,7 @@
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
     "nine-hole posting": 20,
-    "player-scoring": 63,
+    "player-scoring": 71,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,

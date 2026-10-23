@@ -1,3 +1,15 @@
+## 212.31.261023 — Fix: stroke play leaderboard sorted on raw totals, not score to par
+
+Owner (Oct 23, production game 494730): Nihar was "leading" at E thru 1 (net 3) while Amit was second at -5 thru 3 (net 6) — the board sorted on the raw net total (3 < 6), so whoever had played fewest holes looked best. The score column was right; the order was not. The same sort was copied into the public live page.
+
+**Fix (lib/player-scoring strokePace, owner: "share how Stableford does it"):** stroke play now ranks the way Stableford always has — against par pace for the holes each player has played (strokes minus the par of those holes; Stableford: points against 2 a hole), the rule the six-hole segments already used. Same pace: the player further round is listed first, still tied. The app leaderboard and the live page call the one function. Finished rounds are unchanged: when everyone has played the same holes, par pace and lowest total give the same order, so results, recaps and emails (full cards only) do not move.
+Real data (game 494730, as pulled from production): before — Nihar, Amit, Sanjay, Karan; after — Amit -5, Sanjay E and Nihar E (T2), Karan +1.
+Tests: lib/player-scoring (the real 494730 rows, lib/game-494730.fixture, including the old wrong order); the differential test against the frozen baseline (57,460 comparisons) proves every other format and every same-holes stroke board unchanged. Guard: ci/check_stroke_pace_ranking.py (app and live page must rank through strokePace) — negative-tested.
+
+**Many open browser tabs (owner question):** new permanent test ci/test-multitab-storage.cjs runs the real device controller with many tabs over one shared storage: ten tab hand-overs leave one backup (moved, never copied); a live old tab keeps scoring and new tabs are viewers; 50 abandoned tabs with different games use 45 KB of the ~5 MB limit. Negative-tested: with both the move and the duplicate tidy removed it fails (10 backups); the tidy alone is covered by lib/storage-tidy.
+
+No migration. Deploy: code only (staging, then pull request).
+
 ## 212.30.261023 — Phone score backups were duplicated on every relaunch (8.7 MB); log retention (0217)
 
 **1. The phone storage meter found a third leak** (owner, Oct 23: staging phone at 9.4 MB, 8.7 MB of score backups). When the home-screen app relaunched and resumed, it COPIED every pending backup to the new device identity and never removed the old copies — so every relaunch duplicated everything. Fix (lib/scoring-device): resume MOVES the backups; the storage tidy removes an old identity's exact duplicates whatever their age, and its fully uploaded game backups after 2 days; work not yet uploaded is never removed (kept up to 30 days, as before). Tests: lib/storage-tidy (18) — duplicates removed, uploaded old copies removed, unsent and recent kept; the device suite passes with move semantics.
