@@ -15,7 +15,8 @@ checks = {
     'alternate shot group segment component hard-stops if called': 'if (game.game_type === "alt_shot" || cfg.scheme === "none") return null;' in seg,
     'alternate shot does not render individual group segment side game': 'game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta")' in tour and 'game.game_type === "trifecta" || game.game_type === "alt_shot") && (\n        <GroupSegmentSummary' not in tour,
     'alternate shot does not render an individual personal scorecard': 'me && game.game_type !== "alt_shot" && (() => {' in tour,
-    'alternate shot six-hole individual board remains gated off': 'shapeOf(game).dotBasis !== "alt_shot_side" && (' in tour,
+    # 212.24: the panel also follows the chosen segments (segRangesShown) — still gated off for alternate shot
+    'alternate shot six-hole individual board remains gated off': 'shapeOf(game).dotBasis !== "alt_shot_side" && (' in tour or 'shapeOf(game).dotBasis !== "alt_shot_side" && segRangesShown.length > 0 && (' in tour,
 }
 failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items(): print(('PASS' if ok else 'FAIL'), name)

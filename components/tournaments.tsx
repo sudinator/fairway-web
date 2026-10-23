@@ -1,4 +1,6 @@
 "use client";
+import { trace } from "@/lib/save-trace";
+import { SaveTraceView, useSaveTraceOn } from "@/components/save-trace-view";
 import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
@@ -76,7 +78,7 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, typ
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles, backupWriteFailed } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1563,6 +1565,10 @@ function GameRoom({
   const loadRequestRef = React.useRef(0);
   const recoveryReadyRef = React.useRef(false);
   const scoreWriterRef = React.useRef<ReturnType<typeof createGameScoreWriter> | null>(null);
+  // 212.26: the latest entry per row, in MEMORY — used when the phone's backup couldn't be written (a full storage
+  // area made every backup fail silently: the writer found "nothing to send" and the next refresh wiped the entry)
+  const saveTraceOn = useSaveTraceOn();   // 212.27: Admin → Diagnostics switch
+  const memBackupRef = React.useRef(new Map<string, { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }>());
   const resettingRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
   gameRef.current = game;
@@ -1849,15 +1855,21 @@ function GameRoom({
     const n = (safeGame as any)?.holes_meta?.length || 18;
     const resetAt = (safeGame as any)?.scores_reset_at ? new Date((safeGame as any).scores_reset_at).getTime() : 0;
     const reconciled: any[] = [];
+    const scoredOf = (arr: any) => (Array.isArray(arr) ? arr.filter((v: any) => v != null && v > 0).length : 0);
+    trace(`refresh: scorer ${isPrimaryScoringDevice() ? "yes" : "NO — phone entries ignored"} · ready ${recoveryReadyRef.current ? "yes" : "no"}`);
     for (const p of ps) {
       if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
-      let backup = loadGameScores(gameId, p.id);
+      // 212.26: the phone's backup, else this session's memory copy — an entry not yet confirmed must survive a refresh
+      let backup = loadGameScores(gameId, p.id) ?? (memBackupRef.current.has(p.id) ? { ...memBackupRef.current.get(p.id)!, at: Date.now(), scoringVersion: safeGame.scoring_version ?? 0 } : null);
+      if (!backup) trace(`refresh: ${String(p.display_name || "")} — no phone backup`);
       if (backup && (((backup.scoringVersion ?? 0) !== (safeGame.scoring_version ?? 0)) || (resetAt && backup.at < resetAt))) {
+        trace(`refresh: ${String(p.display_name || "")} — phone backup DISCARDED (version ${backup.scoringVersion ?? 0} v ${safeGame.scoring_version ?? 0}${resetAt && backup.at < resetAt ? ", older than reset" : ""})`);
         clearGameScores(gameId, p.id);
         clearSyncedWatermark(gameId, p.id);
         backup = null;
       }
       const { merged } = mergeBackupRow(p, backup || p, n, backup ? loadSyncedWatermark(gameId, p.id) : null);
+      if (backup && scoredOf(backup.scores) !== scoredOf(merged.scores)) trace(`refresh: ${String(p.display_name || "")} — phone ${scoredOf(backup.scores)} holes, kept ${scoredOf(merged.scores)}, database ${scoredOf(p.scores)}`);
       saveGameScores(gameId, p.id, merged, true, backup?.at ?? Date.now(), backup?.scoringVersion ?? (safeGame.scoring_version ?? 0));
       // Never acknowledge the local merge here: the fetch confirmed only p.
       const confirmed = mergeBackupRow(p, p, n).merged;
@@ -1874,6 +1886,7 @@ function GameRoom({
       setNeedsSetup(true);
     setLoading(false);
     recoveryReadyRef.current = isPrimaryScoringDevice();
+    trace(`refresh done · ready ${recoveryReadyRef.current ? "yes" : "no"}`);
     return isPrimaryScoringDevice();
     } catch {
       recoveryReadyRef.current = false;
@@ -2084,18 +2097,24 @@ function GameRoom({
   }, [user.id]);
   // Shared writer serializes each row and acknowledges only confirmed writes.
   if (!scoreWriterRef.current) scoreWriterRef.current = createGameScoreWriter({
-    backup: rowId => loadGameScores(gameIdRef.current, rowId),
+    backup: rowId => loadGameScores(gameIdRef.current, rowId) ?? (memBackupRef.current.get(rowId) as never) ?? null,
     watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
-    paused: () => !isPrimaryScoringDevice() || !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
+    paused: () => {
+      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
+      if (why.length) trace(`held: ${why.join(", ")}`);
+      return why.length > 0;
+    },
     revision: () => { scoreRevisionRef.current++; },
     send: async (rowId, body, locked, clock) => {
       const backup = loadGameScores(gameIdRef.current, rowId);
+      trace(`sending ${Object.keys(body).join("+")}${locked ? " (stats only)" : ""}`);
       const { data, error } = await supabase.rpc("save_game_score_bundle", {
         p_player: rowId, p_version: backup?.scoringVersion ?? (gameRef.current?.scoring_version ?? 0),
         p_patch: { ...body, ...(!locked ? clock || {} : {}) }, p_stats_only: locked,
       });
+      trace(error ? `refused: ${error.code || ""} ${error.message || ""}`.slice(0, 160) : "sent: OK");
       if (isDeviceRejection(error)) markScoringDeviceRevoked();
       if (error?.code === "BN163") {
         recoveryReadyRef.current = false;
@@ -2191,10 +2210,13 @@ function GameRoom({
       const b = loadGameScores(gid, rowId);
       return b ? bundleOf(b as any) : bundleOf(firstBody);
     };
+    memBackupRef.current.set(rowId, bundleOf(firstBody) as never);   // 212.26
+    if (!loadGameScores(gid, rowId)) trace("phone backup missing — sending from memory");
     for (let n = 0; n < 4; n++) {
       if (!isPrimaryScoringDevice()) return;
       setSyncState(n === 0 ? "saving" : "retry");
       const okd = await pushRowCols(rowId, n === 0 ? bundleOf(firstBody) : freshest(), n === 0 ? clock : undefined);
+      trace(`save try ${n + 1}: ${okd ? "saved" : "not saved"}`);
       if (okd) {
         setSyncState("synced");
         recomputePending();
@@ -2256,6 +2278,7 @@ function GameRoom({
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
   ) => {
     const target = players.find((p) => p.id === playerId);
+    trace(`tap ${target?.display_name || "?"} hole ${holeIdx + 1}${"strokes" in patch ? ` = ${patch.strokes}` : ""} · scorer ${isPrimaryScoringDevice() ? "yes" : "NO"}`);
     if (!game || !target || !isPrimaryScoringDevice()) return;
     const n = game.holes_meta.length || 18;
     const scores = [...(target.scores || Array(n).fill(null))];
@@ -3022,6 +3045,9 @@ function GameRoom({
   const setFormat = async (next: GameType) => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const patch = buildFormatPatch(game, next);
+    // 212.23: an automatic name follows the format (the line-up / live links, recap and emails read the name)
+    const nextName = GC.refreshedAutoName(game as any, { gameType: next });
+    if (nextName) patch.name = nextName;
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
@@ -3365,6 +3391,12 @@ function GameRoom({
   const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
   const segLeadersFrom = (rows: { p: Player; seg: [number, number, number] }[]) => SEG.segLeadersFrom(rows, game);
   const segWinners = segLeadersFrom(segTotals);
+  // 212.24: the segment side contest the organizer chose — three sixes (default), front 9 & back 9, or off. A TGC money
+  // game is always three sixes (its payouts use the sixes above, unchanged); the display follows the scheme.
+  const segScheme = SEG.indivSegScheme(game, effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID);
+  const segRangesShown = SEG.segRanges(segScheme, game?.holes_meta?.length || 0);
+  const segLeadersShown = segScheme === "sixes" ? segWinners
+    : SEG.segLeadersFor(players.map((p) => ({ p, seg: SEG.segValues(p, game, segRangesShown) })), game, segRangesShown);
 
   // Bettor-only segment leaders for the money banners (clean-sweep watch/achieved):
   // non-betting players (e.g. guests) still appear in the standings above, but the
@@ -3521,6 +3553,15 @@ function GameRoom({
           </div>
         </div>
       )}
+
+      {/* 212.26: the phone couldn't store a backup — say so where it can be seen (the bottom bar can be hidden) */}
+      {backupWriteFailed && roomTab === "play" ? (
+        <div data-backup-warning style={{ background: C.gold, color: C.green, borderRadius: 10, padding: "8px 12px", margin: "8px 0", fontSize: 13, fontWeight: 700 }}>
+          This phone couldn&apos;t store a backup of your scores, so they&apos;re being sent straight to BNN. Keep a connection until they show as saved.
+        </div>
+      ) : null}
+      {/* 212.25 / 212.27: the save trace — when switched on in Admin → Diagnostics (lib/save-trace) */}
+      {saveTraceOn && roomTab === "play" ? <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", left: 8, right: 8, zIndex: 80, maxHeight: "38vh", overflowY: "auto" }}><SaveTraceView /></div> : null}
 
       {(syncState !== "idle" || pendingHoles > 0) && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", zIndex: 60, padding: "0 12px", pointerEvents: "none" }}>
@@ -4000,9 +4041,9 @@ function GameRoom({
               score. In alternate shot both partners hold the SIDE's score after the fan-out, so
               this listed four players with duplicated figures, implying four rounds nobody played.
               Gated on the SHAPE, so a future non-individual format is covered without another edit. */}
-          {shapeOf(game).dotBasis !== "alt_shot_side" && (
+          {shapeOf(game).dotBasis !== "alt_shot_side" && segRangesShown.length > 0 && (
           <div style={{ marginTop: 18 }}>
-            <Eyebrow>{isStroke ? "SIX-HOLE SEGMENTS (NET SCORE)" : "SIX-HOLE SEGMENTS (NET STABLEFORD)"}</Eyebrow>
+            <Eyebrow>{`${segScheme === "nines" ? "FRONT 9 & BACK 9" : "SIX-HOLE SEGMENTS"} (${isStroke ? "NET SCORE" : "NET STABLEFORD"})`}</Eyebrow>
             <div
               style={{
                 display: "flex",
@@ -4011,7 +4052,7 @@ function GameRoom({
                 marginTop: 8,
               }}
             >
-              {segWinners.map((s, i) => (
+              {segLeadersShown.map((s, i) => (
                 <div
                   key={i}
                   style={{
@@ -4053,9 +4094,10 @@ function GameRoom({
               ))}
             </div>
             <SegmentBoard
+              cols={segRangesShown.map((r) => r.short)}
               isStroke={isStroke}
               rows={leaderboard.map((p) => {
-                const s = segOf(p);
+                const s = segScheme === "sixes" ? segOf(p) : SEG.segValues(p, game, segRangesShown);
                 return {
                   name: p.display_name,
                   thru: playerThru(p),

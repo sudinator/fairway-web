@@ -63,10 +63,12 @@ export function archiveScoringBackups(clear = false) {
     if (scoreKey(key) || key.startsWith(`${PREFIX}${userId}:`)) data[key] = storage.getItem(key)!;
   }
   if (Object.keys(data).length) {
-    const archives = JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]");
+    const archives = trimArchives(JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"));
     archives.push({ user: userId, at: new Date().toISOString(), data });
-    storage.setItem(ARCHIVE_KEY, JSON.stringify(archives));
+    storage.setItem(ARCHIVE_KEY, JSON.stringify(trimArchives(archives)));
     if (clear) Object.keys(data).filter(k => !k.startsWith(PREFIX) || k.startsWith(`${PREFIX}${userId}:${token}:`)).forEach(k => storage.removeItem(k));
+    // 212.26: other identities' backups are NOT removed here — another tab or a phone that scored offline may resume
+    // them (ci/test-scoring-device). The runaway growth was the archive itself, now capped (trimArchives).
   }
 }
 export function downloadScoringRecovery() {
@@ -154,9 +156,48 @@ export async function checkScoringDevice(client: Client, uid: string, takeover =
       if (takeover && data.resumed === true) resumeBackups(resumeToken);
       window.sessionStorage.setItem(`bnn_primary_tab_${uid}`, token);
       window.localStorage.setItem(OWNER_KEY, JSON.stringify({ user: uid, token }));
+      try { tidyScoringStorage(); } catch { /* best effort */ }   // 212.26
       publish("primary");
       if (takeover) window.location.reload();
     } catch { setDeviceError("Could not change or restore this scoring device. Saved scores were retained; reconnect and try again."); }
   })();
   try { await request; } finally { request = null; }
+}
+
+
+// ── 212.26 — keep the site's storage from filling (owner, Oct 23: on staging every score backup failed silently once
+// it was full, and entered scores vanished). The recovery archive keeps its 3 newest entries from the last 30 days;
+// game snapshots not opened for 30 days go; another identity's backup goes only when over 30 days old (it may be a
+// phone's offline work waiting to resume — never removed while recent).
+const ARCHIVE_KEEP = 3, ARCHIVE_DAYS = 30, SNAPSHOT_DAYS = 30;
+type ArchiveEntry = { at?: string; user?: string; data?: Record<string, string | null> };
+function trimArchives(list: ArchiveEntry[]): ArchiveEntry[] {
+  const cutoff = Date.now() - ARCHIVE_DAYS * 86400000;
+  return (Array.isArray(list) ? list : []).filter((a) => !a.at || Date.parse(a.at) >= cutoff).slice(-ARCHIVE_KEEP);
+}
+/** Tidy the site's storage; returns how many entries were removed. Safe to call any time. */
+export function tidyScoringStorage(): number {
+  if (typeof window === "undefined") return 0;
+  const storage = window.localStorage;
+  let removed = 0;
+  try {
+    const raw = storage.getItem(ARCHIVE_KEY);
+    if (raw) { const before = JSON.parse(raw); const after = trimArchives(before); if (after.length !== before.length) { storage.setItem(ARCHIVE_KEY, JSON.stringify(after)); removed += before.length - after.length; } }
+  } catch { try { storage.removeItem(ARCHIVE_KEY); removed++; } catch {} }
+  const cutoff = Date.now() - SNAPSHOT_DAYS * 86400000;
+  const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((k): k is string => !!k);
+  for (const k of keys) {
+    try {
+      if (k.startsWith("bnn_game_snap_")) {
+        const at = JSON.parse(storage.getItem(k) || "{}")?.at;
+        if (!at || at < cutoff) { storage.removeItem(k); removed++; }
+      } else if (k.startsWith(PREFIX) && token && !k.includes(`:${token}:`)) {
+        // another identity's backup: kept — it may be live pending work — UNLESS it is clearly abandoned: its own
+        // timestamp is over 30 days old (a backup without one is kept)
+        const at = (() => { try { return JSON.parse(storage.getItem(k) || "null")?.at; } catch { return undefined; } })();
+        if (typeof at === "number" && at < cutoff) { storage.removeItem(k); removed++; }
+      }
+    } catch { /* leave it */ }
+  }
+  return removed;
 }

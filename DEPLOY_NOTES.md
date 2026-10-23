@@ -1,3 +1,88 @@
+## 212.27.261023 — The score-save trace is a switch in Admin → Diagnostics
+
+Owner (Oct 23): keep the save trace (it found the 212.26 storage bug) but make it something to switch on and off, in Admin → Diagnostics.
+
+- **Admin → Diagnostics → "Score-save trace": On / Off** — per device, OFF by default, on any site (staging or production); only Admin reaches the switch, so members never see it. The game screen shows the trace panel only while it's on (it was always shown on staging). The trace records quietly regardless, so switching it on shows the latest events.
+- lib/save-trace: saveTraceEnabled / setSaveTraceEnabled; components/save-trace-view: SaveTraceToggle, useSaveTraceOn.
+Tests: lib/save-trace-toggle.test.tsx (off by default; on and remembered; off again). Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.26).
+
+## 212.26.261023 — Fix: a full storage area made every score backup fail silently, and entered scores vanished
+
+Found with the 212.25 save trace (owner, Oct 23, staging): "tap … scorer yes", then "save try 1–4: not saved" with no "held" or "sending", then "refresh: … no phone backup" for every player. The save sends what is in the phone's backup; the backup write was failing — the site's storage area (about 5 MB, separate per site) was full — and the error was swallowed, so the writer found nothing to send and the next refresh showed the database's empty card.
+
+**Why it filled:** every new device identity (a fresh install, a takeover, an unrecognised relaunch) copied all earlier identities' score backups into a recovery archive that only grew, and left those backups in place, where they can never be read again (pending work is isolated by device token). Staging, with many test games, deploys and relaunches, filled first; active members on production would have followed in time.
+
+**The fix:**
+- **lib/scoring-device:** the recovery archive (the runaway growth — repeated full copies) keeps its 3 newest entries from the last 30 days; tidyScoringStorage() also removes game snapshots not opened for 30 days, and another identity's backup only when its own timestamp is over 30 days old — never while recent, since another tab or a phone that scored offline may resume it (ci/test-scoring-device caught a first version that removed them) — run after every successful device claim.
+- **lib/draft saveGameScores:** a failed backup write tidies the storage and retries; if it still fails, it is flagged (backupWriteFailed), not swallowed.
+- **The save path (components/tournaments):** each entry is also kept in memory — the writer sends from it when the phone's backup is missing, and a refresh keeps it until confirmed; a plain warning shows at the TOP of the scorecard when backups can't be stored (the bottom status bar can be hidden by the navigation).
+- The staging SAVE TRACE stays for one more round to confirm the fix ("sending … sent: OK").
+
+Tests: lib/storage-tidy.test.ts — a FULL storage area packed with what staging accumulated: the backup succeeds after tidying, the archive is capped at 3, old snapshots go, an unfixable failure is flagged, and the writer sends from memory; the score-recovery and reset suites (the real refresh and save code) pass.
+
+No migration. Deploy: staging first, confirm, then production (it carries 212.20–212.25 too).
+
+## 212.25.261023 — Diagnostic: a save trace on staging
+
+Owner (Oct 23, staging game 564332): in stroke play, entered scores showed, then vanished ~10 s later. The staging API logs show no save_game_score_bundle call at all — the app never sent them — and no status message was seen. The database's save works (tested on a migration-built database: the score is stored).
+
+To find where it breaks without guessing, staging shows a SAVE TRACE at the top of the game screen (lib/save-trace, components/save-trace-view): each tap (and whether this device is the scorer), why the writer held a save (not the scorer / recovery not ready / reset in progress / offline), what was sent and the database's answer, and each refresh (scorer, phone backup missing or discarded, holes kept). Tap the title to collapse. Production never shows it (isStagingClient). No behaviour change.
+
+No migration. Deploy: STAGING ONLY — do not merge to production until the cause is fixed.
+
+## 212.24.261023 — Stableford & stroke play: choose the segment side contest
+
+Owner (Oct 23): a Stableford game showed six-hole segments nobody chose, and there was no way to play front 9 / back 9 instead. The team formats had a Segments setting; the individual formats' "six-hole segments" panel under the leaderboard was always on and always sixes.
+
+- **Setup → Format → Segments** for Stableford and stroke play: **Sixes** (default) / **Nines** (front 9 & back 9) / **Off** — saved in leg_config (no migration). The panel and its breakdown follow the choice ("FRONT 9 & BACK 9 (NET STABLEFORD)"); Off hides it.
+- **TGC money games are always three sixes** — the payouts and clean sweep are built on them (owner: TGC never plays nines). The setting shows "Three sixes — the money game pays on them"; the money calculations (lib/golf computeBetting, lib/segments segOf / segLeadersFrom) are unchanged.
+- lib/segments: indivSegScheme, segRanges, segValues, segLeadersFor — the general version for display; for three sixes it equals the original exactly (tested across 80 random groups, Stableford and stroke play).
+
+Tests: lib/segments-scheme.test.tsx. Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.23).
+
+## 212.23.261023 — An automatic game name follows the format
+
+Owner (Oct 22): changing Stableford to stroke play left the line-up link (and everything that reads the game's name — live link, recap, emails, the app) saying "Stableford / …". Since 208.5 an AUTOMATIC name ("Format / Course / Date") is rebuilt when the course or date changes — the course part works and is tested — but not when the format changes.
+
+- **lib/game-create refreshedAutoName** takes the format too; Setup → Format renames an automatic name in the same update (components/tournaments setFormat). A name the organizer typed is never touched.
+- **A name already left stale** by an earlier format change is recognised as automatic (any format's label), so the next format, course or date change repairs it.
+- **The line-up link's description** names the format properly ("Stroke Play", not the raw "stroke").
+Tests: lib/game-name.test.ts (a format change renames; a stale name is repaired; a typed name is kept; the description's label); lib/lineup-meta.test.ts updated to the label.
+
+Note: chat apps keep the preview they fetched when a link was first shared; sharing the link again shows the new one.
+
+No migration. Deploy: code only (includes 212.22).
+
+## 212.22.261022 — Stroke play scorecard: net score, not Stableford points
+
+Owner (Oct 22): in a stroke play game each score cell's corner badge showed Stableford points ("2", "3") and the legend read "box = net Stableford" — points decide nothing in stroke play. Now, in stroke play only, each played hole's badge is its net score ("net 3" — gross minus the strokes received there), the Out / In / Total boxes show the net total for that nine / the round, and the legend reads "box = net score". Stableford and the other formats keep points. Tests (tee-yardage): stroke play net badges and legend; Stableford unchanged. Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.21).
+
+## 212.21.261022 — Record the real score everywhere; yardage per tee
+
+Owner (Oct 22):
+
+**One entry limit everywhere — par + 8.** Stroke play counted a quad bogey in full, but entry was inconsistent: each player's own card stopped at net double bogey (or double par) outside stroke play, and the round editor at double par — so a 7 on a par 3 couldn't be picked there without a handicap stroke, and the real score was lost. Now every screen and format records the real score up to par + 8 (lib/golf maxHoleScore — the one rule, used by the score pop-up, the player card, the solo/round entry and the round editor). The caps stay in the calculations, which apply them: the handicap index takes each hole at most net double bogey (WHS), Stableford gives 0 points. The quick-pick buttons still stop at double bogey.
+
+**Yardage per tee.** The group scorecard used one yardage for everyone when a group played more than one tee (the game's stored yardage). Each hole header now shows every tee in the group with its yardage, longest first ("Par 4 · Blue 365 · White 340 · SI 7"); one tee reads as before; the score pop-up shows the tapped player's tee. Photographed and reviewed.
+
+Tests: lib/tee-yardage.test.tsx (mixed tees, one tee, the tapped player's tee, the entry limit); full suite unchanged.
+
+No migration. Deploy: code only (includes 212.20).
+
+## 212.20.261022 — Ryder Cup scramble: the recap headline is the session score
+
+Owner (#17): a Ryder Cup scramble's recap headline gives the session score, as the Cup does — "Blues 1½ – ½ Reds" (leader first; level "Reds 1 – 1 Blues") — instead of listing each match result. It comes from the Cup standings' own scoring (lib/competition scoreCompetitionGame: DECIDED matches only), so it can never disagree with the standings; a match unfinished when the game ended is said in a smaller line below ("1 match unfinished — not in the score until completed, as in the Cup standings"). A scramble without the Cup's two teams keeps its headline. Tests (cup-scramble): 1½ – ½; an unfinished match; a non-Cup scramble. Photographed and reviewed.
+
+Also: docs/sql/data_profile.sql gains Part 3 (Insights & Your courses — rounds usable, stroke indexes, putts, members ready, club courses with averages).
+
+No migration. Deploy: code only (includes 212.19).
+
 ## 212.19.261022 — Production matches the migrations: three hand-made functions retired (0216)
 
 The production security check (212.8) found three differences on production:

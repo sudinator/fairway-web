@@ -6,6 +6,6 @@ eq(lineupTitle({ name: "Saturday Trifecta", played_at: "Sat Oct 11" }), "Line-up
 eq(lineupTitle({ name: "Saturday Trifecta", ended: true }), "Saturday Trifecta · finished · Birdie Num Num", "ended title");
 eq(lineupTitle(null), "Line-up · Birdie Num Num", "unknown token title");
 eq(lineupDescription({ course: "Essex County Country Club", players: [1, 2, 3, 4, 5, 6, 7, 8], game_type: "trifecta", allowance_pct: 90 }),
-   "Essex County Country Club · 8 players · trifecta · 90% allowance — tees, playing handicaps, opponents and strokes. Live until the game ends.", "description");
-eq(lineupDescription({ course: "X", players: [1], game_type: "stableford", allowance_pct: 100 }), "X · 1 player · stableford — tees, playing handicaps, opponents and strokes. Live until the game ends.", "100% omits allowance");
+   "Essex County Country Club · 8 players · Trifecta · 90% allowance — tees, playing handicaps, opponents and strokes. Live until the game ends.", "description");
+eq(lineupDescription({ course: "X", players: [1], game_type: "stableford", allowance_pct: 100 }), "X · 1 player · Stableford — tees, playing handicaps, opponents and strokes. Live until the game ends.", "100% omits allowance");
 console.log("lineup-meta tests passed");

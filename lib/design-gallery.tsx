@@ -22,6 +22,8 @@ import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
 import { InsightsCard, InsightsScreen } from "@/components/insights";
 import { YourCourses, CourseDetail } from "@/components/your-courses";
+import { IndivSegmentChoice } from "@/components/game/segment-views";
+import { SaveTraceToggle } from "@/components/save-trace-view";
 import { computeInsights } from "@/lib/insights";
 import { yourCourses } from "@/lib/your-courses";
 import { round as mkRound, PARS as RP, SIS as RS } from "@/lib/test-fixtures/messy-rounds";
@@ -86,6 +88,21 @@ add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () =>
 const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;
 add("19-course-detail", <div style={{ background: "#1B5A46", borderRadius: 12, paddingTop: 12 }}><CourseDetail c={oakRec} loadField={async () => null}
   initialField={{ enough: true, rounds: 41, holes: oakRec.holes.map((h) => ({ hole: h.hole, par: h.par, avg_to_par: Math.round((h.hole === 4 ? 0.9 : h.hole === 13 ? 1.6 : h.avgToPar * 0.8 + 0.3) * 10) / 10 })) }} /></div>);
+
+// 212.21 — a stroke-play group on two tees: each tee's yardage on every hole
+{
+  const tees = [{ name: "Blue", rating: 72.4, slope: 131, par: 72, yardages: holes.map((h) => (h.yards as number) + 25) },
+                { name: "White", rating: 70.1, slope: 125, par: 72, yardages: holes.map((h) => h.yards as number) }];
+  const grp = players().slice(0, 4).map((p, i) => ({ ...p, tee_name: i < 2 ? "Blue" : "White", tee_group: 1, scores: [4, 5, 3, 4, 4, null, null, null, null, null, null, null, null, null, null, null, null, null] })) as never;
+  add("20-scorecard-mixed-tees", <GroupScorecard game={{ ...base, game_type: "stroke", stroke_basis: "net" } as unknown as Game} players={grp} allPlayers={grp} user={{ id: "u0" } as never} isMarker markerName={null} onTakeOver={noop} onRelease={noop} onSetHole={noop} courseTees={tees as never} />);
+}
+
+// 212.24 — the segment choice for an individual game, and for a TGC money game
+add("21-segment-choice", <div><IndivSegmentChoice game={{ ...base, game_type: "stableford", leg_config: { scheme: "nines", metric: "pts", points: {} } } as unknown as Game} moneyGame={false} onSave={noop} />
+  <IndivSegmentChoice game={{ ...base, game_type: "stableford" } as unknown as Game} moneyGame onSave={noop} /></div>);
+
+// 212.27 — the score-save trace switch (Admin → Diagnostics)
+add("22-save-trace-toggle", <SaveTraceToggle />);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

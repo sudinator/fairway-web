@@ -14,7 +14,8 @@ import type { Game, Player } from "@/lib/game-types";
 import { courseLabel, type Course } from "@/lib/courses";
 import { ShareControl } from "@/components/game/scorecard-views";
 import { OrganizerPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
-import { LegConfigEditor } from "@/components/game/segment-views";
+import { LegConfigEditor, IndivSegmentChoice } from "@/components/game/segment-views";
+import { effectiveGroupId, TGC_GROUP_ID } from "@/lib/golf";
 import type { LegConfig } from "@/lib/legs";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { btn, inputStyle, ShortDateInput } from "@/components/ui";
@@ -301,6 +302,10 @@ export function GameSetupWorkspace({
           <OrganizerPanel section="format" {...organizerPanelProps} />
           {onSetLegConfig && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && game.status !== "ended" && (
             <LegConfigEditor game={game} onSave={onSetLegConfig} />
+          )}
+          {/* 212.24: individual games choose their segment side contest; a TGC money game is three sixes */}
+          {onSetLegConfig && (game.game_type === "stableford" || game.game_type === "stroke") && game.status !== "ended" && (
+            <IndivSegmentChoice game={game} moneyGame={effectiveGroupId((game as { group_id?: string | null }).group_id) === TGC_GROUP_ID} onSave={onSetLegConfig} />
           )}
         </>
       )}

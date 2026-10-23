@@ -39,3 +39,26 @@ union all select 'finished games, by format',              string_agg(distinct g
 union all select '  · alternate-shot games',               count(distinct game_id) filter (where game_type = 'alt_shot')::text from gp
 union all select '  · 9-hole games',                       count(distinct game_id) filter (where holes = 9)::text from gp
 union all select '  · games with no holes recorded',       count(distinct game_id) filter (where holes = 0)::text from gp;
+
+-- ── Part 3 · Insights & Your courses (212.18) ─────────────────────────────────────────────────────────
+with r as (
+  select r.id, r.user_id, r.group_id, lower(regexp_replace(trim(r.course), '\s+', ' ', 'g')) as course_key,
+         count(h.*) filter (where h.strokes > 0)                          as scored,
+         count(h.*) filter (where h.strokes > 0 and h.stroke_index is not null) as with_si,
+         count(h.*) filter (where h.strokes > 0 and h.putts is not null)  as with_putts,
+         count(h.*)                                                       as hole_rows
+    from public.rounds r left join public.holes h on h.round_id = r.id
+   where r.deleted_at is null and coalesce(r.status, 'final') = 'final'
+   group by r.id
+), v as (select * from r where scored >= 9)
+select 'personal rounds (final)'                                as what, count(*)::text as value from r
+union all select '  · valid for Insights (9+ holes scored)',     count(*)::text from v
+union all select '  · scores only, no hole-by-hole data',         count(*) filter (where hole_rows = 0)::text from r
+union all select '  · holes with a stroke index (of scored)',     coalesce(round(100.0 * sum(with_si) / nullif(sum(scored), 0)), 0)::text || '%' from v
+union all select '  · rounds with putts on 9+ holes',             count(*) filter (where with_putts >= 9)::text from v
+union all select 'members with 5+ valid rounds (Insights ready)', count(*)::text from (select user_id from v group by user_id having count(*) >= 5) x
+union all select 'members with 1–4 valid rounds (not yet)',       count(*)::text from (select user_id from v group by user_id having count(*) between 1 and 4) x
+union all select 'club courses with club averages (5+ rounds, 3+ members, 2 yrs)', count(*)::text
+  from (select v.group_id, v.course_key from v join public.rounds rr on rr.id = v.id
+         where v.group_id is not null and rr.played_at >= now() - interval '2 years'
+         group by v.group_id, v.course_key having count(*) >= 5 and count(distinct v.user_id) >= 3) x;

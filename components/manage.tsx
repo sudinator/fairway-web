@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveTraceToggle } from "@/components/save-trace-view";
 import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
@@ -8,7 +9,7 @@ import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { chBasis } from "@/lib/game-shape";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook, maxHoleScore } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { write, writeAll } from "@/lib/db-write";
@@ -2144,7 +2145,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                   <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>
                   <div style={{ textAlign: "center", color: C.parBlue, fontWeight: 700 }}>{h.par}</div>
                   <div style={{ textAlign: "center" }}>
-                    <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} width={52} />
+                    <NumPicker value={h.strokes} from={1} to={maxHoleScore(h.par)} onChange={(v) => setHole(i, { strokes: v })} width={52} />
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <NumPicker value={h.putts} from={0} to={h.strokes && h.strokes > 0 ? Math.min(h.strokes, 6) : 6} onChange={(v) => setHole(i, { putts: v })} width={52} />
@@ -2789,7 +2790,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "friction": title = "Friction review"; panel = <AdminFrictionReview />; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
-      case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
+      case "diagnostics": title = "Diagnostics"; panel = <><SaveTraceToggle /><RoundSaveDiag /></>; break;   // 212.27: + the score-save trace switch
       case "clubreports": title = "Club reports"; panel = <AdminClubReport />; break;
       case "clubrequests": title = "Club requests"; panel = <AdminClubRequests user={user} onCount={setClubReqCount} />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
@@ -2844,7 +2845,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="⛳" name="Course data" cap="API verification, pending updates, corrections awaiting approval" onClick={() => setView("coursedata")} />
             <Card icon="🚩" name="Sandbaggers" cap="Entered index vs scoring (18+ rounds)" onClick={() => setView("sandbaggers")} />
             <Card icon="📋" name="Club reports" cap="Preview a club's report for any period" onClick={() => setView("clubreports")} />
-            <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
+            <Card icon="🩺" name="Diagnostics" cap="Score-save trace, round-save log" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
           </>)}
         </>
