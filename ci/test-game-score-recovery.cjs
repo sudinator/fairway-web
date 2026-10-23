@@ -26,7 +26,8 @@ function walk(n){
  ts.forEachChild(n,walk);
 }
 walk(parsed);assert.ok(callback);assert.ok(sendCallback);assert.ok(lockCallback);
-function compileArrow(text,env){const js=ts.transpileModule('const fn='+text+'; return fn;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;return Function(...Object.keys(env),js)(...Object.values(env));}
+function compileArrow(text,env){env={trace:()=>{},...env};   /* 212.25: the staging save trace is a no-op here */
+ const js=ts.transpileModule('const fn='+text+'; return fn;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;return Function(...Object.keys(env),js)(...Object.values(env));}
 function adapter(mode='ok'){
  let stats=0, sent, version, resetEvents=0;
  const client={async rpc(name,args){assert.equal(name,'save_game_score_bundle');stats++;sent=copy(args.p_patch);version=args.p_version;
@@ -44,7 +45,7 @@ function room(server,opts={}){
   if(opts.duringRead){const fn=opts.duringRead;opts.duringRead=null;fn(scoreRevisionRef);}
   const response=table==='games'?{data:{id:'g',holes_meta:[{n:1,par:4},{n:2,par:4}],scores_reset_at:opts.resetAt,scoring_version:opts.version??0}}:table==='game_players'?{data:copy(server),error:opts.failRead?{message:'denied'}:null}:table==='rounds'?{count:0}:{data:[]};return Promise.resolve(response).then(resolve,reject);
  },update(){throw Error('load must not upload')}};return q;}};
- const env={isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
+ const env={trace:()=>{},isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
  return{load:Function(...Object.keys(env),code)(...Object.values(env)),state};
 }
 function seed(b=local,w=base){window.localStorage.clear();draft.saveGameScores('g','p',b,true,100);if(w)draft.saveSyncedWatermark('g','p',w);}

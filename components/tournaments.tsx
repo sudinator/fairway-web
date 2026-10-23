@@ -1,4 +1,6 @@
 "use client";
+import { trace } from "@/lib/save-trace";
+import { SaveTraceView } from "@/components/save-trace-view";
 import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
@@ -1849,15 +1851,20 @@ function GameRoom({
     const n = (safeGame as any)?.holes_meta?.length || 18;
     const resetAt = (safeGame as any)?.scores_reset_at ? new Date((safeGame as any).scores_reset_at).getTime() : 0;
     const reconciled: any[] = [];
+    const scoredOf = (arr: any) => (Array.isArray(arr) ? arr.filter((v: any) => v != null && v > 0).length : 0);
+    trace(`refresh: scorer ${isPrimaryScoringDevice() ? "yes" : "NO — phone entries ignored"} · ready ${recoveryReadyRef.current ? "yes" : "no"}`);
     for (const p of ps) {
       if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
       let backup = loadGameScores(gameId, p.id);
+      if (!backup) trace(`refresh: ${String(p.display_name || "")} — no phone backup`);
       if (backup && (((backup.scoringVersion ?? 0) !== (safeGame.scoring_version ?? 0)) || (resetAt && backup.at < resetAt))) {
+        trace(`refresh: ${String(p.display_name || "")} — phone backup DISCARDED (version ${backup.scoringVersion ?? 0} v ${safeGame.scoring_version ?? 0}${resetAt && backup.at < resetAt ? ", older than reset" : ""})`);
         clearGameScores(gameId, p.id);
         clearSyncedWatermark(gameId, p.id);
         backup = null;
       }
       const { merged } = mergeBackupRow(p, backup || p, n, backup ? loadSyncedWatermark(gameId, p.id) : null);
+      if (backup && scoredOf(backup.scores) !== scoredOf(merged.scores)) trace(`refresh: ${String(p.display_name || "")} — phone ${scoredOf(backup.scores)} holes, kept ${scoredOf(merged.scores)}, database ${scoredOf(p.scores)}`);
       saveGameScores(gameId, p.id, merged, true, backup?.at ?? Date.now(), backup?.scoringVersion ?? (safeGame.scoring_version ?? 0));
       // Never acknowledge the local merge here: the fetch confirmed only p.
       const confirmed = mergeBackupRow(p, p, n).merged;
@@ -1874,6 +1881,7 @@ function GameRoom({
       setNeedsSetup(true);
     setLoading(false);
     recoveryReadyRef.current = isPrimaryScoringDevice();
+    trace(`refresh done · ready ${recoveryReadyRef.current ? "yes" : "no"}`);
     return isPrimaryScoringDevice();
     } catch {
       recoveryReadyRef.current = false;
@@ -2088,14 +2096,20 @@ function GameRoom({
     watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
-    paused: () => !isPrimaryScoringDevice() || !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
+    paused: () => {
+      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
+      if (why.length) trace(`held: ${why.join(", ")}`);
+      return why.length > 0;
+    },
     revision: () => { scoreRevisionRef.current++; },
     send: async (rowId, body, locked, clock) => {
       const backup = loadGameScores(gameIdRef.current, rowId);
+      trace(`sending ${Object.keys(body).join("+")}${locked ? " (stats only)" : ""}`);
       const { data, error } = await supabase.rpc("save_game_score_bundle", {
         p_player: rowId, p_version: backup?.scoringVersion ?? (gameRef.current?.scoring_version ?? 0),
         p_patch: { ...body, ...(!locked ? clock || {} : {}) }, p_stats_only: locked,
       });
+      trace(error ? `refused: ${error.code || ""} ${error.message || ""}`.slice(0, 160) : "sent: OK");
       if (isDeviceRejection(error)) markScoringDeviceRevoked();
       if (error?.code === "BN163") {
         recoveryReadyRef.current = false;
@@ -2195,6 +2209,7 @@ function GameRoom({
       if (!isPrimaryScoringDevice()) return;
       setSyncState(n === 0 ? "saving" : "retry");
       const okd = await pushRowCols(rowId, n === 0 ? bundleOf(firstBody) : freshest(), n === 0 ? clock : undefined);
+      trace(`save try ${n + 1}: ${okd ? "saved" : "not saved"}`);
       if (okd) {
         setSyncState("synced");
         recomputePending();
@@ -2256,6 +2271,7 @@ function GameRoom({
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
   ) => {
     const target = players.find((p) => p.id === playerId);
+    trace(`tap ${target?.display_name || "?"} hole ${holeIdx + 1}${"strokes" in patch ? ` = ${patch.strokes}` : ""} · scorer ${isPrimaryScoringDevice() ? "yes" : "NO"}`);
     if (!game || !target || !isPrimaryScoringDevice()) return;
     const n = game.holes_meta.length || 18;
     const scores = [...(target.scores || Array(n).fill(null))];
@@ -3530,6 +3546,9 @@ function GameRoom({
           </div>
         </div>
       )}
+
+      {/* 212.25: the save trace — staging only (lib/save-trace) */}
+      {isStagingClient() && roomTab === "play" ? <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", left: 8, right: 8, zIndex: 80, maxHeight: "38vh", overflowY: "auto" }}><SaveTraceView /></div> : null}
 
       {(syncState !== "idle" || pendingHoles > 0) && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", zIndex: 60, padding: "0 12px", pointerEvents: "none" }}>

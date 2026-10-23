@@ -1,3 +1,11 @@
+## 212.25.261023 — Diagnostic: a save trace on staging
+
+Owner (Oct 23, staging game 564332): in stroke play, entered scores showed, then vanished ~10 s later. The staging API logs show no save_game_score_bundle call at all — the app never sent them — and no status message was seen. The database's save works (tested on a migration-built database: the score is stored).
+
+To find where it breaks without guessing, staging shows a SAVE TRACE at the top of the game screen (lib/save-trace, components/save-trace-view): each tap (and whether this device is the scorer), why the writer held a save (not the scorer / recovery not ready / reset in progress / offline), what was sent and the database's answer, and each refresh (scorer, phone backup missing or discarded, holes kept). Tap the title to collapse. Production never shows it (isStagingClient). No behaviour change.
+
+No migration. Deploy: STAGING ONLY — do not merge to production until the cause is fixed.
+
 ## 212.24.261023 — Stableford & stroke play: choose the segment side contest
 
 Owner (Oct 23): a Stableford game showed six-hole segments nobody chose, and there was no way to play front 9 / back 9 instead. The team formats had a Segments setting; the individual formats' "six-hole segments" panel under the leaderboard was always on and always sixes.
