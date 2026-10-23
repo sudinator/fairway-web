@@ -3022,6 +3022,9 @@ function GameRoom({
   const setFormat = async (next: GameType) => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const patch = buildFormatPatch(game, next);
+    // 212.23: an automatic name follows the format (the line-up / live links, recap and emails read the name)
+    const nextName = GC.refreshedAutoName(game as any, { gameType: next });
+    if (nextName) patch.name = nextName;
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
@@ -3365,6 +3368,12 @@ function GameRoom({
   const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
   const segLeadersFrom = (rows: { p: Player; seg: [number, number, number] }[]) => SEG.segLeadersFrom(rows, game);
   const segWinners = segLeadersFrom(segTotals);
+  // 212.24: the segment side contest the organizer chose — three sixes (default), front 9 & back 9, or off. A TGC money
+  // game is always three sixes (its payouts use the sixes above, unchanged); the display follows the scheme.
+  const segScheme = SEG.indivSegScheme(game, effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID);
+  const segRangesShown = SEG.segRanges(segScheme, game?.holes_meta?.length || 0);
+  const segLeadersShown = segScheme === "sixes" ? segWinners
+    : SEG.segLeadersFor(players.map((p) => ({ p, seg: SEG.segValues(p, game, segRangesShown) })), game, segRangesShown);
 
   // Bettor-only segment leaders for the money banners (clean-sweep watch/achieved):
   // non-betting players (e.g. guests) still appear in the standings above, but the
@@ -4000,9 +4009,9 @@ function GameRoom({
               score. In alternate shot both partners hold the SIDE's score after the fan-out, so
               this listed four players with duplicated figures, implying four rounds nobody played.
               Gated on the SHAPE, so a future non-individual format is covered without another edit. */}
-          {shapeOf(game).dotBasis !== "alt_shot_side" && (
+          {shapeOf(game).dotBasis !== "alt_shot_side" && segRangesShown.length > 0 && (
           <div style={{ marginTop: 18 }}>
-            <Eyebrow>{isStroke ? "SIX-HOLE SEGMENTS (NET SCORE)" : "SIX-HOLE SEGMENTS (NET STABLEFORD)"}</Eyebrow>
+            <Eyebrow>{`${segScheme === "nines" ? "FRONT 9 & BACK 9" : "SIX-HOLE SEGMENTS"} (${isStroke ? "NET SCORE" : "NET STABLEFORD"})`}</Eyebrow>
             <div
               style={{
                 display: "flex",
@@ -4011,7 +4020,7 @@ function GameRoom({
                 marginTop: 8,
               }}
             >
-              {segWinners.map((s, i) => (
+              {segLeadersShown.map((s, i) => (
                 <div
                   key={i}
                   style={{
@@ -4053,9 +4062,10 @@ function GameRoom({
               ))}
             </div>
             <SegmentBoard
+              cols={segRangesShown.map((r) => r.short)}
               isStroke={isStroke}
               rows={leaderboard.map((p) => {
-                const s = segOf(p);
+                const s = segScheme === "sixes" ? segOf(p) : SEG.segValues(p, game, segRangesShown);
                 return {
                   name: p.display_name,
                   thru: playerThru(p),

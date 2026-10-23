@@ -1,3 +1,54 @@
+## 212.24.261023 — Stableford & stroke play: choose the segment side contest
+
+Owner (Oct 23): a Stableford game showed six-hole segments nobody chose, and there was no way to play front 9 / back 9 instead. The team formats had a Segments setting; the individual formats' "six-hole segments" panel under the leaderboard was always on and always sixes.
+
+- **Setup → Format → Segments** for Stableford and stroke play: **Sixes** (default) / **Nines** (front 9 & back 9) / **Off** — saved in leg_config (no migration). The panel and its breakdown follow the choice ("FRONT 9 & BACK 9 (NET STABLEFORD)"); Off hides it.
+- **TGC money games are always three sixes** — the payouts and clean sweep are built on them (owner: TGC never plays nines). The setting shows "Three sixes — the money game pays on them"; the money calculations (lib/golf computeBetting, lib/segments segOf / segLeadersFrom) are unchanged.
+- lib/segments: indivSegScheme, segRanges, segValues, segLeadersFor — the general version for display; for three sixes it equals the original exactly (tested across 80 random groups, Stableford and stroke play).
+
+Tests: lib/segments-scheme.test.tsx. Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.23).
+
+## 212.23.261023 — An automatic game name follows the format
+
+Owner (Oct 22): changing Stableford to stroke play left the line-up link (and everything that reads the game's name — live link, recap, emails, the app) saying "Stableford / …". Since 208.5 an AUTOMATIC name ("Format / Course / Date") is rebuilt when the course or date changes — the course part works and is tested — but not when the format changes.
+
+- **lib/game-create refreshedAutoName** takes the format too; Setup → Format renames an automatic name in the same update (components/tournaments setFormat). A name the organizer typed is never touched.
+- **A name already left stale** by an earlier format change is recognised as automatic (any format's label), so the next format, course or date change repairs it.
+- **The line-up link's description** names the format properly ("Stroke Play", not the raw "stroke").
+Tests: lib/game-name.test.ts (a format change renames; a stale name is repaired; a typed name is kept; the description's label); lib/lineup-meta.test.ts updated to the label.
+
+Note: chat apps keep the preview they fetched when a link was first shared; sharing the link again shows the new one.
+
+No migration. Deploy: code only (includes 212.22).
+
+## 212.22.261022 — Stroke play scorecard: net score, not Stableford points
+
+Owner (Oct 22): in a stroke play game each score cell's corner badge showed Stableford points ("2", "3") and the legend read "box = net Stableford" — points decide nothing in stroke play. Now, in stroke play only, each played hole's badge is its net score ("net 3" — gross minus the strokes received there), the Out / In / Total boxes show the net total for that nine / the round, and the legend reads "box = net score". Stableford and the other formats keep points. Tests (tee-yardage): stroke play net badges and legend; Stableford unchanged. Photographed and reviewed.
+
+No migration. Deploy: code only (includes 212.21).
+
+## 212.21.261022 — Record the real score everywhere; yardage per tee
+
+Owner (Oct 22):
+
+**One entry limit everywhere — par + 8.** Stroke play counted a quad bogey in full, but entry was inconsistent: each player's own card stopped at net double bogey (or double par) outside stroke play, and the round editor at double par — so a 7 on a par 3 couldn't be picked there without a handicap stroke, and the real score was lost. Now every screen and format records the real score up to par + 8 (lib/golf maxHoleScore — the one rule, used by the score pop-up, the player card, the solo/round entry and the round editor). The caps stay in the calculations, which apply them: the handicap index takes each hole at most net double bogey (WHS), Stableford gives 0 points. The quick-pick buttons still stop at double bogey.
+
+**Yardage per tee.** The group scorecard used one yardage for everyone when a group played more than one tee (the game's stored yardage). Each hole header now shows every tee in the group with its yardage, longest first ("Par 4 · Blue 365 · White 340 · SI 7"); one tee reads as before; the score pop-up shows the tapped player's tee. Photographed and reviewed.
+
+Tests: lib/tee-yardage.test.tsx (mixed tees, one tee, the tapped player's tee, the entry limit); full suite unchanged.
+
+No migration. Deploy: code only (includes 212.20).
+
+## 212.20.261022 — Ryder Cup scramble: the recap headline is the session score
+
+Owner (#17): a Ryder Cup scramble's recap headline gives the session score, as the Cup does — "Blues 1½ – ½ Reds" (leader first; level "Reds 1 – 1 Blues") — instead of listing each match result. It comes from the Cup standings' own scoring (lib/competition scoreCompetitionGame: DECIDED matches only), so it can never disagree with the standings; a match unfinished when the game ended is said in a smaller line below ("1 match unfinished — not in the score until completed, as in the Cup standings"). A scramble without the Cup's two teams keeps its headline. Tests (cup-scramble): 1½ – ½; an unfinished match; a non-Cup scramble. Photographed and reviewed.
+
+Also: docs/sql/data_profile.sql gains Part 3 (Insights & Your courses — rounds usable, stroke indexes, putts, members ready, club courses with averages).
+
+No migration. Deploy: code only (includes 212.19).
+
 ## 212.19.261022 — Production matches the migrations: three hand-made functions retired (0216)
 
 The production security check (212.8) found three differences on production:

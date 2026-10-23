@@ -11,6 +11,8 @@ import type { Game, Player } from "@/lib/game-types";
 import { buildHighlights, type Highlights } from "@/lib/game-highlights";
 import { buildRecapSections, andList, type RecapSections } from "@/lib/game-recap-sections";
 import { scrambleResults, scrambleScoreText } from "@/lib/scramble-game";
+import { cupSideNames } from "@/lib/scramble-teams";
+import { scoreCompetitionGame } from "@/lib/competition";
 
 export type Recap = {
   highlights: Highlights;         // the shared sections (top 3, net birdies, group, course)
@@ -51,7 +53,19 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
     const teamOf = (p: Player) => r.teams.find((t) => (game.foursomes || []).some((f) => f.id === t.groupId && (f[t.side] as string[]).includes(pkey(p))));
     if (r.mode === "match") {
       const done = r.matches.filter((m) => m.status.thru > 0);
-      const headline = !done.length ? "Scramble — no scores yet" : r.matches.length === 1 ? r.matches[0].line : `${r.matches.length} matches: ${r.matches.map((m) => m.line).join(" · ")}`;
+      let headline = !done.length ? "Scramble — no scores yet" : r.matches.length === 1 ? r.matches[0].line : `${r.matches.length} matches: ${r.matches.map((m) => m.line).join(" · ")}`;
+      // 212.20 (owner, #17): a RYDER CUP scramble's headline is the session score — the Cup standings' own scoring
+      // (scoreCompetitionGame: DECIDED matches only), leader first, "Blues 1½ – ½ Reds"; an unfinished match is said.
+      const cup = cupSideNames(game);
+      if (cup && done.length) {
+        const sc = scoreCompetitionGame(game, players, altShotScores, 1);
+        const a = { name: cup[0], pts: sc.decidedA }, b = { name: cup[1], pts: sc.decidedB };
+        const [x, y] = b.pts > a.pts ? [b, a] : [a, b];
+        const open = sc.matchCount - sc.decidedCount;
+        headline = `${x.name} ${fmtPoints(x.pts)} – ${fmtPoints(y.pts)} ${y.name}`;
+        // an unfinished match in a smaller line under the score (the recap's notes) — it scores once it's completed
+        if (open > 0) notes.push(`${open} match${open === 1 ? "" : "es"} unfinished — not in the score until completed, as in the Cup standings.`);
+      }
       live.forEach((p) => { const t = teamOf(p); const m = t && r.matches.find((x) => x.groupId === t.groupId); if (m) personal[pkey(p)] = `Your team (${t!.name}): ${m.line}`; });
       return { headline, endedEarly: false, notes, personal, signature: sig, winner: null };
     }

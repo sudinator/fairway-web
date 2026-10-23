@@ -1,5 +1,5 @@
 import { courseHandicap } from "./golf";
-import type { GameType } from "./game-shape";
+import { GAME_TYPES, type GameType } from "./game-shape";
 import { flightForIndex, type FlightBand } from "./flights";
 import { GP_STATE_DEFAULTS } from "./game-utils";
 import { resolveCreateGameTee, type TeeOption } from "./game-tee-assignment";
@@ -60,21 +60,23 @@ export function autoGameName(gameType: GameTypeOpt, courseName: string, matchDat
 }
 
 /**
- * 208.5: after the date or course changes, the name a game should now have — or null to leave it alone.
+ * 208.5 / 212.23: after the date, course or FORMAT changes, the name a game should now have — or null to leave it alone.
  * Only an AUTOMATIC name is rebuilt: "Format / <current course> / <a date>". The date part is matched by
  * shape, not exact wording, because dates are written differently on differently set-up phones. A name
  * the organizer typed is never touched.
  */
 export function refreshedAutoName(game: { name?: string | null; game_type: string; course?: string | null; played_at?: string | null },
-                                  change: { date?: string; course?: string }): string | null {
+                                  change: { date?: string; course?: string; gameType?: string }): string | null {
   const name = (game.name || "").trim();
-  const prefix = `${gameTypeLabel(game.game_type as GameTypeOpt)} / ${game.course || ""} / `;
-  if (!name.startsWith(prefix)) return null;
-  const datePart = name.slice(prefix.length);
+  // 212.23 (owner): the FORMAT is part of the automatic name too — and a name already left behind by an earlier
+  // format change ("Stableford / …" on a stroke play game) is still recognised as automatic, so it's repaired.
+  const label = GAME_TYPES.map((t) => gameTypeLabel(t as GameTypeOpt)).find((l) => name.startsWith(`${l} / ${game.course || ""} / `));
+  if (!label) return null;
+  const datePart = name.slice(`${label} / ${game.course || ""} / `.length);
   if (!datePart || datePart.includes(" / ") || !/\d/.test(datePart)) return null;
   const date = change.date || String(game.played_at || "").slice(0, 10);
   if (!date) return null;
-  const next = autoGameName(game.game_type as GameTypeOpt, change.course ?? game.course ?? "", date);
+  const next = autoGameName((change.gameType ?? game.game_type) as GameTypeOpt, change.course ?? game.course ?? "", date);
   return next === name ? null : next;
 }
 

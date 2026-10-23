@@ -1,3 +1,23 @@
+## 212.24.261023 — Stableford & stroke play: choose the segment side contest
+
+Owner (Oct 23): a Stableford game showed six-hole segments nobody chose, and there was no way to play front 9 / back 9 instead. The team formats had a Segments setting; the individual formats' "six-hole segments" panel under the leaderboard was always on and always sixes.
+
+## 212.23.261023 — An automatic game name follows the format
+
+Owner (Oct 22): changing Stableford to stroke play left the line-up link (and everything that reads the game's name — live link, recap, emails, the app) saying "Stableford / …". Since 208.5 an AUTOMATIC name ("Format / Course / Date") is rebuilt when the course or date changes — the course part works and is tested — but not when the format changes.
+
+## 212.22.261022 — Stroke play scorecard: net score, not Stableford points
+
+Owner (Oct 22): in a stroke play game each score cell's corner badge showed Stableford points ("2", "3") and the legend read "box = net Stableford" — points decide nothing in stroke play. Now, in stroke play only, each played hole's badge is its net score ("net 3" — gross minus the strokes received there), the Out / In / Total boxes show the net total for that nine / the round, and the legend reads "box = net score". Stableford and the other formats keep points. Tests (tee-yardage): stroke play net badges and legend; Stableford unchanged. Photographed and reviewed.
+
+## 212.21.261022 — Record the real score everywhere; yardage per tee
+
+Owner (Oct 22):
+
+## 212.20.261022 — Ryder Cup scramble: the recap headline is the session score
+
+Owner (#17): a Ryder Cup scramble's recap headline gives the session score, as the Cup does — "Blues 1½ – ½ Reds" (leader first; level "Reds 1 – 1 Blues") — instead of listing each match result. It comes from the Cup standings' own scoring (lib/competition scoreCompetitionGame: DECIDED matches only), so it can never disagree with the standings; a match unfinished when the game ended is said in a smaller line below ("1 match unfinished — not in the score until completed, as in the Cup standings"). A scramble without the Cup's two teams keeps its headline. Tests (cup-scramble): 1½ – ½; an unfinished match; a non-Cup scramble. Photographed and reviewed.
+
 ## 212.19.261022 — Production matches the migrations: three hand-made functions retired (0216)
 
 The production security check (212.8) found three differences on production:

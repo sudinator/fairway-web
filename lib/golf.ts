@@ -1588,3 +1588,11 @@ export function altShotStatus(
   else if (!result) result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`; // still in progress
   return { thru, lead, result };
 }
+
+/**
+ * 212.21 (owner): the highest score a player can ENTER on a hole — par + 8, on every screen and in every format, so the
+ * real score is always recorded (a quad bogey included). The caps belong in the calculations, which apply them: the
+ * handicap index takes each hole at most net double bogey (WHS), Stableford gives 0 points. Entry used to stop at net
+ * double bogey (or double par) outside stroke play, and the round editor at double par — losing the real score.
+ */
+export const maxHoleScore = (par: number) => par + 8;

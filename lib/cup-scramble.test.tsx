@@ -3,6 +3,7 @@ import { ok, report } from "./screen-harness";
 import { cupScrambleMatches, scrambleSetupProblem } from "@/lib/scramble-teams";
 import { scoreCompetitionGame } from "@/lib/competition";
 import { scrambleResults } from "@/lib/scramble-game";
+import { buildRecap } from "@/lib/game-recap";
 import { liveCupSessionScore } from "@/lib/live-competition";
 import type { Game, Player } from "@/lib/game-types";
 
@@ -38,5 +39,20 @@ ok(typeof am.lead === "number", "a lead is reported");
   const r = scrambleResults(game, appPlayers, rows as never);
   ok(r.teams.map((t) => t.name).join(",") === "Reds,Blues", `sides named by the Cup (got ${r.teams.map((t) => t.name)})`);
   ok(/^(Reds|Blues) \d+ UP thru 12$|^All square thru 12$/.test(r.matches[0].line), `the match line names the Cup team (got ${r.matches[0].line})`);
+}
+// 212.20 (#17) — a Ryder Cup scramble's recap headline is the session score, from the Cup standings' own scoring
+{
+  const ids = ["a1", "a2", "b1", "b2", "a3", "a4", "b3", "b4"];
+  const ps = ids.map((id) => ({ id, user_id: id, display_name: id, team: id[0] === "a" ? "A" : "B", course_handicap: 10, course_handicap_source: "manual", scores: [], no_show: false })) as unknown as Player[];
+  const fs = [{ id: "m1", name: "Match 1", a: ["a1", "a2"], b: ["b1", "b2"] }, { id: "m2", name: "Match 2", a: ["a3", "a4"], b: ["b3", "b4"] }];
+  const g = (over: Record<string, unknown> = {}) => ({ ...game, status: "ended", foursomes: fs, ...over }) as unknown as Game;
+  const rowsFor = (fid: string, side: string, s: number, n = 18) => Array.from({ length: n }, (_, i) => ({ game_id: "g", foursome_id: fid, side, hole_index: i, strokes: s }));
+  const full = [...rowsFor("m1", "a", 5), ...rowsFor("m1", "b", 4), ...rowsFor("m2", "a", 4), ...rowsFor("m2", "b", 4)];
+  ok(buildRecap(g(), ps, full as never).headline === "Blues 1½ – ½ Reds", `Blues win match 1, match 2 halved: "Blues 1½ – ½ Reds" (got ${buildRecap(g(), ps, full as never).headline})`);
+  const early = [...rowsFor("m1", "a", 5), ...rowsFor("m1", "b", 4), ...rowsFor("m2", "a", 4, 14), ...rowsFor("m2", "b", 4, 14)];
+  const er = buildRecap(g(), ps, early as never);
+  ok(er.headline === "Blues 1 – 0 Reds" && er.notes.some((n) => n.startsWith("1 match unfinished")), `match 2 stopped after 14: counted as the standings do, noted below (got ${er.headline} / ${er.notes})`);
+  const plain = buildRecap(g({ teams: null }), ps.map((p) => ({ ...p, team: null })) as never, full as never).headline;
+  ok(plain.startsWith("2 matches:"), `a scramble without the Cup's teams keeps its headline (got ${plain})`);
 }
 report("cup scramble");

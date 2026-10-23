@@ -3,7 +3,7 @@
 import type { StrokeBasisKey } from "@/lib/game-shape";
 import React, { useState } from "react";
 import {
-  C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate, roundHoleCount, expectedNineDifferential } from "@/lib/golf";
+  C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate, roundHoleCount, expectedNineDifferential, maxHoleScore } from "@/lib/golf";
 
 // Player avatar: circular photo when one exists, otherwise a colored circle with
 // the player's initials so the layout is always consistent (never a broken image).
@@ -532,7 +532,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
 }) {
   const net = strokes != null && strokes > 0 ? strokes - recv : null;
   const netDouble = par + 2 + recv;
-  const clampG = (v: number) => Math.max(1, Math.min(par + 8, v));
+  const clampG = (v: number) => Math.max(1, Math.min(maxHoleScore(par), v));
   const sfPts = stablefordPts(strokes, par, recv);
   const picks = Array.from(new Set([par - 1, par, par + 1, par + 2].filter((v) => v >= 1 && v <= netDouble)));
   const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
@@ -566,7 +566,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
             {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
             {strokes != null && strokes > 0 ? <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px", marginLeft: 6 }}>{sfPts ?? 0} pts</span> : <span style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>· grey = par, tap to record</span>}
           </div>
-          <button onClick={() => onPatch({ strokes: clampG((strokes || par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: strokes != null && strokes >= par + 8 ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
+          <button onClick={() => onPatch({ strokes: clampG((strokes || par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: strokes != null && strokes >= maxHoleScore(par) ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {picks.map((v) => {
@@ -671,7 +671,8 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
   matchMode?: boolean;          // when true (1:1 match), render one card per hole instead of the wide grid
   showSixes?: boolean;          // TGC: show Front/Middle/Last six net-Stableford subtotals at the top
   strokeSixes?: boolean;     // stroke games: show net-score (lowest) subtotals, not Stableford
-  uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
+  /** @deprecated 212.21 — every format now records the real score (maxHoleScore); kept so callers still compile */
+  uncap?: boolean;
   showIndivDots?: boolean;      // relative games (match/four-ball/trifecta): also show blue individual (full-handicap) dots
   matchStrokeLabel?: string;
   scoreLocked?: boolean;        // group scoring: someone else owns my gross score — view-only, stats still editable
@@ -784,7 +785,7 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
         </div>
         {seg.map((h, j) => {
           const i = from + j;
-          const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
+          const maxStrokes = maxHoleScore(h.par);   // 212.21: the real score, every format (caps live in the calculations)
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
           return (
@@ -904,7 +905,7 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
   );
   const matchCard = (i: number) => {
     const h = holes[i];
-    const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
+    const maxStrokes = maxHoleScore(h.par);   // 212.21: the real score, every format (caps live in the calculations)
     const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
     const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
     const penN = h.penalties || 0; const sandOn = !!h.sand;

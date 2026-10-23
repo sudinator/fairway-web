@@ -247,10 +247,15 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   // tee's yardages (resolves even for older games whose holes_meta had none);
   // otherwise fall back to the game's stored yardage.
   const refTee = playerOrder.length && playerOrder.every((p) => p.tee_name === playerOrder[0].tee_name) ? playerOrder[0].tee_name : null;
-  const ydsAt = (idx: number, fallback: number | null | undefined) => {
-    const t = refTee ? courseTees.find((x) => x.name === refTee) : null;
-    return (t?.yardages?.[idx] ?? fallback ?? null);
-  };
+  // 212.21 (owner): a tee's yardage on a hole; null when the tee or its yardage is unknown
+  const teeYds = (tee: string | null | undefined, idx: number) => (tee ? courseTees.find((x) => x.name === tee)?.yardages?.[idx] ?? null : null);
+  const ydsAt = (idx: number, fallback: number | null | undefined) => (refTee ? teeYds(refTee, idx) : null) ?? fallback ?? null;
+  // a group on MORE THAN ONE tee: each tee's yardage, longest first ("Blue 412 · White 388") — it used to fall back to
+  // the game's one stored yardage for everyone
+  const groupTees = Array.from(new Set(playerOrder.map((p) => p.tee_name).filter((t): t is string => !!t)));
+  const teesAt = (idx: number) => (groupTees.length > 1
+    ? groupTees.map((t) => ({ t, y: teeYds(t, idx) })).filter((x) => x.y != null).sort((a, b) => (b.y as number) - (a.y as number))
+    : []);
   const colorFor = (p: Player): string => {
     if (shapeOf(game).usesTeams && Array.isArray(game.teams) && game.teams.length && p.team) {
       const ti = game.teams.findIndex((t) => t.key === p.team);
@@ -263,6 +268,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   const cell: React.CSSProperties = { position: "relative", background: C.cell, borderRadius: 6, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
   const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 6, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
+  const isStrokePlay = game.game_type === "stroke";   // 212.22: net score badges, not Stableford points
   const sums = (p: Player, from: number, to: number) => {
     let g = 0, net = 0, mPts = 0, cPts = 0;
     for (let i = from; i <= to && i < meta.length; i++) {
@@ -419,7 +425,11 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
       <div key={`hc${i}`} id={`grphole-${i}`} style={{ background: "#13352A", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ color: C.cream, fontSize: 18, fontWeight: 800, lineHeight: 1 }}>Hole {m.n}</span>
-          <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{(() => { const y = ydsAt(i, m.yards); return y ? <> · <b style={{ color: C.cream }}>{y}</b> yds</> : null; })()} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
+          <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{(() => {
+            const multi = teesAt(i);
+            if (multi.length > 1) return <span data-tee-yardages> · {multi.map((x, k) => <React.Fragment key={x.t}>{k ? " · " : ""}{x.t} <b style={{ color: C.cream }}>{x.y}</b></React.Fragment>)}</span>;
+            const y = ydsAt(i, m.yards); return y ? <> · <b style={{ color: C.cream }}>{y}</b> yds</> : null;
+          })()} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
         </div>
         {game.game_type === "alt_shot" && Array.isArray(game.foursomes) ? (
           <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -470,12 +480,13 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                   {c.altSide && gross != null && gross > 0 && <span style={{ position: "absolute", bottom: 3, right: 4, color: C.faint, fontSize: 11, fontWeight: 800 }}>net {gross - recv}</span>}
                   {/* Stableford points are scored off the COURSE handicap. The second box here used to
                       show points computed on the MATCH basis — a number nobody scores — so it is gone (185.0). */}
-                  {!c.altSide && gross != null && gross > 0 && (relBasis ? (
+                  {/* 212.22 (owner): in STROKE PLAY the same badge shows the hole's NET score — points decide nothing there */}
+                  {!c.altSide && gross != null && gross > 0 && (relBasis && !isStrokePlay ? (
                     <>
                       <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.borderCard}`, borderRadius: 6, background: C.cellChip, color: C.ink, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
                     </>
                   ) : (
-                    <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{oPts ?? 0}</span>
+                    <span data-net-badge={isStrokePlay ? "" : undefined} style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{isStrokePlay ? `net ${gross - recv}` : (oPts ?? 0)}</span>
                   ))}
                 </div>
               </div>
@@ -501,12 +512,12 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                 {c.altSide && s.g > 0 && <span style={{ position: "absolute", bottom: 2, right: 4, color: C.sage, fontSize: 11, fontWeight: 800 }}>net {s.net}</span>}
                 {/* Second Stableford box removed (185.0): it showed points computed on the MATCH
                     basis, which is not a number anyone scores. Points are off the course handicap. */}
-                {!c.altSide && s.g > 0 && (relBasis ? (
+                {!c.altSide && s.g > 0 && (relBasis && !isStrokePlay ? (
                   <>
                     <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.sage}`, borderRadius: 6, color: C.cream, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
                   </>
                 ) : (
-                  <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 11, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
+                  <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 11, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{isStrokePlay ? `net ${s.net}` : s.mPts}</span>
                 ))}
               </div>
             </div>
@@ -598,7 +609,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             {Array.from(seen.entries()).map(([key, label]) => (
               <span key={key} style={{ color: DARK[key], fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph(key, DARK[key], false, key)} {label}</span>
             ))}
-            <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes &middot; box = net Stableford</span>
+            <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes &middot; box = {isStrokePlay ? "net score" : "net Stableford"}</span>
           </>;
         })()}
       </div>
@@ -728,7 +739,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             title={`${sideCol?.altSide ? `${sideCol.altSide.name} · ${game.game_type === "scramble" ? "team" : "playing"} hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
             par={m.par}
             si={m.si ?? null}
-            yardage={ydsAt(edit.holeIdx, m.yards)}
+            yardage={teeYds(strokePool.find((x) => x.id === edit.playerId)?.tee_name, edit.holeIdx) ?? ydsAt(edit.holeIdx, m.yards)}   /* 212.21: the tapped player's tee */
             strokes={gross}
             putts={putts}
             fairway={fw}

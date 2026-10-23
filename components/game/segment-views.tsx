@@ -1,4 +1,5 @@
 "use client";
+import { indivSegScheme } from "@/lib/segments";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
@@ -140,19 +141,20 @@ export function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: Le
 export function SegmentBoard({
   rows,
   isStroke,
+  cols = ["1\u20136", "7\u201312", "13\u201318"],
 }: {
   rows: { name: string; thru: number; segs: number[]; total: number; isMe: boolean }[];
   isStroke: boolean;
+  cols?: string[];   // 212.24: the segments' short labels — three sixes by default, or Front / Back
 }) {
   const [open, setOpen] = React.useState(false);
   if (rows.length < 1) return null;
   const sorted = rows.slice().sort((a, b) => (isStroke ? a.total - b.total : b.total - a.total));
-  const segLeader = [0, 1, 2].map((i) => {
+  const segLeader = cols.map((_, i) => {
     const vals = rows.map((r) => r.segs[i]);
     if (!vals.length) return null;
     return isStroke ? Math.min(...vals) : Math.max(...vals);
   });
-  const cols = ["1\u20136", "7\u201312", "13\u201318"];
   return (
     <div style={{ marginTop: 10, background: C.greenLight, borderRadius: 12, overflow: "hidden" }}>
       <div
@@ -371,3 +373,33 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
   );
 }
 
+
+
+/**
+ * 212.24 (owner): the segment side contest for an INDIVIDUAL game (Stableford, stroke play) — three sixes (the
+ * default), front 9 & back 9, or off. A TGC money game is always three sixes (its payouts use them), so it's shown, not
+ * offered. Saved in leg_config.scheme (no migration).
+ */
+export function IndivSegmentChoice({ game, moneyGame, onSave }: { game: Game; moneyGame: boolean; onSave: (cfg: LegConfig) => void }) {
+  const cur = indivSegScheme(game, moneyGame);
+  const base: LegConfig = { ...DEFAULT_LEG_CONFIG, ...((game as { leg_config?: Partial<LegConfig> }).leg_config || {}) } as LegConfig;
+  const opts: { k: "sixes" | "nines" | "none"; label: string }[] = [{ k: "sixes", label: "Sixes" }, { k: "nines", label: "Nines" }, { k: "none", label: "Off" }];
+  return (
+    <div data-indiv-segments style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 12 }}>
+      <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SEGMENTS</div>
+      {moneyGame ? (
+        <div style={{ color: C.cream, fontSize: 13, marginTop: 6 }}>Three sixes — the money game pays on them.</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {opts.map((o) => (
+              <button key={o.k} onClick={() => o.k !== cur && onSave({ ...base, scheme: o.k })} aria-pressed={o.k === cur}
+                style={{ ...btn(o.k === cur), flex: 1, fontSize: 13 }}>{o.label}</button>
+            ))}
+          </div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>A side contest under the leaderboard: the best {game.game_type === "stroke" ? "net score" : "Stableford points"} {cur === "nines" ? "on the front 9 and on the back 9" : cur === "none" ? "— off for this game" : "on holes 1–6, 7–12 and 13–18"}.</div>
+        </>
+      )}
+    </div>
+  );
+}
