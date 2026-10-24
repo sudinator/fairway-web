@@ -4,7 +4,7 @@
 // singles call a match decided when the engine returns a result; four-ball / alternate shot when the
 // lead exceeds the holes left or every hole is played.
 import { matchStatus, fourballStatus, altShotStatus, computeTrifecta, computeSkins, computeHeadToHeadSkins, computeTeamBestBallSkins, type FourballMember, type SkinPlayer } from "@/lib/golf";
-import { shapeOf } from "@/lib/game-shape";
+import { shapeOf, skinsTieOf } from "@/lib/game-shape";
 import { pkey, chBasis, altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
@@ -126,7 +126,7 @@ export function skinsTotals(game: Game, players: Player[]): { byPlayer: Record<s
     let a = 0, b = 0, carry = 0;
     (game.foursomes || []).forEach((f) => {
       if (!f.a.length || !f.b.length) return;
-      const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
+      const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", skinsTieOf(game));
       a += r.skinsBySide.a || 0; b += r.skinsBySide.b || 0; carry += r.carryAtEnd;
     });
     return { byPlayer: {}, byTeam: { A: a, B: b }, carry };
@@ -135,7 +135,7 @@ export function skinsTotals(game: Game, players: Player[]): { byPlayer: Record<s
     const byPlayer: Record<string, number> = {}; let carry = 0;
     (game.pairings || []).forEach((pr) => {
       const pa = sp(pr.a), pb = sp(pr.b); if (!pa || !pb) return;
-      const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100);
+      const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100, skinsTieOf(game));
       Object.entries(r.skinsBySide).forEach(([id, n]) => { byPlayer[id] = (byPlayer[id] || 0) + n; });
       carry += r.carryAtEnd;
     });

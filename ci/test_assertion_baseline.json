@@ -1,5 +1,5 @@
 {
-  "total": 439737,
+  "total": 439750,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -62,6 +62,7 @@
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,
+    "skins ties": 13,
     "storage tidy": 18,
     "stroke agreement": 38,
     "stroke rounding": 24,

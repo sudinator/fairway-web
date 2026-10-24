@@ -41,6 +41,7 @@
     "lib/scramble-render.test.tsx",
     "lib/scramble-noshow.test.tsx",
     "lib/scramble-groups.test.tsx",
+    "lib/skins-tie.test.tsx",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",

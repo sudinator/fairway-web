@@ -46,7 +46,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides, skinsTieOf } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
@@ -181,7 +181,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
         const p = playerOf(uid);
         return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
       });
-      const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
+      const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", skinsTieOf(game));
       return { f, result };
     });
     const carrying = cards.reduce((s, c) => s + c.result.carryAtEnd, 0);
@@ -258,7 +258,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
     const matchCards = game.pairings.map((pr, idx) => {
       const pa = skinPlayerOf(pr.a), pb = skinPlayerOf(pr.b);
       if (!pa || !pb) return null;
-      return { idx, pr, pa, pb, result: computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100) };
+      return { idx, pr, pa, pb, result: computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100, skinsTieOf(game)) };
     }).filter(Boolean) as { idx: number; pr: { a: string; b: string }; pa: SkinPlayer; pb: SkinPlayer; result: ReturnType<typeof computeHeadToHeadSkins> }[];
     const totals: Record<string, number> = {};
     matchCards.forEach(({ result }) => Object.entries(result.skinsBySide).forEach(([id, n]) => { totals[id] = (totals[id] || 0) + n; }));
@@ -286,7 +286,10 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
           </div>
         )}
         {isTeamSkins && (() => {
-          const rem = game.holes_meta.length - (teamTotals.A + teamTotals.B);
+          // 212.35: every 1:1 match (or 2 v 2 foursome) has its own skin on each hole — the game was counted as one
+          // match, so with two matches 6 of 36 left read "6 still in play" when 24 were.
+          const contests = Math.max(1, matchCards.length);
+          const rem = game.holes_meta.length * contests - (teamTotals.A + teamTotals.B);
           return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${fmtSkins(rem)} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
         })()}
         {carrying > 0 && (
@@ -319,11 +322,12 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
                 const tiedCarry = h.decided && !h.winnerId;
                 const won = h.decided && h.winnerId;
                 const winnerLabel = h.winnerId === pa.id ? pa.name : h.winnerId === pb.id ? pb.name : "";
+                const halved = skinsTieOf(game) === "halved";   // 212.35: worded as 2 v 2 skins words it
                 return (
                   <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.borderCard}` }}>
                     <span style={{ width: 24, color: C.sage, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
-                    <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
-                    {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.sage, fontSize: 11 }}>{h.value} at stake</span>}
+                    <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? (halved ? "Halved · ½ each" : "Halved — carries") : "Not played yet"}</span>
+                    {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{halved ? "½ each" : "push →"}</span> : <span style={{ color: C.sage, fontSize: 11 }}>{h.value} at stake</span>}
                   </div>
                 );
               })}

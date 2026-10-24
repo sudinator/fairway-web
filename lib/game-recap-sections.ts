@@ -4,7 +4,7 @@
 // (the day's winner first), then largest margin; formats without teams by largest margin; halves and
 // splits last; equal margins keep tee order.
 import { matchStatus, fourballStatus, altShotStatus, computeTrifecta, computeSkins, computeHeadToHeadSkins, computeTeamBestBallSkins, type SkinPlayer } from "@/lib/golf";
-import { pkey, chBasis, shapeOf } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, skinsTieOf } from "@/lib/game-shape";
 import * as PS from "@/lib/player-scoring";
 import { membersOf, altShotInputsFor, playerLookup } from "@/lib/game-results";
 import { rankTies, type Ranked, type Highlights } from "@/lib/game-highlights";
@@ -176,13 +176,13 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
       const rows: SkinMatchRow[] = [];
       if (shape.skinsStyle === "team_2v2") (game.foursomes || []).forEach((f: any) => {
         if (!f.a?.length || !f.b?.length) return;
-        const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
+        const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", skinsTieOf(game));
         const ta = playerOf(f.a[0])?.team ?? "A"; const a = r.skinsBySide.a || 0, b = r.skinsBySide.b || 0;
         rows.push({ a: f.a.map(nm), b: f.b.map(nm), aSkins: a, bSkins: b, winnerTeam: a === b ? null : a > b ? ta : other(ta) });
       });
       else (game.pairings || []).forEach((pr) => {
         const pa = sp(pr.a), pb = sp(pr.b); if (!pa || !pb) return;
-        const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100);
+        const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100, skinsTieOf(game));
         const ta = playerOf(pr.a)?.team ?? "A"; const a = r.skinsBySide[pr.a] || 0, b = r.skinsBySide[pr.b] || 0;
         rows.push({ a: [pa.name], b: [pb.name], aSkins: a, bSkins: b, winnerTeam: a === b ? null : a > b ? ta : other(ta) });
       });

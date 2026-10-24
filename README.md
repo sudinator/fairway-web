@@ -1,3 +1,7 @@
+## 212.35.261024 — Fix: 1:1 team skins ignored "Halved" (always carried); "skins still in play" counted one match
+
+Found while mapping formats for one-step creation (Oct 24): Create offers 1:1 team skins with ties **halved**, but the 1:1 engine (lib/golf computeHeadToHeadSkins) had no tie setting and always carried ties over. Individual and 2 v 2 skins did respect it. Owner checked production first: **no 1:1 skins game was ever set to halved**, so no past result changes.
+
 ## 212.34.261023 — Scramble: small teams share a group, so one scorer keeps one card for all of them
 
 Owner (Oct 23): with teams of 2, or captains only, teams play together on the course — but saving teams made EACH TEAM ITS OWN TEE GROUP (components/tournaments.tsx, group = team number), so a foursome of two teams had two group cards and no one could keep both.

@@ -1,3 +1,14 @@
+## 212.35.261024 — Fix: 1:1 team skins ignored "Halved" (always carried); "skins still in play" counted one match
+
+Found while mapping formats for one-step creation (Oct 24): Create offers 1:1 team skins with ties **halved**, but the 1:1 engine (lib/golf computeHeadToHeadSkins) had no tie setting and always carried ties over. Individual and 2 v 2 skins did respect it. Owner checked production first: **no 1:1 skins game was ever set to halved**, so no past result changes.
+
+**Fix:** computeHeadToHeadSkins takes the tie setting — halved = every hole worth 1, a tie ½ each, nothing carries (the 2 v 2 rule); carry over unchanged and still the default. Every team skins call (1:1 and 2 v 2, in the scoring screen, the recap and the results) reads the setting through ONE rule, lib/game-shape skinsTieOf. The 1:1 screen words a halved tie as 2 v 2 does ("Halved · ½ each").
+**Also fixed on that screen:** "N skins still in play" was 18 minus skins won, as if the game were one match; with two 1:1 matches 6 left of 36 read "6". It now counts every match (24 in the gallery example).
+Tests: lib/skins-tie (13): the engine both ways, 1:1 halved agrees with 2 v 2 halved, team totals, the screen's wording, "still in play" with two matches. Negative-tested: the old engine fails 4 (the bug's own numbers), the old count fails 1. Guard: ci/check_skins_tie.py — every team skins engine call must pass skinsTieOf(game); negative-tested. Design gallery: 12-skins-11-halved.
+Not in this release: the public live page scores every skins game as individual carry-over (it has no skins setting in its feed) — a separate fix with a migration.
+
+No migration. Deploy: code only.
+
 ## 212.34.261023 — Scramble: small teams share a group, so one scorer keeps one card for all of them
 
 Owner (Oct 23): with teams of 2, or captains only, teams play together on the course — but saving teams made EACH TEAM ITS OWN TEE GROUP (components/tournaments.tsx, group = team number), so a foursome of two teams had two group cards and no one could keep both.
