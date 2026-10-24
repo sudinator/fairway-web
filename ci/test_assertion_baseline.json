@@ -1,5 +1,5 @@
 {
-  "total": 439750,
+  "total": 439782,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -39,6 +39,7 @@
     "legs": 30,
     "lineup renders": 37,
     "live cup parity": 49,
+    "live skins": 19,
     "manual course handicap": 17,
     "manual handicap simulation": 76807,
     "match length": 49,
@@ -62,6 +63,7 @@
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,
+    "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,
     "stroke agreement": 38,

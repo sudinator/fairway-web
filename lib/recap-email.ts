@@ -4,6 +4,7 @@
 // of "how the field played" mirrors components/game/recap-body word for word, and
 // lib/round-email-recap.test.tsx renders both from the same game and checks they read the same.
 import type { Recap } from "@/lib/game-recap";
+import { fmtSkins } from "@/lib/skins-format";
 import { fmtPoints } from "@/lib/game-results";
 import type { CupLine } from "@/lib/cup-standing";
 import { shortenedNote } from "@/lib/round-rules";
@@ -57,8 +58,8 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
   // 1. the format's own results
   if (s.matches?.rows.length) parts.push(H(s.matches.title.toUpperCase()) + TABLE(s.matches.rows.map((m) =>
     ROW(m.halved ? `${esc(m.winners.join(" & "))} halved with ${esc(m.losers.join(" & "))}` : `${esc(m.winners.join(" & "))} <span style="color:#5d6f66">beat</span> ${esc(m.losers.join(" & "))}`, esc(m.result))).join("")));
-  if (s.skins?.length) parts.push(H("SKINS") + TABLE(s.skins.filter((k) => k.skins > 0).map((k) => ROW(esc(k.name), `${fmtPoints(k.skins)} · holes ${k.holes.map((x) => x.n).join(", ")}`)).join("")));
-  if (s.skinMatches?.rows.length) parts.push(H(s.skinMatches.title.toUpperCase()) + TABLE(s.skinMatches.rows.map((m) => ROW(`${esc(m.a.join(" & "))} vs ${esc(m.b.join(" & "))}`, `${fmtPoints(m.aSkins)}–${fmtPoints(m.bSkins)}`)).join("")));
+  if (s.skins?.length) parts.push(H("SKINS") + TABLE(s.skins.filter((k) => k.skins > 0).map((k) => ROW(esc(k.name), `${fmtSkins(k.skins)} · holes ${k.holes.map((x) => x.n).join(", ")}`)).join("")));
+  if (s.skinMatches?.rows.length) parts.push(H(s.skinMatches.title.toUpperCase()) + TABLE(s.skinMatches.rows.map((m) => ROW(`${esc(m.a.join(" & "))} vs ${esc(m.b.join(" & "))}`, `${fmtSkins(m.aSkins)}–${fmtSkins(m.bSkins)}`)).join("")));
   // 211.1 / 212.16: a scramble's results — the app's leaderboard table (SCR_TABLE) and named matches
   if (s.scramble) parts.push(H(s.scramble.mode === "match" ? "SCRAMBLE · TEAM V TEAM" : `SCRAMBLE · ${s.scramble.gross ? "GROSS" : "NET"}`) + TABLE(s.scramble.mode === "match"
     ? s.scramble.matches.map((m) => ROW(`${esc(m.name)} · ${esc(m.line)}<div style="color:#5d6f66;font-size:12px">${esc(m.a)}<br>${esc(m.b)}</div>`, "")).join("")

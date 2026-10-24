@@ -1,3 +1,11 @@
+## 212.37.261024 — Skins counts print as fractions everywhere; the recap body credits shared (halved) holes
+
+Owner (Oct 24) asked for one way to print skins after 212.36 showed the gap. When players tie a hole in individual skins with ties halved, the skin is SHARED — three players tie, each gets ⅓. Every place that printed a skins count got that wrong in its own way: the scoring screen and live page knew only halves (⅓ read "0", 1⅔ read "1½"); the recap email used the match-points printer (⅓ read "½"); the recap headline, "you won N skins" and the recap screen printed raw numbers ("1.6666666666666665").
+
+## 212.36.261023 — The public live scorecard scores skins the way the app does (migration 0218)
+
+Found Oct 24 while fixing 1:1 halved skins (212.35): the shared live link scored EVERY skins game as individual carry-over across the whole field. It ignored "Halved", and it ignored 1:1 and 2 v 2 team skins (the team standings summed field-wide skins by team). The app was right; only the live page was wrong. Its feed had no skins setting at all.
+
 ## 212.35.261024 — Fix: 1:1 team skins ignored "Halved" (always carried); "skins still in play" counted one match
 
 Found while mapping formats for one-step creation (Oct 24): Create offers 1:1 team skins with ties **halved**, but the 1:1 engine (lib/golf computeHeadToHeadSkins) had no tie setting and always carried ties over. Individual and 2 v 2 skins did respect it. Owner checked production first: **no 1:1 skins game was ever set to halved**, so no past result changes.

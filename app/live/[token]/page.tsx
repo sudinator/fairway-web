@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { fmtSkins } from "@/lib/skins-format";
 import type { GameType } from "@/lib/game-shape";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -13,6 +14,7 @@ import {
 } from "@/lib/golf";
 import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
 import { strokePace } from "@/lib/player-scoring";
+import { liveSkins } from "@/lib/live-skins";
 import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
@@ -37,6 +39,8 @@ type LiveGame = {
   game_type: GameType;
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
+  /** 212.36 (0218): how a tied skins hole is settled — absent on older feeds (then carry over, as the app defaults). */
+  skins_mode?: "carryover" | "split" | null;
   trifecta_scoring: "match" | null;
   stroke_basis: "gross" | "net" | null;
   teams: { key: string; name: string }[];
@@ -136,10 +140,12 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
       });
     });
   } else if (game.game_type === "skins") {
-    const sp: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
-    const res = computeSkins(meta, sp, allowance);
-    players.forEach((p) => { if (p.team) addPts(pts, p.team, res.skinsByPlayer[p.id] || 0); });
-    unclaimed = meta.length - Object.values(res.skinsByPlayer).reduce((a, n) => a + (n as number), 0);
+    // 212.36: the app's skins rules (lib/live-skins → lib/game-results skinsTotals) — halved or carry over, and 1:1 /
+    // 2 v 2 team skins by their pairs. It used to count every skins game as individual carry-over across the field.
+    const r = liveSkins({ ...game, holes_meta: meta }, players, pairings, foursomes);
+    if (r.byTeam) Object.entries(r.byTeam).forEach(([k, n]) => addPts(pts, k, n));
+    else players.forEach((p) => { if (p.team) addPts(pts, p.team, r.byPlayer[p.id] || 0); });
+    unclaimed = r.stillInPlay;
   } else {
     players.forEach((p) => { if (p.team) addPts(pts, p.team, computePlayer(p, meta, allowance).points); });
   }
@@ -147,7 +153,7 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   const rows = teams.map((t, i) => ({
     key: t.key, name: t.name, color: teamColor(t.name, i),
     members: players.filter((p) => p.team === t.key).map((p) => p.display_name),
-    scoreNum: pts[t.key] || 0, scoreLabel: isSkins ? String(pts[t.key] || 0) : fmtHalf(pts[t.key] || 0),
+    scoreNum: pts[t.key] || 0, scoreLabel: isSkins ? fmtSkins(pts[t.key] || 0) : fmtHalf(pts[t.key] || 0),   // 212.37: the shared skins printer
   })).sort((x, y) => y.scoreNum - x.scoreNum);
   return { rows, out, unclaimed, isSkins };
 }
@@ -265,9 +271,8 @@ function Scorecard({ data }: { data: LiveData }) {
   const strokeNet = isStroke && game.stroke_basis !== "gross"; // null/"net" => net
   const skinsByPlayer = useMemo(() => {
     if (!isSkins) return {} as Record<string, number>;
-    const sp = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
-    return computeSkins(meta, sp, allowance).skinsByPlayer || {};
-  }, [isSkins, players, meta, allowance]);
+    return liveSkins({ ...game, holes_meta: meta }, players, pairings, foursomes).byPlayer;   // 212.36: the app's rules
+  }, [isSkins, game, players, pairings, foursomes, meta]);
 
   // 212.31: stroke play ranks on par pace (lib/player-scoring strokePace) — the app's rule, not raw totals.
   const strokeMetric = (p: LivePlayer) => { const s = stats[p.id]; return -strokePace(strokeNet ? s.net : s.gross, s.gross - s.toPar, s.thru); };
@@ -321,7 +326,7 @@ function Scorecard({ data }: { data: LiveData }) {
     ? ts.rows.map((r) => ({ title: r.name, color: r.color, players: sortPlayers(players.filter((p) => p.team === r.key)) }))
     : [{ title: null as string | null, color: null as string | null, players: sortPlayers(players) }];
 
-  const rightOf = (p: LivePlayer) => isStab ? `${stats[p.id].points} pts` : isSkins ? `${skinsByPlayer[p.id] || 0} skins` : isStroke ? (stats[p.id].thru ? String(Math.round(strokeNet ? stats[p.id].net : stats[p.id].gross)) : "—") : (stats[p.id].thru ? toParStr(stats[p.id].toPar) : "—");
+  const rightOf = (p: LivePlayer) => isStab ? `${stats[p.id].points} pts` : isSkins ? `${fmtSkins(skinsByPlayer[p.id] || 0)} skins` : isStroke ? (stats[p.id].thru ? String(Math.round(strokeNet ? stats[p.id].net : stats[p.id].gross)) : "—") : (stats[p.id].thru ? toParStr(stats[p.id].toPar) : "—");
 
   return (
     <div>
@@ -737,6 +742,9 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance, altSh
 
 function SkinsCarry({ game, players, meta, allowance }: { game: LiveGame; players: LivePlayer[]; meta: LiveMeta[]; allowance: number }) {
   if (game.game_type !== "skins") return null;
+  // 212.36: carry-overs across the whole field exist only in INDIVIDUAL skins with ties carried. A halved game carries
+  // nothing; team skins (1:1, 2 v 2) are scored match by match (lib/live-skins), so a field-wide pot is not their game.
+  if (game.skins_mode === "split" || (game.teams || []).length === 2) return null;
   const sp: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
   const res = computeSkins(meta, sp, allowance);
   const carried = res.holes.filter((h) => h.decided && h.winnerId === null).map((h) => h.hole);
