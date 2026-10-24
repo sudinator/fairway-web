@@ -1101,13 +1101,16 @@ export function computeSkins(
 }
 
 // Match-play skins: exactly two sides compete on each hole. If one side has the
-// lower net score, that side wins the current skin pot. If the hole is halved,
-// the entire pot carries to the next hole.
+// lower net score, that side wins the current skin pot. A tied hole either carries
+// the pot to the next hole ("carryover") or, with ties halved, is worth 1 and split
+// ½ each with nothing carried — the same rule as 2 v 2 skins (computeTeamBestBallSkins).
+// 212.35 (Oct 24): the tie setting was missing here, so 1:1 skins set to "Halved" carried.
 export function computeHeadToHeadSkins(
   holes: MatchHoleMeta[],
   a: SkinPlayer,
   b: SkinPlayer,
   allowancePct: number = 100,
+  tie: "carryover" | "halved" = "carryover",
 ): SkinMatchResult {
   const allow = matchAllowance(a.ch, b.ch, allowancePct);
   const skinsBySide: Record<string, number> = { [a.id]: 0, [b.id]: 0 };
@@ -1119,7 +1122,7 @@ export function computeHeadToHeadSkins(
     const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si, ah) : null;
     const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si, ah) : null;
     const netById: Record<string, number | null> = { [a.id]: netA, [b.id]: netB };
-    const value = carry + 1;
+    const value = tie === "carryover" ? carry + 1 : 1;
     if (netA == null || netB == null) {
       out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: false, netById });
       return;
@@ -1131,6 +1134,12 @@ export function computeHeadToHeadSkins(
     } else if (netB < netA) {
       skinsBySide[b.id] += value;
       out.push({ hole: h.n, winnerId: b.id, carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else if (tie === "halved") {
+      // Tie is split half a skin to each side; nothing carries.
+      skinsBySide[a.id] += value / 2;
+      skinsBySide[b.id] += value / 2;
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
       carry = 0;
     } else {
       out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });

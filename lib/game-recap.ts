@@ -2,6 +2,7 @@
 // (lib/game-results, lib/player-scoring) — so the Results screen, the recap and the completion
 // notification cannot disagree. Unfinished matches are never described as settled.
 import { matchStatus } from "@/lib/golf";
+import { fmtSkins, skinsWord } from "@/lib/skins-format";
 import { pkey, chBasis, shapeOf } from "@/lib/game-shape";
 import * as PS from "@/lib/player-scoring";
 import { singlesTeamStandings, foursomeTeamStandings, trifectaResults, skinsTotals, playerLookup, fmtPoints } from "@/lib/game-results";
@@ -127,14 +128,15 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
       const t = teamLine(teams, s.byTeam[teams[0].key] ?? 0, s.byTeam[teams[1].key] ?? 0);
       teamPersonal(t.winner);
       const [ta, tb] = teams; const sa = s.byTeam[ta.key] ?? 0, sb = s.byTeam[tb.key] ?? 0;
-      const head = sa === sb ? `${ta.name} and ${tb.name} split the skins ${sa}–${sb}` : sa > sb ? `${ta.name} won the skins ${sa}–${sb}` : `${tb.name} won the skins ${sb}–${sa}`;
+      const A = fmtSkins(sa), B = fmtSkins(sb);   // 212.37: one printer for skins counts
+      const head = sa === sb ? `${ta.name} and ${tb.name} split the skins ${A}–${B}` : sa > sb ? `${ta.name} won the skins ${A}–${B}` : `${tb.name} won the skins ${B}–${A}`;
       return { headline: head, endedEarly: false, notes, personal, signature: `skins-team:${s.byTeam.A}:${s.byTeam.B}`, winner: t.winner };
     }
     const ranked = live.map((p) => ({ p, n: s.byPlayer[pkey(p)] || 0 })).sort((x, y) => y.n - x.n);
-    live.forEach((p) => { const n = s.byPlayer[pkey(p)] || 0; personal[pkey(p)] = `you won ${n} skin${n === 1 ? "" : "s"}`; });
+    live.forEach((p) => { const n = s.byPlayer[pkey(p)] || 0; personal[pkey(p)] = `you won ${skinsWord(n)}`; });
     const top = ranked[0];
     const tied = ranked.filter((r) => r.n === top?.n);
-    const headline = !top || top.n === 0 ? "No skins won" : tied.length > 1 ? `${tied.map((r) => r.p.display_name).join(" and ")} shared the lead with ${top.n} skins each` : `${top.p.display_name} won ${top.n} skin${top.n === 1 ? "" : "s"}`;
+    const headline = !top || top.n === 0 ? "No skins won" : tied.length > 1 ? `${tied.map((r) => r.p.display_name).join(" and ")} shared the lead with ${fmtSkins(top.n)} skins each` : `${top.p.display_name} won ${skinsWord(top.n)}`;
     if (s.carry > 0) notes.push(`${s.carry} skin${s.carry === 1 ? "" : "s"} carried with no winner`);
     return { headline, endedEarly: false, notes, personal, signature: `skins:${ranked.map((r) => `${pkey(r.p)}=${r.n}`).join(",")}`, winner: null };
   }

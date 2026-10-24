@@ -1,3 +1,35 @@
+## 212.37.261024 — Skins counts print as fractions everywhere; the recap body credits shared (halved) holes
+
+Owner (Oct 24) asked for one way to print skins after 212.36 showed the gap. When players tie a hole in individual skins with ties halved, the skin is SHARED — three players tie, each gets ⅓. Every place that printed a skins count got that wrong in its own way: the scoring screen and live page knew only halves (⅓ read "0", 1⅔ read "1½"); the recap email used the match-points printer (⅓ read "½"); the recap headline, "you won N skins" and the recap screen printed raw numbers ("1.6666666666666665").
+
+**One printer — lib/skins-format fmtSkins:** whole numbers plain; halves, thirds, quarters, fifths (fields of 5+), sixths (½ + ⅓ = ⅚) and eighths as fractions (½ ⅓ ¾ ⅕ ⅚ ⅛…); anything else (twelfths) to one decimal. "⅓ skin", "1 skin", "2⅔ skins". Used by the scoring screen (its local halves-only copy removed), the team totals line for skins, the live page, the recap headline and personal lines, the recap tiles and screen, and the recap email. The recap screen's headline styling recognises the fractions.
+**Found while testing it — the recap body contradicted its headline** in halved individual skins: the headline (skinsTotals) said "Raj won 6⅔ skins" while the body credited only OUTRIGHT winners ("Raj 1 skin") and called the shared holes a "Longest carry, holes 2–18". lib/game-recap-sections now credits each player's share of a shared hole (the engine's splitIds) and never calls a shared hole carried. Carry-over games are unchanged (they have no shared holes).
+Tests: lib/skins-format (13): the printer, and a real three-way tie end to end — recap headline, personal line, recap body, recap email, recap screen and scoring screen. Negative-tested: each of the five old files fails. Guard: ci/check_skins_format.py (no file defines its own skins printer; the six that show skins import the shared one) — negative-tested. Design gallery: 12b-skins-thirds.
+
+No migration. Deploy: code only.
+
+## 212.36.261023 — The public live scorecard scores skins the way the app does (migration 0218)
+
+Found Oct 24 while fixing 1:1 halved skins (212.35): the shared live link scored EVERY skins game as individual carry-over across the whole field. It ignored "Halved", and it ignored 1:1 and 2 v 2 team skins (the team standings summed field-wide skins by team). The app was right; only the live page was wrong. Its feed had no skins setting at all.
+
+**Migration 0218** (get_live_scorecard): the current definition, read back from a database with every migration applied, plus ONE line — `skins_mode`. Permissions unchanged (public by share token); the security contract matches exactly. Test: ci/assert-live-skins.sql (the feed carries split and carryover, every field it carried before, still refuses bad tokens) — negative-tested against the old definition.
+**Live page:** team standings and the player list now come from lib/live-skins, which hands the live data to the app's own rules (lib/game-results skinsTotals). The one translation: the live feed sends an empty foursome list where the app has none, so an empty list means 1:1. In 2 v 2 each player shows their pair's skins. "Still in play" counts every match. Skins show halves as "1½". The Carryovers box shows only for individual skins with ties carried — the one style where a field-wide pot is the game.
+Tests: lib/live-skins (19): for individual, 1:1 and 2 v 2, both tie settings, the live numbers EQUAL the app's; the old live answer recorded as not the app's. Negative-tested (without the empty-list rule: 3 fail). Guard: ci/check_live_skins.py (both places use liveSkins; the only field-wide calculation is the guarded Carryovers box) — negative-tested against the real 212.35 page. Full migration chain + every assertion pass on local PostgreSQL 16.
+Also: docs/sql/check_what_is_applied.sql recreated (0185–0218) — the handoff's copy was not in the package.
+
+**Deploy: apply migration 0218 to production FIRST** (SQL editor, "Run without RLS"), then staging, then the pull request. The live page reads skins_mode when present and carries over when absent, so the order is safe either way.
+
+## 212.35.261024 — Fix: 1:1 team skins ignored "Halved" (always carried); "skins still in play" counted one match
+
+Found while mapping formats for one-step creation (Oct 24): Create offers 1:1 team skins with ties **halved**, but the 1:1 engine (lib/golf computeHeadToHeadSkins) had no tie setting and always carried ties over. Individual and 2 v 2 skins did respect it. Owner checked production first: **no 1:1 skins game was ever set to halved**, so no past result changes.
+
+**Fix:** computeHeadToHeadSkins takes the tie setting — halved = every hole worth 1, a tie ½ each, nothing carries (the 2 v 2 rule); carry over unchanged and still the default. Every team skins call (1:1 and 2 v 2, in the scoring screen, the recap and the results) reads the setting through ONE rule, lib/game-shape skinsTieOf. The 1:1 screen words a halved tie as 2 v 2 does ("Halved · ½ each").
+**Also fixed on that screen:** "N skins still in play" was 18 minus skins won, as if the game were one match; with two 1:1 matches 6 left of 36 read "6". It now counts every match (24 in the gallery example).
+Tests: lib/skins-tie (13): the engine both ways, 1:1 halved agrees with 2 v 2 halved, team totals, the screen's wording, "still in play" with two matches. Negative-tested: the old engine fails 4 (the bug's own numbers), the old count fails 1. Guard: ci/check_skins_tie.py — every team skins engine call must pass skinsTieOf(game); negative-tested. Design gallery: 12-skins-11-halved.
+Not in this release: the public live page scores every skins game as individual carry-over (it has no skins setting in its feed) — a separate fix with a migration.
+
+No migration. Deploy: code only.
+
 ## 212.34.261023 — Scramble: small teams share a group, so one scorer keeps one card for all of them
 
 Owner (Oct 23): with teams of 2, or captains only, teams play together on the course — but saving teams made EACH TEAM ITS OWN TEE GROUP (components/tournaments.tsx, group = team number), so a foursome of two teams had two group cards and no one could keep both.

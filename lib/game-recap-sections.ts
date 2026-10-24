@@ -4,7 +4,8 @@
 // (the day's winner first), then largest margin; formats without teams by largest margin; halves and
 // splits last; equal margins keep tee order.
 import { matchStatus, fourballStatus, altShotStatus, computeTrifecta, computeSkins, computeHeadToHeadSkins, computeTeamBestBallSkins, type SkinPlayer } from "@/lib/golf";
-import { pkey, chBasis, shapeOf } from "@/lib/game-shape";
+import { fmtSkins } from "@/lib/skins-format";
+import { pkey, chBasis, shapeOf, skinsTieOf } from "@/lib/game-shape";
 import * as PS from "@/lib/player-scoring";
 import { membersOf, altShotInputsFor, playerLookup } from "@/lib/game-results";
 import { rankTies, type Ranked, type Highlights } from "@/lib/game-highlights";
@@ -176,13 +177,13 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
       const rows: SkinMatchRow[] = [];
       if (shape.skinsStyle === "team_2v2") (game.foursomes || []).forEach((f: any) => {
         if (!f.a?.length || !f.b?.length) return;
-        const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
+        const r = computeTeamBestBallSkins(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", skinsTieOf(game));
         const ta = playerOf(f.a[0])?.team ?? "A"; const a = r.skinsBySide.a || 0, b = r.skinsBySide.b || 0;
         rows.push({ a: f.a.map(nm), b: f.b.map(nm), aSkins: a, bSkins: b, winnerTeam: a === b ? null : a > b ? ta : other(ta) });
       });
       else (game.pairings || []).forEach((pr) => {
         const pa = sp(pr.a), pb = sp(pr.b); if (!pa || !pb) return;
-        const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100);
+        const r = computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100, skinsTieOf(game));
         const ta = playerOf(pr.a)?.team ?? "A"; const a = r.skinsBySide[pr.a] || 0, b = r.skinsBySide[pr.b] || 0;
         rows.push({ a: [pa.name], b: [pb.name], aSkins: a, bSkins: b, winnerTeam: a === b ? null : a > b ? ta : other(ta) });
       });
@@ -192,15 +193,22 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
       out.skinMatches = { title: shape.skinsStyle === "team_2v2" ? "THE GROUPS · SKINS" : "THE HEAD-TO-HEADS · SKINS", rows: ord };
       out.sub = shape.skinsStyle === "team_2v2" ? `Groups: ${teamName("A")} ${won("A")} · ${teamName("B")} ${won("B")}${split ? ` · ${split} split` : ""}`
         : `${teamName(dayWinner)} won ${won(dayWinner)} of ${rows.length} head-to-heads · ${teamName(other(dayWinner))} ${won(other(dayWinner))}${split ? ` · ${split} split` : ""}`;
-      const top = ord[0]; if (top && top.winnerTeam) { const w = top.aSkins > top.bSkins; tiles.push({ label: shape.skinsStyle === "team_2v2" ? "Biggest group win" : "Most skins in a match", who: (w ? top.a : top.b).join(" & "), what: `${Math.max(top.aSkins, top.bSkins)}–${Math.min(top.aSkins, top.bSkins)}` }); }
+      const top = ord[0]; if (top && top.winnerTeam) { const w = top.aSkins > top.bSkins; tiles.push({ label: shape.skinsStyle === "team_2v2" ? "Biggest group win" : "Most skins in a match", who: (w ? top.a : top.b).join(" & "), what: `${fmtSkins(Math.max(top.aSkins, top.bSkins))}–${fmtSkins(Math.min(top.aSkins, top.bSkins))}` }); }
     } else {
       const r = computeSkins(game.holes_meta, players.map((p) => ({ id: pkey(p), name: p.display_name, gross: p.scores || [], ch: ch(p) })), game.allowance_pct ?? 100, game.skins_mode === "split" ? "split" : "carryover");
       const byWinner = new Map<string, SkinRow>();
-      (r.holes as any[]).forEach((hh) => { if (!hh.winnerId) return; const row = byWinner.get(hh.winnerId) || { name: nm(hh.winnerId), holes: [], skins: 0 }; row.holes.push({ n: hh.hole, value: hh.value }); row.skins += hh.value; byWinner.set(hh.winnerId, row); });
+      // 212.37: with ties halved a tied hole has no single winner — it is SHARED (splitIds), each taking an equal part.
+      // Only outright winners were credited, so the body said "Raj 1 skin" under a headline of "Raj won 6⅔ skins".
+      const credit = (id: string, n: number, value: number) => { const row = byWinner.get(id) || { name: nm(id), holes: [], skins: 0 }; row.holes.push({ n, value }); row.skins += value; byWinner.set(id, row); };
+      (r.holes as any[]).forEach((hh) => {
+        if (hh.winnerId) credit(hh.winnerId, hh.hole, hh.value);
+        else if (Array.isArray(hh.splitIds) && hh.splitIds.length) hh.splitIds.forEach((id: string) => credit(id, hh.hole, hh.value / hh.splitIds.length));
+      });
       out.skins = Array.from(byWinner.values()).sort((a, b) => b.skins - a.skins || a.name.localeCompare(b.name));
       const pot = (r.holes as any[]).filter((x) => x.winnerId).sort((a, b) => b.value - a.value)[0];
       // longest run of carried holes
-      let run = 0, bestRun = 0, endAt = 0; (r.holes as any[]).forEach((x) => { run = x.winnerId ? 0 : run + 1; if (run > bestRun) { bestRun = run; endAt = x.hole; } });
+      // (212.37: a shared hole is settled, not carried — and halved skins never carry)
+      let run = 0, bestRun = 0, endAt = 0; (r.holes as any[]).forEach((x) => { run = x.winnerId || (x.splitIds && x.splitIds.length) ? 0 : run + 1; if (run > bestRun) { bestRun = run; endAt = x.hole; } });
       if (pot && pot.value >= 3) out.sub = `A ${pot.value}-skin pot on ${pot.hole}${pot.carriedIn >= 2 ? ` after ${plural(pot.carriedIn, "straight hole")} carried` : ""}`;
       if (pot && pot.value >= 2) tiles.push({ label: "Biggest pot", who: nm(pot.winnerId), what: `${pot.value} skins on #${pot.hole}` });
       if (bestRun >= 3) tiles.push({ label: "Longest carry", who: `Holes ${endAt - bestRun + 1}–${endAt}`, what: `${bestRun} holes in a row` });

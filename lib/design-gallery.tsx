@@ -25,6 +25,7 @@ import { YourCourses, CourseDetail } from "@/components/your-courses";
 import { IndivSegmentChoice } from "@/components/game/segment-views";
 import { SaveTraceToggle } from "@/components/save-trace-view";
 import { StorageMeter } from "@/components/storage-meter";
+import { SkinsView } from "@/components/game/scoring-views";
 import { computeInsights } from "@/lib/insights";
 import { yourCourses } from "@/lib/your-courses";
 import { round as mkRound, PARS as RP, SIS as RS } from "@/lib/test-fixtures/messy-rounds";
@@ -80,6 +81,20 @@ const pairsGame = field({ scramble_team_size: 2, foursomes: [0, 1, 2].map((t) =>
 add("11d-teams-groups-pairs", <ScrambleTeamsBuilder game={pairsGame} players={players().slice(0, 6).map((p, i) => ({ ...p, tee_group: i < 4 ? 1 : 2 }))} readOnly={false} onSave={noop} />);
 const capsGame = field({ scramble_team_size: 1, scramble_handicap: "agreed", foursomes: [0, 1, 2, 3].map((t) => ({ id: `c${t}`, name: `Team ${t + 1}`, a: [`u${t}`], b: [], tee: t < 2 ? 1 : t })) });
 add("11e-teams-groups-captains", <ScrambleTeamsBuilder game={capsGame} players={players().slice(0, 4).map((p, i) => ({ ...p, tee_group: i < 2 ? 1 : i }))} readOnly={false} onSave={noop} />);
+// 212.35: 1:1 team skins with ties halved — a tied hole reads "Halved · ½ each" (it used to carry regardless)
+{
+  const sc = [[4, 4, 5, 4, 3, 5], [5, 4, 4, 4, 4, 5], [4, 5, 4, 3, 4, 4], [4, 4, 4, 5, 4, 4]];
+  const sk = players((i) => (i % 2 ? "B" : "A")).slice(0, 4).map((p, i) => ({ ...p, scores: [...sc[i], ...Array(12).fill(null)] }));
+  const skGame = { ...base, game_type: "skins", skins_mode: "split", foursomes: null, teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }],
+    pairings: [{ a: "u0", b: "u1" }, { a: "u2", b: "u3" }], status: "active" } as unknown as Game;
+  add("12-skins-11-halved", <SkinsView game={skGame} players={sk as Player[]} user={{ id: "u0" }} isCreator mode="view" onChanged={noop} />);
+}
+// 212.37: individual skins, ties halved, three players — tied holes split three ways, printed ⅓ ⅔ (were "0" and "½")
+{
+  const th = players().slice(0, 3).map((p, i) => ({ ...p, course_handicap: 0, handicap_index: 0, scores: [i === 0 ? 3 : 4, 4, 4, 4, i === 1 ? 3 : 4, 4, ...Array(12).fill(null)] }));
+  const thGame = { ...base, game_type: "skins", skins_mode: "split", foursomes: null, teams: null, pairings: [], status: "active" } as unknown as Game;
+  add("12b-skins-thirds", <SkinsView game={thGame} players={th as Player[]} user={{ id: "u0" }} isCreator mode="view" onChanged={noop} />);
+}
 add("12-team-rounds", <TeamRoundsList items={[
   { gameId: "a", date: "2026-10-25", course: "Oak Hollow", format: "scramble", team: "Team 2", holes: 18, result: "1st of 3" },
   { gameId: "b", date: "2026-10-11", course: "Fairmount CC", format: "scramble", team: "Reds", holes: 18, result: "Reds won 2&1" },

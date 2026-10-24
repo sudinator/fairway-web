@@ -32,6 +32,9 @@ export type DotGame = ShapeGame & {
 };
 
 export const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
+/** 212.35: how a tied skins hole is settled — ONE reading of games.skins_mode ("split" = halved) for every team skins
+ *  engine call (1:1 and 2 v 2). 1:1 skins used to ignore it and always carry. */
+export const skinsTieOf = (game: { skins_mode?: string | null }): "carryover" | "halved" => (game.skins_mode === "split" ? "halved" : "carryover");
 
 // ── Canonical game shape ─────────────────────────────────────────────────────
 // shapeOf is the SINGLE place that decides "what mode is this game". Every other
