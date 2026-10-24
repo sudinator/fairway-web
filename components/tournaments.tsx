@@ -5,7 +5,7 @@ import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
-import { cupScrambleMatches, scrambleTeamsOf, cupSideNames, type ScrambleGroup } from "@/lib/scramble-teams";
+import { cupScrambleMatches, scrambleTeamsOf, cupSideNames, type ScrambleGroup, scrambleTeeGroups } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
@@ -2679,9 +2679,11 @@ function GameRoom({
     if (players.some((p) => (p.scores || []).some((x) => x != null)) || game.alt_shot_scoring_started_at) { notifyError("Teams can't change once scoring has started."); return; }
     const { error } = await supabase.from("games").update({ foursomes: groups }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the teams — please try again."); return; }
+    // 212.34: teams that play together share a tee group (one card, one scorer) — lib/scramble-teams scrambleTeeGroups
+    const tee = scrambleTeeGroups(groups, game.scramble_mode === "match" ? "match" : "field", game.scramble_team_size === 1);
     const assignments = players.map((p) => {
-      const gi = groups.findIndex((gr) => gr.a.includes(pkey(p)) || gr.b.includes(pkey(p)));
-      return { player: p.id, group: gi >= 0 ? gi + 1 : null };
+      const gr = groups.find((x) => x.a.includes(pkey(p)) || x.b.includes(pkey(p)));
+      return { player: p.id, group: gr ? tee.get(gr.id) ?? null : null };
     });
     const { error: tErr } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: assignments });
     if (tErr) notifyError("Teams saved, but the tee groups didn't update — please try again.");

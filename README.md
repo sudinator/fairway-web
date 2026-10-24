@@ -1,3 +1,11 @@
+## 212.34.261023 — Scramble: small teams share a group, so one scorer keeps one card for all of them
+
+Owner (Oct 23): with teams of 2, or captains only, teams play together on the course — but saving teams made EACH TEAM ITS OWN TEE GROUP (components/tournaments.tsx, group = team number), so a foursome of two teams had two group cards and no one could keep both.
+
+## 212.33.261023 — Scramble: a no-show stayed on their team but vanished from the Teams screen; no-show now asks first
+
+Owner (Oct 23, staging game 386503): after adding a player, the Teams picker listed 5 players, not 6, and Team 1 "had a player" but showed nobody. Real data: Marcus Johnson had been marked No-show (an accidental tap on the phone, owner) while on Team 1. The Teams screen HID no-shows but kept them in their team; the setup check and scoring still COUNTED him — the check said the teams were complete, and Team 1's team handicap was built with him in it. The shared line-up card hid him too, so it showed a different team handicap from scoring (in the test: 0 against 5).
+
 ## 212.32.261023 — Fix: a test that failed at random on GitHub (212.31's push failed)
 
 212.31's pull request check failed in lib/storage-tidy: "an exact duplicate under an old identity is removed". The app code is unchanged from 212.30 (byte-identical); the TEST stamped the backup and its "exact duplicate" with two separate clock reads. On a fast machine both land in the same millisecond; on GitHub's runner the clock ticked between them, so the copy was not exact and the tidy rightly kept it. Present since 212.30 — it passed there by luck. Reproduced by running the test on a clock that moves 1 ms per read: the old test fails with the CI message, the fixed test (one timestamp for the pair) passes.

@@ -9,7 +9,7 @@ import { C } from "@/lib/golf";
 import { btn, inputStyle } from "@/components/ui";
 import { chBasis, pkey, scrambleMethodOf } from "@/lib/game-shape";
 import { scrambleTeamHandicap, customAllowanceFor } from "@/lib/scramble";
-import { balanceScrambleTeams, scrambleSetupProblem, type ScrambleGroup } from "@/lib/scramble-teams";
+import { balanceScrambleTeams, scrambleSetupProblem, scrambleTeeGroups, SCRAMBLE_GROUP_MAX, type ScrambleGroup } from "@/lib/scramble-teams";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText } from "@/lib/scramble-method";
 import type { Game, Player } from "@/lib/game-types";
 
@@ -37,12 +37,15 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
   const method = scrambleMethodOf(game);
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
   const live = players.filter((p) => !p.no_show);
-  const byKey = new Map(live.map((p) => [pkey(p), p]));
+  // 212.33 (owner, staging game 386503): no-shows keep their team place, so they are SHOWN — listed below the players
+  // and marked inside their team. They used to be hidden while still counted: a team "had a player" but showed none.
+  const out = players.filter((p) => p.no_show);
+  const byKey = new Map(players.map((p) => [pkey(p), p]));
   const ch = (p: Player) => Number(chBasis(p, game.course_par, nh >= 18 ? undefined : nh) ?? 0);
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
   const slots = slotsOf(groups, mode);
   const slotOf = (key: string) => slots.findIndex((t) => t.members.includes(key));
-  const problem = scrambleSetupProblem(groups, live.map(pkey), mode, { size: captains ? 1 : null, method });
+  const problem = scrambleSetupProblem(groups, live.map(pkey), mode, { size: captains ? 1 : null, method, noShows: out.map((p) => ({ key: pkey(p), name: p.display_name })) });
   const sizes = slots.filter((t) => t.members.length).map((t) => t.members.length);
   const mixed = !captains && new Set(sizes).size > 1;
 
@@ -65,6 +68,24 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
     void save(tidy(next));
   };
   const balance = (n: 1 | 2 | 3 | 4) => { const next = balanceScrambleTeams(live.map((p) => ({ key: pkey(p), ch: ch(p) })), n, mode); if (next) void save(next); };
+  // 212.34 (owner): GROUPS ON THE COURSE — small teams (2 players, or captains) can share a tee group, so one scorer
+  // keeps one card for every team in it. Shown from the players' SAVED tee groups (what scoring uses); a change pins
+  // every team's group (foursomes[].tee) so later team edits keep the plan; lib/scramble-teams applies the rules.
+  const teams = mode === "field" ? groups.filter((g) => g.a.length + g.b.length > 0) : [];
+  const showGroups = teams.length >= 2 && teams.some((g) => g.a.length + g.b.length <= 2);
+  const plan = scrambleTeeGroups(groups, mode, captains);
+  const groupOf = (g: ScrambleGroup) => {
+    const saved = [...g.a, ...g.b].map((k) => byKey.get(k)?.tee_group).filter((x): x is number => typeof x === "number");
+    return saved.length ? Math.min(...saved) : plan.get(g.id) ?? 1;
+  };
+  const teamSize = (g: ScrambleGroup) => g.a.length + g.b.length;
+  const current = new Map(teams.map((g) => [g.id, groupOf(g)]));
+  const groupNos = Array.from(new Set(current.values())).sort((x, y) => x - y);
+  const loadOf = (n: number) => teams.filter((g) => current.get(g.id) === n).reduce((t, g) => t + teamSize(g), 0);
+  const moveTeam = (groupId: string, choice: string) => {
+    const target = choice === "new" ? Math.max(0, ...groupNos) + 1 : Number(choice);
+    void save(groups.map((g) => ({ ...g, tee: g.id === groupId ? target : current.get(g.id) ?? g.tee ?? null })));
+  };
   const setHcp = (groupId: string, side: "a" | "b", raw: string) => {
     const v = raw.trim() === "" ? null : Math.round(Number(raw));
     if (v != null && (!Number.isFinite(v) || v < -10 || v > 60)) return;
@@ -117,6 +138,24 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
             </div>
           );
         })}
+        {/* 212.33: no-shows — not playing; one tap takes them off their team (they can't be put on one) */}
+        {out.map((p) => {
+          const k = pkey(p), at = slotOf(k);
+          return (
+            <div key={p.id} data-scramble-noshow={p.display_name} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.borderGreen}` }}>
+              <span style={{ flex: 1, minWidth: 0, color: C.sage, fontSize: 13.5, fontWeight: 700 }}>
+                {p.display_name}<span style={{ display: "block", color: C.gold, fontSize: 11, fontWeight: 700 }}>No-show{at >= 0 ? ` · still on ${slots[at].name}` : ""}</span>
+              </span>
+              {readOnly || at < 0 ? <span style={{ color: C.sage, fontSize: 13 }}>{at >= 0 ? slots[at].name : "No team"}</span> : (
+                <select aria-label={`Team for ${p.display_name}`} disabled={busy} value={String(at)} onChange={(e) => place(k, e.target.value)}
+                  style={{ ...inputStyle, width: 150, flexShrink: 0, padding: "8px 12px", fontSize: 13 }}>
+                  <option value={String(at)}>{slots[at].name}</option>
+                  <option value="">No team</option>
+                </select>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* SUMMARY — the teams, below */}
@@ -139,7 +178,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
                 const part = th?.parts.find((x) => x.index === i);
                 return (
                   <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4, fontSize: 12.5 }}>
-                    <span style={{ color: C.cream }}>{p.display_name}{captains ? " · captain" : ""}</span>
+                    <span style={{ color: C.cream }}>{p.display_name}{captains ? " · captain" : ""}{p.no_show ? <span style={{ color: C.gold, fontWeight: 700 }}> · no-show</span> : null}</span>
                     <span style={{ color: C.sage }}>{ch(p).toFixed(1)}{part ? ` × ${Math.round(part.pct * 100)}% = ${part.counts.toFixed(1)}` : ""}</span>
                   </div>
                 );
@@ -157,6 +196,40 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
           </React.Fragment>
         );
       })}
+
+      {showGroups ? (
+        <div data-scramble-groups>
+          <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 16 }}>GROUPS ON THE COURSE</div>
+          <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4 }}>Teams in the same group share one scorecard — one person can keep score for all of them. Up to {SCRAMBLE_GROUP_MAX} {captains ? "teams" : "players"} a group.</div>
+          {groupNos.map((n) => {
+            const inGroup = teams.filter((g) => current.get(g.id) === n);
+            return (
+              <div key={n} data-scramble-group={`Group ${n}`} style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
+                <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>Group {n}<span style={{ color: C.sage, fontWeight: 500, fontSize: 12 }}> · {loadOf(n)} {captains ? "team" : "player"}{loadOf(n) === 1 ? "" : "s"}</span></div>
+                {inGroup.map((g) => {
+                  const names = [...g.a, ...g.b].map((k) => byKey.get(k)?.display_name).filter(Boolean).join(", ");
+                  const fits = groupNos.filter((m) => m === n || loadOf(m) + teamSize(g) <= SCRAMBLE_GROUP_MAX);
+                  return (
+                    <div key={g.id} data-scramble-group-team={g.name} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                        <span style={{ display: "block", color: C.cream, fontWeight: 700 }}>{g.name}</span>
+                        <span style={{ display: "block", color: C.sage, fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{names}</span>
+                      </span>
+                      {readOnly ? null : (
+                        <select aria-label={`Group for ${g.name}`} disabled={busy} value={String(n)} onChange={(e) => moveTeam(g.id, e.target.value)}
+                          style={{ ...inputStyle, width: 130, flexShrink: 0, padding: "8px 12px", fontSize: 13 }}>
+                          {fits.map((m) => <option key={m} value={String(m)}>Group {m}</option>)}
+                          {inGroup.length > 1 ? <option value="new">Own group</option> : null}
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

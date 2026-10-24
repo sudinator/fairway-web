@@ -119,7 +119,8 @@ export function GameSetupWorkspace({
   // 211.1: a scramble's "matchups" are its teams — complete when every player is on a valid team.
   const isScramble = game.game_type === "scramble" && !usesTeams;   // 212.5: a Ryder Cup scramble uses Teams + Groups
   const scrambleProblem = isScramble ? scrambleSetupProblem(foursomes as never, players.filter((p) => !p.no_show).map(pkey), (game as { scramble_mode?: string | null }).scramble_mode === "match" ? "match" : "field",
-    { size: (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? 1 : null, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed" }) : null;
+    { size: (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? 1 : null, method: ((game as { scramble_handicap?: string | null }).scramble_handicap ?? "usga") as "usga" | "gross" | "agreed",
+      noShows: players.filter((p) => p.no_show).map((p) => ({ key: pkey(p), name: p.display_name })) }) : null;   // 212.33
   const matchupsDone = !usesMatchups || (isScramble ? scrambleProblem == null : total > 0 && cPlaced === total);
   const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");
   // 212.5: players per side in each group — 2, or a Ryder Cup scramble session's size
