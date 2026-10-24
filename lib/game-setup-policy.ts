@@ -126,7 +126,12 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       );
     }
     case "toggle_no_show": {
-      if (!anyScores) return allow();
+      // 212.33 (owner, Oct 23, staging game 386503): a no-show was tapped by accident on a phone during setup — one
+      // tap, no question. Marking someone OUT now always asks; returning them to play before scores stays one tap.
+      // Their team and group places are kept (owner: "I would leave on the team") and flagged in setup.
+      if (!anyScores) return action.next
+        ? requireConfirm(`Mark ${action.player.display_name} as a no-show?`, "They won't play in this game. Any team or group they're in keeps their place — Setup will flag it so you can move them or return them to play.")
+        : allow();
       const effect =
         game.game_type === "fourball" || game.game_type === "trifecta"
           ? "Unplayed holes score net double bogey for their team."

@@ -39,6 +39,8 @@
     "lib/scramble.test.ts",
     "lib/scramble-teams.test.ts",
     "lib/scramble-render.test.tsx",
+    "lib/scramble-noshow.test.tsx",
+    "lib/scramble-groups.test.tsx",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",

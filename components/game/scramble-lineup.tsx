@@ -12,14 +12,16 @@ import { SCRAMBLE_METHOD_LABEL } from "@/lib/scramble-method";
 import { fmtMatchDate } from "@/lib/lineup-meta";
 import type { Game, Player } from "@/lib/game-types";
 
-type Line = { name: string; index: number | null; ch: number; pct: number | null; counts: number | null };
+type Line = { name: string; index: number | null; ch: number; pct: number | null; counts: number | null; noShow: boolean };
 export type LineupTeam = { key: string; name: string; matchName: string | null; lines: Line[]; handicap: number; raw: number | null; method: "usga" | "agreed" | "gross" };
 
 /** The teams, in order, with every input and the working — the data both the card and the text read. */
 export function scrambleLineupTeams(game: Game, players: Player[]): LineupTeam[] {
   const method = scrambleMethodOf(game);
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
-  const byKey = new Map(players.filter((p) => !p.no_show).map((p) => [pkey(p), p]));
+  // 212.33: every player, no-shows included and marked — a no-show keeps their team place (owner), and scoring
+  // counts them in the team handicap (lib/game-shape scrambleTeamHandicapFor); the line-up must show the same team.
+  const byKey = new Map(players.map((p) => [pkey(p), p]));
   const groups = (Array.isArray(game.foursomes) ? game.foursomes : []) as unknown as ScrambleGroup[];
   return scrambleTeamsOf(groups, cupSideNames(game)).map((t) => {
     const members = t.members.map((k) => byKey.get(k)).filter((p): p is Player => !!p);
@@ -27,7 +29,7 @@ export function scrambleLineupTeams(game: Game, players: Player[]): LineupTeam[]
     const th = method === "usga" && members.length >= 2 ? scrambleTeamHandicap(chs, false, customAllowanceFor(game.scramble_allowance, members.length)) : null;
     const lines: Line[] = members.map((p, i) => {
       const part = th?.parts.find((x) => x.index === i);
-      return { name: p.display_name, index: p.handicap_index ?? null, ch: chs[i], pct: part ? part.pct : null, counts: part ? part.counts : null };
+      return { name: p.display_name, index: p.handicap_index ?? null, ch: chs[i], pct: part ? part.pct : null, counts: part ? part.counts : null, noShow: !!p.no_show };
     });
     // USGA lines read lowest course handicap first — the order the percentages apply in
     if (th) lines.sort((x, y) => x.ch - y.ch);
@@ -93,7 +95,7 @@ export function ScrambleLineupCard({ game, players, title }: { game: Game; playe
                     </div>
                     {t.lines.map((l, i) => (
                       <div key={i} style={{ display: "grid", gridTemplateColumns: cols, gap: 6, fontSize: 13, marginTop: 4, alignItems: "baseline" }}>
-                        <span style={{ color: C.cream, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}{captains ? " · captain" : ""}</span>
+                        <span style={{ minWidth: 0 }}><span style={{ display: "block", color: C.cream, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}{captains ? " · captain" : ""}</span>{l.noShow ? <span data-lineup-noshow style={{ display: "block", color: C.gold, fontSize: 11, fontWeight: 700 }}>No-show</span> : null}</span>
                         <span style={{ ...num, color: C.sage }}>{l.index != null ? f1(l.index) : "–"}</span>
                         <span style={{ ...num, color: C.cream }}>{f1(l.ch)}</span>
                         {usga ? <><span style={{ ...num, color: C.sage }}>{l.pct != null ? `${Math.round(l.pct * 100)}%` : ""}</span><span style={{ ...num, color: C.cream, fontWeight: 700 }}>{l.counts != null ? f1(l.counts) : ""}</span></> : null}
@@ -124,7 +126,7 @@ export function scrambleLineupText(game: Game, players: Player[]): string {
   for (const t of teams) {
     if (t.matchName) out.push(t.matchName);
     out.push(`${t.name} — team handicap ${t.method === "gross" ? "—" : t.handicap}`);
-    for (const l of t.lines) out.push(`  ${l.name}: ${l.index != null ? `index ${f1(l.index)} → ` : ""}course hcp ${f1(l.ch)}${l.pct != null && l.counts != null ? ` × ${Math.round(l.pct * 100)}% = ${f1(l.counts)}` : ""}`);
+    for (const l of t.lines) out.push(`  ${l.name}${l.noShow ? " (no-show)" : ""}: ${l.index != null ? `index ${f1(l.index)} → ` : ""}course hcp ${f1(l.ch)}${l.pct != null && l.counts != null ? ` × ${Math.round(l.pct * 100)}% = ${f1(l.counts)}` : ""}`);
     if (t.raw != null) out.push(`  ${t.lines.map((l) => f1(l.counts ?? 0)).join(" + ")} = ${t.raw.toFixed(2)} → ${t.handicap}`);
     out.push("");
   }

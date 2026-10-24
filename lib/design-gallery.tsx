@@ -69,6 +69,17 @@ add("09-recap-final", <RecapBody game={ended} recap={buildRecap(ended, players()
 const endedM = match({ status: "ended" });
 add("10-recap-matches", <RecapBody game={endedM} recap={buildRecap(endedM, players((i) => (i % 4 < 2 ? "A" : "B")), matchRows as never)} mode="share" />);
 add("11-lineup", <ScrambleLineupCard game={field()} players={players()} />);
+// 212.33 (owner, staging game 386503): a no-show keeps their team place — listed below the players, marked in the team,
+// named by the setup check; the line-up card marks them too (its team handicap matches scoring's)
+const noShowGame = field({ foursomes: [{ id: "t1", name: "Team 1", a: ["u2", "u4"], b: [] }, { id: "t2", name: "Team 2", a: ["u5", "u0"], b: [] }, { id: "t3", name: "Team 3", a: ["u1", "u3"], b: [] }] });
+const noShowPlayers = players().slice(0, 6).map((p) => (p.user_id === "u2" ? { ...p, no_show: true } : p));
+add("11b-teams-noshow", <ScrambleTeamsBuilder game={noShowGame} players={noShowPlayers} readOnly={false} onSave={noop} />);
+add("11c-lineup-noshow", <ScrambleLineupCard game={noShowGame} players={noShowPlayers} />);
+// 212.34 (owner): small teams share a tee group — one card, one scorer. Teams of 2 pair up; captains one each, combinable.
+const pairsGame = field({ scramble_team_size: 2, foursomes: [0, 1, 2].map((t) => ({ id: `t${t + 1}`, name: `Team ${t + 1}`, a: [`u${t * 2}`, `u${t * 2 + 1}`], b: [] })) });
+add("11d-teams-groups-pairs", <ScrambleTeamsBuilder game={pairsGame} players={players().slice(0, 6).map((p, i) => ({ ...p, tee_group: i < 4 ? 1 : 2 }))} readOnly={false} onSave={noop} />);
+const capsGame = field({ scramble_team_size: 1, scramble_handicap: "agreed", foursomes: [0, 1, 2, 3].map((t) => ({ id: `c${t}`, name: `Team ${t + 1}`, a: [`u${t}`], b: [], tee: t < 2 ? 1 : t })) });
+add("11e-teams-groups-captains", <ScrambleTeamsBuilder game={capsGame} players={players().slice(0, 4).map((p, i) => ({ ...p, tee_group: i < 2 ? 1 : i }))} readOnly={false} onSave={noop} />);
 add("12-team-rounds", <TeamRoundsList items={[
   { gameId: "a", date: "2026-10-25", course: "Oak Hollow", format: "scramble", team: "Team 2", holes: 18, result: "1st of 3" },
   { gameId: "b", date: "2026-10-11", course: "Fairmount CC", format: "scramble", team: "Reds", holes: 18, result: "Reds won 2&1" },

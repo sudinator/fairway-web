@@ -99,4 +99,44 @@ begin
   if not ok then raise exception 'a Ryder Cup scramble was switched to one leaderboard'; end if;
   raise notice 'CUP_SCRAMBLE_PASS a Cup scramble session: 2 v 2 accepted; a team of 3 and leaderboard mode refused';
 end $$;
+-- 212.34 (owner, Oct 23): small teams share a tee group so ONE scorer keeps one card for every team in it. No migration:
+-- 0203/0209 already let a tee group's marker score any team in their group. Proven here, both ways.
+do $$
+declare gx uuid := '20300000-0000-0000-0000-0000000000b7'; o text := '20300000-0000-0000-0000-000000000001';
+        b1 text := '20300000-0000-0000-0000-000000000004'; b2 text := '20300000-0000-0000-0000-000000000005';
+        b3 text := '20300000-0000-0000-0000-000000000006'; b4 text := '20300000-0000-0000-0000-000000000007'; ok boolean;
+begin
+  insert into public.games(id, code, name, course, holes_meta, game_type, status, created_by, scramble_team_size, scramble_mode, scramble_handicap, foursomes) values
+   (gx, '212340', 'Scramble pairs', 'C', '[]', 'scramble', 'active', o::uuid, 2, 'field', 'usga',
+    jsonb_build_array(jsonb_build_object('id','t1','name','Team 1','a',jsonb_build_array(b1,b2),'b','[]'::jsonb,'tee',1),
+                      jsonb_build_object('id','t2','name','Team 2','a',jsonb_build_array(b3,b4),'b','[]'::jsonb,'tee',2)));
+  insert into public.game_players(game_id, user_id, display_name, tee_group, is_marker) values
+   (gx, b1::uuid, 'b1', 1, true), (gx, b2::uuid, 'b2', 1, false), (gx, b3::uuid, 'b3', 2, true), (gx, b4::uuid, 'b4', 2, false);
+  perform set_config('request.jwt.claim.sub', b1, true);   -- b1's device from the 0203 block above (one primary device each)
+  perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000d4');
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"20300000-0000-0000-0000-0000000000d4"}', true);
+  execute 'set local role authenticated';
+  -- one team per group (how teams were grouped before 212.34): group 1's marker cannot score Team 2
+  begin perform public.save_scramble_score_fenced(gx, 0, 't2', 'a', 0, 4, null); ok := false; exception when others then ok := sqlerrm like '%not allowed to score this scramble team%'; if not ok then raise exception 'unexpected refusal: %', sqlerrm; end if; end;
+  if not ok then raise exception 'a marker scored a team in another group'; end if;
+  execute 'reset role';
+  -- the two teams now share group 1 (and group 2's marker steps down): group 1's marker scores BOTH teams
+  update public.game_players set tee_group = 1, is_marker = false where game_id = gx and user_id in (b3::uuid, b4::uuid);
+  execute 'set local role authenticated';
+  perform public.save_scramble_score_fenced(gx, 0, 't1', 'a', 0, 4, null);
+  perform public.save_scramble_score_fenced(gx, 0, 't2', 'a', 0, 5, null);
+  execute 'reset role';
+  if (select string_agg(foursome_id || '=' || strokes, ',' order by foursome_id) from game_alt_shot_scores where game_id = gx and hole_index = 0) is distinct from 't1=4,t2=5' then
+    raise exception 'the group marker could not score both teams in the group';
+  end if;
+  -- someone in the group who isn't the marker still can't score the other team
+  perform set_config('request.jwt.claim.sub', b2, true);
+  perform public.claim_scoring_device('20300000-0000-0000-0000-0000000000e2');
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"20300000-0000-0000-0000-0000000000e2"}', true);
+  execute 'set local role authenticated';
+  begin perform public.save_scramble_score_fenced(gx, 0, 't2', 'a', 1, 4, null); ok := false; exception when others then ok := sqlerrm like '%not allowed to score this scramble team%'; end;
+  execute 'reset role';
+  if not ok then raise exception 'a non-marker scored the other team in their group'; end if;
+  raise notice 'SCRAMBLE_SHARED_GROUP_PASS a group marker scores every team in the group; not a team in another group; a non-marker scores only their own team';
+end $$;
 rollback;

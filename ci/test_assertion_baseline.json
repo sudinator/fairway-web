@@ -1,7 +1,7 @@
 {
-  "total": 439695,
+  "total": 439737,
   "suites": {
-    "(unnamed suites)": 513,
+    "(unnamed suites)": 514,
     "ai-sanitize": 11,
     "all allocators": 253,
     "alt shot": 73,
@@ -51,6 +51,8 @@
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,
+    "scramble groups": 25,
+    "scramble no-shows": 16,
     "scramble screens": 51,
     "scramble simulation": 1,
     "screen render": 67,

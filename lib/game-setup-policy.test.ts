@@ -49,7 +49,8 @@ check("allowance scored confirm", decision(baseGame(), [scored], { type: "set_al
 check("skins style scored blocked", decision({ ...baseGame(), game_type: "skins" }, [scored], { type: "set_skins_style", style: "team_11" }), "block");
 check("match team scored blocked", decision({ ...baseGame(), game_type: "match" }, [scored], { type: "set_match_team", on: true }), "block");
 check("ended edit blocks until reopen", decision({ ...baseGame(), status: "ended" }, [scored], { type: "set_allowance", pct: 85 }), "block");
-check("no-show pre-score allow", decision(baseGame(), [blank], { type: "toggle_no_show", player: blank, next: true }), "allow");
+check("no-show pre-score confirm (212.33: accidental tap)", decision(baseGame(), [blank], { type: "toggle_no_show", player: blank, next: true }), "confirm");
+check("return to play pre-score allow", decision(baseGame(), [{ ...blank, no_show: true }], { type: "toggle_no_show", player: { ...blank, no_show: true }, next: false }), "allow");
 check("no-show midround confirm", decision(baseGame(), [scored], { type: "toggle_no_show", player: scored, next: true }), "confirm");
 check("tee target locked blocked", decision(baseGame(), [scored, P("p3", [null, null], { tee_group: 2, group_locked: true }), blank], { type: "set_tee_group", player: blank, group: 2 }), "block");
 check("team score midround confirm", decision({ ...baseGame(), game_type: "fourball", foursomes }, [scored], { type: "set_team_score_mode", mode: "aggregate" }), "confirm");

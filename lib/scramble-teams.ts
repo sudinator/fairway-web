@@ -7,7 +7,7 @@
 // exactly as they do for alternate shot.
 
 // 211.8: a_hcp / b_hcp — a team handicap the organizer entered (null / absent = calculated from its players).
-export type ScrambleGroup = { id: string; name: string; a: string[]; b: string[]; a_hcp?: number | null; b_hcp?: number | null };
+export type ScrambleGroup = { id: string; name: string; a: string[]; b: string[]; a_hcp?: number | null; b_hcp?: number | null; tee?: number | null };
 export type TeamPlayer = { key: string; ch: number | null };
 
 /** Team sizes as even as possible within 2–4 (e.g. 10 players in teams of 4 → 4, 3, 3). null = can't (fewer than 2).
@@ -62,13 +62,19 @@ export function scrambleTeamsOf(groups: ScrambleGroup[] | null | undefined, side
 
 /** Setup is complete: every player on exactly one team of 2–4 (or 1 in a "teammates outside the app" game, where
  *  every team needs its handicap entered unless the game is gross); team v team needs two teams in every match. */
-export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match", opts: { size?: number | null; gross?: boolean; method?: "usga" | "gross" | "agreed" | null; exact?: number | null; sideNames?: [string, string] } = {}): string | null {
+export function scrambleSetupProblem(groups: ScrambleGroup[] | null | undefined, playerKeys: string[], mode: "field" | "match", opts: { size?: number | null; gross?: boolean; method?: "usga" | "gross" | "agreed" | null; exact?: number | null; sideNames?: [string, string]; noShows?: { key: string; name: string }[] } = {}): string | null {
   const method = opts.method ?? (opts.gross ? "gross" : "usga");
   const solo = opts.size === 1;
   const gs = groups || [];
   if (!gs.length) return "Make the teams — Setup → Teams.";
   const placed = gs.flatMap((g) => [...g.a, ...g.b]);
   if (new Set(placed).size !== placed.length) return "A player is on two teams.";
+  // 212.33 (owner, staging game 386503): a no-show keeps their team place (owner: "I would leave on the team") — so
+  // say so, by name, until the organizer moves them or returns them to play. The team handicap still counts them.
+  for (const ns of opts.noShows ?? []) {
+    const t = scrambleTeamsOf(gs, opts.sideNames).find((x) => x.members.includes(ns.key));
+    if (t) return `${ns.name} is marked as a no-show but is on ${t.name} — take them off the team, or return them to play.`;
+  }
   const missing = playerKeys.filter((k) => !placed.includes(k)).length;
   if (missing) return `${missing} player${missing === 1 ? " isn't" : "s aren't"} on a team yet.`;
   if (mode === "field" && gs.some((g) => !g.a.length && !g.b.length)) return "A team has no players — add players to it or remove it.";
@@ -105,4 +111,40 @@ export function cupScrambleMatches(sideA: TeamPlayer[], sideB: TeamPlayer[], siz
 export function cupSideNames(game: { teams?: unknown }): [string, string] | null {
   const t = Array.isArray(game.teams) ? (game.teams as { key?: string; name?: string }[]) : [];
   return t.length === 2 ? [t[0]?.name || "Team A", t[1]?.name || "Team B"] : null;
+}
+
+/** 212.34 (owner, Oct 23) — which TEE GROUP each team plays in, for a one-leaderboard scramble. Saving teams used to
+ * make every team its own group, so two teams of 2 playing as a foursome had two group cards and one scorer couldn't
+ * keep both. Rules: a team never splits; a group holds at most 4 players (a captain counts as one); teams of 2 pair
+ * up by default; captains (owner: "don't need to default to 2 teams per group but have that option") and teams of
+ * 3–4 default to one team per group; the organizer's choice (foursomes[].tee) wins wherever it still fits. Team v
+ * team keeps one group per match. Returns team id → group number 1..n, numbered in team order. */
+export const SCRAMBLE_GROUP_MAX = 4;
+export function scrambleTeeGroups(groups: ScrambleGroup[] | null | undefined, mode: "field" | "match", captains: boolean): Map<string, number> {
+  const gs = (groups || []).filter((g) => (g.a?.length ?? 0) + (g.b?.length ?? 0) > 0);
+  const out = new Map<string, number>();
+  if (mode === "match") { gs.forEach((g, i) => out.set(g.id, i + 1)); return out; }
+  const size = (g: ScrambleGroup) => (g.a?.length ?? 0) + (g.b?.length ?? 0);
+  const load = new Map<string, number>(), label = new Map<string, string>();   // provisional group labels
+  // 1. the organizer's choices, where they fit
+  for (const g of gs) {
+    if (typeof g.tee !== "number" || !Number.isInteger(g.tee) || g.tee < 1) continue;
+    const k = `t${g.tee}`;
+    if ((load.get(k) ?? 0) + size(g) > SCRAMBLE_GROUP_MAX) continue;
+    load.set(k, (load.get(k) ?? 0) + size(g)); label.set(g.id, k);
+  }
+  // 2. everyone else: teams of 2 pair up (not captains); the rest play one team per group
+  let n = 0, open: string | null = null;
+  for (const g of gs) {
+    if (label.has(g.id)) continue;
+    if (!captains && size(g) === 2 && open && (load.get(open) ?? 0) + 2 <= SCRAMBLE_GROUP_MAX) {
+      load.set(open, (load.get(open) ?? 0) + 2); label.set(g.id, open); open = null; continue;
+    }
+    const k = `d${++n}`; load.set(k, size(g)); label.set(g.id, k);
+    if (!captains && size(g) === 2) open = k;   // a lone pair waits for the next pair, even past a bigger team
+  }
+  // 3. number the groups 1..n in the order their first team appears
+  const num = new Map<string, number>();
+  for (const g of gs) { const k = label.get(g.id)!; if (!num.has(k)) num.set(k, num.size + 1); out.set(g.id, num.get(k)!); }
+  return out;
 }

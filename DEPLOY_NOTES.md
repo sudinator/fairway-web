@@ -1,3 +1,31 @@
+## 212.34.261023 — Scramble: small teams share a group, so one scorer keeps one card for all of them
+
+Owner (Oct 23): with teams of 2, or captains only, teams play together on the course — but saving teams made EACH TEAM ITS OWN TEE GROUP (components/tournaments.tsx, group = team number), so a foursome of two teams had two group cards and no one could keep both.
+
+**The rule (lib/scramble-teams scrambleTeeGroups — one rule, used by team saving and the Teams screen):** a team never splits; a group holds at most 4 players (a captain counts as one); **teams of 2 pair up by default** (two teams a group, even past a bigger team in the list); **captains default to one team per group, with the option to combine** (owner); teams of 3–4 keep a group each, as before; the organizer's choice wins wherever it fits, otherwise that team gets its own group; groups are numbered 1..n in team order. Team v team is unchanged (a match is its group). Ryder Cup scrambles have their own Teams and Groups steps — unaffected.
+
+**Teams screen — "Groups on the course"** (shown when any team is 2 or fewer, one-leaderboard games): each group lists its teams; each team has a group picker offering only groups with room, or "Own group". It shows the SAVED groups (what scoring uses); a change pins every team's group (games.foursomes[].tee) so later team edits keep the plan. Captains are counted as teams ("2 teams · up to 4 teams a group").
+
+**Scoring:** the group card already shows every team in its group; the server already lets a tee group's marker score any team in that group (0203/0209) — **no migration**. Proven on a fresh database (ci/assert-scramble.sql, new): a group marker scores both teams in the group, NOT a team in another group (the old layout), and a non-marker only their own team.
+
+Tests: lib/scramble-groups (25: the rules incl. game 386503's shape — three teams of 2 → Teams 1+2 in Group 1, Team 3 in Group 2; the screen; one card with both teams). Negative-tested: the old one-team-per-group rule fails 6. Guard: ci/check_scramble_tee_groups.py (team saving must use the rule, never team position) — negative-tested. The full migration chain + every database assertion pass on local PostgreSQL 16. Design gallery: 11d-teams-groups-pairs, 11e-teams-groups-captains.
+
+Existing games: groups change the next time the teams are saved (or use the new section). Deploy: code only.
+
+## 212.33.261023 — Scramble: a no-show stayed on their team but vanished from the Teams screen; no-show now asks first
+
+Owner (Oct 23, staging game 386503): after adding a player, the Teams picker listed 5 players, not 6, and Team 1 "had a player" but showed nobody. Real data: Marcus Johnson had been marked No-show (an accidental tap on the phone, owner) while on Team 1. The Teams screen HID no-shows but kept them in their team; the setup check and scoring still COUNTED him — the check said the teams were complete, and Team 1's team handicap was built with him in it. The shared line-up card hid him too, so it showed a different team handicap from scoring (in the test: 0 against 5).
+
+**Owner's decisions:** a no-show keeps their team place ("I would leave on the team"), shown and flagged; and marking someone a no-show asks first.
+1. **Teams screen** (components/game/scramble-teams-builder): no-shows are listed below the players ("No-show · still on Team 1"), with a picker that can only keep them or take them off; inside the team they are marked "no-show". Nobody disappears.
+2. **Setup check** (lib/scramble-teams scrambleSetupProblem): "Marcus Johnson is marked as a no-show but is on Team 1 — take them off the team, or return them to play." — so Teams isn't "complete" until it's resolved.
+3. **Line-up card and text** (components/game/scramble-lineup): show the no-show, marked, with the same team handicap scoring uses.
+4. **No-show asks first, even in setup** (lib/game-setup-policy): "Mark Marcus Johnson as a no-show? They won't play in this game…" Returning a player to play before scores stays one tap. After scoring starts, nothing changes (teams are locked).
+Audit of the other team screens: the Ryder Cup scramble line-up had the same gap (fixed above). The Ryder Cup tee-group picker leaves no-shows out of its slots and its counts alike, so it doesn't disagree with itself.
+Tests: lib/scramble-noshow (16, from game 386503's real teams and players): the old check passing is recorded; each old file is caught (builder, line-up, policy). Design gallery: 11b-teams-noshow, 11c-lineup-noshow (the review moved the line-up's "No-show" onto its own line — it was cut off).
+
+No migration. Deploy: code only. Game 386503 shows the flag at once — take Marcus off Team 1, or return him to play.
+
 ## 212.32.261023 — Fix: a test that failed at random on GitHub (212.31's push failed)
 
 212.31's pull request check failed in lib/storage-tidy: "an exact duplicate under an old identity is removed". The app code is unchanged from 212.30 (byte-identical); the TEST stamped the backup and its "exact duplicate" with two separate clock reads. On a fast machine both land in the same millisecond; on GitHub's runner the clock ticked between them, so the copy was not exact and the tidy rightly kept it. Present since 212.30 — it passed there by luck. Reproduced by running the test on a clock that moves 1 ms per read: the old test fails with the CI message, the fixed test (one timestamp for the pair) passes.
