@@ -89,6 +89,12 @@ add("11e-teams-groups-captains", <ScrambleTeamsBuilder game={capsGame} players={
     pairings: [{ a: "u0", b: "u1" }, { a: "u2", b: "u3" }], status: "active" } as unknown as Game;
   add("12-skins-11-halved", <SkinsView game={skGame} players={sk as Player[]} user={{ id: "u0" }} isCreator mode="view" onChanged={noop} />);
 }
+// 212.37: individual skins, ties halved, three players — tied holes split three ways, printed ⅓ ⅔ (were "0" and "½")
+{
+  const th = players().slice(0, 3).map((p, i) => ({ ...p, course_handicap: 0, handicap_index: 0, scores: [i === 0 ? 3 : 4, 4, 4, 4, i === 1 ? 3 : 4, 4, ...Array(12).fill(null)] }));
+  const thGame = { ...base, game_type: "skins", skins_mode: "split", foursomes: null, teams: null, pairings: [], status: "active" } as unknown as Game;
+  add("12b-skins-thirds", <SkinsView game={thGame} players={th as Player[]} user={{ id: "u0" }} isCreator mode="view" onChanged={noop} />);
+}
 add("12-team-rounds", <TeamRoundsList items={[
   { gameId: "a", date: "2026-10-25", course: "Oak Hollow", format: "scramble", team: "Team 2", holes: 18, result: "1st of 3" },
   { gameId: "b", date: "2026-10-11", course: "Fairmount CC", format: "scramble", team: "Reds", holes: 18, result: "Reds won 2&1" },

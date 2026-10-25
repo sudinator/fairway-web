@@ -313,8 +313,7 @@ function CreateGame({
     // Alternate shot is 50% of the partners' COMBINED course handicaps — one ball in play, so
     // half the strokes. That is the format's definition rather than a preference, unlike
     // four-ball's 85% which an organiser may reasonably vary.
-    const nextAllowance =
-      nextType === "alt_shot" ? 50 : nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
+    const nextAllowance = GC.defaultAllowanceFor(nextType as GC.GameTypeOpt);   // 212.38: moved verbatim to lib/game-create
     setAllowancePct(nextAllowance);
     setAllowanceInput(String(nextAllowance));
   };
@@ -688,7 +687,7 @@ function CreateGame({
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
-        scramble: gameType === "scramble" ? { cupTeams: !!cupScrambleSize, teamSize: cupScrambleSize ?? (scrambleTeamSize === 1 ? 1 : null), handicap: scrambleTeamSize === 1 && !cupScrambleSize ? "agreed" : scrambleHandicap, minDrives: scrambleMinDrives, mode: cupScrambleSize || fmtFamily === "match" ? "match" : "field", allowance: scrambleHandicap === "usga" ? scrambleAllowance : null } : undefined,
+        scramble: GC.scrambleCreateSettings({ gameType, cupScrambleSize, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance, fmtFamily }),   // 212.38: moved verbatim
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase

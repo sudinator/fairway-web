@@ -4,6 +4,7 @@
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
 import { shortenedNote } from "@/lib/round-rules";
+import { fmtSkins } from "@/lib/skins-format";
 import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
 import { C } from "@/lib/golf";
@@ -42,7 +43,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
   const share = mode === "share";
   const live = (game as any).players_count as number | undefined; // set by the caller
   const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? (cup.sessionCount ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : `Session ${cup.sessionNo}`) : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
-  const head = recap.headline.match(/^(.*?)([\d½]+–[\d½]+|net \d+|\d+ skins?|\d+ points)$/);
+  const head = recap.headline.match(/^(.*?)([\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+–[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+|net \d+|[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+ skins?|\d+ points)$/);   // 212.37: skins counts can be fractions (lib/skins-format)
   const nbRows = share ? h.netBirdies.top : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
   return (
     <div data-recap-body={mode} style={{ display: "flex", flexDirection: "column", gap: 10, color: C.cream }}>
@@ -92,7 +93,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
           {s.skins.map((r) => (
             <div key={r.name} style={S.row}>
               <span style={S.name}>{r.name}<span style={{ color: C.sage, fontSize: 12 }}> · {r.holes.map((x) => `#${x.n}${x.value > 1 ? ` (${x.value})` : ""}`).join(", ")}</span></span>
-              <span style={S.num}>{r.skins}</span>
+              <span style={S.num}>{fmtSkins(r.skins)}</span>
             </div>
           ))}
         </div>
@@ -106,7 +107,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
               <div key={i} style={S.row}>
                 {r.winnerTeam ? <Dot color={teamColor(game, r.winnerTeam)} /> : null}
                 <span style={S.name}>{r.winnerTeam ? <><b>{(aWin ? r.a : r.b).join(" & ")}</b> beat {(aWin ? r.b : r.a).join(" & ")}</> : <>{r.a.join(" & ")} and {r.b.join(" & ")} split</>}</span>
-                <span style={S.num}>{Math.max(r.aSkins, r.bSkins)}–{Math.min(r.aSkins, r.bSkins)}</span>
+                <span style={S.num}>{fmtSkins(Math.max(r.aSkins, r.bSkins))}–{fmtSkins(Math.min(r.aSkins, r.bSkins))}</span>
               </div>
             );
           })}

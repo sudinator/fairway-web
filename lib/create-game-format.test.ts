@@ -71,7 +71,9 @@ eq(formatReviewLabel({ ...base, gameType: "skins", teamMode: true, skinsTeamStyl
 const keys = reachableFormatKeys();
 // 183.0: Trifecta has one rule, so the two per-hole shapes (trifecta:best_ball:per_hole, trifecta:aggregate:per_hole) are gone: 19 → 17.
 // 211.1: scramble adds two shapes — one leaderboard and team v team: 17 → 19.
-eq(keys.length, 19, "current reachable format shape count");
+// 212.38: Alternate Shot has its own Create button but was missing from the list: 19 → 20.
+eq(keys.length, 20, "current reachable format shape count");
+eq(keys.includes("alt_shot"), true, "alternate shot is reachable");
 eq(keys.includes("scramble:field") && keys.includes("scramble:match"), true, "both scramble shapes are reachable");
 eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Leaderboard · USGA handicaps", "scramble review (leaderboard)");
 eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 2, scrambleHandicap: "gross", scrambleMinDrives: 3, fmtFamily: "match" } as never), "Scramble · Team v team · Gross · each drive ×3", "scramble review (team v team, gross, drives)");

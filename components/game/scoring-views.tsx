@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { fmtSkins } from "@/lib/skins-format";
 import { pointsOutlook, outlookLine } from "@/lib/points-outlook";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
@@ -172,7 +173,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
 
   const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
   // Skins counts can carry a half (split / halved ties) — render "3½", "½", "4".
-  const fmtSkins = (n: number): string => { const whole = Math.floor(n); return n - whole >= 0.5 ? (whole === 0 ? "½" : `${whole}½`) : String(whole); };
+  // 212.37: fmtSkins is the shared printer (lib/skins-format) — this local copy knew only halves (⅓ read "0")
 
   if (isTeamBestBallSkins) {
     const foursomes = game.foursomes || [];
@@ -953,7 +954,7 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   const cs = clinchState(aPts, bPts, unclaimed);
   const leadName = cs.leader === "A" ? aName : cs.leader === "B" ? bName : null;
   const hi = Math.max(aPts, bPts), lo = Math.min(aPts, bPts);
-  const f = fmtPoints;
+  const f = metric === "skins" ? fmtSkins : fmtPoints;   // 212.37: skins counts can be thirds
   const totalPool = aPts + bPts + unclaimed;
   const outrightTarget = Math.floor((totalPool / 2) * 2 + 1e-9) / 2 + 0.5;
   const matchPointsNeeded = Math.max(0, outrightTarget - hi);
