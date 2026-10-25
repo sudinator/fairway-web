@@ -39,7 +39,10 @@ check('team assignment is inherited into child game rows', 'seed?.participantTea
 check('aggregation uses canonical existing scoring engines', all(x in logic for x in ['matchProgress(', 'fourballProgress(', 'altShotProgress(', 'computeTrifecta(', 'canonicalAltShotGross(']))
 check('UI exposes Four-Ball Alternate Shot Singles and Trifecta sessions', all(x in comp for x in ['Four-Ball', 'Alternate Shot', 'Singles', 'Trifecta']))
 check('Ryder Cup Trifecta uses one scorecard with fixed match and best-ball contracts', all(x in (tour + create) for x in ['setTeamScoreMode("best_ball")', 'trifecta_scoring: o.gameType === "trifecta" ? "match" : null', 'One gross score per golfer feeds two true Singles matches and one Four-Ball match']))
-check('Ryder Cup Trifecta exposes team groups and synchronizes their foursomes', 'game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta"' in tour and 'game.game_type === "alt_shot" || game.game_type === "trifecta"' in (root/'components/game/setup/game-setup-workspace.tsx').read_text())
+# 212.39: the foursome-sync rule moved verbatim from components/tournaments.tsx to lib/structure-ops (teamPlayFoursomesAfter), which
+# Manage Game's syncTeamPlayFoursomes calls — so the rule is checked where it now lives, and the call is checked in the screen.
+structure_ops = (root/'lib/structure-ops.ts').read_text()
+check('Ryder Cup Trifecta exposes team groups and synchronizes their foursomes', 'game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta"' in structure_ops and 'SO.teamPlayFoursomesAfter(game, nextPlayers)' in tour and 'game.game_type === "alt_shot" || game.game_type === "trifecta"' in (root/'components/game/setup/game-setup-workspace.tsx').read_text())
 check('Trifecta session planning converts foursomes into three matches', 'format === "trifecta" ? enteredCount * 3 : enteredCount' in comp and 'session.planned_match_count / 3' in comp)
 check('one match row keeps teams left/right with centered result', 'gridTemplateColumns: "minmax(0,1fr) 18px minmax(0,1fr)"' in comp and 'm.leftNames' in comp and 'm.rightNames' in comp)
 check('linked Cup games keep persistent team contract', all(x in mig for x in ['competition_game_player_contract', 'competition_game_structure_contract', 'competition_roster_contract']))

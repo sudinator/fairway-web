@@ -110,6 +110,7 @@ import { roundStats } from "@/lib/round-stats";
 import * as GU from "@/lib/game-utils";
 import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
 import * as GC from "@/lib/game-create";
+import * as SO from "@/lib/structure-ops";
 import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
@@ -2515,9 +2516,9 @@ function GameRoom({
   };
 
   const syncTeamPlayFoursomes = async (nextPlayers: Player[]) => {
-    if (!game || !Array.isArray(game.teams) || game.teams.length !== 2) return;
-    if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble") return;
-    const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
+    if (!game) return;
+    const next = SO.teamPlayFoursomesAfter(game, nextPlayers);   // 212.39: moved verbatim to lib/structure-ops
+    if (!next) return;
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the groups — please try again."); return; }
     setGame({ ...game, foursomes: next });
@@ -2526,7 +2527,7 @@ function GameRoom({
   const setAltShotFirstDriver = async (foursomeId: string, side: "a" | "b", playerKey: string) => {
     if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return;
     if (!allowSetupChange({ type: "set_foursomes" })) return;
-    const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, [side === "a" ? "a_first" : "b_first"]: playerKey } : f);
+    const next = SO.altShotFirstDriverFoursomes(game.foursomes, foursomeId, side, playerKey);   // 212.39: lib/structure-ops
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the starting player — please try again."); return; }
     setGame({ ...game, foursomes: next });
@@ -2535,7 +2536,7 @@ function GameRoom({
   const setTrifectaPairing = async (foursomeId: string, cross: boolean) => {
     if (!game || game.game_type !== "trifecta" || !Array.isArray(game.foursomes)) return;
     if (!allowSetupChange({ type: "set_foursomes" })) return;
-    const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, swap: cross } : f);
+    const next = SO.trifectaSwapFoursomes(game.foursomes, foursomeId, cross);   // 212.39: lib/structure-ops
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the Singles matchups — please try again."); return; }
     setGame({ ...game, foursomes: next });
@@ -2566,9 +2567,8 @@ function GameRoom({
   const setPlayerTeam = async (p: Player, team: string | null) => {
     if (!game || !allowSetupChange({ type: "set_team", player: p, team })) return;
     const nextPlayers = players.map((x) => x.id === p.id ? { ...x, team } : x);
-    const teamFormat = Array.isArray(game.teams) && game.teams.length === 2 && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
-    const foursomes = teamFormat ? deriveTeamFoursomesFromGroups(nextPlayers, game.teams!, game.foursomes) : null;
-    const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [{ player: p.id, team }], p_groups: [], p_foursomes: foursomes });
+    // 212.39: the payload is built by lib/structure-ops (moved verbatim)
+    const { error } = await supabase.rpc("apply_game_structure", SO.teamMoveArgs(game.id, game, nextPlayers, [{ player: p.id, team }]));
     if (error) notifyError(`Couldn't move ${p.display_name} — nothing was changed. ${error.message}`);
     else setPlayers(nextPlayers);
     await load();
@@ -2591,11 +2591,8 @@ function GameRoom({
     // 206.1 (review finding 4): teams AND the foursomes built from them are saved in ONE transaction
     // (apply_game_structure, 0184) — never player by player with failures ignored.
     const nextPlayers = players.map((x) => { const a = r.assignments.find((y) => y.id === x.id); return a ? { ...x, team: a.team } : x; });
-    const teamFormat = Array.isArray(game.teams) && game.teams.length === 2 && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
-    const foursomes = teamFormat ? deriveTeamFoursomesFromGroups(nextPlayers, game.teams!, game.foursomes) : null;
-    const { error } = await supabase.rpc("apply_game_structure", {
-      p_game: game.id, p_teams: r.assignments.map((a) => ({ player: a.id, team: a.team })), p_groups: [], p_foursomes: foursomes,
-    });
+    // 212.39: the payload is built by lib/structure-ops (moved verbatim)
+    const { error } = await supabase.rpc("apply_game_structure", SO.teamMoveArgs(game.id, game, nextPlayers, r.assignments.map((a) => ({ player: a.id, team: a.team }))));
     if (error) {
       notifyError(`Couldn't balance the teams — nothing was changed. ${error.message}`);
       await load();
@@ -2679,11 +2676,7 @@ function GameRoom({
     const { error } = await supabase.from("games").update({ foursomes: groups }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the teams — please try again."); return; }
     // 212.34: teams that play together share a tee group (one card, one scorer) — lib/scramble-teams scrambleTeeGroups
-    const tee = scrambleTeeGroups(groups, game.scramble_mode === "match" ? "match" : "field", game.scramble_team_size === 1);
-    const assignments = players.map((p) => {
-      const gr = groups.find((x) => x.a.includes(pkey(p)) || x.b.includes(pkey(p)));
-      return { player: p.id, group: gr ? tee.get(gr.id) ?? null : null };
-    });
+    const assignments = SO.scrambleTeeAssignments(game, players, groups);   // 212.39: lib/structure-ops (moved verbatim)
     const { error: tErr } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: assignments });
     if (tErr) notifyError("Teams saved, but the tee groups didn't update — please try again.");
     await load();

@@ -45,6 +45,7 @@
     "lib/live-skins.test.tsx",
     "lib/skins-format.test.tsx",
     "lib/create-behaviour.test.ts",
+    "lib/structure-behaviour.test.ts",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",

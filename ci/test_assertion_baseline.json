@@ -1,5 +1,5 @@
 {
-  "total": 439850,
+  "total": 439878,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -69,6 +69,7 @@
     "storage tidy": 18,
     "stroke agreement": 38,
     "stroke rounding": 24,
+    "structure behaviour": 28,
     "sync/column tests": 6,
     "team colour dot": 10,
     "team rounds": 11,

@@ -1,3 +1,7 @@
+## 212.39.261025 — One-step game creation, phase 1 (part 2): what Manage Game saves, pinned on a real database
+
+Completes phase 1's yardstick (owner, Oct 24): alongside what Create saves (212.38), a record of exactly what MANAGE GAME stores when the organizer sets teams, matchups and groups, for every format Create can make. **Nothing members see changes.**
+
 ## 212.38.261024 — One-step game creation, phase 1 (part 1): what Create saves, pinned for every format
 
 The yardstick for the one-step Create flow (owner, Oct 24): a record of exactly what today's Create step saves, for every format combination, which every later phase must reproduce. **Nothing members see changes.**
