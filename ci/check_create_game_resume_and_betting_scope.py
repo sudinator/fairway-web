@@ -11,7 +11,8 @@ checks = [
     ("resume checkpoints visibility hidden", 'document.visibilityState === "hidden"' in tour),
     ("resume restores workspace section", 'setCreateSection(d.createSection as CreateGameSection)' in tour),
     ("resume restores handicap overrides", 'setHcpOverrides(d.hcpOverrides || {})' in tour),
-    ("draft stores workspace section", 'createSection?: "game" | "players" | "format" | "structure" | "review";' in setup),
+    # 212.41: + "teams" — a one-step draft reopens on its Teams step
+    ("draft stores workspace section", 'createSection?: "game" | "players" | "format" | "structure" | "review" | "teams";' in setup),
     ("draft stores handicap overrides", 'hcpOverrides?: Record<string, number>;' in setup),
     ("leader no-bet label is capability gated", 'showBetStatus && p.bets === false' in leader),
     ("create path passes TGC capability", 'tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID' in tour),

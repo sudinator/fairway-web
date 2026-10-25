@@ -1,6 +1,8 @@
 "use client";
 
 import { SCRAMBLE_METHOD_LABEL, type ScrambleMethod } from "@/lib/scramble-method";
+import { DraftBanner, ShareLinks } from "@/components/game/setup/one-step";
+import { isDraftGame } from "@/lib/one-step-create";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { scrambleSetupProblem, scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
 import React from "react";
@@ -47,6 +49,8 @@ export type GameSetupWorkspaceProps = {
   randomizing: boolean;
   groupOverflow: string[];
   isCompetitionGame?: boolean;
+  /** 212.41: a saved draft — tell every player (announce_game_players) and make the game visible to them. */
+  onSendToPlayers?: () => Promise<void>;
   /** Tees of the game's course, for rating/slope on the line-up card (200.0). */
   courseTees?: CourseTee[];
 };
@@ -82,7 +86,11 @@ export function GameSetupWorkspace({
   groupOverflow,
   isCompetitionGame = false,
   courseTees = [],
+  onSendToPlayers,
 }: GameSetupWorkspaceProps) {
+  // 212.41 (owner, Oct 25): a saved draft is the organizer's alone until sent; nothing can be shared before that.
+  const draft = isDraftGame(game);
+  const draftBanner = draft && onSendToPlayers ? <DraftBanner onSend={onSendToPlayers} /> : null;
   // Whether the line-up card is open. Local: presentation, not setup state.
   const [showLineup, setShowLineup] = React.useState(false);
   /**
@@ -182,6 +190,7 @@ export function GameSetupWorkspace({
   if (section === "overview") {
     return (
       <div style={{ marginTop: 16 }}>
+        {draftBanner}
         <div style={{ ...cardStyle, padding: 14, marginBottom: 10 }}>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{game.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{game.course} · {game.game_type === "fourball" ? "Four-ball" : game.game_type}</div>
@@ -206,6 +215,7 @@ export function GameSetupWorkspace({
 
   return (
     <div style={{ marginTop: 16 }}>
+      {draftBanner}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} onClick={() => onSetupTabChange("overview")}>‹ Control center</button>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>
@@ -267,10 +277,7 @@ export function GameSetupWorkspace({
             </div>
           </div>
 
-          <div style={{ ...cardStyle, marginTop: 10 }}>
-            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SHARING</div>
-            <ShareControl game={game} onShare={organizerPanelProps.onShare} token={game.lineup_slug ?? game.share_token ?? null} />
-          </div>
+          {/* 212.41 (owner, Oct 25): sharing moved to the Review tab (ShareLinks) — one place to share */}
 
           <div style={{ ...cardStyle, marginTop: 10 }}>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>GAME STATUS</div>
@@ -344,7 +351,12 @@ export function GameSetupWorkspace({
         <div>
           {/* The roster, as a shareable card. Opens the same modal the scorecard share uses, so
               the image, the Web Share sheet and the copy-as-text path are all one implementation. */}
+          {/* 212.41 (owner, Oct 25): the game's share links live here — and only once the game is created and sent */}
           <div style={{ ...cardStyle, marginBottom: 10 }}>
+            {draft ? <div data-share-after-send style={{ color: C.sage, fontSize: 12.5, lineHeight: 1.45 }}>The line-up and live scores links — and the line-up card — can be shared once you send the game to its players.</div>
+              : <ShareLinks lineupToken={game.lineup_slug ?? null} liveToken={game.share_token ?? null} onShare={organizerPanelProps.onShare} />}
+          </div>
+          {draft ? null : <div style={{ ...cardStyle, marginBottom: 10 }}>
             <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Share the line-up</div>
             <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>
               Post this to your group chat so everyone can check their handicap, tee and team before you start.
@@ -352,7 +364,7 @@ export function GameSetupWorkspace({
             <button onClick={() => setShowLineup(true)} style={{ ...btn(true), width: "100%", fontSize: 13 }}>
               View line-up card
             </button>
-          </div>
+          </div>}
           {/* What is actually RUNNING. The reported bug was a side game nobody chose; being able to
               turn it off is half the fix, and saying plainly what is on is the other half. */}
           <div style={{ ...cardStyle, marginBottom: 10 }}>
@@ -381,7 +393,7 @@ export function GameSetupWorkspace({
       )}
       {showLineup ? (
         <ShareLineupModal game={game} players={players} courseTees={courseTees} currentUserId={organizerPanelProps.user?.id ?? null}
-          linkControl={<ShareControl game={game} onShare={organizerPanelProps.onShare} path="lineup" token={game.lineup_slug ?? game.share_token ?? null} title="Live line-up link"
+          linkControl={draft ? null : <ShareControl game={game} onShare={organizerPanelProps.onShare} path="lineup" token={game.lineup_slug ?? game.share_token ?? null} title="Live line-up link"
             blurb="One link for the chat. It shows every player's tees, playing handicap, opponents and strokes, updates as you change pairings, and stops working when the game ends." />}
           onClose={() => setShowLineup(false)} />
       ) : null}

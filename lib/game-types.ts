@@ -30,6 +30,8 @@ export type Game = {
   trifecta_scoring?: "match" | null; // trifecta: always "match" since 183.0 (two 1-v-1 singles + four-ball, one point each). Column kept; the Ryder Cup trigger (0146) requires it.
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
   lineup_slug?: string | null; // readable line-up link (0177): course-date-6chars; minted with share_token
+  /** 0219 (212.41): when the players were told; null = a DRAFT — saved, but only its organizer (and club admins) see it. */
+  players_notified_at?: string | null;
   ended_at?: string | null;
   alt_shot_scoring_started_at?: string | null;
   /** 211.1: scramble settings (0203) — null for every other format. */

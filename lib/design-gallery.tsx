@@ -25,6 +25,11 @@ import { YourCourses, CourseDetail } from "@/components/your-courses";
 import { IndivSegmentChoice } from "@/components/game/segment-views";
 import { SaveTraceToggle } from "@/components/save-trace-view";
 import { StorageMeter } from "@/components/storage-meter";
+import { CreateGameWorkspace } from "@/components/game/setup/create-game-workspace";
+import { PlayerCountHint, OneStepReview, DraftBanner, ShareLinks } from "@/components/game/setup/one-step";
+import { createSectionsFor, SECTION_LABEL, playerCountHint } from "@/lib/one-step-create";
+import { balanceScrambleTeams, scrambleTeeGroups } from "@/lib/scramble-teams";
+import { pkey as galleryPkey, chBasis } from "@/lib/game-shape";
 import { SkinsView } from "@/components/game/scoring-views";
 import { computeInsights } from "@/lib/insights";
 import { yourCourses } from "@/lib/your-courses";
@@ -87,6 +92,38 @@ add("11e-teams-groups-captains", <ScrambleTeamsBuilder game={capsGame} players={
   const sk = players((i) => (i % 2 ? "B" : "A")).slice(0, 4).map((p, i) => ({ ...p, scores: [...sc[i], ...Array(12).fill(null)] }));
   const skGame = { ...base, game_type: "skins", skins_mode: "split", foursomes: null, teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }],
     pairings: [{ a: "u0", b: "u1" }, { a: "u2", b: "u3" }], status: "active" } as unknown as Game;
+// 212.41 — ONE-STEP CREATE (phase 3, scramble first), for the owner's approval: Format before Players, a Teams step
+// inside Create, a Review that saves everything at once. The draft has no saved rows yet; the Teams step opens on balanced
+// teams (teams of 2 pair into foursomes, 212.34) that the organizer can change.
+{
+  const steps = (active: "players" | "teams" | "review", child: React.ReactNode, teamsDone = true) => (
+    <CreateGameWorkspace activeSection={active} onSectionChange={noop}
+      sections={createSectionsFor("scramble").map((k) => ({ key: k, label: SECTION_LABEL[k], done: k === "game" || k === "format" || (k === "players" && active !== "players") || (k === "teams" && active === "review" && teamsDone) }))}>
+      {child}
+    </CreateGameWorkspace>
+  );
+  const draftPlayers = players().slice(0, 8).map((p) => ({ ...p, tee_group: null, team: null }));
+  const draftGame = field({ scramble_team_size: 2, foursomes: [] });
+  const balanced = balanceScrambleTeams(draftPlayers.map((p) => ({ key: galleryPkey(p), ch: Number(chBasis(p as Player, 72) ?? 0) })), 2, "field") ?? [];
+  const tee = scrambleTeeGroups(balanced, "field", false);
+  const withGroups = draftPlayers.map((p) => { const t = balanced.find((g) => g.a.includes(galleryPkey(p)) || g.b.includes(galleryPkey(p))); return { ...p, tee_group: t ? tee.get(t.id) ?? null : null }; });
+  add("14a-create-players-hint", steps("players", <div>
+    <PlayerCountHint hint={playerCountHint("scramble", { players: 8 })} />
+  </div>));
+  add("14b-create-teams-step", steps("teams", <ScrambleTeamsBuilder game={{ ...draftGame, foursomes: balanced } as Game} players={withGroups as Player[]} readOnly={false} onSave={noop} />));
+  const lines = [
+    { ok: true, label: "Course", value: "Oak Hollow · Blue tees" }, { ok: true, label: "Date", value: "Sun, Oct 25" },
+    { ok: true, label: "Format", value: "Scramble · Leaderboard · teams of 2" }, { ok: true, label: "Players", value: "8" },
+    { ok: true, label: "Teams", value: "4 teams of 2" }, { ok: true, label: "Groups", value: "2 groups — Teams 1+2, Teams 3+4" },
+  ];
+  add("14c-create-review-ready", steps("review", <OneStepReview lines={lines} problem={null} busy={false} onCreate={noop} onCreateLater={noop} onCancel={noop} />));
+  add("14d-create-review-blocked", steps("review", <OneStepReview lines={lines.map((l) => (l.label === "Teams" ? { ok: false, label: "Teams", value: "Karan Patel isn't on a team" } : l))}
+    problem="Put every player on a team before creating the game — or create now and finish later." busy={false} onCreate={noop} onCreateLater={noop} onCancel={noop} />, false));
+  add("14e-manage-game-draft", <div><DraftBanner onSend={async () => {}} /><div style={{ color: "#B8CFC4", fontSize: 12 }}>(the rest of Manage Game, as today — the line-up link is offered once the game is sent)</div></div>);
+  // 212.41 (owner, Oct 25): Manage Game → Review — the two share links, one switch; only once the game is created
+  add("14f-review-share-off", <div style={{ background: "#1B5A46", borderRadius: 12, padding: 14 }}><ShareLinks lineupToken={null} liveToken={null} onShare={async () => {}} /></div>);
+  add("14g-review-share-on", <div style={{ background: "#1B5A46", borderRadius: 12, padding: 14 }}><ShareLinks lineupToken="oak-hollow-oct25-ab12cd" liveToken="k3J9xQ2mP7vL0aB4" onShare={async () => {}} /></div>);
+}
   add("12-skins-11-halved", <SkinsView game={skGame} players={sk as Player[]} user={{ id: "u0" }} isCreator mode="view" onChanged={noop} />);
 }
 // 212.37: individual skins, ties halved, three players — tied holes split three ways, printed ⅓ ⅔ (were "0" and "½")

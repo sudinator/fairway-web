@@ -106,6 +106,7 @@
   "finish_tee_group(uuid)": "authenticated",
   "finish_tee_group_and_post(uuid)": "authenticated",
   "game_added_note(uuid,uuid)": "",
+  "game_announced_or_mine(uuid)": "authenticated",
   "game_setup_line(uuid,uuid)": "",
   "get_admin_analytics()": "authenticated",
   "get_admin_engagement()": "authenticated",
@@ -481,6 +482,12 @@
    "roles": "public",
    "using": "is_admin()"
   },
+  "game_alt_shot_scores.drafts_private": {
+   "check": "game_announced_or_mine(game_id)",
+   "cmd": "*",
+   "roles": "authenticated",
+   "using": "game_announced_or_mine(game_id)"
+  },
   "game_alt_shot_scores.game_alt_shot_scores_select": {
    "check": null,
    "cmd": "r",
@@ -493,11 +500,23 @@
    "roles": "public",
    "using": "(EXISTS ( SELECT 1\n   FROM game_contests c\n  WHERE ((c.id = game_contest_entries.contest_id) AND can_see_game(c.game_id))))"
   },
+  "game_contests.drafts_private": {
+   "check": "game_announced_or_mine(game_id)",
+   "cmd": "*",
+   "roles": "authenticated",
+   "using": "game_announced_or_mine(game_id)"
+  },
   "game_contests.gc_select": {
    "check": null,
    "cmd": "r",
    "roles": "public",
    "using": "can_see_game(game_id)"
+  },
+  "game_players.drafts_private": {
+   "check": "game_announced_or_mine(game_id)",
+   "cmd": "*",
+   "roles": "authenticated",
+   "using": "game_announced_or_mine(game_id)"
   },
   "game_players.edit own scores": {
    "check": "(auth.uid() = user_id)",
@@ -582,6 +601,12 @@
    "cmd": "a",
    "roles": "public",
    "using": null
+  },
+  "games.drafts_private": {
+   "check": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())",
+   "cmd": "*",
+   "roles": "authenticated",
+   "using": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())"
   },
   "games.find or member games": {
    "check": null,
