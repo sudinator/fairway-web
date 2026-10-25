@@ -24,7 +24,9 @@ const rowId = (n: number, k: number) => `21392000-0000-0000-${hex(n, 4)}-${hex(k
 const q = (v: unknown) => `'${JSON.stringify(v).replace(/'/g, "''")}'`;
 
 type Op = { route: string; sql: string };
-export type StructureCase = { id: string; gameId: string; insertGame: string; insertPlayers: string; ops: Op[] };
+export type StructureCase = { id: string; gameId: string; insertGame: string; insertPlayers: string; ops: Op[];
+  /** 212.40: what Create saved, and the line-up the organizer ended with — the one-step flow is given exactly these. */
+  created: { game: Record<string, unknown>; players: Record<string, unknown>[] }; final: { game: Game; players: Player[] } };
 
 export function structureCase(c: CreateCase, n: number): StructureCase | null {
   const rec = createBehaviour(c);
@@ -71,6 +73,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
     setGame({ foursomes: groups }, "setScrambleTeams → games.foursomes");
     const assign = scrambleTeeAssignments(state.game, state.players, groups);
     ops.push({ route: "setScrambleTeams → set_tee_groups", sql: `perform public.set_tee_groups('${gid}'::uuid, ${q(assign)}::jsonb);` });
+    state = { ...state, players: state.players.map((x) => { const t = assign.find((y) => y.player === x.id); return t ? { ...x, tee_group: t.group } : x; }) };
   } else if (hasTeams && has4 && type === "skins") {   // 2 v 2 skins: teams, then the foursome editor (saveFoursomes)
     ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
     let fs: Foursome[] = (state.game.foursomes ?? []) as Foursome[];
@@ -108,7 +111,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
   const insertGame = `insert into public.games (${cols.join(", ")}) select ${cols.join(", ")} from jsonb_populate_record(null::public.games, ${q(Object.fromEntries(cols.map((k) => [k, game[k]])))}::jsonb);`;
   const pcols = Array.from(new Set(players.flatMap((p) => Object.keys(p as unknown as Record<string, unknown>))));
   const insertPlayers = `insert into public.game_players (${pcols.join(", ")}) select ${pcols.join(", ")} from jsonb_populate_recordset(null::public.game_players, ${q(players)}::jsonb);`;
-  return { id: c.id, gameId: gid, insertGame, insertPlayers, ops };
+  return { id: c.id, gameId: gid, insertGame, insertPlayers, ops, created: { game: Object.fromEntries(cols.map((k) => [k, game[k]])), players: players as unknown as Record<string, unknown>[] }, final: state };
 }
 
 export function structureCases(keys: string[]): StructureCase[] {

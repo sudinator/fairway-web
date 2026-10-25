@@ -1,3 +1,7 @@
+## 212.40.261025 — One-step game creation, phase 2: the single server step (migration 0219)
+
+The server step the one-step Create flow will use (owner, Oct 25). **No screen uses it yet** — phase 3 moves the Create flow over, format by format — so **nothing members see changes**, and today's Create works exactly as before.
+
 ## 212.39.261025 — One-step game creation, phase 1 (part 2): what Manage Game saves, pinned on a real database
 
 Completes phase 1's yardstick (owner, Oct 24): alongside what Create saves (212.38), a record of exactly what MANAGE GAME stores when the organizer sets teams, matchups and groups, for every format Create can make. **Nothing members see changes.**
