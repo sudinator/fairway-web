@@ -1,5 +1,5 @@
 {
-  "total": 439782,
+  "total": 439881,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -19,6 +19,8 @@
     "contests": 26,
     "course history": 6,
     "course ordering": 4,
+    "create behaviour": 68,
+    "create game complete": 3,
     "create-game format": 12,
     "cup on the recap": 8,
     "cup scramble": 13,
@@ -68,6 +70,7 @@
     "storage tidy": 18,
     "stroke agreement": 38,
     "stroke rounding": 24,
+    "structure behaviour": 28,
     "sync/column tests": 6,
     "team colour dot": 10,
     "team rounds": 11,

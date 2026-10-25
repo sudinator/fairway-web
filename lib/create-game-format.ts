@@ -1,4 +1,4 @@
-import type { GameTypeOpt } from "./game-create";
+import { defaultAllowanceFor, type GameTypeOpt } from "./game-create";
 import type { MatchLength } from "./match-length";
 
 export type CreateFormatState = {
@@ -123,6 +123,8 @@ export function reachableFormatKeys(): string[] {
   const out = ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team"];
   for (const score of ["best_ball", "aggregate"] as const) out.push(`fourball:team:${score}`);
   for (const score of ["best_ball", "aggregate"] as const) out.push(`trifecta:${score}`);
+  // 212.38: Alternate Shot has its own Create button (components/tournaments.tsx) but was missing from this list.
+  out.push("alt_shot");
   for (const ties of ["carryover", "split"] as const) {
     out.push(`skins:individual:${ties}`);
     out.push(`skins:team_11:${ties}`);
@@ -131,4 +133,64 @@ export function reachableFormatKeys(): string[] {
   // 211.1: scramble — one leaderboard (created under stroke play) or team v team (under match play).
   out.push("scramble:field", "scramble:match");
   return out;
+}
+
+/**
+ * 212.38 (one-step creation, phase 1) — REPLAY the Create screen's format buttons. Each format combination is reached by
+ * the same clicks a person makes, through the same helpers the buttons call, applied the way the screen applies them
+ * (components/tournaments.tsx applyGuidedFormatPatch: every field a click names is set; choosing a format resets the
+ * allowance to that format's default). Used to pin what Create saves for every combination (lib/create-behaviour.test).
+ */
+export type ReplayedFormat = GuidedFormatState & { allowancePct: number; matchLength: MatchLength };
+/** The Create screen's starting state when it is not opened from a tee time or Ryder Cup session. */
+export const CREATE_FORMAT_START: ReplayedFormat = {
+  gameType: "stableford", teamMode: false, skinsTeamStyle: "head_to_head", teamScoreMode: "best_ball", strokeBasis: "net",
+  skinsMode: "carryover", fmtFamily: "stroke", matchKind: "ind", allowancePct: 100, matchLength: "18",
+  scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null,
+};
+export function applyCreateFormatPatch(s: ReplayedFormat, patch: CreateFormatPatch): ReplayedFormat {
+  const n = { ...s };
+  if (patch.gameType) { n.gameType = patch.gameType; n.allowancePct = defaultAllowanceFor(patch.gameType); }
+  if (patch.fmtFamily) n.fmtFamily = patch.fmtFamily;
+  if (patch.matchKind) n.matchKind = patch.matchKind;
+  if (patch.teamMode !== undefined) n.teamMode = patch.teamMode;
+  if (patch.skinsTeamStyle) n.skinsTeamStyle = patch.skinsTeamStyle;
+  if (patch.teamScoreMode) n.teamScoreMode = patch.teamScoreMode;
+  if (patch.strokeBasis) n.strokeBasis = patch.strokeBasis;
+  if (patch.skinsMode) n.skinsMode = patch.skinsMode;
+  return n;
+}
+/** The format state Create holds after the clicks for one reachable key (plus optional scramble size / nine). */
+export function replayFormatKey(key: string, extra: { matchLength?: MatchLength; scrambleTeamSize?: 1 | 2 | 3 | 4 } = {}): ReplayedFormat {
+  let s = { ...CREATE_FORMAT_START };
+  const click = (f: (st: ReplayedFormat) => CreateFormatPatch) => { s = applyCreateFormatPatch(s, f(s)); };
+  const [type, a, b, c] = key.split(":");
+  const family = (fam: "stroke" | "match") => click((st) => selectGuidedFamily(st, fam));
+  if (type === "stableford" || type === "stroke") {
+    family("stroke"); click(() => selectGuidedStrokeFormat(type));
+    if (type === "stroke") click(() => ({ strokeBasis: a as "net" | "gross" }));
+  } else if (type === "match") {
+    family("match"); click((st) => selectGuidedMatchKind(st, "ind"));
+    if (a === "team") click(() => setGuidedTeamMode(true));
+  } else if (type === "fourball" || type === "trifecta") {
+    family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat(type));
+    click(() => ({ teamScoreMode: (type === "fourball" ? b : a) as "best_ball" | "aggregate" }));
+  } else if (type === "alt_shot") {
+    family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat("alt_shot"));
+  } else if (type === "skins") {
+    if (a === "team_2v2") {
+      family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat("skins"));
+      click(() => ({ teamScoreMode: b as "best_ball" | "aggregate", skinsMode: c as "carryover" | "split" }));
+    } else {
+      family("stroke"); click(() => selectGuidedStrokeFormat("skins"));
+      if (a === "team_11") click(() => setGuidedTeamMode(true));
+      click(() => ({ skinsMode: b as "carryover" | "split" }));
+    }
+  } else if (type === "scramble") {
+    if (a === "match") { family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat("scramble")); }
+    else { family("stroke"); click(() => selectGuidedStrokeFormat("scramble")); }
+  } else throw new Error(`unknown format key ${key}`);
+  if (extra.matchLength) s.matchLength = extra.matchLength;
+  if (extra.scrambleTeamSize) s.scrambleTeamSize = extra.scrambleTeamSize;
+  return s;
 }

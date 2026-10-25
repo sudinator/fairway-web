@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { foursomeTeeGroupUpdates } from "@/lib/structure-ops";
 import { fmtSkins } from "@/lib/skins-format";
 import { pointsOutlook, outlookLine } from "@/lib/points-outlook";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -1118,12 +1119,8 @@ export function FourballView({
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
     // with the foursomes and there's no separate "Groups" step for four-ball.
     const groupOf = deriveTeeGroupsFromFoursomes(next);
-    await Promise.all(players.map((p) => {
-      const g = groupOf[pkey(p)] ?? null;
-      return (p.tee_group ?? null) !== g
-        ? supabase.from("game_players").update({ tee_group: g }).eq("id", p.id)
-        : Promise.resolve();
-    }));
+    // 212.39: which players change group is decided by lib/structure-ops (moved verbatim)
+    await Promise.all(foursomeTeeGroupUpdates(players, groupOf).map((u) => supabase.from("game_players").update({ tee_group: u.tee_group }).eq("id", u.id)));
     onChanged();
   };
 

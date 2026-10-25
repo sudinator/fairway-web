@@ -1,3 +1,15 @@
+## 212.40.261025 — One-step game creation, phase 2: the single server step (migration 0219)
+
+The server step the one-step Create flow will use (owner, Oct 25). **No screen uses it yet** — phase 3 moves the Create flow over, format by format — so **nothing members see changes**, and today's Create works exactly as before.
+
+## 212.39.261025 — One-step game creation, phase 1 (part 2): what Manage Game saves, pinned on a real database
+
+Completes phase 1's yardstick (owner, Oct 24): alongside what Create saves (212.38), a record of exactly what MANAGE GAME stores when the organizer sets teams, matchups and groups, for every format Create can make. **Nothing members see changes.**
+
+## 212.38.261024 — One-step game creation, phase 1 (part 1): what Create saves, pinned for every format
+
+The yardstick for the one-step Create flow (owner, Oct 24): a record of exactly what today's Create step saves, for every format combination, which every later phase must reproduce. **Nothing members see changes.**
+
 ## 212.37.261024 — Skins counts print as fractions everywhere; the recap body credits shared (halved) holes
 
 Owner (Oct 24) asked for one way to print skins after 212.36 showed the gap. When players tie a hole in individual skins with ties halved, the skin is SHARED — three players tie, each gets ⅓. Every place that printed a skins count got that wrong in its own way: the scoring screen and live page knew only halves (⅓ read "0", 1⅔ read "1½"); the recap email used the match-points printer (⅓ read "½"); the recap headline, "you won N skins" and the recap screen printed raw numbers ("1.6666666666666665").

@@ -124,6 +124,30 @@ export function buildGamePayload(o: GamePayloadOpts) {
   };
 }
 
+/**
+ * 212.38 (one-step creation, phase 1) — rules the Create SCREEN used to hold inline, moved here VERBATIM so what Create
+ * saves can be pinned by a test (lib/create-behaviour.test) and reused by the one-step flow. No behaviour change.
+ *
+ * The handicap allowance a format starts at when it is chosen. Alternate shot is 50% of the partners' COMBINED course
+ * handicaps — one ball in play, so half the strokes; four-ball and trifecta 85%; everything else 100%.
+ */
+export function defaultAllowanceFor(gameType: GameTypeOpt): number {
+  return gameType === "alt_shot" ? 50 : gameType === "fourball" || gameType === "trifecta" ? 85 : 100;
+}
+
+/** The scramble settings Create saves (null for every other format) — moved verbatim from the Create screen. */
+export function scrambleCreateSettings(i: {
+  gameType: GameTypeOpt; cupScrambleSize: 2 | 3 | 4 | null; scrambleTeamSize: 1 | 2 | 3 | 4;
+  scrambleHandicap: "usga" | "gross" | "agreed"; scrambleMinDrives: number | null;
+  scrambleAllowance: NonNullable<GamePayloadOpts["scramble"]>["allowance"]; fmtFamily: "stroke" | "match";
+}): GamePayloadOpts["scramble"] {
+  return i.gameType === "scramble" ? {
+    cupTeams: !!i.cupScrambleSize, teamSize: i.cupScrambleSize ?? (i.scrambleTeamSize === 1 ? 1 : null),
+    handicap: i.scrambleTeamSize === 1 && !i.cupScrambleSize ? "agreed" : i.scrambleHandicap, minDrives: i.scrambleMinDrives,
+    mode: i.cupScrambleSize || i.fmtFamily === "match" ? "match" : "field", allowance: i.scrambleHandicap === "usga" ? i.scrambleAllowance : null,
+  } : undefined;
+}
+
 // Split skins stays simple only in a small field (organizer is steered to teams or 1:1 beyond 4).
 export function splitSkinsTooBig(gameType: GameTypeOpt, teamMode: boolean, skinsMode: string, fieldCount: number): boolean {
   return gameType === "skins" && !teamMode && skinsMode === "split" && fieldCount > 4;

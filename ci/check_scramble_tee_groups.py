@@ -10,7 +10,11 @@ bad = []
 if not m: bad.append("components/tournaments.tsx: setScrambleTeams not found")
 else:
     body = m.group(1)
-    if "scrambleTeeGroups(" not in body: bad.append("setScrambleTeams must assign tee groups with scrambleTeeGroups")
+    # 212.39: the assignment moved verbatim to lib/structure-ops scrambleTeeAssignments — check both links of the chain
+    ops = (ROOT / "lib/structure-ops.ts").read_text(encoding="utf-8")
+    fn = re.search(r"export function scrambleTeeAssignments\(.*?\n\}", ops, re.S)
+    if "SO.scrambleTeeAssignments(" not in body: bad.append("setScrambleTeams must assign tee groups with lib/structure-ops scrambleTeeAssignments")
+    if not fn or "scrambleTeeGroups(" not in fn.group(0): bad.append("lib/structure-ops scrambleTeeAssignments must assign tee groups with scrambleTeeGroups")
     if re.search(r"gi\s*\+\s*1|findIndex\([^)]*\)\s*\+\s*1", body): bad.append("setScrambleTeams must not number groups by team position")
 lib = (ROOT / "lib/scramble-teams.ts").read_text(encoding="utf-8")
 if "export function scrambleTeeGroups(" not in lib or "SCRAMBLE_GROUP_MAX = 4" not in lib: bad.append("lib/scramble-teams.ts must export scrambleTeeGroups and SCRAMBLE_GROUP_MAX = 4")
