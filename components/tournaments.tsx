@@ -111,6 +111,7 @@ import * as GU from "@/lib/game-utils";
 import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
 import * as GC from "@/lib/game-create";
 import * as SO from "@/lib/structure-ops";
+import { countsForIndividualStats } from "@/lib/round-rules";
 import { isOneStep, createSectionsFor, SECTION_LABEL, playerCountHint, defaultScrambleSize } from "@/lib/one-step-create";
 import { PlayerCountHint, OneStepReview } from "@/components/game/setup/one-step";
 import { ScrambleTeamsBuilder as DraftTeamsBuilder } from "@/components/game/scramble-teams-builder";
@@ -4255,7 +4256,10 @@ function GameRoom({
           keeps my gross score it's shown view-only ("kept by X") while my putts / fairways
           / sand / penalties stay editable (they save through the stats chokepoint). The
           group scorer and self-scorers get a fully-editable card. */}
-      {roomTab === "play" && me && game.game_type !== "alt_shot" && (() => {
+      {/* 212.41 (owner, Oct 25): no personal scorecard in a format where you don't play your own ball — scramble
+          (the team's ball) and alternate shot (the pair's). One rule, lib/round-rules countsForIndividualStats; a shamble
+          (best drive, then your own ball) would keep it. Scramble used to show an empty card here. */}
+      {roomTab === "play" && me && countsForIndividualStats(game.game_type) && (() => {
         const myScoreLocked = !isEnded && markerOwnsMyRowRef.current;
         const mk = myScoreLocked
           ? ((teeGroupsInUse && myRow?.tee_group != null)
@@ -4436,7 +4440,7 @@ function GameRoom({
           scores.
         </div>
       )}
-      {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
+      {roomTab === "play" && me && countsForIndividualStats(game.game_type) && (me.scores || []).some((s: any) => s != null && s > 0) && (
         <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 18, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
       )}
       {roomTab === "play" && players.some((p: any) => (p.scores || []).some((s: any) => s != null && s > 0)) && (

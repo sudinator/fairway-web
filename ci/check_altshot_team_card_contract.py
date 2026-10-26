@@ -14,7 +14,10 @@ checks = {
     'alternate shot modal writes only the side score': 'if (sideCol?.altSide && edit.alt && onSetAltShotScore)' in score and 'onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null)' in score,
     'alternate shot group segment component hard-stops if called': 'if (game.game_type === "alt_shot" || cfg.scheme === "none") return null;' in seg,
     'alternate shot does not render individual group segment side game': 'game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta")' in tour and 'game.game_type === "trifecta" || game.game_type === "alt_shot") && (\n        <GroupSegmentSummary' not in tour,
-    'alternate shot does not render an individual personal scorecard': 'me && game.game_type !== "alt_shot" && (() => {' in tour,
+    # 212.42: the card now follows the shared rule (lib/round-rules countsForIndividualStats), which excludes alternate
+    # shot AND scramble — ci/check_shared_ball_scorecards.py checks the rule itself.
+    'alternate shot does not render an individual personal scorecard': 'me && countsForIndividualStats(game.game_type) && (() => {' in tour
+        and '"alt_shot"' in Path("lib/round-rules.ts").read_text(encoding="utf-8").split("export function countsForIndividualStats")[1].split("}")[0],
     # 212.24: the panel also follows the chosen segments (segRangesShown) — still gated off for alternate shot
     'alternate shot six-hole individual board remains gated off': 'shapeOf(game).dotBasis !== "alt_shot_side" && (' in tour or 'shapeOf(game).dotBasis !== "alt_shot_side" && segRangesShown.length > 0 && (' in tour,
 }

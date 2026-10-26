@@ -1,3 +1,13 @@
+## 212.42.261025 — No personal scorecard in a scramble (or any format where you don't play your own ball)
+
+Owner (Oct 25, staging games 376421 and 672063): at the bottom of a scramble's Results tab sat the player's own scorecard — empty, because in a scramble the team posts one score per hole and players record none (lib/round-rules). The screen hid it only for alternate shot, with its own "not alternate shot" check, so scramble was missed.
+
+**The rule (owner):** no individual scorecard in any format where you don't play your own ball — scramble (the team's ball) and alternate shot (the pair's). A shamble, if added (best drive, then your own ball), keeps individual cards. The personal scorecard and "Share my scorecard" now follow the app's ONE rule for this, lib/round-rules countsForIndividualStats (which already excluded both formats from individual stats), instead of a screen-local check. Everything else a scramble shows is the team's: Results (the team leaderboard), the Group Card, the live page (one card per team since 212.1) and the recap.
+Guard: ci/check_shared_ball_scorecards.py (the rule excludes both formats; the card and the share button use it; no screen-local copy) — negative-tested with the old check put back.
+Also in the staging trial: the scoring script now marks "scoring started" as the app's own scramble scoring does — in a scramble that mark is what locks teams and settings, since players' own cards stay empty.
+
+No migration. Deploy: code only.
+
 ## 212.41.261025 — One-step game creation, phase 3: scramble is created in one step; drafts are private (migration 0220)
 
 The first visible piece of the one-step Create flow (owner, Oct 24–25). **Scramble** is set up end to end inside Create and saved in one server step (create_game_complete, 0219); every other format keeps today's flow, with one change below.
