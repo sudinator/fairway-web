@@ -50,6 +50,7 @@
     "lib/one-step-walkthrough.test.tsx",
     "lib/draft-games.test.tsx",
     "lib/compact-team-editor.test.tsx",
+    "lib/odd-field.test.ts",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",

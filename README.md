@@ -1,3 +1,7 @@
+## 212.45.261025 — The Teams step: the organizer picks; names saved on Save; start over; odd numbers play one 2 v 1
+
+Owner feedback (Oct 26) on the four-ball / trifecta / alternate shot Teams step, all addressed:
+
 ## 212.44.261025 — The compact team card: teams named and coloured on the Teams step
 
 Owner (Oct 26): compared the full team editor with a compact mock-up as whole screens and chose the compact card — "but want the ability to name the teams … and to pick colors".

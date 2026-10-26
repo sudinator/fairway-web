@@ -49,7 +49,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides, scrambleTeamHandicapFor } from "@/lib/game-shape";
-import { randomTeeGroups, teamGroupSlotChoices, type GPlayer } from "@/lib/grouping";
+import { randomTeeGroups, teamGroupSlotChoices, type GPlayer, groupShapeOk, allowsOneShortGroup } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -794,7 +794,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, onClearGroups, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -804,6 +804,8 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   onRandomize?: () => Promise<void>;
   canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
   onBalanceMatchups?: () => Promise<void>;
+  /** 212.45 (owner, Oct 26): clear every group choice — "if I build balanced groups and don't like it, start over". */
+  onClearGroups?: () => Promise<void>;
 }) {
   const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
   const groupOptions = Array.from({ length: Math.max(2, Math.ceil(players.length / 2) + 1) }, (_, i) => i + 1);
@@ -841,7 +843,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
 
   if (teamGroupsOwnStructure && Array.isArray(game.teams) && game.teams.length === 2) {
-    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onBalanceMatchups={onBalanceMatchups} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
+    return <TeamGroupsBuilder game={game} players={players} onClearGroups={onClearGroups} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onBalanceMatchups={onBalanceMatchups} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
   }
 
   return (
@@ -947,7 +949,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
+export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, onClearGroups, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -955,6 +957,7 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
   onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onRandomize?: () => Promise<void>;
   onBalanceMatchups?: () => Promise<void>;
+  onClearGroups?: () => Promise<void>;
   canRandomize: boolean;
   randomizeReason: string;
   randomizing: boolean;
@@ -971,9 +974,11 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
   const maxExisting = assignedGroups.length ? Math.max(...assignedGroups) : 0;
   const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / perSide));
   const unassigned = players.filter((p) => p.tee_group == null && !p.no_show);
-  const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter((group) =>
-    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === perSide),
-  ).length;
+  // 212.45: a group is ready at two a side — or as the one 2 v 1 group an odd four-ball / trifecta field allows (lib/grouping)
+  const groupSides = (group: number) => teams.map((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length) as [number, number];
+  const shortGroups = Array.from({ length: groupCount }, (_, i) => groupSides(i + 1)).filter(([x, y]) => (x > 0 || y > 0) && !(x === perSide && y === perSide)).length;
+  const groupReady = (group: number) => { const [x, y] = groupSides(group); return groupShapeOk(game.game_type, x, y, shortGroups, perSide); };
+  const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter(groupReady).length;
   const scoringStarted = players.some((p) => (p.scores || []).some((score) => score != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
 
   const selectFor = (teamKey: string, group: number, slot: number) => {
@@ -1003,7 +1008,7 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
         {game.game_type === "scramble"
           ? <>Each group is one match: its {teams[0].name} players are one scramble team, its {teams[1].name} players the other — exactly {perSide} of each.</>
-          : <>Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players.</>} Team membership stays visible while you build the match.
+          : <>Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players{allowsOneShortGroup(game.game_type) ? <> — with an odd number, one group plays 2 v 1 ({game.game_type === "trifecta" ? "the lone player plays a single against each opponent" : "the lone player's ball against the pair's best ball"})</> : null}.</>} Team membership stays visible while you build the match.
       </div>
       {game.game_type === "trifecta" ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Once four players are selected, choose the two Singles matchups inside that group.</div> : null}
       {scoringStarted ? <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>Groups and Trifecta Singles matchups are locked because scoring has started.</div> : null}
@@ -1016,6 +1021,9 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(false), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
           {randomizing ? "Building…" : "🎲 Build even groups"}
         </button>
+        {onClearGroups && players.some((p) => p.tee_group != null) ? (
+          <button data-groups-start-over onClick={() => void onClearGroups()} disabled={randomizing} style={{ ...btn(false), fontSize: 13, marginLeft: 8 }}>Start over</button>
+        ) : null}
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? (game.game_type === "scramble"
           ? `Both buttons make teams of exactly ${perSide} from each side with handicaps spread evenly, one match per group. A starting point — captains can still move anyone afterwards.`
           : "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards.") : randomizeReason}</div>
@@ -1033,11 +1041,11 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
 
       {Array.from({ length: groupCount }, (_, i) => i + 1).map((group) => {
         const sides = teams.map((t) => players.filter((p) => p.team === t.key && p.tee_group === group && !p.no_show));
-        const ready = sides.every((side) => side.length === perSide);
+        const ready = groupReady(group);   // 212.45: two a side, or the one allowed 2 v 1
         const extras = sides.flatMap((side) => side.slice(perSide));
         const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? `✓ READY · ${perSide} v ${perSide}` : `NEEDS ${Math.max(0, 2 * perSide - sides.reduce((n, s) => n + Math.min(perSide, s.length), 0))} MORE`}</div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? `✓ READY · ${sides[0].length} v ${sides[1].length}` : `NEEDS ${Math.max(0, 2 * perSide - sides.reduce((n, s) => n + Math.min(perSide, s.length), 0))} MORE`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
             <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/{perSide} selected</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{Array.from({ length: perSide }, (_, slot) => <React.Fragment key={slot}>{selectFor(t.key, group, slot)}</React.Fragment>)}</div>

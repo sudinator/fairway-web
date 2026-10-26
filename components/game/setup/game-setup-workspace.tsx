@@ -3,6 +3,7 @@
 import { SCRAMBLE_METHOD_LABEL, type ScrambleMethod } from "@/lib/scramble-method";
 import { DraftBanner, ShareLinks } from "@/components/game/setup/one-step";
 import { CompactTeamEditor } from "@/components/game/compact-team-editor";
+import { groupShapesOk } from "@/lib/grouping";
 import { decideSetupChange } from "@/lib/game-setup-policy";
 import { isDraftGame } from "@/lib/one-step-create";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
@@ -137,7 +138,8 @@ export function GameSetupWorkspace({
   const perSide = game.game_type === "scramble" ? Number((game as { scramble_team_size?: number | null }).scramble_team_size) || 2 : 2;
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
   const showMatchupsTab = usesMatchups && game.game_type !== "trifecta";
-  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === perSide && f.b.length === perSide);
+  // 212.45: two a side — or the one 2 v 1 group an odd four-ball / trifecta field allows (lib/grouping groupShapesOk)
+  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && groupShapesOk(game.game_type, foursomes.map((f) => [f.a.length, f.b.length] as [number, number]), perSide);
   const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));
   const groupsDone = teamGroupFormat ? (teamGroupsValid && altDriversDone) : usesFoursomes || (total > 0 && cGrouped === total);
   const structureDone = teamsDone && matchupsDone && groupsDone;

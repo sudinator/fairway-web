@@ -22,7 +22,7 @@ domain = {
 context = {'favorites','profileIdx','groupRoster'}
 transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits','allowanceInput'}
 runtime = {'busy','err','draftAvailable','draftDismissed','pendingFavName','createSection',
-           'draftResuggested','visitedSteps','draftBalanceNote'}   # 212.41: screen state — a note, and which steps you've been to
+           'draftResuggested','visitedSteps'}   # 212.41: screen state — a note, and which steps you've been to
 expected_state = domain | context | transient | runtime
 expected_refs = {'hydratedRef','resumedRef','guestsSeeded','latestDraftRef','doneRef',
                  'draftIds'}   # 212.41: the one-step draft's fixed player ids — saved with the teams (oneStepTeams.ids)

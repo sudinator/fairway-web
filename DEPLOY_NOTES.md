@@ -1,3 +1,17 @@
+## 212.45.261025 — The Teams step: the organizer picks; names saved on Save; start over; odd numbers play one 2 v 1
+
+Owner feedback (Oct 26) on the four-ball / trifecta / alternate shot Teams step, all addressed:
+
+**No team tile on the Game step** for one-step formats ("Create Team Names (Red vs Blue)", trifecta's "Two teams") — the teams are named and picked on the Teams step.
+**Renaming works:** "✎ Edit names" → two boxes → **Save names** (or Cancel). Before, typing went straight into the live name, so every player's button changed as you typed and an emptied name snapped back to "Team 1". Now nothing changes until Save; a blank keeps the old name. The colour dot still sits beside each name.
+**Nothing is picked by default:** every player starts with "no team yet"; **Balance by handicap** is an option. **Groups stay locked** until every player is on a team and the teams fit (the note shows where things stand, e.g. "now Team 1 4 v Team 2 3"). Once open, nothing is pre-picked: **Build balanced matchups** (like plays like) or **Build even groups** (a similar mix in each) — both, as Manage Game offers — or pick by hand.
+**Start over** for the teams (clears teams and groups) and for the groups (clears the groups), shown once there's something to clear.
+**Odd numbers (owner's rule):** four-ball and trifecta with an odd field play **one 2 v 1 group, scored as before** — four-ball: the lone player's ball against the pair's best ball; trifecta: the lone player plays a single against each opponent. Teams must split 4 v 3, 6 v 5 … (the bigger side even) — 9 players (5 v 4) can't make one 2 v 1 group and is told so. **Alternate shot needs an even number** (a side shares one ball between two), and Review says so first. ONE rule, lib/grouping (allowsOneShortGroup, teamSizesFitGroups, groupShapesOk), used by the Teams step, the Groups editor's READY badges ("✓ READY · 2 v 1"), Review and Manage Game's checklist; both group builders gained the option to make the leftover two-and-one the last group, used in Create and Manage Game. The server already stored a 2 v 1 group (checked on a real database: 7 players, groups 2v2 and 2v1).
+"Build balanced matchups"' trifecta ordering (strong v strong singles) moved verbatim into lib/structure-ops (balancedMatchupFoursomes) so Create and Manage Game share it.
+Tests: lib/odd-field (23) — which splits open the groups, which group shapes are ready, the builders with and without the option, Review for 7 in four-ball, trifecta and alternate shot. lib/one-step-walkthrough (79) — nothing picked on arrival, groups locked, Balance opens them, Start over (teams and groups), Edit names → Save (an emptied name stays empty, buttons unchanged until Save), and 7 players: four-ball balances 4 v 3, builds one 2 v 2 and one 2 v 1 (both READY), Review "2 groups — one plays 2 v 1", one create call with those groups; alternate shot stays locked and Review says it needs an even number. lib/compact-team-editor (11).
+
+No migration. Deploy: code only.
+
 ## 212.44.261025 — The compact team card: teams named and coloured on the Teams step
 
 Owner (Oct 26): compared the full team editor with a compact mock-up as whole screens and chose the compact card — "but want the ability to name the teams … and to pick colors".
