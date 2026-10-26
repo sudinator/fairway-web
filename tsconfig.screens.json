@@ -49,6 +49,7 @@
     "lib/create-complete-behaviour.test.ts",
     "lib/one-step-walkthrough.test.tsx",
     "lib/draft-games.test.tsx",
+    "lib/compact-team-editor.test.tsx",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",
