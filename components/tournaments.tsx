@@ -111,6 +111,11 @@ import * as GU from "@/lib/game-utils";
 import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
 import * as GC from "@/lib/game-create";
 import * as SO from "@/lib/structure-ops";
+import { countsForIndividualStats } from "@/lib/round-rules";
+import { isOneStep, createSectionsFor, SECTION_LABEL, playerCountHint, defaultScrambleSize } from "@/lib/one-step-create";
+import { PlayerCountHint, OneStepReview } from "@/components/game/setup/one-step";
+import { ScrambleTeamsBuilder as DraftTeamsBuilder } from "@/components/game/scramble-teams-builder";
+import { balanceScrambleTeams, scrambleSetupProblem } from "@/lib/scramble-teams";
 import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
@@ -262,7 +267,7 @@ export default function Tournaments({
 }
 
 // ---------------- List + join ----------------
-function CreateGame({
+export function CreateGame({   // 212.41: exported for the one-step walkthrough test
   user,
   displayName,
   activeGroupId,
@@ -334,6 +339,11 @@ function CreateGame({
   const [teamMode, setTeamMode] = useState(seed?.gameType === "match");
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
+  // 212.41: the one-step draft's teams (and the fixed ids its guests get) — kept in the local draft with everything else
+  const [draftGroups, setDraftGroups] = useState<ScrambleGroup[] | null>(null);
+  const [draftResuggested, setDraftResuggested] = useState(false);
+  const draftIds = React.useRef<Record<string, string>>({});
+
   const [team1, setTeam1] = useState(seed?.teamNames?.A || "Team 1");
   // 209.4: team colours chosen with the names (owner-approved mock) — saved with the new game.
   const [teamColours, setTeamColours] = useState<[string | null, string | null]>([null, null]);
@@ -525,6 +535,8 @@ function CreateGame({
   const applyDraft = (d: SetupDraft) => {
     resumedRef.current = true;
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
+    // 212.41: the one-step draft's teams come back as you left them (with the same guest ids they point at)
+    if (d.oneStepTeams) { draftIds.current = { ...d.oneStepTeams.ids }; setDraftGroups(d.oneStepTeams.groups as ScrambleGroup[]); }
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
     setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setMatchLength((d.matchLength ?? "18") as MatchLength); setTeamScoreMode(d.teamScoreMode as any);
     setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
@@ -536,7 +548,7 @@ function CreateGame({
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
     setHcpOverrides(d.hcpOverrides || {});
     if (d.createSection === "structure") setCreateSection("review");
-    else if (d.createSection && ["game", "players", "format", "review"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);
+    else if (d.createSection && ["game", "players", "format", "review", "teams"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);   // 212.41: + teams
     setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
     setPendingFavName(d.favName);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
@@ -565,7 +577,8 @@ function CreateGame({
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance]);
+    oneStepTeams: draftGroups ? { groups: draftGroups, ids: { ...draftIds.current } } : undefined,   // 212.41
+  }), [draftGroups, name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -640,6 +653,125 @@ function CreateGame({
       ? courseHandicap(idxVal, creatorResolvedTee.tee.slope, creatorResolvedTee.tee.rating, coursePar)
       : null;
 
+  // 212.41 (one-step creation, phase 3): the game and player records Create saves are built in ONE place, used by
+  // today's two-step Create and by the one-step flow — moved verbatim from create() below.
+  const buildCreatePayload = (code: string) => GC.buildGamePayload({
+        code, activeGroupId, name, courseName: pickedFav!.name,
+        // A nine-hole game is simply nine entries in holes_meta. holesForLength keeps the
+        // course's own hole numbers and stroke indexes, so a back nine reads 10-18 and strokes
+        // still fall on the course's hardest holes.
+        courseHoles: holesForLength(pickedFav!.holes, matchLength),
+        teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
+        skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
+        sideContestsEnabled: !seed?.competitionSession,
+        scramble: GC.scrambleCreateSettings({ gameType, cupScrambleSize, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance, fmtFamily }),   // 212.38: moved verbatim
+      });
+  const buildCreateRows = (gameId: string, holesCount: number) => GC.buildPlayerRows({
+        gameId, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
+        hcpOverrides, tee, tees: pickedFav!.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
+        flightTeeIdx: teeAssignments.flight, coursePar, holesCount, flightsSupported, flightMode, flightBands,
+        tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
+        sideContestsEnabled: !seed?.competitionSession,
+        includeCreator: seed?.competitionSession ? !!selectedPlayers[user.id] && seed.memberIds.includes(user.id) : true,
+      });
+
+  // ── 212.41: ONE-STEP CREATION (phase 3, scramble first) ──────────────────────────────────────────────────────────
+  // The whole game — players, teams, groups — is a draft on the phone; nothing is saved until "Create game", which
+  // saves it all in one server step (create_game_complete, 0219) and only then tells the players. Ryder Cup sessions
+  // keep today's flow for now.
+  const oneStep = isOneStep(gameType as GC.GameTypeOpt) && !seed?.competitionSession;
+  // The steps in order — the step bar, Back and Continue all follow this one list.
+  const createSteps = createSectionsFor(oneStep ? (gameType as GC.GameTypeOpt) : "stableford");
+  // 212.41: a step is ticked only once you've been to it — Format and Players used to show ✓ before you'd seen them
+  // (a default format is always set, and you're always a player).
+  const [visitedSteps, setVisitedSteps] = useState<Set<CreateGameSection>>(() => new Set(["game"]));
+  useEffect(() => { setVisitedSteps((v) => (v.has(createSection) ? v : new Set([...v, createSection]))); }, [createSection]);
+  const stepAt = (d: number) => createSteps[Math.min(createSteps.length - 1, Math.max(0, createSteps.indexOf(createSection) + d))];
+  const idFor = (k: string) => (draftIds.current[k] ??= crypto.randomUUID());
+  const scrambleModeNow: "field" | "match" = fmtFamily === "match" ? "match" : "field";
+  const draft = (() => {
+    if (!oneStep || !pickedFav || !tee) return null;
+    const holesCount = holesForLength(pickedFav.holes, matchLength).length;
+    let gi = 0;
+    // members are keyed by their account; each guest gets a fixed id for as long as the draft lasts
+    const rows = buildCreateRows("draft", holesCount).map((r: any) => ({ ...r, id: r.user_id ? idFor(`u:${r.user_id}`) : idFor(`g:${guestPlayers[gi++]?.id ?? gi}`) }));
+    const game = { ...buildCreatePayload("000000"), id: "draft", foursomes: draftGroups ?? [] };
+    const assignments = SO.scrambleTeeAssignments(game as never, rows as never, draftGroups ?? []);
+    const players = rows.map((r: any) => ({ ...r, tee_group: assignments.find((t) => t.player === r.id)?.group ?? null, no_show: false, scores: [] }));
+    return { game, players, rows, assignments };
+  })();
+  const draftKeys = draft ? draft.players.map((p: any) => pkey(p)) : [];
+  const draftProblem: string | null = !oneStep ? null : !draft ? "Pick a course first."
+    : !(draftGroups ?? []).length ? "Put the players into teams."
+    : scrambleSetupProblem(draftGroups, draftKeys, scrambleModeNow, { size: scrambleTeamSize === 1 ? 1 : null, method: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap });
+  // The Teams step opens on balanced teams. If players are added later the teams are suggested afresh (and it says
+  // so); a removed player simply leaves their team.
+  useEffect(() => {
+    if (createSection !== "teams" || !oneStep || !draft) return;
+    const keys = draftKeys, placed = new Set((draftGroups ?? []).flatMap((g) => [...g.a, ...g.b]));
+    const unplaced = keys.some((k) => !placed.has(k));
+    if (!draftGroups || unplaced) {
+      const size = scrambleTeamSize === 1 ? 1 : defaultScrambleSize(keys.length);
+      // the same handicap rule the Teams screen balances with (chBasis — a manual course handicap wins)
+      const nh = (draft.game.holes_meta as unknown[]).length;
+      setDraftGroups(balanceScrambleTeams(draft.players.map((p: any) => ({ key: pkey(p), ch: Number(chBasis(p, draft.game.course_par, nh >= 18 ? undefined : nh) ?? 0) })), size, scrambleModeNow) ?? []);
+      setDraftResuggested(!!draftGroups);
+    } else if ([...placed].some((k) => !keys.includes(k))) {
+      setDraftGroups(draftGroups.map((g) => ({ ...g, a: g.a.filter((k) => keys.includes(k)), b: g.b.filter((k) => keys.includes(k)) })).filter((g) => g.a.length + g.b.length > 0));
+    }
+  }, [createSection, oneStep, draftKeys.join("|"), scrambleTeamSize, scrambleModeNow]);
+  const oneStepReviewLines = () => {
+    const n = draftKeys.length, groups = draftGroups ?? [];
+    const sizes = groups.map((g) => g.a.length + g.b.length), tees = draft ? new Set(draft.assignments.map((a) => a.group).filter((x) => x != null)) : new Set();
+    return [
+      { ok: !!pickedFav && !!tee, label: "Course", value: pickedFav ? `${pickedFav.name}${tee ? ` · ${tee.name} tees` : ""}` : "Pick a course" },
+      { ok: true, label: "Date", value: new Date(`${matchDate}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) },
+      { ok: !!gameType, label: "Game", value: formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, fmtFamily } as never) },
+      { ok: n > 0, label: "Players", value: String(n) },
+      { ok: !draftProblem, label: scrambleModeNow === "match" ? "Matches" : "Teams", value: draftProblem ? draftProblem : scrambleModeNow === "match" ? `${groups.length} match${groups.length === 1 ? "" : "es"}` : (new Set(sizes).size === 1 ? `${groups.length} team${groups.length === 1 ? "" : "s"} of ${sizes[0]}` : `${groups.length} teams of ${[...new Set(sizes)].sort().join(" and ")}`) },
+      { ok: !draftProblem, label: "Groups", value: tees.size ? `${tees.size} group${tees.size === 1 ? "" : "s"} on the course` : "—" },
+      { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
+    ];
+  };
+  const createOneStep = async (announce: boolean) => {
+    if (!pickedFav || !tee || !draft) { setErr("Pick a course (from your favorites)."); return; }
+    if (announce && draftProblem) { setErr(draftProblem); return; }
+    if (flightBlocked) { setErr("Some players need a handicap index before this event can be flighted — set them under Flights, or turn flights off."); return; }
+    setBusy(true);
+    setErr(null);
+    try {
+      const gameId = crypto.randomUUID();
+      const payload = { ...buildCreatePayload(makeCode()), id: gameId };
+      const rows = draft.rows.map(({ game_id: _g, ...r }: any) => r);
+      const groups = draftGroups ?? [];
+      const { error } = await supabase.rpc("create_game_complete", {
+        p_game: payload, p_players: rows, p_teams: [], p_groups: draft.assignments.filter((a) => a.group != null),
+        p_foursomes: groups.length ? groups : null, p_announce: announce,
+      });
+      if (error) throw error;
+      // the same follow-ups as today's Create (create() below)
+      if (idxVal != null && idxVal !== profileIdx) { try { await supabase.from("profiles").update({ handicap_index: idxVal }).eq("id", user.id); } catch {} }
+      for (const [uid, hi] of Object.entries(hcpOverrides)) { if (uid !== user.id && hi != null) { try { await supabase.from("profiles").update({ handicap_index: hi }).eq("id", uid); } catch {} } }
+      // the club's activity feed hears about a draft only when it is sent (Manage Game → Send to players)
+      if (announce) await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${payload.name}" at ${pickedFav.name}` });
+      if (seed?.teeTimeId) {
+        try {
+          await supabase.rpc("link_tee_time_game", { p_tee_time_id: seed.teeTimeId, p_game_id: gameId });
+          await supabase.from("group_activity").insert({ group_id: activeGroupId, actor_user_id: user.id, action: "tt_game_linked", summary: `created a game from this tee time ("${payload.name}")`, meta: { tee_time_id: seed.teeTimeId, game_id: gameId } });
+        } catch { /* linking never blocks game creation */ }
+      }
+      doneRef.current = true;
+      clearSetupDraft(activeGroupId, draftSourceId);
+      // Create game → the scorecard; sharing is in Manage Game → Review. Save draft → Manage Game, where the Draft
+      // banner's "Send to players" tells everyone when it's ready (owner, Oct 25).
+      if (announce) onCreated(gameId, "play");   // owner, Oct 25: straight to the scorecard
+      else onCreated(gameId, "setup", "overview");
+    } catch (e: any) {
+      setErr(failureMessage("Couldn't create the game", e));
+      setBusy(false);
+    }
+  };
+
   const create = async () => {
     if (!pickedFav || !tee) {
       setErr("Pick a course (from your favorites).");
@@ -679,17 +811,7 @@ function CreateGame({
     setBusy(true);
     setErr(null);
     try {
-      const payload = GC.buildGamePayload({
-        code: makeCode(), activeGroupId, name, courseName: pickedFav.name,
-        // A nine-hole game is simply nine entries in holes_meta. holesForLength keeps the
-        // course's own hole numbers and stroke indexes, so a back nine reads 10-18 and strokes
-        // still fall on the course's hardest holes.
-        courseHoles: holesForLength(pickedFav.holes, matchLength),
-        teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
-        skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
-        sideContestsEnabled: !seed?.competitionSession,
-        scramble: GC.scrambleCreateSettings({ gameType, cupScrambleSize, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, scrambleAllowance, fmtFamily }),   // 212.38: moved verbatim
-      });
+      const payload = buildCreatePayload(makeCode());   // 212.41: one builder for both Create flows
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
         .from("games")
@@ -710,14 +832,7 @@ function CreateGame({
         }
       }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
-      const rows = GC.buildPlayerRows({
-        gameId: game.id, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
-        hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
-        flightTeeIdx: teeAssignments.flight, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
-        tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
-        sideContestsEnabled: !seed?.competitionSession,
-        includeCreator: seed?.competitionSession ? !!selectedPlayers[user.id] && seed.memberIds.includes(user.id) : true,
-      });
+      const rows = buildCreateRows(game.id, holesMeta.length);   // 212.41: one builder for both Create flows
       const seededRows = seed?.participantTeams
         ? rows.map((row) => row.user_id ? { ...row, team: seed.participantTeams?.[row.user_id] ?? null } : row)
         : rows;
@@ -771,6 +886,7 @@ function CreateGame({
     );
   });
 
+
   return (
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>CREATE A GAME</Eyebrow>
@@ -789,31 +905,16 @@ function CreateGame({
       <CreateGameWorkspace
         activeSection={createSection}
         onSectionChange={setCreateSection}
-        sections={[
-          { key: "game", label: "Game", done: !!pickedFav && !!tee },
-          { key: "players", label: "Players", done: (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0 },
-          { key: "format", label: "Format", done: !!gameType },
-          { key: "review", label: "Review", done: !!pickedFav && !!tee && !flightBlocked },
-        ]}
+        sections={createSteps.map((k) => ({ key: k, label: SECTION_LABEL[k], done: visitedSteps.has(k) && k !== createSection && (
+          k === "game" ? !!pickedFav && !!tee
+          : k === "players" ? (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0
+          : k === "format" ? !!gameType
+          : k === "teams" ? !draftProblem
+          : !!pickedFav && !!tee && !flightBlocked && (!oneStep || !draftProblem)) }))}   // 212.41: Format before Players; one-step formats add Teams
       >
         {createSection === "game" && (
           <div>
-      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 190 }}>
-          <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
-          <input
-            style={{ ...inputStyle, marginTop: 6 }}
-            value={name}
-            placeholder="Leave blank to auto-name"
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-        <div>
-          <label style={{ color: C.sage, fontSize: 12 }}>Play date</label>
-          <div><ShortDateInput value={matchDate} onChange={(v) => setMatchDate(v || todayLocal())} /></div>
-        </div>
-      </div>
-
+      {/* 212.41 (owner, Oct 25): Game name moved to the Game step; the course comes first here, then the date */}
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>
           Course (from your favorites — so par &amp; stroke index are correct)
@@ -899,34 +1000,22 @@ function CreateGame({
             })}
           </div>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Applied to everyone unless a flight or individual player has a different tee.</div>
-          <div style={{ marginTop: 12 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>
-              Your handicap index
-            </label>
-            <input
-              style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }}
-              inputMode="decimal"
-              placeholder="14.2"
-              value={idxStr}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v);
-              }}
-            />
-          </div>
-          {ch != null && (
-            <div style={{ color: C.gold, fontWeight: 800, marginTop: 10 }}>
-              Your course handicap: {ch}
-            </div>
-          )}
+          {/* 212.41 (owner, Oct 25): no "your handicap index" here — a game always has several players, and every
+              player's handicap (yours included, from your profile) can be updated together in Manage Game. */}
         </div>
       )}
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Play date</label>
+        <div style={{ marginTop: 6 }}><ShortDateInput value={matchDate} onChange={(v) => setMatchDate(v || todayLocal())} /></div>
+      </div>
 
           </div>
         )}
 
         {createSection === "players" && (
           <div>
+      {/* 212.41: what this many players can make in the chosen format (scramble first) */}
+      <PlayerCountHint hint={oneStep ? playerCountHint(gameType as GC.GameTypeOpt, { players: groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length, captains: scrambleTeamSize === 1, scrambleMode: fmtFamily === "match" ? "match" : "field" }) : null} />
       <div style={{ marginTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
@@ -1135,6 +1224,11 @@ function CreateGame({
 
         {createSection === "format" && (
           <div>
+      {/* 212.41 (owner, Oct 25): the game's name lives with the format — left blank, it's named from the format, course and date */}
+      <div style={{ marginTop: 12 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
+        <input style={{ ...inputStyle, marginTop: 6 }} value={name} placeholder="Leave blank to auto-name" onChange={(e) => setName(e.target.value)} />
+      </div>
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
         {/* Two-family guided chooser: shared with Manage Game so both flows use the same visual language. */}
@@ -1202,7 +1296,7 @@ function CreateGame({
               <button onClick={() => setScrambleTeamSize(4)} style={{ ...btn(scrambleTeamSize !== 1), flex: 1, fontSize: 13 }}>Every player</button>
               <button onClick={() => { setScrambleTeamSize(1); setScrambleHandicap("agreed"); }} style={{ ...btn(scrambleTeamSize === 1), flex: 1, fontSize: 13 }}>Captains only</button>
             </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleTeamSize === 1 ? "Each team is represented by its captain, who enters the team's score — the teammates play outside the app." : "Make the teams in Setup → Teams: balanced teams of 2, 3 or 4, or pick them yourself. Teams may differ in size."}</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{scrambleTeamSize === 1 ? "Each team is represented by its captain, who enters the team's score — the teammates play outside the app." : (oneStep ? "Make the teams on the Teams step, after Players: balanced teams of 2, 3 or 4, or pick them yourself. Teams may differ in size." : "Make the teams in Setup → Teams: balanced teams of 2, 3 or 4, or pick them yourself. Teams may differ in size.")}</div>
             </>)}
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>HANDICAPS</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -1476,7 +1570,21 @@ function CreateGame({
           </div>
         )}
 
-        {createSection === "review" && (
+        {createSection === "teams" && oneStep && draft && (
+          <div data-one-step-teams>
+            <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+              Suggested teams, balanced by handicap — change anything. Nothing is saved until you create the game.
+            </div>
+            {draftResuggested ? <div data-teams-resuggested style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>The players changed, so the teams were suggested again.</div> : null}
+            <DraftTeamsBuilder game={draft.game as any} players={draft.players as any} readOnly={false} onSave={(g) => setDraftGroups(g)} />
+          </div>
+        )}
+        {createSection === "review" && oneStep && (
+          <OneStepReview busy={busy} problem={draftProblem ? `${draftProblem} Fix it on the Teams step — or create now and finish later.` : null}
+            lines={oneStepReviewLines()} onCancel={onCancel}
+            onCreate={() => void createOneStep(true)} onCreateLater={() => void createOneStep(false)} />
+        )}
+        {createSection === "review" && !oneStep && (
           <div>
             <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.borderGreen}` }}>
               {[
@@ -1511,8 +1619,8 @@ function CreateGame({
 
         {createSection !== "review" && (
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(createSection === "players" ? "game" : "players")}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
-            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(createSection === "game" ? "players" : createSection === "players" ? "format" : "review")}>Continue</button>
+            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(stepAt(-1))}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
+            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(stepAt(1))}>Continue</button>
           </div>
         )}
       </CreateGameWorkspace>
@@ -3695,6 +3803,14 @@ function GameRoom({
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, onSetScrambleTeams: setScrambleTeams, isCompetitionGame: !!competitionLink,
+          // 212.41: a saved draft — tell every player at once (announce_game_players, 0219), which makes it visible to them
+          onSendToPlayers: async () => {
+            const { error } = await supabase.rpc("announce_game_players", { p_game: game.id });
+            if (error) throw new Error(`Couldn't send the game — ${error.message}`);
+            // the club's activity feed hears about it now — not while it was a draft
+            await logActivity(supabase, { actor_id: user.id, actor_name: players.find((x) => x.user_id === user.id)?.display_name || "The organizer", action: "game_created", group_id: game.group_id, summary: `Created the game "${game.name}" at ${game.course}` });
+            await load();
+          },
           courseTees,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
@@ -4140,7 +4256,10 @@ function GameRoom({
           keeps my gross score it's shown view-only ("kept by X") while my putts / fairways
           / sand / penalties stay editable (they save through the stats chokepoint). The
           group scorer and self-scorers get a fully-editable card. */}
-      {roomTab === "play" && me && game.game_type !== "alt_shot" && (() => {
+      {/* 212.41 (owner, Oct 25): no personal scorecard in a format where you don't play your own ball — scramble
+          (the team's ball) and alternate shot (the pair's). One rule, lib/round-rules countsForIndividualStats; a shamble
+          (best drive, then your own ball) would keep it. Scramble used to show an empty card here. */}
+      {roomTab === "play" && me && countsForIndividualStats(game.game_type) && (() => {
         const myScoreLocked = !isEnded && markerOwnsMyRowRef.current;
         const mk = myScoreLocked
           ? ((teeGroupsInUse && myRow?.tee_group != null)
@@ -4321,7 +4440,7 @@ function GameRoom({
           scores.
         </div>
       )}
-      {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
+      {roomTab === "play" && me && countsForIndividualStats(game.game_type) && (me.scores || []).some((s: any) => s != null && s > 0) && (
         <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 18, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
       )}
       {roomTab === "play" && players.some((p: any) => (p.scores || []).some((s: any) => s != null && s > 0)) && (

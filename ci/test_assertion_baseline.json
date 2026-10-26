@@ -1,5 +1,5 @@
 {
-  "total": 439881,
+  "total": 439914,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -24,6 +24,7 @@
     "create-game format": 12,
     "cup on the recap": 8,
     "cup scramble": 13,
+    "draft games": 11,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
@@ -50,6 +51,7 @@
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
     "nine-hole posting": 20,
+    "one-step walkthrough": 22,
     "player-scoring": 71,
     "round stat completeness": 8,
     "save trace toggle": 3,

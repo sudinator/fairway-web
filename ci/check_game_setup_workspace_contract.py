@@ -36,7 +36,10 @@ checks = [
     (workspace, 'onSetGameDate: (date: string) => Promise<void>;', "Game section must receive the existing organizer date writer"),
     (workspace, 'onChangeCourse: (course: Course) => Promise<void>;', "Game section must receive the atomic pre-score course-change callback"),
     # 202.1: the control passes the readable slug (falls back to the token for games shared before 0177).
-    (workspace, '<ShareControl game={game} onShare={organizerPanelProps.onShare} token={game.lineup_slug ?? game.share_token ?? null} />', "live-link control must live in Game"),
+    # 212.41 (owner, Oct 25): sharing moved to Review — the line-up and live scores links together (one switch),
+    # offered only once the game is created and sent (never for a draft). The readable slug still leads the line-up link.
+    (workspace, '<ShareLinks lineupToken={game.lineup_slug ?? null} liveToken={game.share_token ?? null} onShare={organizerPanelProps.onShare} />', "the share links must live in Review"),
+    (workspace, 'The line-up and live scores links — and the line-up card — can be shared once you send the game to its players.', "a draft must not offer the share links"),
     (workspace, 'onClick={organizerPanelProps.onReset}', "Reset Scores must live in Game danger zone"),
     (workspace, 'onClick={organizerPanelProps.onDelete}', "Delete Game must live in Game danger zone"),
     (organizer, 'section?: "players" | "teams" | "format";', "OrganizerPanel must expose the separated Format surface"),

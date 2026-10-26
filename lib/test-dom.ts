@@ -37,6 +37,10 @@ function setGlobal(name: string, value: unknown) {
 setGlobal("window", dom.window);
 setGlobal("document", dom.window.document);
 setGlobal("navigator", dom.window.navigator);
+// 212.41: a browser exposes localStorage / sessionStorage as bare globals too (lib/form-draft writes `localStorage`);
+// without these the Create screen's local draft silently didn't save in tests.
+setGlobal("localStorage", dom.window.localStorage);
+setGlobal("sessionStorage", dom.window.sessionStorage);
 g.HTMLElement = dom.window.HTMLElement;
 g.Element = dom.window.Element;
 g.Node = dom.window.Node;

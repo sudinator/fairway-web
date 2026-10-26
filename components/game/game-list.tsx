@@ -68,6 +68,7 @@ import {
   Avatar,
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
+import { isDraftGame, visibleGames } from "@/lib/one-step-create";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 
 const supabase = createClient();
@@ -104,7 +105,13 @@ export function GameList({
       .in("id", ids)
       .eq("group_id", activeGroupId)
       .order("created_at", { ascending: false });
-    setGames(data || []);
+    // 212.41 (owner, Oct 25): a saved DRAFT shows only to its organizer and club admins until it is sent to players.
+    const me = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const anyDraft = (data || []).some((g: any) => isDraftGame(g) && g.created_by !== me);
+    const { data: adm } = anyDraft && me
+      ? await supabase.from("group_members").select("role").eq("group_id", activeGroupId).eq("user_id", me).eq("status", "active").maybeSingle()
+      : { data: null as { role?: string } | null };
+    setGames(visibleGames((data || []) as Game[], me, (adm as { role?: string } | null)?.role === "admin"));
   }, [activeGroupId]);
   useEffect(() => {
     load();
@@ -123,6 +130,8 @@ export function GameList({
         .eq("group_id", activeGroupId)
         .single();
       if (error || !game) throw new Error("No game found with that code.");
+      // 212.41: a draft isn't open to anyone but its organizer until it is sent to the players
+      if (isDraftGame(game) && game.created_by !== (await supabase.auth.getUser()).data.user?.id) throw new Error("No game found with that code.");
       const uid = (await supabase.auth.getUser()).data.user!.id;
       // Add me as a player if not already in.
       const { data: existing } = await supabase
@@ -258,7 +267,7 @@ export function GameList({
           }}
         >
           <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
-            {g.name}
+            {g.name}{isDraftGame(g) ? <span data-draft-badge style={{ marginLeft: 8, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>DRAFT</span> : null}
             {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
           </div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
