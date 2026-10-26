@@ -124,13 +124,23 @@ const handicapOrder = (a: CompetitivePlayer, b: CompetitivePlayer) => {
   return ah - bh || a.id.localeCompare(b.id);
 };
 
+/** 212.45: with an odd field (where allowed), the leftover two from one team and one from the other make the last group. */
+function oneShortGroup(assignments: CompetitiveAssignmentResult["assignments"], field: CompetitivePlayer[], count: number, opts: { oneShortGroup?: boolean }) {
+  if (!opts.oneShortGroup) return;
+  const placed = new Set(assignments.map((x) => x.playerId));
+  const left = field.filter((p) => !placed.has(p.id));
+  const teams = [...new Set(left.map((p) => p.team))];
+  const sizes = teams.map((t) => left.filter((p) => p.team === t).length).sort();
+  if (left.length === 3 && teams.length === 2 && sizes[0] === 1 && sizes[1] === 2) left.forEach((p) => assignments.push({ playerId: p.id, group: count + 1 }));
+}
+
 /**
  * Build valid team-match foursomes: exactly two players from each of the two
  * persistent teams. Within each team, low+high handicap pairs reduce the spread
  * between groups; the second team's pairs are then matched in reverse total order.
  * Odd/imbalanced leftovers stay explicitly unassigned instead of creating a 3-v-1.
  */
-export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string, string]): CompetitiveAssignmentResult {
+export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string, string], opts: { oneShortGroup?: boolean } = {}): CompetitiveAssignmentResult {
   const pairsFor = (key: string) => {
     const sorted = field.filter((p) => p.team === key).sort(handicapOrder);
     const pairs: CompetitivePlayer[][] = [];
@@ -147,6 +157,7 @@ export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string
   for (let i = 0; i < count; i++) {
     [...a.pairs[i], ...b.pairs[i]].forEach((p) => assignments.push({ playerId: p.id, group: i + 1 }));
   }
+  oneShortGroup(assignments, field, count, opts);
   const placed = new Set(assignments.map((x) => x.playerId));
   return { assignments, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id) };
 }
@@ -158,7 +169,7 @@ export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string
  * reverse order to even out the GROUPS; both are offered, the organizer chooses.) Within each pair
  * the stronger player is listed first, so a Trifecta's singles fall strong v strong, weak v weak.
  */
-export function balancedTeamMatchups(field: CompetitivePlayer[], teamKeys: [string, string]): CompetitiveAssignmentResult & { strongFirst: Record<string, string[]> } {
+export function balancedTeamMatchups(field: CompetitivePlayer[], teamKeys: [string, string], opts: { oneShortGroup?: boolean } = {}): CompetitiveAssignmentResult & { strongFirst: Record<string, string[]> } {
   const pairsFor = (key: string) => {
     const sorted = field.filter((p) => p.team === key).sort(handicapOrder);
     const pairs: CompetitivePlayer[][] = [];
@@ -177,6 +188,7 @@ export function balancedTeamMatchups(field: CompetitivePlayer[], teamKeys: [stri
     [...a.pairs[i], ...b.pairs[i]].forEach((p) => assignments.push({ playerId: p.id, group: i + 1 }));
     strongFirst[String(i + 1)] = [a.pairs[i][0].id, a.pairs[i][1].id, b.pairs[i][0].id, b.pairs[i][1].id];
   }
+  oneShortGroup(assignments, field, count, opts);
   const placed = new Set(assignments.map((x) => x.playerId));
   return { assignments, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id), strongFirst };
 }
@@ -216,4 +228,29 @@ export function randomTeeGroups(field: GPlayer[], maxPer = 4, rng: () => number 
   const assignments: { playerId: string; group: number }[] = [];
   groups.forEach((ids, i) => ids.forEach((id) => assignments.push({ playerId: id, group: i + 1 })));
   return { assignments, overflowGuestIds: overflow.flatMap((o) => o.guestIds) };
+}
+
+// ── 212.45 (owner, Oct 26): an ODD field in four-ball or trifecta plays ONE 2 v 1 group, scored as before — four-ball:
+// the lone player's ball against the pair's best ball; trifecta: the lone player plays a single against EACH opponent.
+// Alternate shot needs two a side (a lone player can't alternate with themselves). ONE rule for the Create Teams step,
+// the Groups editor, Review and Manage Game's checklist.
+export const allowsOneShortGroup = (gameType: string | null | undefined): boolean => gameType === "fourball" || gameType === "trifecta";
+/** Team sizes the groups can be built from: equal and a multiple of the side size, or — where allowed — one more on one
+ * side with that side even (4 v 3, 6 v 5 …): the leftover two and one make the single 2 v 1 group. */
+export function teamSizesFitGroups(gameType: string | null | undefined, a: number, b: number, perSide = 2): boolean {
+  if (a === b) return a > 0 && a % perSide === 0;
+  if (!allowsOneShortGroup(gameType) || perSide !== 2) return false;
+  const big = Math.max(a, b), small = Math.min(a, b);
+  return big - small === 1 && big % 2 === 0;
+}
+/** One group's shape is fine: two a side, or the single allowed 2 v 1 (shortGroups = how many groups aren't 2 v 2). */
+export function groupShapeOk(gameType: string | null | undefined, x: number, y: number, shortGroups: number, perSide = 2): boolean {
+  if (x === perSide && y === perSide) return true;
+  return allowsOneShortGroup(gameType) && perSide === 2 && shortGroups === 1 && Math.min(x, y) === 1 && Math.max(x, y) === 2;
+}
+/** Every group fine: all two a side, or exactly one 2 v 1 where allowed. */
+export function groupShapesOk(gameType: string | null | undefined, groups: [number, number][], perSide = 2): boolean {
+  if (!groups.length) return false;
+  const short = groups.filter(([x, y]) => !(x === perSide && y === perSide)).length;
+  return groups.every(([x, y]) => groupShapeOk(gameType, x, y, short, perSide));
 }

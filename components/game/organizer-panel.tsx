@@ -125,6 +125,8 @@ export type OrganizerPanelProps = {
   onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
   onSetMatchTeam?: (on: boolean) => Promise<void>;
   anyScores?: boolean;
+  /** 212.43: shown inside the one-step Create flow — no "Organizer · Manage game" header or Hide button. */
+  inCreate?: boolean;
 };
 
 export function OrganizerPanel({
@@ -156,6 +158,7 @@ export function OrganizerPanel({
   onSetSkinsStyle,
   onSetMatchTeam,
   anyScores = false,
+  inCreate = false,
 }: OrganizerPanelProps) {
   // Compact control padding, defined ONCE. Every small input and button in this panel shares it, so
   // the manual-handicap field lines up with the handicap field beside it by construction rather
@@ -284,6 +287,7 @@ export function OrganizerPanel({
         marginTop: 16,
       }}
     >
+      {inCreate ? null : (
       <div style={{ display: "flex", alignItems: "center" }}>
         <Eyebrow>★ ORGANIZER · MANAGE GAME</Eyebrow>
         <div style={{ flex: 1 }} />
@@ -294,6 +298,7 @@ export function OrganizerPanel({
           {open ? "Hide" : "Show"}
         </button>
       </div>
+      )}
       <div
         style={{
           color: allSet ? C.cream : C.gold,

@@ -26,7 +26,8 @@ checks = [
     ("components/tournaments.tsx", '} satisfies OrganizerPanelProps;', "OrganizerPanel spread props must be contract-checked"),
     ("components/tournaments.tsx", 'return <GameSetupWorkspace {...workspaceProps} />;', "GameRoom setup must reach the extracted workspace"),
     ("components/game/setup/game-setup-workspace.tsx", '<OrganizerPanel section="players" {...organizerPanelProps} />', "Players setup step must reach OrganizerPanel"),
-    ("components/game/setup/game-setup-workspace.tsx", '<OrganizerPanel section="teams" {...organizerPanelProps} />', "Teams setup step must reach OrganizerPanel"),
+    # 212.44 (owner, Oct 26): Manage Game's Teams tab uses the compact team card, wired to the same save handlers
+    ("components/game/setup/game-setup-workspace.tsx", '<CompactTeamEditor game={game} players={players} onSetTeam={organizerPanelProps.onSetTeam} onBalanceTeams={organizerPanelProps.onBalanceTeams}', "Teams setup step must reach the compact team card, wired to Manage Game's save handlers"),
     ("components/game/setup/game-setup-workspace.tsx", '<GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}', "tee-group writes must remain wired to GroupsBuilder"),
     ("components/game/organizer-panel.tsx", 'onSetTee(p, e.target.value)', "per-player tee selector must consume its callback"),
     ("components/game/organizer-panel.tsx", 'onClick={() => { if (!blocked({ type: "add_player" })) onAddMember(m); }}', "member add UI must consume its callback"),

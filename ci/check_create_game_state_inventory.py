@@ -16,6 +16,7 @@ domain = {
   'hcpOverrides','teamScoreMode','strokeBasis','fmtFamily','matchKind','teamMode',
   'skinsTeamStyle','skinsMode','team1','team2','teamColours','scrambleTeamSize','scrambleHandicap','scrambleMinDrives','scrambleAllowance','selectedPlayers','guestPlayers','teeAssignments',
   'draftGroups',   # 212.41: one-step teams — saved in the local draft (oneStepTeams)
+  'draftLineup',   # 212.43: the four-ball family's line-up — saved in the local draft (oneStepLineup)
 
 }
 context = {'favorites','profileIdx','groupRoster'}

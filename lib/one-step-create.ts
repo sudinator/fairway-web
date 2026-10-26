@@ -5,10 +5,13 @@
  */
 import type { GameTypeOpt } from "./game-create";
 import { scrambleTeamSizes } from "./scramble-teams";
+import { groupShapesOk, allowsOneShortGroup } from "./grouping";
 import type { CreateGameSection } from "@/components/game/setup/create-game-workspace";
 
 /** Formats whose Create flow is one step. Moved family by family, each after the owner approves it on staging. */
-export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble"]);
+export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble", "fourball", "trifecta", "alt_shot"]);   // 212.43: + the four-ball family
+/** The team formats whose groups ARE the matches (two a side) — four-ball, trifecta, alternate shot. */
+export const isTeamGroupOneStep = (t: GameTypeOpt) => t === "fourball" || t === "trifecta" || t === "alt_shot";
 export const isOneStep = (t: GameTypeOpt) => ONE_STEP_FORMATS.has(t);
 
 /** The Create steps, in order: Game → Format → Players → Review; one-step formats add Teams before Review. */
@@ -61,4 +64,26 @@ export const isDraftGame = (g: { players_notified_at?: string | null }) => g.pla
 /** Owner, Oct 25: a draft is visible only to its organizer and club admins until it is sent to the players. */
 export function visibleGames<T extends { players_notified_at?: string | null; created_by?: string | null }>(games: T[], me: string | null, clubAdmin: boolean): T[] {
   return games.filter((g) => !isDraftGame(g) || clubAdmin || (!!me && g.created_by === me));
+}
+
+/** 212.43: what a four-ball-family line-up still needs before "Create game" (null = ready). Mirrors Manage Game's
+ * readiness: everyone on a team and in a group, every group exactly two a side, and in alternate shot who drives first. */
+export function teamGroupLineupProblem(gameType: GameTypeOpt,
+  players: { id: string; display_name: string; team: string | null; tee_group: number | null }[],
+  foursomes: { id: string; name?: string; a?: string[] | null; b?: string[] | null; a_first?: string | null; b_first?: string | null }[]): string | null {
+  if (!players.length) return "Add players first.";
+  // the root cause first: no grouping can fix an odd alternate-shot field
+  if (gameType === "alt_shot" && players.length % 2 === 1) return "Alternate shot needs an even number of players — each side shares one ball between two.";
+  const noTeam = players.filter((p) => !p.team);
+  if (noTeam.length) return `${noTeam.length === 1 ? `${noTeam[0].display_name} isn't` : `${noTeam.length} players aren't`} on a team yet.`;
+  const noGroup = players.filter((p) => p.tee_group == null);
+  if (noGroup.length) return `${noGroup.length === 1 ? `${noGroup[0].display_name} isn't` : `${noGroup.length} players aren't`} in a group yet.`;
+  // 212.45: two a side — or, in four-ball and trifecta with an odd number, exactly ONE 2 v 1 group (owner, Oct 26)
+  const shapes = foursomes.map((f) => [(f.a ?? []).length, (f.b ?? []).length] as [number, number]);
+  if (!foursomes.length || !groupShapesOk(gameType, shapes)) {
+    const bad = foursomes.find((f) => !(((f.a ?? []).length === 2) && ((f.b ?? []).length === 2)));
+    return `Each group needs two players from each team${allowsOneShortGroup(gameType) ? " (with an odd number, one group plays 2 v 1)" : ""}${bad ? ` — ${bad.name ?? "a group"} has ${(bad.a ?? []).length} v ${(bad.b ?? []).length}` : ""}.`;
+  }
+  if (gameType === "alt_shot" && foursomes.some((f) => !f.a_first || !f.b_first)) return "Choose who drives first for each side in every group.";
+  return null;
 }

@@ -29,6 +29,23 @@ export function teamPlayFoursomesAfter(game: G, nextPlayers: Player[]): Foursome
   return deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
 }
 
+/** 212.45: "Build balanced matchups" — the foursomes from the new groups, a Trifecta's singles ordered strong v strong
+ * (swap chosen so the stronger A meets the stronger B). Moved verbatim from Manage Game's balanceMatchups so the
+ * one-step Create draft uses the same rule. */
+export function balancedMatchupFoursomes(game: G, nextPlayers: Player[], ph: (p: Player) => number): Foursome[] {
+  const built = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
+  const keyOf = (p: Player) => p.user_id ?? p.id;
+  return game.game_type === "trifecta"
+    ? built.map((f) => {
+        if (f.a.length !== 2 || f.b.length !== 2) return f;
+        const phOf = (k: string) => { const p = nextPlayers.find((x) => keyOf(x) === k); return p ? ph(p) : 0; };
+        const aStrongFirst = phOf(f.a[0]) <= phOf(f.a[1]);
+        const bStrongFirst = phOf(f.b[0]) <= phOf(f.b[1]);
+        return { ...f, swap: aStrongFirst !== bStrongFirst };
+      })
+    : built;
+}
+
 /** setScrambleTeams: each player's tee group once the scramble teams are saved (set_tee_groups assignments). */
 export function scrambleTeeAssignments(game: G, players: Player[], groups: ScrambleGroup[]) {
   const tee = scrambleTeeGroups(groups, game.scramble_mode === "match" ? "match" : "field", game.scramble_team_size === 1);

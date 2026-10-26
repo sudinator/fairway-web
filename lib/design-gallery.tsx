@@ -26,6 +26,11 @@ import { IndivSegmentChoice } from "@/components/game/segment-views";
 import { SaveTraceToggle } from "@/components/save-trace-view";
 import { StorageMeter } from "@/components/storage-meter";
 import { CreateGameWorkspace } from "@/components/game/setup/create-game-workspace";
+import { CompactTeamEditor } from "@/components/game/compact-team-editor";
+import { btn } from "@/components/ui";
+import { OrganizerPanel } from "@/components/game/organizer-panel";
+import { GroupsBuilder } from "@/components/game/scorecard-views";
+import { deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
 import { PlayerCountHint, OneStepReview, DraftBanner, ShareLinks } from "@/components/game/setup/one-step";
 import { createSectionsFor, SECTION_LABEL, playerCountHint } from "@/lib/one-step-create";
 import { balanceScrambleTeams, scrambleTeeGroups } from "@/lib/scramble-teams";
@@ -119,6 +124,31 @@ add("11e-teams-groups-captains", <ScrambleTeamsBuilder game={capsGame} players={
   add("14c-create-review-ready", steps("review", <OneStepReview lines={lines} problem={null} busy={false} onCreate={noop} onCreateLater={noop} onCancel={noop} />));
   add("14d-create-review-blocked", steps("review", <OneStepReview lines={lines.map((l) => (l.label === "Teams" ? { ok: false, label: "Teams", value: "Karan Patel isn't on a team" } : l))}
     problem="Put every player on a team before creating the game — or create now and finish later." busy={false} onCreate={noop} onCreateLater={noop} onCancel={noop} />, false));
+// 212.44 (owner, Oct 26): the four-ball Teams step TODAY (Manage Game's full team editor) v a COMPACT editor — the same
+// 8 players, teams and 2 v 2 groups, as whole screens.
+{
+  const tm = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
+  const anoop = async () => {};
+  // teams alternate A/B, so the first four make Group 1 (2 v 2) and the next four Group 2
+  const fbPlayers = players((i) => (i % 2 ? "B" : "A")).slice(0, 8).map((p, i) => ({ ...p, tee_group: i < 4 ? 1 : 2 }));
+  const fbBase = { ...base, game_type: "fourball", teams: tm, allowance_pct: 85, team_score_mode: "best_ball", pairings: [], status: "setup" } as unknown as Game;
+  const fbGame = { ...fbBase, foursomes: deriveTeamFoursomesFromGroups(fbPlayers as never, tm as never, null) } as unknown as Game;
+  const step = (editor: React.ReactNode) => (
+    <CreateGameWorkspace activeSection="teams" onSectionChange={anoop}
+      sections={createSectionsFor("fourball").map((k) => ({ key: k, label: SECTION_LABEL[k], done: k !== "teams" && k !== "review" }))}>
+      <div style={{ color: "#B8CFC4", fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>Suggested teams and groups, balanced by handicap — change anything. Nothing is saved until you create the game.</div>
+      {editor}
+      <div style={{ marginTop: 12 }}>
+        <GroupsBuilder game={fbGame} players={fbPlayers as Player[]} onSetTeeGroup={anoop} onSetTeamGroupSlot={anoop} onSetAltShotFirstDriver={anoop} onSetTrifectaPairing={anoop} onRandomize={anoop} canRandomize />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}><button style={{ ...btn(false) }}>Back</button><button style={{ ...btn(true) }}>Continue</button></div>
+    </CreateGameWorkspace>
+  );
+  add("15a-teams-step-today", step(<OrganizerPanel section="teams" inCreate game={fbGame} players={fbPlayers as Player[]} user={{ id: "u0" }} courseTees={[]}
+    onSetTeam={anoop} onBalanceTeams={async () => null} onRenameTeams={anoop} onSetTeamColours={anoop}
+    onOverride={anoop} onSetTee={anoop} onRemove={anoop} onToggleNoShow={anoop} onRename={anoop} onDelete={anoop} onEnd={anoop} onReopen={anoop} onReset={anoop} onShare={anoop} />));
+  add("15b-teams-step-compact", step(<CompactTeamEditor game={fbGame} players={fbPlayers as Player[]} onSetTeam={anoop} onBalanceTeams={async () => null} onRenameTeams={anoop} onSetTeamColours={anoop} />));
+}
   add("14e-manage-game-draft", <div><DraftBanner onSend={async () => {}} /><div style={{ color: "#B8CFC4", fontSize: 12 }}>(the rest of Manage Game, as today — the line-up link is offered once the game is sent)</div></div>);
   // 212.41 (owner, Oct 25): Manage Game → Review — the two share links, one switch; only once the game is created
   add("14f-review-share-off", <div style={{ background: "#1B5A46", borderRadius: 12, padding: 14 }}><ShareLinks lineupToken={null} liveToken={null} onShare={async () => {}} /></div>);

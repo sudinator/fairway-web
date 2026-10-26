@@ -1,3 +1,15 @@
+## 212.45.261025 — The Teams step: the organizer picks; names saved on Save; start over; odd numbers play one 2 v 1
+
+Owner feedback (Oct 26) on the four-ball / trifecta / alternate shot Teams step, all addressed:
+
+## 212.44.261025 — The compact team card: teams named and coloured on the Teams step
+
+Owner (Oct 26): compared the full team editor with a compact mock-up as whole screens and chose the compact card — "but want the ability to name the teams … and to pick colors".
+
+## 212.43.261025 — One-step game creation, phase 4 (part 1): four-ball, trifecta and alternate shot are created in one step
+
+The four-ball family joins scramble in the one-step Create flow (owner, Oct 25: "keep going"). Team match play and team skins follow next; every other format is unchanged.
+
 ## 212.42.261025 — No personal scorecard in a scramble (or any format where you don't play your own ball)
 
 Owner (Oct 25, staging games 376421 and 672063): at the bottom of a scramble's Results tab sat the player's own scorecard — empty, because in a scramble the team posts one score per hole and players record none (lib/round-rules). The screen hid it only for alternate shot, with its own "not alternate shot" check, so scramble was missed.

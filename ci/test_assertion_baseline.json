@@ -1,5 +1,5 @@
 {
-  "total": 439914,
+  "total": 440005,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -14,6 +14,7 @@
     "card": 11,
     "chart-helpers": 10,
     "club report view": 11,
+    "compact team editor": 11,
     "competition": 16,
     "component render": 17,
     "contests": 26,
@@ -51,7 +52,8 @@
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
     "nine-hole posting": 20,
-    "one-step walkthrough": 22,
+    "odd field": 23,
+    "one-step walkthrough": 79,
     "player-scoring": 71,
     "round stat completeness": 8,
     "save trace toggle": 3,

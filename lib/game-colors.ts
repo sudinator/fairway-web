@@ -63,3 +63,19 @@ export function pickTeamColour(teams: [TeamLike, TeamLike], i: 0 | 1, key: strin
   colors[o] = mine ? mine.key : null;
   return { colors, swapped: true };
 }
+
+/** WCAG contrast ratio between two #rrggbb colours. */
+export function contrastRatio(a: string, b: string): number {
+  const lum = (h: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+/** 212.44: the readable text colour ON a team colour — dark ink or light, whichever contrasts more. Dark text on red,
+ * purple, navy or maroon fills was below the reading threshold (the contrast guard found it in the compact team card). */
+export const TEAM_INK_DARK = "#0B1A14", TEAM_INK_LIGHT = "#FBF8F0";
+export function readableInk(fill: string): string {
+  return contrastRatio(TEAM_INK_DARK, fill) >= contrastRatio(TEAM_INK_LIGHT, fill) ? TEAM_INK_DARK : TEAM_INK_LIGHT;
+}
