@@ -41,6 +41,8 @@ export type SetupDraft = {
   createSection?: "game" | "players" | "format" | "structure" | "review" | "teams";   // 212.41: one-step "teams"
   /** 212.41: one-step Create — the draft's teams and the fixed ids its players have. Optional: older drafts load as before. */
   oneStepTeams?: { groups: { id: string; name: string; a: string[]; b: string[]; tee?: number | null }[]; ids: Record<string, string> };
+  /** 212.43: one-step four-ball family — each player's team and group, the 2 v 2 foursomes, and the fixed player ids. */
+  oneStepLineup?: { team: Record<string, string | null>; group: Record<string, number | null>; foursomes: unknown[] | null; ids: Record<string, string> };
   selectedPlayers: Record<string, boolean>;
   guestPlayers: { id: string; display_name: string; handicap_index: number | null; guest_of: string }[];
 };

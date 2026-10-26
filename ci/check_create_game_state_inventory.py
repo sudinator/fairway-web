@@ -16,12 +16,13 @@ domain = {
   'hcpOverrides','teamScoreMode','strokeBasis','fmtFamily','matchKind','teamMode',
   'skinsTeamStyle','skinsMode','team1','team2','teamColours','scrambleTeamSize','scrambleHandicap','scrambleMinDrives','scrambleAllowance','selectedPlayers','guestPlayers','teeAssignments',
   'draftGroups',   # 212.41: one-step teams — saved in the local draft (oneStepTeams)
+  'draftLineup',   # 212.43: the four-ball family's line-up — saved in the local draft (oneStepLineup)
 
 }
 context = {'favorites','profileIdx','groupRoster'}
 transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits','allowanceInput'}
 runtime = {'busy','err','draftAvailable','draftDismissed','pendingFavName','createSection',
-           'draftResuggested','visitedSteps'}   # 212.41: screen state — a note, and which steps you've been to
+           'draftResuggested','visitedSteps','draftBalanceNote'}   # 212.41: screen state — a note, and which steps you've been to
 expected_state = domain | context | transient | runtime
 expected_refs = {'hydratedRef','resumedRef','guestsSeeded','latestDraftRef','doneRef',
                  'draftIds'}   # 212.41: the one-step draft's fixed player ids — saved with the teams (oneStepTeams.ids)

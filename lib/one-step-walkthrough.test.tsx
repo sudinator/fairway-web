@@ -139,5 +139,77 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
   const teamsAfter = [...el4.querySelectorAll("[data-scramble-team]")].map((t) => t.textContent || "").join(" | ");
   ok(teamsBefore.length > 0 && teamsAfter === teamsBefore, `the teams come back exactly as left (4 teams of 2)${teamsAfter === teamsBefore ? "" : ` — before "${teamsBefore.slice(0, 120)}", after "${teamsAfter.slice(0, 120)}"`}`);
   root4.unmount();
+
+  // ── 212.43: THE FOUR-BALL FAMILY, one step ─────────────────────────────────────────────────────────────────────
+  for (const fmt of ["Four-ball", "Trifecta", "Alternate Shot"] as const) {
+    window.localStorage.clear();
+    const e = document.createElement("div"); document.body.appendChild(e);
+    const r = createRoot(e); let made = null as unknown[] | null;
+    await act(async () => { r.render(<CreateGame user={ME} displayName="Amit Sud" activeGroupId="00000000-0000-0000-0000-00000000c1b0" onCancel={() => {}} onCreated={(...a: unknown[]) => { made = a; }} />); });
+    await flush();
+    await clickText(e, "Oak Hollow"); await clickText(e, "Continue");
+    await clickText(e, "Match play"); await clickText(e, "Team"); await clickText(e, fmt);
+    ok(!!e.querySelector("[data-teams-named-later]") && !e.querySelector('input[placeholder="Team 1 name"]'), `${fmt}: the Game step points to the Teams step for team names (owner, Oct 26)`);
+    if (fmt === "Four-ball") shot(e, "w6b-fourball-game-step");
+    ok(JSON.stringify(stepBar(e)) === JSON.stringify(["Course", "Game", "Players", "Teams", "Review"]), `${fmt}: one step — a Teams step before Review (got ${stepBar(e).join(", ")})`);
+    await clickText(e, "Continue");
+    for (const name of ["Raj Mehta", "Nihar Shah", "Karan Patel", "Sam Lee", "Vikram Rao", "Bo Li", "Lex Rivera"]) await clickText(e, name, "label");
+    await clickText(e, "Continue");
+    const teamsTxt = e.querySelector("[data-one-step-teams]")?.textContent || "";
+    ok(teamsTxt.includes("Suggested teams and groups") && !!e.querySelector("[data-compact-teams]") && e.querySelectorAll("[data-compact-player]").length === 8, `${fmt}: the Teams step opens on the compact team card, one row per player`);
+    if (fmt === "Four-ball") {
+      // name the sides and pick a colour HERE (owner, Oct 26) — it must reach what Create game saves
+      const nameInput = e.querySelector('input[aria-label="Name of Team 1"]') as HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+      await act(async () => { setter.call(nameInput, "Reds"); nameInput.dispatchEvent(new Event("input", { bubbles: true })); }); await flush(2);
+      const dot = e.querySelector('button[aria-label^="Choose Reds"]') as HTMLButtonElement;
+      ok(!!dot, "the colour dot sits beside the team's name");
+      await act(async () => { dot.click(); }); await flush(2);
+      shot(e, "w7b-colour-picker");
+      const swatch = [...e.querySelectorAll("button")].find((b) => /purple|green|red|orange|blue|gold/i.test(b.getAttribute("aria-label") || "") && !(b.getAttribute("aria-label") || "").startsWith("Choose")) as HTMLButtonElement | undefined;
+      if (swatch) { await act(async () => { swatch.click(); }); await flush(2); }
+      ok(!!swatch, "the colour picker opens with the colours to choose from");
+    }
+    if (fmt === "Four-ball") shot(e, "w7-fourball-teams");
+    await clickText(e, "Continue");
+    const rv = e.querySelector("[data-one-step-review]")?.textContent || "";
+    if (fmt !== "Alternate Shot") {
+      ok(rv.includes(`${fmt === "Four-ball" ? "Reds" : "Team 1"} 4 · Team 2 4`) && rv.includes("2 groups of 2 v 2"), `four-ball: Review shows balanced teams of 4 and two 2 v 2 groups (got "${rv.slice(0, 220)}")`);
+      shot(e, "w8-fourball-review");
+    } else {
+      ok(rv.includes("Choose who drives first"), `alternate shot: Review asks for the first drivers before it can be created (got "${rv.slice(0, 200)}")`);
+      const createBtn = [...e.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Create game") as HTMLButtonElement;
+      ok(!!createBtn && createBtn.disabled, "alternate shot: Create game is disabled until the first drivers are chosen");
+      // choose the first drivers on the Teams step (the same picker Manage Game uses), then come back
+      await clickText(e, "Teams");   // back to the Teams step through the step bar
+      const pickers = [...e.querySelectorAll("select")].filter((sel) => [...sel.options].some((o) => /drive|first/i.test(o.textContent || "") || o.value === ""));
+      for (const sel of e.querySelectorAll("select")) {
+        const lbl = (sel.getAttribute("aria-label") || "") + " " + (sel.closest("div")?.textContent || "");
+        if (!/first|drive/i.test(lbl)) continue;
+        const opt = [...(sel as HTMLSelectElement).options].find((o) => o.value);
+        if (!opt) continue;
+        await act(async () => { (sel as HTMLSelectElement).value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }); await flush(2);
+      }
+      void pickers;
+      await clickText(e, "Continue");
+      const rv2 = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(!rv2.includes("Choose who drives first") && rv2.includes("2 groups of 2 v 2"), `alternate shot: with first drivers chosen, Review is ready (got "${rv2.slice(0, 200)}")`);
+    }
+    calls.length = 0;
+    await clickText(e, "Create game");
+    const b = calls.find((x) => x.url.includes("/rpc/create_game_complete"))?.body as { p_game?: { game_type?: string; teams?: { key: string }[] }; p_players?: unknown[]; p_teams?: { team: string }[]; p_groups?: unknown[]; p_foursomes?: { a: string[]; b: string[]; a_first?: string; b_first?: string }[]; p_announce?: boolean } | undefined;
+    const want = fmt === "Four-ball" ? "fourball" : fmt === "Trifecta" ? "trifecta" : "alt_shot";
+    ok(!!b && b.p_game?.game_type === want && (b.p_players ?? []).length === 8 && (b.p_teams ?? []).length === 8 && (b.p_groups ?? []).length === 8
+      && (b.p_foursomes ?? []).length === 2 && (b.p_foursomes ?? []).every((f) => f.a.length === 2 && f.b.length === 2) && b.p_announce === true,
+      `${fmt}: ONE call — the game, 8 players, 8 team places, 8 group places, two 2 v 2 foursomes (got ${JSON.stringify({ t: b?.p_game?.game_type, p: b?.p_players?.length, tm: b?.p_teams?.length, g: b?.p_groups?.length, f: b?.p_foursomes?.map((f) => `${f.a.length}v${f.b.length}`) })})`);
+    ok(new Set((b?.p_teams ?? []).map((t) => t.team)).size === 2 && (b?.p_teams ?? []).filter((t) => t.team === "A").length === 4, `${fmt}: four a side`);
+    if (fmt === "Four-ball") {
+      const tm = (b?.p_game?.teams ?? []) as { key: string; name: string; color?: string | null }[];
+      ok(tm[0]?.name === "Reds" && !!tm[0]?.color, `four-ball: the name and colour chosen on the Teams step are saved (got ${JSON.stringify(tm)})`);
+    }
+    if (fmt === "Alternate Shot") ok((b?.p_foursomes ?? []).every((f) => !!f.a_first && !!f.b_first), "alternate shot: the first drivers are saved with the foursomes");
+    ok(Array.isArray(made) && (made as unknown[])[1] === "play", `${fmt}: Create game goes straight to the scorecard`);
+    r.unmount();
+  }
   report("one-step walkthrough");
 })();

@@ -2,6 +2,8 @@
 
 import { SCRAMBLE_METHOD_LABEL, type ScrambleMethod } from "@/lib/scramble-method";
 import { DraftBanner, ShareLinks } from "@/components/game/setup/one-step";
+import { CompactTeamEditor } from "@/components/game/compact-team-editor";
+import { decideSetupChange } from "@/lib/game-setup-policy";
 import { isDraftGame } from "@/lib/one-step-create";
 import { ScrambleTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { scrambleSetupProblem, scrambleTeamsOf, type ScrambleGroup } from "@/lib/scramble-teams";
@@ -339,7 +341,13 @@ export function GameSetupWorkspace({
               </div>
               <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>To change sides, return to the Ryder Cup roster before configuring its sessions.</div>
             </div>
-          ) : <OrganizerPanel section="teams" {...organizerPanelProps} />)}
+          ) : (
+            // 212.44 (owner, Oct 26): the compact team card, as in Create — one row per player, each side's colour, name
+            // and strength at the top. A player who already has scores can't change team (the setup policy's rule).
+            <CompactTeamEditor game={game} players={players} onSetTeam={organizerPanelProps.onSetTeam} onBalanceTeams={organizerPanelProps.onBalanceTeams}
+              onRenameTeams={organizerPanelProps.onRenameTeams} onSetTeamColours={organizerPanelProps.onSetTeamColours}
+              isBlocked={(p) => { const d = decideSetupChange({ game, players, action: { type: "set_team", player: p, team: null } } as never); return d.decision === "block" ? (d as { reason?: string }).reason ?? "Can't change team now." : null; }} />
+          ))}
           {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && (isScramble
             ? <div style={cardStyle}><ScrambleTeamsBuilder game={game} players={players} readOnly={anyScores || !onSetScrambleTeams} onSave={(g) => onSetScrambleTeams?.(g)} /></div>

@@ -30,7 +30,8 @@ checks = [
     (workspace, 'title: "Review"', "overview must expose Review"),
     (workspace, '<OrganizerPanel section="players" {...organizerPanelProps} />', "Players section must reach the existing OrganizerPanel"),
     (workspace, '<OrganizerPanel section="format" {...organizerPanelProps} />', "Format section must reuse existing format mutation handlers"),
-    (workspace, '<OrganizerPanel section="teams" {...organizerPanelProps} />', "Teams structure section must reach the existing OrganizerPanel"),
+    # 212.44 (owner, Oct 26): the compact team card, wired to Manage Game's own save handlers
+    (workspace, 'onRenameTeams={organizerPanelProps.onRenameTeams} onSetTeamColours={organizerPanelProps.onSetTeamColours}', "Teams structure section must reach the compact team card with Manage Game's handlers"),
     (workspace, '<GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}', "Groups structure section must preserve tee-group callback wiring"),
     (workspace, 'setupTab === "matchups"', "Matchups must remain a distinct reachable sub-state"),
     (workspace, 'onSetGameDate: (date: string) => Promise<void>;', "Game section must receive the existing organizer date writer"),
