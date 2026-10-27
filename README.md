@@ -1,3 +1,7 @@
+## 212.56.261027 — Permission audit, part 3: who may change a score matches the app (migration 0227)
+
+Owner (Oct 27): in a team match a non-scorer "can also enter their own stats for a team match when they are not a scorer — like FW hit, putts, S / penalty etc. They cannot edit their score."
+
 ## 212.55.261027 — The organizer can take over any group's scoring during the round, and hand it back (migration 0226)
 
 Owner (Oct 27): "allow the organizer to jump in and take over scoring, the existing scorer is notified but doesn't need to give permission, and then I can hand the scoring back to anyone else who is a member of the group and chooses to score". (Option 1; option 2 — correcting after the end — shipped in 212.54.)

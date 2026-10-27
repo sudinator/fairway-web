@@ -1,3 +1,15 @@
+## 212.56.261027 — Permission audit, part 3: who may change a score matches the app (migration 0227)
+
+Owner (Oct 27): in a team match a non-scorer "can also enter their own stats for a team match when they are not a scorer — like FW hit, putts, S / penalty etc. They cannot edit their score."
+
+**Found.** The app locks each row's score to whoever OWNS it, but the server only checked table rules: a non-scorer's own score sent through the app's own scoring route was ACCEPTED (and so was the organizer's save of a score another group's scorer owned, and a group member's score for a guest in a group with a scorer). Reachable only by using one's own login outside the app.
+**Migration 0227** makes the server match the app's ownership exactly: a change to a row's scores (or clock) is accepted only from the row's owner — the organizer while they hold the group (0226); else the group's scorer; else the whole-game scorer; else the player keeps their own card (a guest's card: the players in the guest's group; and the organizer). Stats — putts, fairways, penalties, sand — stay the player's own, as before. Scramble and alternate shot are untouched (their team-score functions already decide who may score a team); an ended game is decided by 0222/0225. The refusal says who keeps score ("Sam Lee is keeping score for this group — only they can change its scores. You can still enter your own stats"; the organizer is told to take over the group's scoring first).
+No app change: the app never sends a score for a row it doesn't own.
+Tests: ci/assert-score-owner.sql — 21 attempts across four situations (a group scorer; the organizer's hold; a whole-game scorer; nobody keeping score): non-scorer's own score refused, own stats allowed by both routes, the scorer scores the group and its guest, the organizer can't override another scorer (and can when holding the group), the whole-game scorer scores everyone, guests only by their group; negative-tested — without 0227 it lists the four gaps by name. Full migration chain + every assertion pass on local PostgreSQL 16.
+**Part 2 (direct saves to the other game tables) — already consistent, now pinned** in ci/assert-game-permissions.sql: games are written directly by the creator only; team scores and side contests have no direct writes at all (functions only); a new permissive write rule on those tables fails the test until reviewed.
+
+**Deploy: apply migration 0227 to production FIRST** (after 0218–0226; SQL editor, "Run without RLS"), then staging, then the pull request. Then check_what_is_applied.sql: 0185–0227 all "applied".
+
 ## 212.55.261027 — The organizer can take over any group's scoring during the round, and hand it back (migration 0226)
 
 Owner (Oct 27): "allow the organizer to jump in and take over scoring, the existing scorer is notified but doesn't need to give permission, and then I can hand the scoring back to anyone else who is a member of the group and chooses to score". (Option 1; option 2 — correcting after the end — shipped in 212.54.)

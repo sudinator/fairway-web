@@ -123,6 +123,18 @@ begin
   end;
   if bad is distinct from '' then raise exception 'WHO-CAN-DO-WHAT mismatch (direct saves):%', bad; end if;
 
+  -- 212.56 (part 2 of the audit): direct writes to the other game tables — games: the creator only; team scores and
+  -- side contests: no direct writes at all (functions only). A new permissive write rule here fails until reviewed.
+  select string_agg(c.relname || '.' || p.polname, ', ') into bad
+    from pg_policy p join pg_class c on c.oid = p.polrelid
+   where c.relname in ('games', 'game_alt_shot_scores', 'game_contests') and p.polpermissive and p.polcmd in ('a', 'd', 'w', '*')
+     and p.polname not in ('create games', 'update own games', 'organizer deletes game');
+  if bad is not null then raise exception 'UNREVIEWED direct-write rule(s) on game tables: %', bad; end if;
+  if (select count(*) from pg_policy p join pg_class c on c.oid = p.polrelid where c.relname = 'games' and p.polpermissive and p.polcmd in ('a', 'd', 'w', '*')
+        and coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') not like '%created_by%') > 0 then
+    raise exception 'a direct-write rule on games no longer requires the creator';
+  end if;
+
   -- THE REGISTER: every game function signed-in members can call is classified (and, if it changes setup, tested above)
   select string_agg(p.proname, ', ' order by p.proname) into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -147,6 +159,6 @@ begin
        -- the club's Money tab (club admins manage money; not game setup)
        'save_bet_expense_atomic', 'delete_bet_expense_atomic');
   if bad is not null then raise exception 'UNCLASSIFIED game functions (decide who may call them, test it, and list them here): %', bad; end if;
-  raise notice 'GAME_PERMISSIONS_PASS 13 actions x 6 people + 10 direct saves match the app (organizer; system admin for the six setup rules; a club admin not in the game can''t); every game function is classified';
+  raise notice 'GAME_PERMISSIONS_PASS 13 actions x 6 people + 10 direct saves match the app (organizer; system admin for the six setup rules; a club admin not in the game can''t); every game function is classified; direct writes: games by the creator only, team scores and contests through functions only';
 end $$;
 rollback;
