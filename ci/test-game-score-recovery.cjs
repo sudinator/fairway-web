@@ -26,16 +26,19 @@ function walk(n){
  ts.forEachChild(n,walk);
 }
 walk(parsed);assert.ok(callback);assert.ok(sendCallback);assert.ok(lockCallback);
+// 212.50: the real late-score decisions (lib/late-scores), loaded — not a stand-in
+const lateScores=(()=>{const src=fs.readFileSync(path.join(__dirname,'../lib/late-scores.ts'),'utf8');const m={exports:{}};
+ Function('exports','module',ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(m.exports,m);return m.exports;})();
 function compileArrow(text,env){env={trace:()=>{},...env};   /* 212.25: the staging save trace is a no-op here */
  const js=ts.transpileModule('const fn='+text+'; return fn;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;return Function(...Object.keys(env),js)(...Object.values(env));}
 function adapter(mode='ok'){
- let stats=0, sent, version, resetEvents=0;
+ let stats=0, sent, version, resetEvents=0; const events=[];
  const client={async rpc(name,args){assert.equal(name,'save_game_score_bundle');stats++;sent=copy(args.p_patch);version=args.p_version;
   if(mode==='throw')throw Error('network');
-  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:['error','rpc-error','reset'].includes(mode)?{message:'denied',code:mode==='reset'?'BN163':'42501'}:null};
+  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:['error','rpc-error','reset','late'].includes(mode)?{message:'denied',code:mode==='reset'?'BN163':mode==='late'?'BN164':'42501'}:null};
  }};
- const env={supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{},loadGameScores:()=>({scoringVersion:7}),gameIdRef:{current:'g'},gameRef:{current:{scoring_version:8}},recoveryReadyRef:{current:true},window:{dispatchEvent(){resetEvents++}},Event:window.Event};
- return{send:compileArrow(sendCallback,env),get stats(){return stats},get version(){return version},get resetEvents(){return resetEvents},env};
+ const env={supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{},loadGameScores:()=>({scoringVersion:7}),gameIdRef:{current:'g'},gameRef:{current:{scoring_version:8}},recoveryReadyRef:{current:true},endedRejectedRef:{current:false},isLateScoreRefusal:lateScores.isLateScoreRefusal,window:{dispatchEvent(e){resetEvents++;events.push(e&&e.type)}},Event:window.Event};
+ return{send:compileArrow(sendCallback,env),get stats(){return stats},get version(){return version},get resetEvents(){return resetEvents},events,env};
 }
 const code=ts.transpileModule('const load='+callback+'; return load;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 function room(server,opts={}){
@@ -76,6 +79,12 @@ t=writer();let release;t.hold=new Promise(r=>release=r);const first=t.w.write('p
 t=writer();t.paused=true;assert.equal(await t.w.write('p'),false);assert.equal(t.sends.length,0);
 assert.ok(source.includes('p_stats_only: locked'));assert.ok(source.includes('p_version: backup?.scoringVersion'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
 seed();r=room([{id:'p',user_id:'u',...base}],{viewer:true});await r.load();assert.deepEqual(r.state.players[0].scores,base.scores,'viewer shows server, not stale local backup');assert.deepEqual(draft.loadGameScores('g','p').scores,local.scores,'viewer preserves pending recovery');assert.deepEqual(draft.loadSyncedWatermark('g','p').scores,base.scores,'viewer never acknowledges pending work');
+// 212.50: the game ENDED before this phone's score arrived (BN164): not saved, the queue holds, the player is told —
+// and recovery is NOT dropped (unlike a reset, the scores are kept)
+adapterTest=adapter('late');assert.equal(await adapterTest.send('p',{scores:[4]},false),false,'a late score is not reported as saved');
+assert.equal(adapterTest.env.endedRejectedRef.current,true,'the queue holds for this game');
+assert.deepEqual(adapterTest.events,['bnn-game-ended-rejected'],'the player is told (and no reset is signalled)');
+assert.equal(adapterTest.env.recoveryReadyRef.current,true,'unlike a reset, the kept scores stay recoverable');
 adapterTest=adapter('reset');assert.equal(await adapterTest.send('p',{scores:[4]},false),false);assert.equal(adapterTest.version,7,'original durable version, not new game version');assert.equal(adapterTest.resetEvents,1);assert.equal(adapterTest.env.recoveryReadyRef.current,false);
 // 212.29 (owner, Oct 23, production): Reset scores must not be undone by the in-memory copy of an unsent entry
 {

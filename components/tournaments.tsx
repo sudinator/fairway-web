@@ -122,6 +122,7 @@ import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { CompactTeamEditor } from "@/components/game/compact-team-editor";
 import { byName } from "@/lib/names";
+import { isLateScoreRefusal, lateScoreNotice, lateScoreHold, keepsSideScores } from "@/lib/late-scores";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
@@ -2159,9 +2160,9 @@ function GameRoom({
     const endedNotice = async () => {
       if (!alive || endedSaid) return;
       endedSaid = true;
-      const holes = countPending() + (gameRef.current && (gameRef.current.game_type === "alt_shot" || gameRef.current.game_type === "scramble") ? loadAltShotDrafts(gameRef.current.id).length : 0);
+      const holes = countPending() + (gameRef.current && keepsSideScores(gameRef.current.game_type) ? loadAltShotDrafts(gameRef.current.id).length : 0);
       await load();
-      alert(`This game has ended, so ${holes > 0 ? `${holes} ${holes === 1 ? "score" : "scores"} on this phone weren't` : "the latest scores on this phone weren't"} added. They're kept on this phone — ask the organizer to reopen the game if they should count.`);
+      alert(lateScoreNotice(holes));
     };
     window.addEventListener("bnn-game-ended-rejected", endedNotice);
     const dropMem = () => clearMemBackups();   // 212.29: a reset made elsewhere — pre-reset entries are void
@@ -2322,7 +2323,7 @@ function GameRoom({
   }, [recomputePending]);
   // 212.49: the organizer reopened the game — scores this phone kept after the end (BN164) may now sync
   useEffect(() => {
-    if (game && game.status !== "ended" && endedRejectedRef.current) { endedRejectedRef.current = false; void drainOutbox(); }
+    if (game && lateScoreHold({ refused: endedRejectedRef.current, status: game.status }).resume) { endedRejectedRef.current = false; void drainOutbox(); }
   }, [game?.status, drainOutbox]);
   const syncNow = async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -2387,7 +2388,7 @@ function GameRoom({
         recoveryReadyRef.current = false;
         window.dispatchEvent(new Event("bnn-game-reset-rejected"));
       }
-      if (error?.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
     },
   });
@@ -2592,7 +2593,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
-      if (error.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
@@ -2613,7 +2614,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
-      if (error.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);

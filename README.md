@@ -1,3 +1,9 @@
+## 212.50.261026 — The phone's late-score handling, tested
+
+Owner (Oct 26): "have you done automated testing on 212.49? if not do it". 212.49 had the full CI, every database test from a fresh database, and preflight — but the PHONE's reaction to a refused late score was only checked as present in the code, not run. Now it is: the decisions moved verbatim into lib/late-scores (which code means "the game has ended", the one-time message, hold while ended / resume on reopen, which formats keep team scores) and the game screen applies them on all three scoring routes (player scores, scramble and alternate-shot team scores).
+Tests: lib/late-scores (10) — including that the phone listens for exactly the code the server raises (read from migration 0222), negative-tested by changing the phone's code; a reset (BN163), a setup lock and success are not mistaken for it; the message's wording (one / several / unknown); hold while ended, resume once reopened. The app ↔ server sync check now also requires all three scoring routes to use lib/late-scores.
+No behaviour change. No migration. Deploy: code only (0222 from 212.49 is still needed if not yet applied).
+
 ## 212.49.261026 — The server enforces every setup rule the app does; late scores after the end are refused (migration 0222)
 
 Owner (Oct 26): "doesn't it make sense to do a full inventory of offline functionality and ensure that the server side is handled similarly in order to keep the app in sync?" — then "Yes, enforce rules 1–11" and, for scores that arrive after a game has ended, "Refuse them: once ended, scores only change if the organizer reopens".

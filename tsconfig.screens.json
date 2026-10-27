@@ -53,6 +53,7 @@
     "lib/odd-field.test.ts",
     "lib/groups-start-over.test.tsx",
     "lib/names.test.ts",
+    "lib/late-scores.test.ts",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",

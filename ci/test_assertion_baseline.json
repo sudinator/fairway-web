@@ -1,5 +1,5 @@
 {
-  "total": 440020,
+  "total": 440030,
   "suites": {
     "(unnamed suites)": 514,
     "ai-sanitize": 11,
@@ -41,6 +41,7 @@
     "hole result consistency": 981,
     "insights": 28,
     "insights screens": 7,
+    "late scores": 10,
     "legs": 30,
     "lineup renders": 37,
     "live cup parity": 49,

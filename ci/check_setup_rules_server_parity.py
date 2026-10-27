@@ -35,13 +35,13 @@ for a in sorted(blocking):
     if words not in (R / f).read_text(encoding="utf-8"): bad.append(f'"{a}": {f} no longer checks "{words}"')
 # the phone's side of late scores (BN164): pause the queue for that game, keep the scores, say so once, resume on reopen
 t = (R / "components/tournaments.tsx").read_text(encoding="utf-8")
-for needle, what in [('if (error?.code === "BN164") { endedRejectedRef.current = true;', "player scores refused after the end pause the queue"),
-                     ('if (error.code === "BN164") { endedRejectedRef.current = true;', "team / side scores refused after the end pause the queue"),
+for needle, what in [('if (isLateScoreRefusal(error)) { endedRejectedRef.current = true;', "scores refused after the end pause the queue"),
                      ('endedRejectedRef.current && "game ended"', "the queue holds while the game is ended"),
                      ('window.addEventListener("bnn-game-ended-rejected", endedNotice);', "the player is told once"),
-                     ('if (game && game.status !== "ended" && endedRejectedRef.current) { endedRejectedRef.current = false; void drainOutbox(); }', "reopening the game resumes sending")]:
+                     ('lateScoreHold({ refused: endedRejectedRef.current, status: game.status }).resume', "reopening the game resumes sending"),
+                     ('alert(lateScoreNotice(holes));', "the message comes from lib/late-scores")]:
     if needle not in t: bad.append(f"late scores: {what} (components/tournaments.tsx)")
-if t.count('if (error.code === "BN164")') < 2: bad.append("late scores: BOTH team-score routes (scramble and alternate shot) must handle BN164")
+if t.count('if (isLateScoreRefusal(error))') < 3: bad.append("late scores: player scores AND both team-score routes (scramble, alternate shot) must handle the refusal")
 if len(blocking) < 10: bad.append(f"only {len(blocking)} blocking actions found in lib/game-setup-policy — the parser needs updating")
 if bad: print("SETUP RULES ↔ SERVER: FAIL\n  " + "\n  ".join(bad)); sys.exit(1)
 print(f"setup rules ↔ server: PASS ({len(blocking)} blocking app rules, each with a server test)")
