@@ -9,7 +9,15 @@ insert into public.profiles(id, display_name, account_status) select id, 'P' || 
 insert into public.groups(id, name, created_by) values ('22200000-0000-0000-0000-00000000c1b0', 'Lock Club', '22200000-0000-0000-0000-0000000000a0');
 insert into public.group_members(group_id, user_id, email, role, status)
 select '22200000-0000-0000-0000-00000000c1b0', id, email, 'member', 'active' from auth.users where email like '%@l.test';
-insert into public.scoring_devices(user_id, token) values ('22200000-0000-0000-0000-0000000000a0', '22209999-0000-0000-0000-000000000001');
+insert into public.scoring_devices(user_id, token) values ('22200000-0000-0000-0000-0000000000a0', '22209999-0000-0000-0000-000000000001'),
+  ('22200000-0000-0000-0000-0000000000a1', '22209999-0000-0000-0000-000000000002');
+create or replace function pg_temp.as_p1() returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', '22200000-0000-0000-0000-0000000000a1', true);
+  perform set_config('request.jwt.claims', '{"sub":"22200000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"22209999-0000-0000-0000-000000000002"}', true);
+  execute 'set local role authenticated';
+end $$;
 
 create or replace function pg_temp.as_org() returns void language plpgsql as $$
 begin
@@ -96,11 +104,29 @@ begin
   if not pg_temp.refused(format('delete from public.game_players where id = %L', '22203000-0000-0000-0000-000000000004'), 'has ended') then raise exception 'rule 1: a player removed from an ended game'; end if;
   -- the name, date, team names stay editable
   update public.games set name = 'FB renamed', teams = '[{"key":"A","name":"Reds"},{"key":"B","name":"Blues"}]'::jsonb where id = fb;
-  -- LATE SCORES (a phone that was offline) are refused with BN164 — on a player's card and a team / side score
-  -- (sent the way the phone sends them: save_game_score_bundle)
-  if not pg_temp.refused_code(format('select public.save_game_score_bundle(%L::uuid, %s, %L::jsonb, false)', '22203000-0000-0000-0000-000000000002', (select scoring_version from public.games where id = sf), '{"scores":[4,5]}'), 'BN164') then raise exception 'late score accepted on an ended game'; end if;
-  if not pg_temp.refused_code(format('select public.save_game_score_bundle(%L::uuid, %s, %L::jsonb, false)', '22203000-0000-0000-0000-000000000003', (select scoring_version from public.games where id = sf), '{"putts":[2]}'), 'BN164') then raise exception 'late stat accepted on an ended game'; end if;
-  if not pg_temp.refused_code(format('select public.save_scramble_score_fenced(%L::uuid, %s, %L, %L, 1, 3, null)', sc, (select scoring_version from public.games where id = sc), 't1', 'a'), 'BN164') then raise exception 'late team score accepted on an ended scramble'; end if;
+  -- LATE SCORES from a PLAYER's phone (offline when the organizer ended the game) are refused with BN164 — on their own
+  -- card (sent the way the phone sends it) and on their scramble team's score
+  perform pg_temp.as_p1();
+  if not pg_temp.refused_code(format('select public.save_game_score_bundle(%L::uuid, %s, %L::jsonb, false)', '22203000-0000-0000-0000-000000000002', (select scoring_version from public.games where id = sf), '{"scores":[4,5]}'), 'BN164') then raise exception 'a player''s late score was accepted on an ended game'; end if;
+  if not pg_temp.refused_code(format('select public.save_scramble_score_fenced(%L::uuid, %s, %L, %L, 1, 3, null)', sc, (select scoring_version from public.games where id = sc), 't1', 'a'), 'BN164') then raise exception 'a player''s late team score was accepted on an ended scramble'; end if;
+  perform pg_temp.as_org();
+  -- 0225 (owner, Oct 27): the ORGANIZER corrects an ended game's scores — any card, any team — without reopening; noted
+  -- for the re-post; setup on the ended game stays locked (checked above)
+  perform public.save_game_score_bundle('22203000-0000-0000-0000-000000000002'::uuid, (select scoring_version from public.games where id = sf), '{"scores":[3]}'::jsonb, false);
+  perform public.save_game_score_bundle('22203000-0000-0000-0000-000000000003'::uuid, (select scoring_version from public.games where id = sf), '{"scores":[6],"putts":[2]}'::jsonb, false);
+  perform public.save_scramble_score_fenced(sc, (select scoring_version from public.games where id = sc), 't1', 'a', 1, 3, null);
+  perform pg_temp.as_maintenance();
+  if (select scores from public.game_players where id = '22203000-0000-0000-0000-000000000002') <> '[3]'::jsonb then raise exception 'the organizer''s correction did not save'; end if;
+  if (select scores_corrected_at from public.games where id = sf) is null or (select scores_corrected_at from public.games where id = sc) is null then raise exception 'a correction was not noted for the re-post'; end if;
+  if not exists (select 1 from public.score_audit where game_player_id = '22203000-0000-0000-0000-000000000002' and changed_by = '22200000-0000-0000-0000-0000000000a0') then raise exception 'the correction was not logged'; end if;
+  -- the re-post: the organizer only, and it records when
+  perform pg_temp.as_p1();
+  if not pg_temp.refused(format('select public.repost_game_rounds(%L::uuid)', sf), 'only the organizer') then raise exception 'a player re-posted the rounds'; end if;
+  perform pg_temp.as_org();
+  perform public.repost_game_rounds(sf);
+  perform pg_temp.as_maintenance();
+  if (select rounds_reposted_at from public.games where id = sf) is null or (select rounds_reposted_at < scores_corrected_at from public.games where id = sf) then raise exception 'the re-post was not recorded after the correction'; end if;
+  perform pg_temp.as_org();
   -- the organizer resets the scores: clearing is allowed, and the game reopens
   perform public.reset_game_scores(fb);
   if (select status from public.games where id = fb) = 'ended' then raise exception 'reset did not reopen the game'; end if;
@@ -110,6 +136,6 @@ begin
   -- maintenance work is unaffected
   perform pg_temp.as_maintenance();
   update public.games set allowance_pct = 50 where id = sf;
-  raise notice 'SETUP_LOCKS_PASS rules 1–11 refused at the server; confirm-level changes, team names, within-family formats, resets and whole-game deletes allowed; late scores refused (BN164)';
+  raise notice 'SETUP_LOCKS_PASS rules 1–11 refused at the server; confirm-level changes, team names, within-family formats, resets and whole-game deletes allowed; a player''s late scores refused (BN164); the organizer corrects an ended game, logged, re-posted on request';
 end $$;
 rollback;

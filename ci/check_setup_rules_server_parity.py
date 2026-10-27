@@ -48,6 +48,19 @@ for needle, what in [('const isOrganizer = game.created_by === user.id;', "the o
                      ('{roomTab === "setup" && isOrganizer && (() => {', "Manage Game is shown to the organizer only")]:
     if needle not in t: bad.append(f"who: {what} (components/tournaments.tsx) — if this changes, change the server's rules and ci/assert-game-permissions.sql to match")
 if "BNN_ALLOWED" not in (R / "ci/assert-game-permissions.sql").read_text(encoding="utf-8"): bad.append("who: ci/assert-game-permissions.sql is missing its who-can-do-what matrix")
+# 212.54 (owner, Oct 27): after the END, the organizer corrects any score (0225) and re-posts on confirmation
+for needle, what in [('const correctingScores = gameEnded && game?.created_by === user.id && correcting;', "only the organizer, only after the end, can switch on correcting"),
+                     ('if (correctingRef.current) return false;   // 212.54', "while correcting, the organizer may save any row"),
+                     ('groupLocked={correctingScores ? false : (viewedGroupLocked || gameEnded)}', "the Group Card unlocks only while correcting"),
+                     ('if (!confirm("Re-post every player\'s round for this game from the corrected scores?")) return;', "the re-post asks the organizer to confirm"),
+                     ('supabase.rpc("repost_game_rounds", { p_game: game.id })', "the re-post goes through repost_game_rounds")]:
+    if needle not in t: bad.append(f"organizer corrections: {what} (components/tournaments.tsx)")
+# 212.55 (owner, Oct 27): the organizer takes over any group's scoring, and hands it back (0226)
+for needle, what in [('if (row.tee_group != null && (gameRef.current?.organizer_scoring_groups ?? []).includes(row.tee_group)) return gameRef.current?.created_by !== user.id;', "a held group's scores belong to the organizer"),
+                     ('supabase.rpc("organizer_take_group_scoring", { p_game: game.id, p_group: viewGroup })', "Take over scoring calls the server"),
+                     ('supabase.rpc("organizer_release_group_scoring", { p_game: game.id, p_group: viewGroup })', "Hand back scoring calls the server"),
+                     ('&& myRow.tee_group === viewGroup && !organizerHolds(viewGroup);', "nobody in a held group is offered 'I'll keep score'")]:
+    if needle not in t: bad.append(f"organizer takes over scoring: {what} (components/tournaments.tsx)")
 if len(blocking) < 10: bad.append(f"only {len(blocking)} blocking actions found in lib/game-setup-policy — the parser needs updating")
 if bad: print("SETUP RULES ↔ SERVER: FAIL\n  " + "\n  ".join(bad)); sys.exit(1)
 print(f"setup rules ↔ server: PASS ({len(blocking)} blocking app rules, each with a server test)")

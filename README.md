@@ -1,3 +1,11 @@
+## 212.55.261027 — The organizer can take over any group's scoring during the round, and hand it back (migration 0226)
+
+Owner (Oct 27): "allow the organizer to jump in and take over scoring, the existing scorer is notified but doesn't need to give permission, and then I can hand the scoring back to anyone else who is a member of the group and chooses to score". (Option 1; option 2 — correcting after the end — shipped in 212.54.)
+
+## 212.54.261027 — After the game ends, the organizer can correct any score; rounds re-post when they confirm (migration 0225)
+
+Owner (Oct 27): "once the game has ended and marked as such, the ability to edit any score and logged accordingly, with the changes flowing through" — and the posted rounds should "Ask the organizer to confirm the re-post". (Taking over a group's scoring mid-round — the owner's option 1 — follows next.)
+
 ## 212.53.261027 — Permission audit, part 1: what a player can change on player rows matches the app (migration 0224)
 
 Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 1 of 4 (players' own rows; then every direct save by role, the scoring roles, and clubs / membership / Money / tee times / profiles).

@@ -134,6 +134,8 @@ begin
        'set_game_share', 'set_game_played_date', 'change_game_course_before_scoring', 'reset_game_scores', 'finish_game_and_post_rounds',
        'delete_game', 'finish_game', 'change_game_match_length_before_scoring', 'delete_game_contest', 'update_game_contest',
        'link_tee_time_game', 'delete_competition_session_game', 'create_game_complete', 'post_game_rounds',
+       'repost_game_rounds',   -- 0225: organizer only, on an ended game (tested in ci/assert-setup-locks.sql)
+       'organizer_take_group_scoring', 'organizer_release_group_scoring',   -- 0226: organizer only (ci/assert-organizer-group-scoring.sql)
        -- system admin tools (is_admin inside)
        'admin_delete_game', 'admin_delete_stale_game', 'admin_end_game', 'admin_reassign_organizer', 'admin_reopen_game', 'admin_reset_game', 'admin_score_audit',
        -- scoring roles: a player's own card, a group's marker (covered by the scoring and recovery tests)

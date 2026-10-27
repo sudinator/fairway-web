@@ -1913,7 +1913,10 @@ function GameRoom({
     if (!teeGroupsInUse) return;
     setViewGroup((cur) => (cur != null && teeGroupList.includes(cur)) ? cur : (myRow?.tee_group ?? teeGroupList[0] ?? null));
   }, [teeGroupsInUse, myRow?.tee_group, teeGroupList.join(",")]);
-  const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker);
+  // 212.55 (owner, Oct 27): groups whose scoring the ORGANIZER has taken over — the organizer owns their scores until handing back
+  const organizerHolds = (grp: number | null | undefined) => grp != null && (game?.organizer_scoring_groups ?? []).includes(grp);
+  const iAmOrganizer = !!game && game.created_by === user.id;
+  const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && (players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker) || organizerHolds(myRow.tee_group));
   // Roll everyone up to the group card when group scoring turns ON, and drop
   // everyone back to their own scorecard when it turns OFF (disband). Only fires
   // on the transition, so a steady state never fights a manual tab tap. Together
@@ -1929,14 +1932,20 @@ function GameRoom({
   }, [game?.marker_user_id, myGroupHasMarker]);
   const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
   const gameEnded = game?.status === "ended";
+  // 212.54 (owner, Oct 27): after the game has ENDED, its organizer can switch on "Correct scores" and edit ANY score in any
+  // group — logged by the score audit — then re-post the players' rounds once they confirm. Nobody else can (0225).
+  const [correcting, setCorrecting] = useState(false);
+  const correctingScores = gameEnded && game?.created_by === user.id && correcting;
+  const correctingRef = React.useRef(false);
+  correctingRef.current = correctingScores;
   const viewedGroupLocked = teeGroupsInUse && cardPlayers.length > 0 && cardPlayers.some((p) => p.group_locked);
   const myGroupLocked = !!myRow?.group_locked;
   const iAmViewedMarker = !!myRow?.is_marker && myRow?.tee_group != null && myRow?.tee_group === viewGroup;
-  const cardCanEdit = gameEnded ? false : (teeGroupsInUse ? (iAmViewedMarker && !viewedGroupLocked) : (game?.marker_user_id === user.id));
+  const cardCanEdit = correctingScores ? true : gameEnded ? false : (teeGroupsInUse ? (organizerHolds(viewGroup) ? iAmOrganizer && !viewedGroupLocked : iAmViewedMarker && !viewedGroupLocked) : (game?.marker_user_id === user.id));
   const viewedMarkerPlayer = teeGroupsInUse
     ? (players.find((p) => p.tee_group === viewGroup && p.is_marker) || null)
     : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
-  const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
+  const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup && !organizerHolds(viewGroup);
   const claimGroupMarker = async () => {
     if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
@@ -2344,13 +2353,15 @@ function GameRoom({
     myIsMarker: myRow?.is_marker ?? false,
     gameMarkerUserId: game?.marker_user_id ?? null,
     players,
-  });
+  }) || (!!myRow && organizerHolds(myRow.tee_group) && game?.created_by !== user.id);   // 212.55: the organizer holds my group
   // True when the gross score for a given row is owned by SOMEONE ELSE (a group/tee-group
   // marker, or the whole-game marker) — i.e. this device may write that row's peripheral
   // stats but never its score. Individual scoring returns false (you own your own row).
   const scoreLockedForRow = React.useCallback((rowId: string): boolean => {
     const row = playersRef.current.find((p) => p.id === rowId);
     if (!row) return true;
+    if (correctingRef.current) return false;   // 212.54: the organizer correcting an ended game
+    if (row.tee_group != null && (gameRef.current?.organizer_scoring_groups ?? []).includes(row.tee_group)) return gameRef.current?.created_by !== user.id;   // 212.55
     if (playersRef.current.some(p => p.tee_group != null) && row.tee_group != null) {
       const mk = playersRef.current.find((p) => p.tee_group === row.tee_group && p.is_marker);
       if (mk) return mk.user_id !== user.id;
@@ -3891,6 +3902,34 @@ function GameRoom({
         <GameRecapCard game={game} players={players} altShotScores={altShotScores} userId={user.id} betStale={betStale}
           competition={competitionLink} onOpenCompetition={onOpenCompetition} />
       )}
+      {/* 212.54: correcting an ENDED game's scores (the organizer only), then the re-post the organizer confirms */}
+      {roomTab === "play" && isEnded && isOrganizer && (
+        <div data-correct-scores style={{ background: C.greenLight, border: `1px solid ${correcting ? C.gold : C.borderGreen}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{correcting ? "Correcting scores" : "Need to fix a score?"}</div>
+          <div style={{ color: C.sage, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+            {correcting
+              ? "Open the Group Card and tap any score, in any group, to change it. Every change is logged in Score history."
+              : "As the organizer you can correct any score after the game has ended. Every change is logged."}
+          </div>
+          <button onClick={() => { setCorrecting((c) => !c); if (!correcting) setCardView(true); }} style={{ ...btn(!correcting), marginTop: 10, fontSize: 13 }}>
+            {correcting ? "Done correcting" : "✎ Correct scores"}
+          </button>
+        </div>
+      )}
+      {roomTab === "play" && isEnded && isOrganizer && game.scores_corrected_at && (!game.rounds_reposted_at || game.scores_corrected_at > game.rounds_reposted_at) && (
+        <div data-repost-rounds style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
+          <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>Scores were corrected after the game ended</div>
+          <div style={{ color: C.cream, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+            The players' posted rounds still show the old scores. Re-post them so everyone's rounds and stats match the corrected card.
+          </div>
+          <button onClick={async () => {
+            if (!confirm("Re-post every player's round for this game from the corrected scores?")) return;
+            const { error } = await supabase.rpc("repost_game_rounds", { p_game: game.id });
+            saved(error, "re-post the rounds", "Rounds re-posted from the corrected scores.");
+            await load();
+          }} style={{ ...btn(true), marginTop: 10, fontSize: 13 }}>Re-post rounds</button>
+        </div>
+      )}
       {roomTab === "play" && betStale && (
         <div style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
           <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>⚠️ Posted bet winnings are out of date</div>
@@ -4171,7 +4210,7 @@ function GameRoom({
         </div>
       )}
       {roomTab === "setup" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
-      {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
+      {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && !(organizerHolds(myRow?.tee_group) && !iAmOrganizer) && (
         <div style={{ background: "#16302A", border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
@@ -4189,13 +4228,42 @@ function GameRoom({
               {teeGroupList.map((g) => {
                 const grpPlayers = players.filter((p) => p.tee_group === g);
                 const locked = gameEnded || grpPlayers.some((p) => p.group_locked);
-                const hasMarker = grpPlayers.some((p) => p.is_marker);
+                const hasMarker = grpPlayers.some((p) => p.is_marker) || organizerHolds(g);   // 212.55: the organizer counts
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
                     Group {g}{locked ? " 🔒" : hasMarker ? " ✓" : " · needs scorer"}
                   </button>
                 );
               })}
+            </div>
+          )}
+          {/* 212.55 (owner, Oct 27): the organizer takes over any group's scoring (its scorer is told, no permission needed)
+              and hands it back for anyone in the group who chooses to score */}
+          {teeGroupsInUse && viewGroup != null && !gameEnded && !viewedGroupLocked && iAmOrganizer && (
+            organizerHolds(viewGroup) ? (
+              <div data-organizer-holds style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+                <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>You're keeping score for Group {viewGroup}</div>
+                <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>The group's players can still enter their own stats. Hand it back when you're done — anyone in the group can then keep score.</div>
+                <button disabled={!primary || offline} onClick={async () => {
+                  if (!confirm(`Hand back scoring for Group ${viewGroup}? Its players will be told they can keep score again.`)) return;
+                  const { error } = await supabase.rpc("organizer_release_group_scoring", { p_game: game.id, p_group: viewGroup });
+                  saved(error, `hand back Group ${viewGroup}'s scoring`, `Group ${viewGroup} can choose a new scorer.`);
+                  await load();
+                }} style={{ ...btn(false), fontSize: 13, marginTop: 10 }}>Hand back scoring</button>
+              </div>
+            ) : (myRow?.tee_group !== viewGroup || !iAmViewedMarker) ? (
+              <button data-organizer-take-over disabled={!primary || offline} onClick={async () => {
+                const who = viewedMarkerPlayer?.display_name;
+                if (!confirm(`Take over scoring for Group ${viewGroup}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`)) return;
+                const { error } = await supabase.rpc("organizer_take_group_scoring", { p_game: game.id, p_group: viewGroup });
+                saved(error, `take over Group ${viewGroup}'s scoring`, `You're keeping score for Group ${viewGroup}.`);
+                await load();
+              }} style={{ ...btn(false), fontSize: 13, marginTop: 12 }}>Take over scoring for Group {viewGroup}</button>
+            ) : null
+          )}
+          {teeGroupsInUse && viewGroup != null && !gameEnded && !iAmOrganizer && organizerHolds(viewGroup) && (
+            <div data-organizer-holds-notice style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: 14, marginTop: 12, color: C.sage, fontSize: 12.5, lineHeight: 1.5 }}>
+              The organizer is keeping score for Group {viewGroup}. You can still enter your own stats; they'll hand the card back when they're done.
             </div>
           )}
           {canClaimViewed && !viewedMarkerPlayer && (
@@ -4217,7 +4285,7 @@ function GameRoom({
           <GroupScorecard game={game} players={cardPlayers} allPlayers={players} user={user} courseTees={courseTees}
             readOnly={!primary}
             isMarker={primary && cardCanEdit}
-            markerName={viewedMarkerPlayer?.display_name ?? null}
+            markerName={organizerHolds(viewGroup) ? `${players.find((x) => x.user_id === game.created_by)?.display_name ?? "The organizer"} (organizer)` : (viewedMarkerPlayer?.display_name ?? null)}
             onTakeOver={takeOverScoring}
             onRelease={releaseScoring}
             onSetHole={setPlayerHole}
@@ -4226,7 +4294,7 @@ function GameRoom({
             onSetScrambleScore={setScrambleSideHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
-            groupLocked={viewedGroupLocked || gameEnded}
+            groupLocked={correctingScores ? false : (viewedGroupLocked || gameEnded)}
             canClaim={primary && canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}

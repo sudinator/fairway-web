@@ -70,8 +70,16 @@ let adapterTest=adapter();assert.equal(await adapterTest.send('p',{scores:[4,nul
 adapterTest=adapter('rpc-error');assert.equal(await adapterTest.send('p',{putts:[1,2]},true),false);assert.equal(adapterTest.stats,1);
 adapterTest=adapter('zero');assert.equal(await adapterTest.send('p',{putts:[1,2]},true),false,'void stats RPC must confirm a visible row');
 const playersRef={current:[{id:'p',user_id:'u',tee_group:1},{id:'marker',user_id:'other',tee_group:1,is_marker:true}]},gameRef={current:{marker_user_id:null}};
-const locked=compileArrow(lockCallback,{playersRef,gameRef,user:{id:'u'}});
-assert.equal(locked('p'),true);assert.equal(locked('missing'),true);playersRef.current[1].user_id='u';assert.equal(locked('p'),false);playersRef.current.pop();gameRef.current.marker_user_id='other';assert.equal(locked('p'),true,'whole-game marker fallback');
+const correctingRef={current:false};   // 212.54: the organizer correcting an ended game
+const locked=compileArrow(lockCallback,{playersRef,gameRef,user:{id:'u'},correctingRef});
+assert.equal(locked('p'),true);assert.equal(locked('missing'),true);
+// 212.54: while the organizer corrects an ENDED game, no row is locked to another scorer; switched off, the lock is back
+correctingRef.current=true;assert.equal(locked('p'),false,'the correcting organizer may save a row another scorer owns');correctingRef.current=false;assert.equal(locked('p'),true,'correcting off: the scorer owns the row again');
+// 212.55: a group the ORGANIZER has taken over — the organizer owns its scores; anyone else (its old scorer too) doesn't
+gameRef.current.organizer_scoring_groups=[1];gameRef.current.created_by='u';assert.equal(locked('p'),false,'the organizer holding the group may save its rows');
+gameRef.current.created_by='someone-else';assert.equal(locked('p'),true,'while the organizer holds the group, its own players may not save its scores');
+gameRef.current.organizer_scoring_groups=[];delete gameRef.current.created_by;
+playersRef.current[1].user_id='u';assert.equal(locked('p'),false);playersRef.current.pop();gameRef.current.marker_user_id='other';assert.equal(locked('p'),true,'whole-game marker fallback');
 let t=writer();t.fail=true;assert.equal(await t.w.write('p'),false);assert.deepEqual(t.wm,base);t.fail=false;assert.equal(await t.w.write('p'),true);assert.deepEqual(t.wm,local);
 t=writer({send:async()=>{throw Error('offline')}});assert.equal(await t.w.write('p'),false);assert.deepEqual(t.wm,base);
 t=writer();t.locked=true;assert.equal(await t.w.write('p'),false);assert.ok(t.sends[0].locked);assert.ok(!('scores' in t.sends[0].body));assert.deepEqual(t.wm.scores,base.scores);assert.deepEqual(t.wm.putts,local.putts);

@@ -32,6 +32,11 @@ export type Game = {
   lineup_slug?: string | null; // readable line-up link (0177): course-date-6chars; minted with share_token
   /** 0219 (212.41): when the players were told; null = a DRAFT — saved, but only its organizer (and club admins) see it. */
   players_notified_at?: string | null;
+  /** 0225 (212.54): when an ENDED game's scores were last corrected by its organizer, and when its rounds were re-posted. */
+  scores_corrected_at?: string | null;
+  rounds_reposted_at?: string | null;
+  /** 0226 (212.55): the groups whose scoring the organizer has taken over (and not yet handed back). */
+  organizer_scoring_groups?: number[] | null;
   ended_at?: string | null;
   alt_shot_scoring_started_at?: string | null;
   /** 211.1: scramble settings (0203) — null for every other format. */
