@@ -121,7 +121,10 @@ begin
   if not ok then raise exception 'a marker scored a team in another group'; end if;
   execute 'reset role';
   -- the two teams now share group 1 (and group 2's marker steps down): group 1's marker scores BOTH teams
+  -- a setup step, done as the database owner with no signed-in identity (0224: a player can't move players between groups)
+  perform set_config('request.jwt.claim.sub', '', true); perform set_config('request.jwt.claims', '', true);
   update public.game_players set tee_group = 1, is_marker = false where game_id = gx and user_id in (b3::uuid, b4::uuid);
+  perform set_config('request.jwt.claim.sub', b1, true);
   execute 'set local role authenticated';
   perform public.save_scramble_score_fenced(gx, 0, 't1', 'a', 0, 4, null);
   perform public.save_scramble_score_fenced(gx, 0, 't2', 'a', 0, 5, null);

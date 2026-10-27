@@ -18,12 +18,13 @@ const players = [P(1, "Raj", 4, "A"), P(2, "Sam", 22, "B"), P(3, "Bo", 9, "A", t
     isBlocked={(p) => ((p.scores || []).some((x) => x != null) ? `${p.display_name} has scores` : null)} />);
   const sum = [...t.el.querySelectorAll("[data-team-summary]")].map((x) => x.textContent || "");
   ok(sum.length === 2 && sum[0].includes("2 players · plays 13") && sum[1].includes("1 player · plays 22"), `each side's players and total playing handicap (got ${JSON.stringify(sum)})`);
-  const rows = [...t.el.querySelectorAll("[data-compact-player]")].map((r) => r.getAttribute("data-compact-player"));
-  ok(rows[0] === "Lex" && (t.el.querySelector('[data-compact-player="Lex"]')?.textContent || "").includes("no team yet"), "a player with no team is listed first, marked");
+  const order = () => [...t.el.querySelectorAll("[data-compact-player]")].map((r) => r.getAttribute("data-compact-player")).join(",");
+  ok(order() === "Bo,Lex,Raj,Sam" && (t.el.querySelector('[data-compact-player="Lex"]')?.textContent || "").includes("no team yet"), `players are listed alphabetically by first name; a player with no team is marked (got ${order()})`);
   const btn = (who: string, team: string) => [...t.el.querySelectorAll(`[data-compact-player="${who}"] button`)].find((b) => b.textContent === team) as HTMLButtonElement;
   await act(async () => { btn("Lex", "Blues").click(); });
   await act(async () => { btn("Raj", "Reds").click(); });   // tap the team you're on → clears
   ok(JSON.stringify(moves) === JSON.stringify([["Lex", "B"], ["Raj", null]]), `assign, and tap again to clear (got ${JSON.stringify(moves)})`);
+  ok(order() === "Bo,Lex,Raj,Sam", "assigning or clearing a team never moves anyone in the list (owner, Oct 26)");
   ok(btn("Bo", "Blues").disabled && btn("Bo", "Reds").disabled, "a player with scores can't change team");
   ok(!!t.el.querySelector('button[aria-label^="Choose Blues"]') && !!t.el.querySelector("[data-edit-names]"), "each side has its colour dot, and the names an Edit button");
   // rename: Edit → type → Save; nothing changes until Save, and an emptied name keeps the old one (owner, Oct 26)

@@ -26,16 +26,19 @@ function walk(n){
  ts.forEachChild(n,walk);
 }
 walk(parsed);assert.ok(callback);assert.ok(sendCallback);assert.ok(lockCallback);
+// 212.50: the real late-score decisions (lib/late-scores), loaded — not a stand-in
+const lateScores=(()=>{const src=fs.readFileSync(path.join(__dirname,'../lib/late-scores.ts'),'utf8');const m={exports:{}};
+ Function('exports','module',ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(m.exports,m);return m.exports;})();
 function compileArrow(text,env){env={trace:()=>{},...env};   /* 212.25: the staging save trace is a no-op here */
  const js=ts.transpileModule('const fn='+text+'; return fn;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;return Function(...Object.keys(env),js)(...Object.values(env));}
 function adapter(mode='ok'){
- let stats=0, sent, version, resetEvents=0;
+ let stats=0, sent, version, resetEvents=0; const events=[];
  const client={async rpc(name,args){assert.equal(name,'save_game_score_bundle');stats++;sent=copy(args.p_patch);version=args.p_version;
   if(mode==='throw')throw Error('network');
-  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:['error','rpc-error','reset'].includes(mode)?{message:'denied',code:mode==='reset'?'BN163':'42501'}:null};
+  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:['error','rpc-error','reset','late'].includes(mode)?{message:'denied',code:mode==='reset'?'BN163':mode==='late'?'BN164':'42501'}:null};
  }};
- const env={supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{},loadGameScores:()=>({scoringVersion:7}),gameIdRef:{current:'g'},gameRef:{current:{scoring_version:8}},recoveryReadyRef:{current:true},window:{dispatchEvent(){resetEvents++}},Event:window.Event};
- return{send:compileArrow(sendCallback,env),get stats(){return stats},get version(){return version},get resetEvents(){return resetEvents},env};
+ const env={supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{},loadGameScores:()=>({scoringVersion:7}),gameIdRef:{current:'g'},gameRef:{current:{scoring_version:8}},recoveryReadyRef:{current:true},endedRejectedRef:{current:false},isLateScoreRefusal:lateScores.isLateScoreRefusal,window:{dispatchEvent(e){resetEvents++;events.push(e&&e.type)}},Event:window.Event};
+ return{send:compileArrow(sendCallback,env),get stats(){return stats},get version(){return version},get resetEvents(){return resetEvents},events,env};
 }
 const code=ts.transpileModule('const load='+callback+'; return load;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 function room(server,opts={}){
@@ -67,8 +70,16 @@ let adapterTest=adapter();assert.equal(await adapterTest.send('p',{scores:[4,nul
 adapterTest=adapter('rpc-error');assert.equal(await adapterTest.send('p',{putts:[1,2]},true),false);assert.equal(adapterTest.stats,1);
 adapterTest=adapter('zero');assert.equal(await adapterTest.send('p',{putts:[1,2]},true),false,'void stats RPC must confirm a visible row');
 const playersRef={current:[{id:'p',user_id:'u',tee_group:1},{id:'marker',user_id:'other',tee_group:1,is_marker:true}]},gameRef={current:{marker_user_id:null}};
-const locked=compileArrow(lockCallback,{playersRef,gameRef,user:{id:'u'}});
-assert.equal(locked('p'),true);assert.equal(locked('missing'),true);playersRef.current[1].user_id='u';assert.equal(locked('p'),false);playersRef.current.pop();gameRef.current.marker_user_id='other';assert.equal(locked('p'),true,'whole-game marker fallback');
+const correctingRef={current:false};   // 212.54: the organizer correcting an ended game
+const locked=compileArrow(lockCallback,{playersRef,gameRef,user:{id:'u'},correctingRef});
+assert.equal(locked('p'),true);assert.equal(locked('missing'),true);
+// 212.54: while the organizer corrects an ENDED game, no row is locked to another scorer; switched off, the lock is back
+correctingRef.current=true;assert.equal(locked('p'),false,'the correcting organizer may save a row another scorer owns');correctingRef.current=false;assert.equal(locked('p'),true,'correcting off: the scorer owns the row again');
+// 212.55: a group the ORGANIZER has taken over — the organizer owns its scores; anyone else (its old scorer too) doesn't
+gameRef.current.organizer_scoring_groups=[1];gameRef.current.created_by='u';assert.equal(locked('p'),false,'the organizer holding the group may save its rows');
+gameRef.current.created_by='someone-else';assert.equal(locked('p'),true,'while the organizer holds the group, its own players may not save its scores');
+gameRef.current.organizer_scoring_groups=[];delete gameRef.current.created_by;
+playersRef.current[1].user_id='u';assert.equal(locked('p'),false);playersRef.current.pop();gameRef.current.marker_user_id='other';assert.equal(locked('p'),true,'whole-game marker fallback');
 let t=writer();t.fail=true;assert.equal(await t.w.write('p'),false);assert.deepEqual(t.wm,base);t.fail=false;assert.equal(await t.w.write('p'),true);assert.deepEqual(t.wm,local);
 t=writer({send:async()=>{throw Error('offline')}});assert.equal(await t.w.write('p'),false);assert.deepEqual(t.wm,base);
 t=writer();t.locked=true;assert.equal(await t.w.write('p'),false);assert.ok(t.sends[0].locked);assert.ok(!('scores' in t.sends[0].body));assert.deepEqual(t.wm.scores,base.scores);assert.deepEqual(t.wm.putts,local.putts);
@@ -76,6 +87,12 @@ t=writer();let release;t.hold=new Promise(r=>release=r);const first=t.w.write('p
 t=writer();t.paused=true;assert.equal(await t.w.write('p'),false);assert.equal(t.sends.length,0);
 assert.ok(source.includes('p_stats_only: locked'));assert.ok(source.includes('p_version: backup?.scoringVersion'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
 seed();r=room([{id:'p',user_id:'u',...base}],{viewer:true});await r.load();assert.deepEqual(r.state.players[0].scores,base.scores,'viewer shows server, not stale local backup');assert.deepEqual(draft.loadGameScores('g','p').scores,local.scores,'viewer preserves pending recovery');assert.deepEqual(draft.loadSyncedWatermark('g','p').scores,base.scores,'viewer never acknowledges pending work');
+// 212.50: the game ENDED before this phone's score arrived (BN164): not saved, the queue holds, the player is told —
+// and recovery is NOT dropped (unlike a reset, the scores are kept)
+adapterTest=adapter('late');assert.equal(await adapterTest.send('p',{scores:[4]},false),false,'a late score is not reported as saved');
+assert.equal(adapterTest.env.endedRejectedRef.current,true,'the queue holds for this game');
+assert.deepEqual(adapterTest.events,['bnn-game-ended-rejected'],'the player is told (and no reset is signalled)');
+assert.equal(adapterTest.env.recoveryReadyRef.current,true,'unlike a reset, the kept scores stay recoverable');
 adapterTest=adapter('reset');assert.equal(await adapterTest.send('p',{scores:[4]},false),false);assert.equal(adapterTest.version,7,'original durable version, not new game version');assert.equal(adapterTest.resetEvents,1);assert.equal(adapterTest.env.recoveryReadyRef.current,false);
 // 212.29 (owner, Oct 23, production): Reset scores must not be undone by the in-memory copy of an unsent entry
 {

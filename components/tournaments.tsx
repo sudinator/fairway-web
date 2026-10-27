@@ -65,8 +65,8 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, type GPlayer } from "@/lib/grouping";
-import { notifyError } from "@/components/toast";
+import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, fieldFitsTeamGroups, type GPlayer } from "@/lib/grouping";
+import { notifyError, notifyInfo } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type Course, type CourseTee } from "@/lib/courses";
@@ -121,6 +121,8 @@ import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { CompactTeamEditor } from "@/components/game/compact-team-editor";
+import { byName } from "@/lib/names";
+import { isLateScoreRefusal, lateScoreNotice, lateScoreHold, keepsSideScores } from "@/lib/late-scores";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
@@ -470,11 +472,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
           avatar_url: p.avatar_url ?? null,
           handicap_index: p.handicap_index ?? null,
         }))
-        .sort((a: any, b: any) =>
-          a.display_name.localeCompare(b.display_name, undefined, {
-            sensitivity: "base",
-          }),
-        );
+        .sort(byName);   // 212.48: the shared name rule (lib/names)
       setGroupRoster(roster);
       const mine = roster.find((p) => p.id === user.id);
       if (mine && mine.handicap_index != null) {
@@ -1688,6 +1686,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               ) : (
                 <div data-groups-locked style={{ background: C.greenLight, borderRadius: 14, padding: 16, color: C.sage, fontSize: 12.5, lineHeight: 1.45 }}>
                   <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Groups</div>
+                  {/* 212.47: when the NUMBER of players can't work for this format, say so — the same words as the Players step */}
+                  {teamCounts && !fieldFitsTeamGroups(gameType, draft.players.length) ? (
+                    <div data-groups-wrong-size style={{ color: C.gold, marginBottom: 6 }}>{playerCountHint(gameType as GC.GameTypeOpt, { players: draft.players.length })?.text}</div>
+                  ) : null}
                   Groups open once every player is on a team and both teams have the same, even number of players{oneShort ? <> — or, with an odd number, one more on one side with that side even (4 v 3, 6 v 5) so one group plays 2 v 1</> : null}
                   {teamCounts ? <> — now <b style={{ color: C.cream }}>{teamCounts.names[0]} {teamCounts.counts[0]} v {teamCounts.names[1]} {teamCounts.counts[1]}</b>{teamCounts.unassigned ? <>, {teamCounts.unassigned} without a team</> : null}</> : null}.
                 </div>
@@ -1808,6 +1810,9 @@ function GameRoom({
   const memBackupRef = React.useRef(new Map<string, MemEntry>());
   const clearMemBackups = () => memBackupRef.current.clear();
   const resettingRef = React.useRef(false);
+  // 212.49 (owner, Oct 26): the game ENDED while this phone still had unsent scores — the server refuses them (BN164).
+  // Stop sending for this game (no endless retries), keep them on the phone, and say so once. Cleared on reopen.
+  const endedRejectedRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
   gameRef.current = game;
   // Connectivity flag. Ownership changes (marker takeover / hand-off / switching to
@@ -1908,7 +1913,10 @@ function GameRoom({
     if (!teeGroupsInUse) return;
     setViewGroup((cur) => (cur != null && teeGroupList.includes(cur)) ? cur : (myRow?.tee_group ?? teeGroupList[0] ?? null));
   }, [teeGroupsInUse, myRow?.tee_group, teeGroupList.join(",")]);
-  const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker);
+  // 212.55 (owner, Oct 27): groups whose scoring the ORGANIZER has taken over — the organizer owns their scores until handing back
+  const organizerHolds = (grp: number | null | undefined) => grp != null && (game?.organizer_scoring_groups ?? []).includes(grp);
+  const iAmOrganizer = !!game && game.created_by === user.id;
+  const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && (players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker) || organizerHolds(myRow.tee_group));
   // Roll everyone up to the group card when group scoring turns ON, and drop
   // everyone back to their own scorecard when it turns OFF (disband). Only fires
   // on the transition, so a steady state never fights a manual tab tap. Together
@@ -1924,14 +1932,20 @@ function GameRoom({
   }, [game?.marker_user_id, myGroupHasMarker]);
   const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
   const gameEnded = game?.status === "ended";
+  // 212.54 (owner, Oct 27): after the game has ENDED, its organizer can switch on "Correct scores" and edit ANY score in any
+  // group — logged by the score audit — then re-post the players' rounds once they confirm. Nobody else can (0225).
+  const [correcting, setCorrecting] = useState(false);
+  const correctingScores = gameEnded && game?.created_by === user.id && correcting;
+  const correctingRef = React.useRef(false);
+  correctingRef.current = correctingScores;
   const viewedGroupLocked = teeGroupsInUse && cardPlayers.length > 0 && cardPlayers.some((p) => p.group_locked);
   const myGroupLocked = !!myRow?.group_locked;
   const iAmViewedMarker = !!myRow?.is_marker && myRow?.tee_group != null && myRow?.tee_group === viewGroup;
-  const cardCanEdit = gameEnded ? false : (teeGroupsInUse ? (iAmViewedMarker && !viewedGroupLocked) : (game?.marker_user_id === user.id));
+  const cardCanEdit = correctingScores ? true : gameEnded ? false : (teeGroupsInUse ? (organizerHolds(viewGroup) ? iAmOrganizer && !viewedGroupLocked : iAmViewedMarker && !viewedGroupLocked) : (game?.marker_user_id === user.id));
   const viewedMarkerPlayer = teeGroupsInUse
     ? (players.find((p) => p.tee_group === viewGroup && p.is_marker) || null)
     : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
-  const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
+  const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup && !organizerHolds(viewGroup);
   const claimGroupMarker = async () => {
     if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
@@ -2149,10 +2163,21 @@ function GameRoom({
         alert("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
       }
     };
+    // 212.49: the game ended before this phone's scores reached the server (BN164). Unlike a reset, they are KEPT on
+    // the phone — the organizer can reopen the game and they will sync then. Said once.
+    let endedSaid = false;
+    const endedNotice = async () => {
+      if (!alive || endedSaid) return;
+      endedSaid = true;
+      const holes = countPending() + (gameRef.current && keepsSideScores(gameRef.current.game_type) ? loadAltShotDrafts(gameRef.current.id).length : 0);
+      await load();
+      alert(lateScoreNotice(holes));
+    };
+    window.addEventListener("bnn-game-ended-rejected", endedNotice);
     const dropMem = () => clearMemBackups();   // 212.29: a reset made elsewhere — pre-reset entries are void
     window.addEventListener("bnn-game-reset-rejected", dropMem);
     window.addEventListener("bnn-game-reset-rejected", reloadAfterReset);
-    return () => { alive = false; window.removeEventListener("bnn-game-reset-rejected", dropMem); window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
+    return () => { alive = false; window.removeEventListener("bnn-game-ended-rejected", endedNotice); window.removeEventListener("bnn-game-reset-rejected", dropMem); window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
   }, [load]);
 
   useEffect(() => {
@@ -2305,6 +2330,10 @@ function GameRoom({
     }
     return pushed;
   }, [recomputePending]);
+  // 212.49: the organizer reopened the game — scores this phone kept after the end (BN164) may now sync
+  useEffect(() => {
+    if (game && lateScoreHold({ refused: endedRejectedRef.current, status: game.status }).resume) { endedRejectedRef.current = false; void drainOutbox(); }
+  }, [game?.status, drainOutbox]);
   const syncNow = async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       alert("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
@@ -2324,13 +2353,15 @@ function GameRoom({
     myIsMarker: myRow?.is_marker ?? false,
     gameMarkerUserId: game?.marker_user_id ?? null,
     players,
-  });
+  }) || (!!myRow && organizerHolds(myRow.tee_group) && game?.created_by !== user.id);   // 212.55: the organizer holds my group
   // True when the gross score for a given row is owned by SOMEONE ELSE (a group/tee-group
   // marker, or the whole-game marker) — i.e. this device may write that row's peripheral
   // stats but never its score. Individual scoring returns false (you own your own row).
   const scoreLockedForRow = React.useCallback((rowId: string): boolean => {
     const row = playersRef.current.find((p) => p.id === rowId);
     if (!row) return true;
+    if (correctingRef.current) return false;   // 212.54: the organizer correcting an ended game
+    if (row.tee_group != null && (gameRef.current?.organizer_scoring_groups ?? []).includes(row.tee_group)) return gameRef.current?.created_by !== user.id;   // 212.55
     if (playersRef.current.some(p => p.tee_group != null) && row.tee_group != null) {
       const mk = playersRef.current.find((p) => p.tee_group === row.tee_group && p.is_marker);
       if (mk) return mk.user_id !== user.id;
@@ -2350,7 +2381,7 @@ function GameRoom({
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
     paused: () => {
-      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
+      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", endedRejectedRef.current && "game ended", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
       if (why.length) trace(`held: ${why.join(", ")}`);
       return why.length > 0;
     },
@@ -2368,6 +2399,7 @@ function GameRoom({
         recoveryReadyRef.current = false;
         window.dispatchEvent(new Event("bnn-game-reset-rejected"));
       }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
     },
   });
@@ -2572,6 +2604,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
@@ -2592,6 +2625,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      if (isLateScoreRefusal(error)) { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
@@ -2690,7 +2724,7 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(idxVal, slope, rating, game.course_par)
         : null;
-    await supabase
+    const { error: setupErr } = await supabase
       .from("game_players")
       .update({
         handicap_index: idxVal,
@@ -2700,6 +2734,7 @@ function GameRoom({
         course_handicap: ch,
       })
       .eq("id", me.id);
+    if (!saved(setupErr, "save your handicap")) return;
     setNeedsSetup(false);
     await load();
   };
@@ -2707,6 +2742,14 @@ function GameRoom({
   const setupDecision = (action: SetupAction): SetupDecision => {
     if (!game) return { decision: "block", reason: "Game is not loaded." };
     return decideSetupChange({ game, players, action });
+  };
+  // 212.51 (owner, Oct 26: "It doesn't look like it saved … there is no message either way"): a setup save says when the
+  // server refuses it — in the server's own words — and, where asked, confirms when it lands. Since 0221/0222 the server
+  // refuses what the app refuses; a save that ignored the answer became a silent failure.
+  const saved = (error: { message?: string } | null | undefined, what: string, ok?: string): boolean => {
+    if (error) { notifyError(`Couldn't ${what} — ${error.message || "please try again"}`); return false; }
+    if (ok) notifyInfo(ok);
+    return true;
   };
   const allowSetupChange = (action: SetupAction): boolean => {
     const d = setupDecision(action);
@@ -2729,13 +2772,14 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(idxVal, slope, rating, game.course_par)
         : null;
-    await supabase
+    const { error: hcpErr } = await supabase
       .from("game_players")
       .update({
         handicap_index: idxVal,
         course_handicap: ch,
       })
       .eq("id", p.id);
+    if (!saved(hcpErr, `save ${p.display_name}'s handicap`, `${p.display_name}'s handicap saved${idxVal != null ? ` (index ${idxVal}${ch != null ? `, course handicap ${ch}` : ""})` : ""}.`)) { await load(); return; }
     // Notify the player their game handicap was set by the organizer (if it's not the organizer themselves).
     if (p.user_id && p.user_id !== user.id) {
       try {
@@ -2897,7 +2941,7 @@ function GameRoom({
     if (players.some((p) => (p.scores || []).some((x) => x != null)) || game.alt_shot_scoring_started_at) { notifyError("Scramble settings can't change once scoring has started."); return; }
     const { error } = await supabase.from("games").update({ ...patch, ...(clearTeams ? { foursomes: [] } : {}) }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the scramble settings — please try again."); return; }
-    if (clearTeams) await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: players.map((p) => ({ player: p.id, group: null })) });
+    if (clearTeams) { const { error: clrErr } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: players.map((p) => ({ player: p.id, group: null })) }); saved(clrErr, "clear the scramble groups"); }
     await load();
   };
 
@@ -3023,6 +3067,23 @@ function GameRoom({
   // button (set_tee_groups → syncTeamPlayFoursomes), then for a Trifecta the swap flag is set per
   // foursome so the two singles fall strong v strong and weak v weak. Captains edit afterwards as
   // with any built structure.
+  // 212.46 (owner, Oct 26): Groups → Start over. Only before scores (setup rule "clear_groups" — after that the organizer
+  // resets the scores first); every group cleared, and a team format's 2 v 2 foursomes with them, in ONE transaction.
+  const clearGroups = async () => {
+    if (!game) return;
+    const d = setupDecision({ type: "clear_groups" });
+    if (d.decision === "block") { notifyError((d as { reason?: string }).reason ?? "The groups can't be cleared now."); return; }
+    const grouped = players.filter((p) => p.tee_group != null);
+    if (!grouped.length) return;
+    if (!confirm(`Clear all ${grouped.length} players' groups and start over?`)) return;
+    const nextPlayers = players.map((p) => ({ ...p, tee_group: null }));
+    const foursomes = SO.teamPlayFoursomesAfter(game, nextPlayers);
+    const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [], p_groups: grouped.map((p) => ({ player: p.id, group: null })), p_foursomes: foursomes });
+    if (error) { notifyError("Couldn't clear the groups — nothing was changed. Please try again."); return; }
+    setGroupOverflow([]);
+    await load();
+  };
+
   const balanceMatchups = async () => {
     if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
@@ -3127,7 +3188,8 @@ function GameRoom({
     const patch = value == null
       ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
       : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: user?.id ?? null, course_handicap_set_at: new Date().toISOString() };
-    await supabase.from("game_players").update(patch).eq("id", p.id);
+    const { error: manErr } = await supabase.from("game_players").update(patch).eq("id", p.id);
+    saved(manErr, `save ${p.display_name}'s course handicap`, `${p.display_name}'s course handicap ${value == null ? "cleared" : "saved"}.`);
     await load();
   };
 
@@ -3142,7 +3204,7 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(p.handicap_index, tee.slope, tee.rating, game.course_par)
         : null;
-    await supabase
+    const { error: teeErr } = await supabase
       .from("game_players")
       .update({
         rating: tee.rating,
@@ -3151,6 +3213,7 @@ function GameRoom({
         course_handicap: ch,
       })
       .eq("id", p.id);
+    saved(teeErr, `change ${p.display_name}'s tee`, `${p.display_name} now plays the ${tee.name} tees.`);
     await load();
   };
 
@@ -3184,7 +3247,8 @@ function GameRoom({
     if (!game) return;
     const next = !p.no_show;
     if (!allowSetupChange({ type: "toggle_no_show", player: p, next })) return;
-    await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
+    const { error: nsErr } = await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
+    saved(nsErr, next ? `mark ${p.display_name} out` : `return ${p.display_name} to play`);
     await load();
   };
 
@@ -3201,7 +3265,10 @@ function GameRoom({
         b: (f.b || []).filter((uid) => uid !== removedKey),
       }));
     }
-    if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
+    if (Object.keys(updates).length) {
+      const { error: rmStructErr } = await supabase.from("games").update(updates).eq("id", game.id);
+      if (!saved(rmStructErr, `remove ${p.display_name}`)) { await load(); return; }
+    }
     // Notify BEFORE removing the row, so the organizer<->player relationship the
     // create_notification check relies on still exists at insert time.
     if (p.user_id && p.user_id !== user.id) {
@@ -3212,17 +3279,19 @@ function GameRoom({
         });
       } catch {}
     }
-    await supabase.from("game_players").delete().eq("id", p.id);
+    const { error: rmErr } = await supabase.from("game_players").delete().eq("id", p.id);
+    if (!saved(rmErr, `remove ${p.display_name}`)) { await load(); return; }
     await load();
   };
 
   // Organizer: rename the game.
   const renameGame = async (newName: string) => {
     if (!game || !newName.trim() || !allowSetupChange({ type: "rename_game" })) return;
-    await supabase
+    const { error: nameErr } = await supabase
       .from("games")
       .update({ name: newName.trim() })
       .eq("id", game.id);
+    saved(nameErr, "rename the game");
     await load();
   };
 
@@ -3257,7 +3326,7 @@ function GameRoom({
     if (error) { alert(failureMessage("Couldn't change the date", error)); return; }
     // 208.5: an automatic "Format / Course / Date" name follows the new date (a typed name is kept).
     const nextName = GC.refreshedAutoName(game as any, { date: newDate });
-    if (nextName) await supabase.from("games").update({ name: nextName }).eq("id", game.id);
+    if (nextName) { const { error: renErr } = await supabase.from("games").update({ name: nextName }).eq("id", game.id); saved(renErr, "update the game's name to the new date"); }
     await load();
   };
 
@@ -3267,7 +3336,8 @@ function GameRoom({
     if (!game) return;
     const v = Math.max(0, Math.min(100, Math.round(pct)));
     if ((game.allowance_pct ?? 100) === v || !allowSetupChange({ type: "set_allowance", pct: v })) return;
-    await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
+    const { error: allowErr } = await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
+    saved(allowErr, "change the handicap allowance", `Handicap allowance set to ${v}%.`);
     await load();
   };
 
@@ -3418,7 +3488,8 @@ function GameRoom({
   // Organizer: reopen an ended game if it was ended by mistake.
   const reopenGame = async () => {
     if (!game) return;
-    await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    const { error: reopenErr } = await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    saved(reopenErr, "reopen the game", "Game reopened.");
     await load();
   };
 
@@ -3831,6 +3902,34 @@ function GameRoom({
         <GameRecapCard game={game} players={players} altShotScores={altShotScores} userId={user.id} betStale={betStale}
           competition={competitionLink} onOpenCompetition={onOpenCompetition} />
       )}
+      {/* 212.54: correcting an ENDED game's scores (the organizer only), then the re-post the organizer confirms */}
+      {roomTab === "play" && isEnded && isOrganizer && (
+        <div data-correct-scores style={{ background: C.greenLight, border: `1px solid ${correcting ? C.gold : C.borderGreen}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{correcting ? "Correcting scores" : "Need to fix a score?"}</div>
+          <div style={{ color: C.sage, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+            {correcting
+              ? "Open the Group Card and tap any score, in any group, to change it. Every change is logged in Score history."
+              : "As the organizer you can correct any score after the game has ended. Every change is logged."}
+          </div>
+          <button onClick={() => { setCorrecting((c) => !c); if (!correcting) setCardView(true); }} style={{ ...btn(!correcting), marginTop: 10, fontSize: 13 }}>
+            {correcting ? "Done correcting" : "✎ Correct scores"}
+          </button>
+        </div>
+      )}
+      {roomTab === "play" && isEnded && isOrganizer && game.scores_corrected_at && (!game.rounds_reposted_at || game.scores_corrected_at > game.rounds_reposted_at) && (
+        <div data-repost-rounds style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
+          <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>Scores were corrected after the game ended</div>
+          <div style={{ color: C.cream, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+            The players' posted rounds still show the old scores. Re-post them so everyone's rounds and stats match the corrected card.
+          </div>
+          <button onClick={async () => {
+            if (!confirm("Re-post every player's round for this game from the corrected scores?")) return;
+            const { error } = await supabase.rpc("repost_game_rounds", { p_game: game.id });
+            saved(error, "re-post the rounds", "Rounds re-posted from the corrected scores.");
+            await load();
+          }} style={{ ...btn(true), marginTop: 10, fontSize: 13 }}>Re-post rounds</button>
+        </div>
+      )}
       {roomTab === "play" && betStale && (
         <div style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
           <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>⚠️ Posted bet winnings are out of date</div>
@@ -3919,6 +4018,7 @@ function GameRoom({
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, onSetScrambleTeams: setScrambleTeams, isCompetitionGame: !!competitionLink,
+          onClearGroups: clearGroups,
           // 212.41: a saved draft — tell every player at once (announce_game_players, 0219), which makes it visible to them
           onSendToPlayers: async () => {
             const { error } = await supabase.rpc("announce_game_players", { p_game: game.id });
@@ -4110,7 +4210,7 @@ function GameRoom({
         </div>
       )}
       {roomTab === "setup" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
-      {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
+      {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && !(organizerHolds(myRow?.tee_group) && !iAmOrganizer) && (
         <div style={{ background: "#16302A", border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
@@ -4128,13 +4228,42 @@ function GameRoom({
               {teeGroupList.map((g) => {
                 const grpPlayers = players.filter((p) => p.tee_group === g);
                 const locked = gameEnded || grpPlayers.some((p) => p.group_locked);
-                const hasMarker = grpPlayers.some((p) => p.is_marker);
+                const hasMarker = grpPlayers.some((p) => p.is_marker) || organizerHolds(g);   // 212.55: the organizer counts
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
                     Group {g}{locked ? " 🔒" : hasMarker ? " ✓" : " · needs scorer"}
                   </button>
                 );
               })}
+            </div>
+          )}
+          {/* 212.55 (owner, Oct 27): the organizer takes over any group's scoring (its scorer is told, no permission needed)
+              and hands it back for anyone in the group who chooses to score */}
+          {teeGroupsInUse && viewGroup != null && !gameEnded && !viewedGroupLocked && iAmOrganizer && (
+            organizerHolds(viewGroup) ? (
+              <div data-organizer-holds style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+                <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>You're keeping score for Group {viewGroup}</div>
+                <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>The group's players can still enter their own stats. Hand it back when you're done — anyone in the group can then keep score.</div>
+                <button disabled={!primary || offline} onClick={async () => {
+                  if (!confirm(`Hand back scoring for Group ${viewGroup}? Its players will be told they can keep score again.`)) return;
+                  const { error } = await supabase.rpc("organizer_release_group_scoring", { p_game: game.id, p_group: viewGroup });
+                  saved(error, `hand back Group ${viewGroup}'s scoring`, `Group ${viewGroup} can choose a new scorer.`);
+                  await load();
+                }} style={{ ...btn(false), fontSize: 13, marginTop: 10 }}>Hand back scoring</button>
+              </div>
+            ) : (myRow?.tee_group !== viewGroup || !iAmViewedMarker) ? (
+              <button data-organizer-take-over disabled={!primary || offline} onClick={async () => {
+                const who = viewedMarkerPlayer?.display_name;
+                if (!confirm(`Take over scoring for Group ${viewGroup}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`)) return;
+                const { error } = await supabase.rpc("organizer_take_group_scoring", { p_game: game.id, p_group: viewGroup });
+                saved(error, `take over Group ${viewGroup}'s scoring`, `You're keeping score for Group ${viewGroup}.`);
+                await load();
+              }} style={{ ...btn(false), fontSize: 13, marginTop: 12 }}>Take over scoring for Group {viewGroup}</button>
+            ) : null
+          )}
+          {teeGroupsInUse && viewGroup != null && !gameEnded && !iAmOrganizer && organizerHolds(viewGroup) && (
+            <div data-organizer-holds-notice style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: 14, marginTop: 12, color: C.sage, fontSize: 12.5, lineHeight: 1.5 }}>
+              The organizer is keeping score for Group {viewGroup}. You can still enter your own stats; they'll hand the card back when they're done.
             </div>
           )}
           {canClaimViewed && !viewedMarkerPlayer && (
@@ -4156,7 +4285,7 @@ function GameRoom({
           <GroupScorecard game={game} players={cardPlayers} allPlayers={players} user={user} courseTees={courseTees}
             readOnly={!primary}
             isMarker={primary && cardCanEdit}
-            markerName={viewedMarkerPlayer?.display_name ?? null}
+            markerName={organizerHolds(viewGroup) ? `${players.find((x) => x.user_id === game.created_by)?.display_name ?? "The organizer"} (organizer)` : (viewedMarkerPlayer?.display_name ?? null)}
             onTakeOver={takeOverScoring}
             onRelease={releaseScoring}
             onSetHole={setPlayerHole}
@@ -4165,7 +4294,7 @@ function GameRoom({
             onSetScrambleScore={setScrambleSideHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
-            groupLocked={viewedGroupLocked || gameEnded}
+            groupLocked={correctingScores ? false : (viewedGroupLocked || gameEnded)}
             canClaim={primary && canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}

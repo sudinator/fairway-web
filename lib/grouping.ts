@@ -254,3 +254,13 @@ export function groupShapesOk(gameType: string | null | undefined, groups: [numb
   const short = groups.filter(([x, y]) => !(x === perSide && y === perSide)).length;
   return groups.every(([x, y]) => groupShapeOk(gameType, x, y, short, perSide));
 }
+
+/** 212.47 (owner, Oct 26: "keep it strict"): does a field of n players work for this team format? The teams split as
+ * evenly as possible (ceil / floor). Four-ball and trifecta: 4, 7, 8, 11, 12, 15, 16 …; alternate shot: 4, 8, 12, 16 … */
+export function fieldFitsTeamGroups(gameType: string | null | undefined, n: number): boolean {
+  return n >= 4 && teamSizesFitGroups(gameType, Math.ceil(n / 2), Math.floor(n / 2));
+}
+/** The field sizes that work, for the message ("4, 7, 8, 11, 12, 15 or 16"). */
+export function teamGroupFieldSizes(gameType: string | null | undefined, upTo = 16): number[] {
+  return Array.from({ length: upTo }, (_, i) => i + 1).filter((n) => fieldFitsTeamGroups(gameType, n));
+}

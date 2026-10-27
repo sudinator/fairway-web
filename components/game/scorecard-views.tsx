@@ -1,5 +1,6 @@
 "use client";
 import { scrambleResults } from "@/lib/scramble-game";
+import { sortByName, byName } from "@/lib/names";
 import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
 import { driveTally } from "@/lib/scramble";
 import { shortNamer } from "@/lib/short-names";
@@ -794,7 +795,20 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, onClearGroups, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+/** 212.45/212.46: "Start over" for the groups — clears every group choice. In Manage Game it's allowed only before scores
+ * are entered (the setup rule "clear_groups"); when blocked, tapping it explains how to redo the groups instead. */
+function GroupsStartOver({ onClear, blocked, disabled }: { onClear: () => Promise<void>; blocked?: string | null; disabled?: boolean }) {
+  const [why, setWhy] = React.useState<string | null>(null);
+  return (
+    <>
+      <button data-groups-start-over disabled={disabled} onClick={() => { if (blocked) setWhy(blocked); else { setWhy(null); void onClear(); } }}
+        style={{ ...btn(false), fontSize: 13, marginLeft: 8, opacity: blocked ? 0.75 : 1 }}>Start over</button>
+      {why ? <div data-groups-start-over-blocked style={{ color: C.gold, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>{why}</div> : null}
+    </>
+  );
+}
+
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, onClearGroups, clearGroupsBlocked, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -806,6 +820,8 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   onBalanceMatchups?: () => Promise<void>;
   /** 212.45 (owner, Oct 26): clear every group choice — "if I build balanced groups and don't like it, start over". */
   onClearGroups?: () => Promise<void>;
+  /** Why Start over isn't allowed right now (scores entered) — shown when tapped. */
+  clearGroupsBlocked?: string | null;
 }) {
   const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
   const groupOptions = Array.from({ length: Math.max(2, Math.ceil(players.length / 2) + 1) }, (_, i) => i + 1);
@@ -829,7 +845,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
       return { id: `m${i}`, label: members.map((m) => m.display_name).join(" v ") || `Match ${i + 1}`, members };
     });
   } else {
-    units = players.map((p) => ({ id: p.id, label: p.display_name, members: [p] }));
+    units = sortByName(players).map((p) => ({ id: p.id, label: p.display_name, members: [p] }));   // 212.48: alphabetical
   }
 
   const unitGroup = (u: Unit): number | null => {
@@ -843,7 +859,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
 
   if (teamGroupsOwnStructure && Array.isArray(game.teams) && game.teams.length === 2) {
-    return <TeamGroupsBuilder game={game} players={players} onClearGroups={onClearGroups} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onBalanceMatchups={onBalanceMatchups} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
+    return <TeamGroupsBuilder game={game} players={players} onClearGroups={onClearGroups} clearGroupsBlocked={clearGroupsBlocked} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onBalanceMatchups={onBalanceMatchups} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
   }
 
   return (
@@ -872,6 +888,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
             style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
             {randomizing ? "Shuffling…" : "🎲 Randomize groups"}
           </button>
+          {onClearGroups && players.some((p) => p.tee_group != null) ? <GroupsStartOver onClear={onClearGroups} blocked={clearGroupsBlocked} disabled={randomizing} /> : null}
           <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
             {canRandomize
               ? "Shuffles everyone into balanced foursomes. Guests stay in their sponsor's group. You can still fine-tune below."
@@ -933,7 +950,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
                         {game.teams![si].name} · tees off first
                         <select value={chosen || ""} onChange={(e) => e.target.value && onSetAltShotFirstDriver?.(f.id, side, e.target.value)} style={{ ...inputStyle, width: "100%", marginTop: 3, padding: "8px 12px", fontSize: 12 }}>
                           <option value="">Select player…</option>
-                          {ids.map((id) => <option key={id} value={id}>{byKey(id)?.display_name || id}</option>)}
+                          {[...ids].sort((x, y) => byName({ display_name: byKey(x)?.display_name }, { display_name: byKey(y)?.display_name })).map((id) => <option key={id} value={id}>{byKey(id)?.display_name || id}</option>)}
                         </select>
                       </label>;
                     })}
@@ -949,7 +966,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, onClearGroups, canRandomize, randomizeReason, randomizing }: {
+export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, onClearGroups, clearGroupsBlocked, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -958,6 +975,7 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
   onRandomize?: () => Promise<void>;
   onBalanceMatchups?: () => Promise<void>;
   onClearGroups?: () => Promise<void>;
+  clearGroupsBlocked?: string | null;
   canRandomize: boolean;
   randomizeReason: string;
   randomizing: boolean;
@@ -997,7 +1015,7 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
         style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 12 }}
       >
         <option value="">{current ? "Move to unassigned" : "Select player…"}</option>
-        {choices.sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => <option key={p.id} value={p.id}>{label(p)}{p.tee_group != null && p.id !== current?.id ? ` · Group ${p.tee_group}` : ""}</option>)}
+        {choices.sort(byName).map((p) => <option key={p.id} value={p.id}>{label(p)}{p.tee_group != null && p.id !== current?.id ? ` · Group ${p.tee_group}` : ""}</option>)}
       </select>
     );
   };
@@ -1021,9 +1039,7 @@ export function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltS
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(false), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
           {randomizing ? "Building…" : "🎲 Build even groups"}
         </button>
-        {onClearGroups && players.some((p) => p.tee_group != null) ? (
-          <button data-groups-start-over onClick={() => void onClearGroups()} disabled={randomizing} style={{ ...btn(false), fontSize: 13, marginLeft: 8 }}>Start over</button>
-        ) : null}
+        {onClearGroups && players.some((p) => p.tee_group != null) ? <GroupsStartOver onClear={onClearGroups} blocked={clearGroupsBlocked} disabled={randomizing} /> : null}
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? (game.game_type === "scramble"
           ? `Both buttons make teams of exactly ${perSide} from each side with handicaps spread evenly, one match per group. A starting point — captains can still move anyone afterwards.`
           : "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards.") : randomizeReason}</div>

@@ -218,6 +218,27 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-create-game-announce.sq
 
 # 0220: a saved draft is private at the server until it is sent.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-draft-private.sql"
+
+# 0221: once scoring has started, the server refuses the group changes the app refuses.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-group-changes-after-scores.sql"
+
+# 0222: the server refuses every setup change the app refuses (rules 1–11), and late scores on an ended game.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-setup-locks.sql"
+
+# 0223: who can do what to a game matches the app (organizer; system admins for setup); every game function classified.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-permissions.sql"
+
+# 0226: the organizer takes over any group's scoring and hands it back.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-organizer-group-scoring.sql"
+
+# 0227: who may change a player's score matches the app (the row's owner only).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-score-owner.sql"
+
+# 0228: a round posted from a game can't be changed or deleted directly by its player.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-posted-rounds.sql"
+
+# 0229: is_test and deactivation on a profile are a system admin's.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-profile-flags.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

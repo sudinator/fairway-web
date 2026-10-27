@@ -1,7 +1,7 @@
 /** 212.45 (owner, Oct 26) — an odd field in four-ball or trifecta plays ONE 2 v 1 group, scored as before; alternate
  * shot needs two a side. One rule (lib/grouping) for Create, the Groups editor, Review and Manage Game. */
 import { ok, report } from "./screen-harness";
-import { allowsOneShortGroup, teamSizesFitGroups, groupShapesOk, groupShapeOk, balancedTeamGroups, balancedTeamMatchups } from "@/lib/grouping";
+import { allowsOneShortGroup, teamSizesFitGroups, groupShapesOk, groupShapeOk, balancedTeamGroups, balancedTeamMatchups, teamGroupFieldSizes, fieldFitsTeamGroups } from "@/lib/grouping";
 import { teamGroupLineupProblem } from "@/lib/one-step-create";
 
 ok(allowsOneShortGroup("fourball") && allowsOneShortGroup("trifecta") && !allowsOneShortGroup("alt_shot") && !allowsOneShortGroup("scramble"), "four-ball and trifecta allow one 2 v 1; alternate shot and scramble don't");
@@ -25,4 +25,8 @@ const fs = [{ id: "g1", name: "Group 1", a: ["x1", "x2"], b: ["x3", "x4"], a_fir
 ok(teamGroupLineupProblem("fourball", seven, fs) === null, "Review: a 7-player four-ball with one 2 v 1 group is ready");
 ok(teamGroupLineupProblem("trifecta", seven, fs) === null, "Review: the same in trifecta");
 ok((teamGroupLineupProblem("alt_shot", seven, fs) || "").includes("even number"), "Review: alternate shot with 7 says it needs an even number");
+// 212.47 (owner, Oct 26: "keep it strict"): which field sizes work
+ok(JSON.stringify(teamGroupFieldSizes("fourball")) === "[4,7,8,11,12,15,16]" && JSON.stringify(teamGroupFieldSizes("trifecta")) === "[4,7,8,11,12,15,16]", `four-ball / trifecta: 4, 7, 8, 11, 12, 15, 16 (got ${teamGroupFieldSizes("fourball")})`);
+ok(JSON.stringify(teamGroupFieldSizes("alt_shot")) === "[4,8,12,16]", `alternate shot: 4, 8, 12, 16 (got ${teamGroupFieldSizes("alt_shot")})`);
+ok(!fieldFitsTeamGroups("fourball", 6) && !fieldFitsTeamGroups("fourball", 5) && !fieldFitsTeamGroups("fourball", 9) && !fieldFitsTeamGroups("fourball", 3), "four-ball: 3, 5, 6 and 9 don't work");
 report("odd field");

@@ -107,6 +107,7 @@
   "finish_tee_group_and_post(uuid)": "authenticated",
   "game_added_note(uuid,uuid)": "",
   "game_announced_or_mine(uuid)": "authenticated",
+  "game_scoring_started(uuid)": "",
   "game_setup_line(uuid,uuid)": "",
   "get_admin_analytics()": "authenticated",
   "get_admin_engagement()": "authenticated",
@@ -144,6 +145,8 @@
   "move_expense_event(uuid,uuid)": "authenticated",
   "my_push_delivery_log(integer)": "authenticated",
   "notify_signup_approvers(uuid,text,text)": "",
+  "organizer_release_group_scoring(uuid,smallint)": "authenticated",
+  "organizer_take_group_scoring(uuid,smallint)": "authenticated",
   "pending_course_reviews()": "authenticated",
   "person_label(uuid)": "authenticated",
   "plays_with_guest(uuid,smallint)": "authenticated",
@@ -172,6 +175,7 @@
   "remove_account(uuid,text)": "authenticated",
   "rename_team_competition(uuid,text)": "authenticated",
   "reopen_competition_schedule(uuid,text)": "authenticated",
+  "repost_game_rounds(uuid)": "authenticated",
   "reset_game_scores(uuid)": "authenticated",
   "resolve_friction(uuid,text,text,uuid,boolean)": "authenticated",
   "restore_account(uuid)": "authenticated",
@@ -206,6 +210,7 @@
   "set_tee_group(uuid,smallint)": "authenticated",
   "set_tee_groups(uuid,jsonb)": "authenticated",
   "set_tee_time_captain(uuid,uuid)": "authenticated",
+  "setup_lock_exempt()": "",
   "shares_active_club(uuid)": "authenticated",
   "submit_course_correction(uuid,uuid,text,text,jsonb,text,text)": "authenticated",
   "sweep_friction(boolean)": "authenticated",
@@ -603,10 +608,10 @@
    "using": null
   },
   "games.drafts_private": {
-   "check": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())",
+   "check": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_admin())",
    "cmd": "*",
    "roles": "authenticated",
-   "using": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())"
+   "using": "((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_admin())"
   },
   "games.find or member games": {
    "check": null,

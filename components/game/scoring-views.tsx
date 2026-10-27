@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { sortByName } from "@/lib/names";
 import { foursomeTeeGroupUpdates } from "@/lib/structure-ops";
 import { fmtSkins } from "@/lib/skins-format";
 import { pointsOutlook, outlookLine } from "@/lib/points-outlook";
@@ -465,7 +466,7 @@ function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSav
                 <span style={{ display: "block", color: isTeam ? teamColour(teams![sideIndex], sideIndex) : C.sage, fontSize: 11, fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTeam ? teams![sideIndex].name : `Player ${sideIndex + 1}`}</span>
                 <select aria-label={`Match ${row + 1} player ${sideIndex + 1}`} value={pair[side]} disabled={blocked || busy} onChange={(e) => setSlot(row, side, e.target.value)} style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 11.5 }}>
                   <option value="">Select player…</option>
-                  {choicesFor(side, row).map((p) => <option key={pkey(p)} value={pkey(p)}>{optionLabel(p)}</option>)}
+                  {sortByName(choicesFor(side, row)).map((p) => <option key={pkey(p)} value={pkey(p)}>{optionLabel(p)}</option>)}
                 </select>
               </label>
             </React.Fragment>)}
@@ -647,7 +648,7 @@ export function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130, opacity: matchupsBlocked ? 0.55 : 1 }}
             >
               <option value="">{useTeamPick ? `${teamA!.name}…` : "Player A…"}</option>
-              {(useTeamPick ? players.filter((p) => p.team === teamA!.key) : players).map((p) => (
+              {sortByName(useTeamPick ? players.filter((p) => p.team === teamA!.key) : players).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}{inMatchCount(pkey(p)) > 0 ? " · in a match" : ""}
                 </option>
@@ -661,7 +662,7 @@ export function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130, opacity: matchupsBlocked ? 0.55 : 1 }}
             >
               <option value="">{useTeamPick ? `${teamB!.name}…` : "Player B…"}</option>
-              {(useTeamPick ? players.filter((p) => p.team === teamB!.key) : players.filter((p) => pkey(p) !== aSel)).map((p) => (
+              {sortByName(useTeamPick ? players.filter((p) => p.team === teamB!.key) : players.filter((p) => pkey(p) !== aSel)).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}{inMatchCount(pkey(p)) > 0 ? " · in a match" : ""}
                 </option>
@@ -1264,7 +1265,7 @@ export function FourballView({
                   <select defaultValue="" disabled={foursomesBlocked} onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
                     style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4, opacity: foursomesBlocked ? 0.55 : 1 }}>
                     <option value="">+ Add player…</option>
-                    {unplaced.filter((p) => !isTeam || p.team === (team === "a" ? teams![0].key : teams![1].key)).map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
+                    {sortByName(unplaced.filter((p) => !isTeam || p.team === (team === "a" ? teams![0].key : teams![1].key))).map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
                   </select>
                 )}
               </div>
