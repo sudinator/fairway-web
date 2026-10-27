@@ -1,3 +1,7 @@
+## 212.57.261027 — Permission audit, part 4: posted rounds and profile flags match the app (migrations 0228, 0229)
+
+Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 4 (outside games) begins with the table rules.
+
 ## 212.56.261027 — Permission audit, part 3: who may change a score matches the app (migration 0227)
 
 Owner (Oct 27): in a team match a non-scorer "can also enter their own stats for a team match when they are not a scorer — like FW hit, putts, S / penalty etc. They cannot edit their score."
