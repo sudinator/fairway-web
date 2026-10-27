@@ -65,7 +65,7 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, type GPlayer } from "@/lib/grouping";
+import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, fieldFitsTeamGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -121,6 +121,7 @@ import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { CompactTeamEditor } from "@/components/game/compact-team-editor";
+import { byName } from "@/lib/names";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
@@ -470,11 +471,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
           avatar_url: p.avatar_url ?? null,
           handicap_index: p.handicap_index ?? null,
         }))
-        .sort((a: any, b: any) =>
-          a.display_name.localeCompare(b.display_name, undefined, {
-            sensitivity: "base",
-          }),
-        );
+        .sort(byName);   // 212.48: the shared name rule (lib/names)
       setGroupRoster(roster);
       const mine = roster.find((p) => p.id === user.id);
       if (mine && mine.handicap_index != null) {
@@ -1688,6 +1685,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               ) : (
                 <div data-groups-locked style={{ background: C.greenLight, borderRadius: 14, padding: 16, color: C.sage, fontSize: 12.5, lineHeight: 1.45 }}>
                   <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Groups</div>
+                  {/* 212.47: when the NUMBER of players can't work for this format, say so — the same words as the Players step */}
+                  {teamCounts && !fieldFitsTeamGroups(gameType, draft.players.length) ? (
+                    <div data-groups-wrong-size style={{ color: C.gold, marginBottom: 6 }}>{playerCountHint(gameType as GC.GameTypeOpt, { players: draft.players.length })?.text}</div>
+                  ) : null}
                   Groups open once every player is on a team and both teams have the same, even number of players{oneShort ? <> — or, with an odd number, one more on one side with that side even (4 v 3, 6 v 5) so one group plays 2 v 1</> : null}
                   {teamCounts ? <> — now <b style={{ color: C.cream }}>{teamCounts.names[0]} {teamCounts.counts[0]} v {teamCounts.names[1]} {teamCounts.counts[1]}</b>{teamCounts.unassigned ? <>, {teamCounts.unassigned} without a team</> : null}</> : null}.
                 </div>
@@ -3023,6 +3024,23 @@ function GameRoom({
   // button (set_tee_groups → syncTeamPlayFoursomes), then for a Trifecta the swap flag is set per
   // foursome so the two singles fall strong v strong and weak v weak. Captains edit afterwards as
   // with any built structure.
+  // 212.46 (owner, Oct 26): Groups → Start over. Only before scores (setup rule "clear_groups" — after that the organizer
+  // resets the scores first); every group cleared, and a team format's 2 v 2 foursomes with them, in ONE transaction.
+  const clearGroups = async () => {
+    if (!game) return;
+    const d = setupDecision({ type: "clear_groups" });
+    if (d.decision === "block") { notifyError((d as { reason?: string }).reason ?? "The groups can't be cleared now."); return; }
+    const grouped = players.filter((p) => p.tee_group != null);
+    if (!grouped.length) return;
+    if (!confirm(`Clear all ${grouped.length} players' groups and start over?`)) return;
+    const nextPlayers = players.map((p) => ({ ...p, tee_group: null }));
+    const foursomes = SO.teamPlayFoursomesAfter(game, nextPlayers);
+    const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [], p_groups: grouped.map((p) => ({ player: p.id, group: null })), p_foursomes: foursomes });
+    if (error) { notifyError("Couldn't clear the groups — nothing was changed. Please try again."); return; }
+    setGroupOverflow([]);
+    await load();
+  };
+
   const balanceMatchups = async () => {
     if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
@@ -3919,6 +3937,7 @@ function GameRoom({
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, onSetScrambleTeams: setScrambleTeams, isCompetitionGame: !!competitionLink,
+          onClearGroups: clearGroups,
           // 212.41: a saved draft — tell every player at once (announce_game_players, 0219), which makes it visible to them
           onSendToPlayers: async () => {
             const { error } = await supabase.rpc("announce_game_players", { p_game: game.id });

@@ -5,7 +5,7 @@
  */
 import type { GameTypeOpt } from "./game-create";
 import { scrambleTeamSizes } from "./scramble-teams";
-import { groupShapesOk, allowsOneShortGroup } from "./grouping";
+import { groupShapesOk, allowsOneShortGroup, fieldFitsTeamGroups, teamGroupFieldSizes } from "./grouping";
 import type { CreateGameSection } from "@/components/game/setup/create-game-workspace";
 
 /** Formats whose Create flow is one step. Moved family by family, each after the owner approves it on staging. */
@@ -37,6 +37,22 @@ function describeSizes(sizes: number[]): string {
  * chosen on the Teams step ("Every player"), or each player is a captain ("Captains only"). */
 export function playerCountHint(t: GameTypeOpt, o: { players: number; captains?: boolean; scrambleMode?: "field" | "match" }): { text: string; ok: boolean } | null {
   const n = o.players;
+  if (isTeamGroupOneStep(t)) {
+    // 212.47 (owner, Oct 26: keep it strict): say up front whether this many players works for the format
+    const label = t === "alt_shot" ? "Alternate shot" : t === "trifecta" ? "Trifecta" : "Four-ball";
+    const sizes = teamGroupFieldSizes(t);
+    const list = `${sizes.slice(0, -1).join(", ")} or ${sizes[sizes.length - 1]}`;
+    if (!fieldFitsTeamGroups(t, n)) {
+      // the nearest sizes that work, either side
+      const up = sizes.find((x) => x > n), down = [...sizes].reverse().find((x) => x < n);
+      const fix = [up ? `add ${up - n === 1 ? "1 player" : `${up - n} players`} (for ${up})` : null, down ? `remove ${n - down === 1 ? "1" : n - down} (for ${down})` : null].filter(Boolean).join(" or ");
+      return { text: `${label} works with ${list} players${t === "alt_shot" ? " (two pairs a group)" : ""} — you have ${n}: ${fix}.`, ok: false };
+    }
+    const a = Math.ceil(n / 2), b = Math.floor(n / 2), groups = Math.ceil(a / 2);
+    return a === b
+      ? { text: `${n} players: two teams of ${a}, ${groups} group${groups === 1 ? "" : "s"} of 2 v 2.`, ok: true }
+      : { text: `${n} players: teams of ${a} and ${b} — ${groups} groups, one of them 2 v 1${t === "trifecta" ? " (the lone player plays a single against each opponent)" : " (the lone player's ball against the pair's best ball)"}.`, ok: true };
+  }
   if (t !== "scramble") return null;
   if (n < 2) return { text: "Add players — a scramble needs at least two.", ok: false };
   if (o.captains) return { text: `${word(n, "captain")} — each one keeps score for a whole team. Their teammates don't need the app.`, ok: true };

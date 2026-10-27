@@ -1,3 +1,18 @@
+## 212.48.261026 — Names listed alphabetically by first name, everywhere players are picked
+
+Owner (Oct 26): "when picking teams, rather than a random order, make it alphabetical by name so it is easier to find on the screen … even when you list names, make it alphabetical from first name."
+
+## 212.47.261026 — Players keep their place; field sizes said up front; the server freezes groups once scoring starts (migration 0221)
+
+Owner (Oct 26):
+**Team card: players keep their place.** Giving someone a team no longer moves them to the bottom — the list stays in the order players were added (it used to sort "no team yet" first). Test: assigning or clearing never moves anyone.
+**Four-ball with 6 players (owner: "keep it strict").** Four-ball and trifecta work with 4, 7, 8, 11, 12, 15 or 16 players (equal even teams, or one more on one side for the single 2 v 1 group); alternate shot with 4, 8, 12 or 16. Now said UP FRONT on the Players step — e.g. "Four-ball works with 4, 7, 8, 11, 12, 15 or 16 players — you have 6: add 1 player (for 7) or remove 2 (for 4)"; when it works: "7 players: teams of 4 and 3 — 2 groups, one of them 2 v 1 (…)" — and the locked Groups note says the same. lib/grouping fieldFitsTeamGroups / teamGroupFieldSizes (the one rule).
+**Migration 0221 — group changes after scoring, refused at the server** (owner: yes). One trigger on game_players covers every route that changes a group (set_tee_group, set_tee_groups, apply_game_structure, direct updates) and mirrors the app's setup rule: a scramble or alternate-shot game whose team scoring has started — groups frozen; a player with scores, or whose group has finished and locked — their group frozen; nobody moved into a finished, locked group. A late player with no scores can still join an active group; resetting the scores frees everything; maintenance work without a signed-in caller is unaffected. Before this the server refused team changes for scored players but not group changes. Test: ci/assert-group-changes-after-scores.sql (through the app's own group functions, with the organizer's scoring device as in the app); negative-tested (without the trigger a scored player is moved). Full migration chain + every assertion pass on local PostgreSQL 16; the permission contract is unchanged (the trigger function is callable by no one).
+
+## 212.46.261025 — Manage Game → Groups → Start over (only before scores)
+
+Owner (Oct 26): Start over for the groups in Manage Game too, "subject to no scores being entered. If there are scores entered then you need to tell the organizer to reset scores and then can redo groups."
+
 ## 212.45.261025 — The Teams step: the organizer picks; names saved on Save; start over; odd numbers play one 2 v 1
 
 Owner feedback (Oct 26) on the four-ball / trifecta / alternate shot Teams step, all addressed:

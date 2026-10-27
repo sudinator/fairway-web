@@ -1,3 +1,33 @@
+## 212.48.261026 — Names listed alphabetically by first name, everywhere players are picked
+
+Owner (Oct 26): "when picking teams, rather than a random order, make it alphabetical by name so it is easier to find on the screen … even when you list names, make it alphabetical from first name."
+
+ONE rule, lib/names (sortByName / byName — by the name as written, so first name first, ignoring capitals and accents), for every setup list of players to pick from: the **team card** (Create and Manage Game), the **scramble Teams** list, the **groups list** for individual formats (single players; groups and matches keep their order), the **matchup pickers** (match play, 1:1 skins), the 2 v 2 **"+ Add player"** picker, **alternate shot's first-driver** picker, and the team-group slot picker. Create's club roster (Players step) and Manage Game's Players list were already alphabetical — they now use the same rule. Alphabetical order is fixed, so nobody moves when given a team.
+Also: the balance note ("Team 1 54 · Team 2 53") clears when the teams are renamed, instead of naming the old teams.
+Guard: ci/check_alphabetical_pickers.py (11 setup lists use lib/names). Tests: lib/names (3) — first name, capitals and accents ignored, ties by the rest of the name; lib/compact-team-editor — alphabetical, and assigning never moves anyone. An older guard that pinned the Players list's sort text now pins the shared rule.
+
+No migration. Deploy: code only (0221 from 212.47 is still needed if not yet applied).
+
+## 212.47.261026 — Players keep their place; field sizes said up front; the server freezes groups once scoring starts (migration 0221)
+
+Owner (Oct 26):
+**Team card: players keep their place.** Giving someone a team no longer moves them to the bottom — the list stays in the order players were added (it used to sort "no team yet" first). Test: assigning or clearing never moves anyone.
+**Four-ball with 6 players (owner: "keep it strict").** Four-ball and trifecta work with 4, 7, 8, 11, 12, 15 or 16 players (equal even teams, or one more on one side for the single 2 v 1 group); alternate shot with 4, 8, 12 or 16. Now said UP FRONT on the Players step — e.g. "Four-ball works with 4, 7, 8, 11, 12, 15 or 16 players — you have 6: add 1 player (for 7) or remove 2 (for 4)"; when it works: "7 players: teams of 4 and 3 — 2 groups, one of them 2 v 1 (…)" — and the locked Groups note says the same. lib/grouping fieldFitsTeamGroups / teamGroupFieldSizes (the one rule).
+**Migration 0221 — group changes after scoring, refused at the server** (owner: yes). One trigger on game_players covers every route that changes a group (set_tee_group, set_tee_groups, apply_game_structure, direct updates) and mirrors the app's setup rule: a scramble or alternate-shot game whose team scoring has started — groups frozen; a player with scores, or whose group has finished and locked — their group frozen; nobody moved into a finished, locked group. A late player with no scores can still join an active group; resetting the scores frees everything; maintenance work without a signed-in caller is unaffected. Before this the server refused team changes for scored players but not group changes. Test: ci/assert-group-changes-after-scores.sql (through the app's own group functions, with the organizer's scoring device as in the app); negative-tested (without the trigger a scored player is moved). Full migration chain + every assertion pass on local PostgreSQL 16; the permission contract is unchanged (the trigger function is callable by no one).
+
+**Deploy: apply migration 0221 to production FIRST** (after 0218–0220; SQL editor, "Run without RLS"), then staging, then the pull request. Then check_what_is_applied.sql: 0185–0221 all "applied".
+
+## 212.46.261025 — Manage Game → Groups → Start over (only before scores)
+
+Owner (Oct 26): Start over for the groups in Manage Game too, "subject to no scores being entered. If there are scores entered then you need to tell the organizer to reset scores and then can redo groups."
+
+**Start over** sits beside "Build balanced matchups / Build even groups" (team formats) and "Randomize groups" (individual formats) once any groups exist. Before scores: it confirms, then clears every group — and a team format's 2 v 2 foursomes with them — in ONE transaction (apply_game_structure); the teams stay as they are. After scores (or once a group has finished and locked): tapping it explains instead — "Scores have been entered, so the groups can't be cleared. Reset the scores first (Game → Reset scores), then you can redo the groups." One rule decides it: the setup policy's new "clear_groups" action (lib/game-setup-policy), used by the button and re-checked by the handler.
+Checked on a real database: clearing a four-ball's groups leaves 0 players grouped, 0 foursomes, and every team choice kept.
+Tests: lib/groups-start-over (6) — allowed before scores; blocked with scores or a locked group, with the reset-scores wording; the button clears when allowed and only explains when blocked.
+Note: the server refuses TEAM changes for a player with scores, but group changes are protected by the app's setup rules only (as for every group action today) — raised with the owner.
+
+No migration. Deploy: code only.
+
 ## 212.45.261025 — The Teams step: the organizer picks; names saved on Save; start over; odd numbers play one 2 v 1
 
 Owner feedback (Oct 26) on the four-ball / trifecta / alternate shot Teams step, all addressed:

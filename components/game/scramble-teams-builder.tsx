@@ -5,6 +5,7 @@
 // when their last player moves. "Make balanced teams of 2 / 3 / 4" is a shortcut. Captains only: each player is their
 // own team. (A Ryder Cup scramble builds its matches in Setup → Groups — 212.5.) Saving also sets tee groups.
 import React, { useState } from "react";
+import { sortByName } from "@/lib/names";
 import { C } from "@/lib/golf";
 import { btn, inputStyle } from "@/components/ui";
 import { chBasis, pkey, scrambleMethodOf } from "@/lib/game-shape";
@@ -119,7 +120,7 @@ export function ScrambleTeamsBuilder({ game, players, readOnly, onSave }: {
       {/* PLAYERS — one column, a team selector on the right */}
       <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>PLAYERS</div>
       <div data-scramble-players style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 6 }}>
-        {live.map((p, i) => {
+        {sortByName(live).map((p, i) => {   /* 212.48: alphabetical by first name */
           const k = pkey(p), at = slotOf(k);
           return (
             <div key={p.id} data-scramble-player={p.display_name} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: i ? 8 : 0, paddingTop: i ? 8 : 0, borderTop: i ? `1px solid ${C.borderGreen}` : "none" }}>

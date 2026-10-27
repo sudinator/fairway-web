@@ -1,5 +1,6 @@
 "use client";
 import { ScrambleSettings, type ScramblePatch } from "@/components/game/scramble-settings";
+import { byName } from "@/lib/names";
 import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
@@ -224,10 +225,7 @@ export function OrganizerPanel({
   // Setup rosters use a deliberate, stable alphabetical order. Never rely on PostgreSQL
   // return order: updating a row can change its physical tuple position and otherwise make
   // that player appear to jump in the UI after a tee/handicap/team edit.
-  const orderedPlayers = useMemo(() => [...players].sort((a, b) =>
-    (a.display_name || "").localeCompare(b.display_name || "", undefined, { sensitivity: "base" }) ||
-    a.id.localeCompare(b.id),
-  ), [players]);
+  const orderedPlayers = useMemo(() => [...players].sort((a, b) => byName(a, b) || a.id.localeCompare(b.id)), [players]);   // 212.48: the shared name rule
   // Members already in this game can sponsor a walk-up guest (keeps them together when grouping).
   const gameMembers = orderedPlayers.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
 

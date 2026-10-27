@@ -238,6 +238,26 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
     r.unmount();
   }
 
+  // ── 212.47 (owner, Oct 26: keep it strict): SIX players in four-ball don't work — said on Players and on Groups ──
+  {
+    window.localStorage.clear();
+    const e = document.createElement("div"); document.body.appendChild(e);
+    const r = createRoot(e);
+    await act(async () => { r.render(<CreateGame user={ME} displayName="Amit Sud" activeGroupId="00000000-0000-0000-0000-00000000c1b0" onCancel={() => {}} onCreated={() => {}} />); });
+    await flush();
+    await clickText(e, "Oak Hollow"); await clickText(e, "Continue");
+    await clickText(e, "Match play"); await clickText(e, "Team"); await clickText(e, "Four-ball");
+    await clickText(e, "Continue");
+    for (const name of ["Raj Mehta", "Nihar Shah", "Karan Patel", "Sam Lee", "Vikram Rao"]) await clickText(e, name, "label");
+    const hint = e.querySelector("[data-player-count-hint]")?.textContent || "";
+    ok(hint.includes("Four-ball works with 4, 7, 8, 11, 12, 15 or 16 players — you have 6: add 1 player (for 7) or remove 2 (for 4)"), `six in four-ball: the Players step says so up front ("${hint}")`);
+    await clickText(e, "Continue");
+    await clickText(e, "Balance by handicap");
+    const lock = e.querySelector("[data-groups-wrong-size]")?.textContent || "";
+    ok(!!e.querySelector("[data-groups-locked]") && lock.includes("you have 6"), `six in four-ball: 3 v 3 keeps the groups locked, saying why ("${lock.slice(0, 90)}")`);
+    r.unmount();
+  }
+
   // ── 212.45 (owner, Oct 26): SEVEN players — four-ball plays one 2 v 1 group; alternate shot needs an even number ──
   for (const fmt of ["Four-ball", "Alternate Shot"] as const) {
     window.localStorage.clear();

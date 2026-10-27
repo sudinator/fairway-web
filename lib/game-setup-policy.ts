@@ -19,6 +19,7 @@ export type SetupAction =
   | { type: "set_team"; player: Player; team: string | null }
   | { type: "set_tee_group"; player: Player; group: number | null }
   | { type: "randomize_groups" }
+  | { type: "clear_groups" }   // 212.46: Manage Game → Groups → Start over
   | { type: "set_format"; target: GameType }
   | { type: "set_match_length"; length: "18" | "front9" | "back9" }
   | { type: "set_allowance"; pct: number }
@@ -179,6 +180,13 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
           "Scoring is already underway. This is allowed only because this player has no scores and the target group is still active.",
         );
       }
+      return allow();
+    }
+    case "clear_groups": {
+      // 212.46 (owner, Oct 26): Start over clears every group — only before scores are entered; after that the organizer
+      // resets the scores first, then redoes the groups.
+      if (players.some((p) => p.group_locked)) return block("A tee group has already finished and is locked, so the groups can't be cleared. Reset the scores first (Game → Reset scores), then you can redo the groups.");
+      if (anyScores) return block("Scores have been entered, so the groups can't be cleared. Reset the scores first (Game → Reset scores), then you can redo the groups.");
       return allow();
     }
     case "randomize_groups": {

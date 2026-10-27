@@ -37,6 +37,8 @@ export type GameSetupWorkspaceProps = {
   courseOptions: Course[];
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  /** 212.46: Groups → Start over — clear every group (only before scores; see the setup rule "clear_groups"). */
+  onClearGroups?: () => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   /** 211.1: save a scramble's teams (games.foursomes + tee groups). */
   onSetScrambleTeams?: (groups: ScrambleGroup[]) => Promise<void>;
@@ -90,6 +92,7 @@ export function GameSetupWorkspace({
   isCompetitionGame = false,
   courseTees = [],
   onSendToPlayers,
+  onClearGroups,
 }: GameSetupWorkspaceProps) {
   // 212.41 (owner, Oct 25): a saved draft is the organizer's alone until sent; nothing can be shared before that.
   const draft = isDraftGame(game);
@@ -350,7 +353,8 @@ export function GameSetupWorkspace({
               onRenameTeams={organizerPanelProps.onRenameTeams} onSetTeamColours={organizerPanelProps.onSetTeamColours}
               isBlocked={(p) => { const d = decideSetupChange({ game, players, action: { type: "set_team", player: p, team: null } } as never); return d.decision === "block" ? (d as { reason?: string }).reason ?? "Can't change team now." : null; }} />
           ))}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}
+            onClearGroups={onClearGroups} clearGroupsBlocked={(() => { const d = decideSetupChange({ game, players, action: { type: "clear_groups" } } as never); return d.decision === "block" ? (d as { reason?: string }).reason ?? null : null; })()} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && (isScramble
             ? <div style={cardStyle}><ScrambleTeamsBuilder game={game} players={players} readOnly={anyScores || !onSetScrambleTeams} onSave={(g) => onSetScrambleTeams?.(g)} /></div>
             : <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>)}

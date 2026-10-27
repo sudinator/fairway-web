@@ -45,8 +45,8 @@ checks = [
     (workspace, 'onClick={organizerPanelProps.onDelete}', "Delete Game must live in Game danger zone"),
     (organizer, 'section?: "players" | "teams" | "format";', "OrganizerPanel must expose the separated Format surface"),
     (organizer, 'const orderedPlayers = useMemo(() => [...players].sort((a, b) =>', "setup roster order must be explicit rather than database-return order"),
-    (organizer, '(a.display_name || "").localeCompare(b.display_name || "", undefined, { sensitivity: "base" }) ||', "setup roster must sort alphabetically, case-insensitively"),
-    (organizer, 'a.id.localeCompare(b.id),', "setup roster ordering must have a stable id tie-breaker"),
+    # 212.48: the shared name rule (lib/names byName — alphabetical by first name, ignoring capitals), with the id tie-breaker
+    (organizer, '[...players].sort((a, b) => byName(a, b) || a.id.localeCompare(b.id))', "setup roster must sort alphabetically (lib/names), with a stable id tie-breaker"),
     (organizer, '{orderedPlayers.map((p) => {', "player editor must render the canonical alphabetical roster"),
     (organizer, 'display: section === "format" ? "none" : undefined', "Format surface must not duplicate the player editor"),
     (organizer, '{section === "format" && (', "competition/scoring mutations must remain reachable from Format"),

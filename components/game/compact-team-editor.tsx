@@ -6,6 +6,7 @@
  * team colours (the app's own picker) — owner: "want the ability to name the teams … and to pick colors".
  */
 import React from "react";
+import { sortByName } from "@/lib/names";
 import { C, applyAllowance } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
 import { teamColour, readableInk } from "@/lib/game-colors";
@@ -30,7 +31,8 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
     border: `1px solid ${primary ? C.gold : C.borderGreen}`, borderRadius: 999, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
   const plays = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
   const live = players.filter((p) => !p.no_show);
-  const sorted = [...live].sort((a, b) => Number(!!a.team) - Number(!!b.team) || plays(a) - plays(b));
+  // 212.48 (owner, Oct 26): alphabetical by first name — easy to find, and nobody moves when given a team
+  const sorted = sortByName(live);
   return (
     <div data-compact-teams style={{ background: C.greenLight, borderRadius: 14, padding: 16 }}>
       {/* the two sides: each one's colour (tap the dot — the app's own picker; picking the other side's colour swaps them),
@@ -65,7 +67,7 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
               <button data-save-names onClick={async () => {
                 const fallback: [string, string] = [teams[0]?.name ?? "Team 1", teams[1]?.name ?? "Team 2"];
                 const next: [string, string] = [names[0].trim() || fallback[0], names[1].trim() || fallback[1]];
-                setNames(null); await onRenameTeams(next);
+                setNames(null); setMsg(null); await onRenameTeams(next);   // the balance note named the old teams
               }} style={{ ...pill(true) }}>Save names</button>
               <button onClick={() => setNames(null)} style={{ ...pill(false) }}>Cancel</button>
             </>
