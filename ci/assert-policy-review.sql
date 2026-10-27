@@ -51,8 +51,14 @@ begin
   execute 'reset role'; perform public.claim_scoring_device('20700000-0000-0000-0000-0000000000f1'); execute 'set local role authenticated';
   perform set_config('request.headers', '{"x-bnn-scoring-device":"20700000-0000-0000-0000-0000000000f1"}', true);
 
+  -- 0222 (owner, Oct 26: rule 1): an ENDED game can't be changed — not even by the organizer — until it is reopened
+  begin delete from game_players where id = guest; ok := false; exception when others then ok := sqlerrm like '%has ended%'; end;
+  if not ok then raise exception 'the organizer removed a guest from an ENDED game (it must be reopened first)'; end if;
+  execute 'reset role'; perform set_config('request.jwt.claim.sub', '', true);
+  update games set status = 'active' where id = gm;   -- reopened
+  perform set_config('request.jwt.claim.sub', adm::text, true); execute 'set local role authenticated';
   delete from game_players where id = guest; get diagnostics n = row_count;
-  if n <> 1 then raise exception 'the organizer could not remove a guest after the game ended'; end if;
+  if n <> 1 then raise exception 'the organizer could not remove a guest once the game was reopened'; end if;
   -- 2. badges: read your own, never create one
   perform set_config('request.jwt.claim.sub', p1::text, true);
   if (select count(*) from member_badges where user_id = p1) <> 1 then raise exception 'a member cannot read their own badge'; end if;
@@ -82,5 +88,5 @@ begin
   delete from game_players where game_id = gm; delete from games where id = gm;
   delete from group_members where group_id in (ga, gb, gc); delete from groups where id in (ga, gb, gc);
   delete from profiles where id in (adm, p1, p2, o); delete from auth.users where id in (adm, p1, p2, o);
-  raise notice 'POLICY_REVIEW_PASS guests only by their group (not after the end; organizer always); badges read-only; activity by meaning; club deletions recorded';
+  raise notice 'POLICY_REVIEW_PASS guests only by their group (not after the end; the organizer once reopened); badges read-only; activity by meaning; club deletions recorded';
 end $$;

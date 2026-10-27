@@ -1,3 +1,7 @@
+## 212.49.261026 — The server enforces every setup rule the app does; late scores after the end are refused (migration 0222)
+
+Owner (Oct 26): "doesn't it make sense to do a full inventory of offline functionality and ensure that the server side is handled similarly in order to keep the app in sync?" — then "Yes, enforce rules 1–11" and, for scores that arrive after a game has ended, "Refuse them: once ended, scores only change if the organizer reopens".
+
 ## 212.48.261026 — Names listed alphabetically by first name, everywhere players are picked
 
 Owner (Oct 26): "when picking teams, rather than a random order, make it alphabetical by name so it is easier to find on the screen … even when you list names, make it alphabetical from first name."

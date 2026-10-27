@@ -1809,6 +1809,9 @@ function GameRoom({
   const memBackupRef = React.useRef(new Map<string, MemEntry>());
   const clearMemBackups = () => memBackupRef.current.clear();
   const resettingRef = React.useRef(false);
+  // 212.49 (owner, Oct 26): the game ENDED while this phone still had unsent scores — the server refuses them (BN164).
+  // Stop sending for this game (no endless retries), keep them on the phone, and say so once. Cleared on reopen.
+  const endedRejectedRef = React.useRef(false);
   const gameRef = React.useRef<Game | null>(game);
   gameRef.current = game;
   // Connectivity flag. Ownership changes (marker takeover / hand-off / switching to
@@ -2150,10 +2153,21 @@ function GameRoom({
         alert("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
       }
     };
+    // 212.49: the game ended before this phone's scores reached the server (BN164). Unlike a reset, they are KEPT on
+    // the phone — the organizer can reopen the game and they will sync then. Said once.
+    let endedSaid = false;
+    const endedNotice = async () => {
+      if (!alive || endedSaid) return;
+      endedSaid = true;
+      const holes = countPending() + (gameRef.current && (gameRef.current.game_type === "alt_shot" || gameRef.current.game_type === "scramble") ? loadAltShotDrafts(gameRef.current.id).length : 0);
+      await load();
+      alert(`This game has ended, so ${holes > 0 ? `${holes} ${holes === 1 ? "score" : "scores"} on this phone weren't` : "the latest scores on this phone weren't"} added. They're kept on this phone — ask the organizer to reopen the game if they should count.`);
+    };
+    window.addEventListener("bnn-game-ended-rejected", endedNotice);
     const dropMem = () => clearMemBackups();   // 212.29: a reset made elsewhere — pre-reset entries are void
     window.addEventListener("bnn-game-reset-rejected", dropMem);
     window.addEventListener("bnn-game-reset-rejected", reloadAfterReset);
-    return () => { alive = false; window.removeEventListener("bnn-game-reset-rejected", dropMem); window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
+    return () => { alive = false; window.removeEventListener("bnn-game-ended-rejected", endedNotice); window.removeEventListener("bnn-game-reset-rejected", dropMem); window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
   }, [load]);
 
   useEffect(() => {
@@ -2306,6 +2320,10 @@ function GameRoom({
     }
     return pushed;
   }, [recomputePending]);
+  // 212.49: the organizer reopened the game — scores this phone kept after the end (BN164) may now sync
+  useEffect(() => {
+    if (game && game.status !== "ended" && endedRejectedRef.current) { endedRejectedRef.current = false; void drainOutbox(); }
+  }, [game?.status, drainOutbox]);
   const syncNow = async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       alert("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
@@ -2351,7 +2369,7 @@ function GameRoom({
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
     paused: () => {
-      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
+      const why = [!isPrimaryScoringDevice() && "not the scorer", !recoveryReadyRef.current && "recovery not ready", resettingRef.current && "reset in progress", endedRejectedRef.current && "game ended", (typeof navigator !== "undefined" && !navigator.onLine) && "offline"].filter(Boolean);
       if (why.length) trace(`held: ${why.join(", ")}`);
       return why.length > 0;
     },
@@ -2369,6 +2387,7 @@ function GameRoom({
         recoveryReadyRef.current = false;
         window.dispatchEvent(new Event("bnn-game-reset-rejected"));
       }
+      if (error?.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
     },
   });
@@ -2573,6 +2592,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      if (error.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
@@ -2593,6 +2613,7 @@ function GameRoom({
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) {
       if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      if (error.code === "BN164") { endedRejectedRef.current = true; window.dispatchEvent(new Event("bnn-game-ended-rejected")); }
       setSyncState("error"); return;
     }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);

@@ -14,7 +14,9 @@ begin
     values (gid,'ATOM','Atomic','C','fourball','active',grp,org,'[{"key":"A","name":"Red"},{"key":"B","name":"Blue"}]','[]',
             (select jsonb_agg(jsonb_build_object('n',i,'par',4,'si',i)) from generate_series(1,18) i), 72, 100);
   insert into game_players(id,game_id,display_name,team,tee_group,scores) values
-    (p1,gid,'P1','A',1,'[]'),(p2,gid,'P2','A',1,'[]'),(p3,gid,'P3','B',1,'[]'),(p4,gid,'P4','B',1,'[4,null]');
+    (p1,gid,'P1','A',1,'[]'),(p2,gid,'P2','A',1,'[]'),(p3,gid,'P3','B',1,'[]'),(p4,gid,'P4','B',1,'[]');
+  -- 0222: P4's score is entered AFTER the line-up is saved below — the app (and now the server) freezes foursomes once
+  -- anyone has scored, so the line-up is saved first, as it would be in a real round.
 
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', org::text, true);
@@ -31,6 +33,11 @@ begin
   execute 'reset role';
   if (select team from game_players where id = p1) <> 'A' then raise exception 'partial save: P1 moved although the batch failed'; end if;
   if (select foursomes->0->>'id' from games where id = gid) <> 'f1' then raise exception 'partial save: foursomes replaced although the batch failed'; end if;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', org::text, true);
+  -- P4 now posts a score (as the app's scoring would)
+  execute 'reset role'; perform set_config('request.jwt.claim.sub', '', true);
+  update game_players set scores = '[4,null]' where id = p4;
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', org::text, true);
   -- A scored player cannot change team.
