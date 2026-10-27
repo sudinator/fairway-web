@@ -582,7 +582,15 @@ export function OrganizerPanel({
             </div>
           )}
 
-          {section === "players" && (onAddMember || onAddGuest) && (
+          {/* 212.51 (owner, Oct 26: "I can still enter details for a guest … no message either way"): when adding isn't
+              allowed (a team contest once scoring starts, an ended game), say WHY in place of the forms — the disabled
+              button looked enabled and its reason was a hover tooltip, which phones never show. */}
+          {section === "players" && (onAddMember || onAddGuest) && blocked({ type: "add_player", guest: true }) && (
+            <div data-add-blocked style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 12, color: C.gold, fontSize: 13, lineHeight: 1.45 }}>
+              {reasonFor({ type: "add_player", guest: true })}
+            </div>
+          )}
+          {section === "players" && (onAddMember || onAddGuest) && !blocked({ type: "add_player", guest: true }) && (
             <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 12 }}>
               {onAddMember && eligibleMembers.length > 0 && (
                 <>
@@ -619,7 +627,7 @@ export function OrganizerPanel({
                       onClick={async () => {
                         if (onAddGuest) { await onAddGuest(addGuestName, parseFloat(addGuestHcp), addGuestSponsor || user.id); setAddGuestName(""); setAddGuestHcp(""); setAddGuestSponsor(""); }
                       }}
-                      style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
+                      style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" && !blocked({ type: "add_player", guest: true }) ? 1 : 0.5 }}
                     >+ Add guest</button>
                   </div>
                 </>

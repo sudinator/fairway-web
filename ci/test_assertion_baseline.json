@@ -1,7 +1,8 @@
 {
-  "total": 440030,
+  "total": 440034,
   "suites": {
     "(unnamed suites)": 514,
+    "add player blocked": 4,
     "ai-sanitize": 11,
     "all allocators": 253,
     "alt shot": 73,

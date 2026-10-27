@@ -66,7 +66,7 @@ import {
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, fieldFitsTeamGroups, type GPlayer } from "@/lib/grouping";
-import { notifyError } from "@/components/toast";
+import { notifyError, notifyInfo } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type Course, type CourseTee } from "@/lib/courses";
@@ -2713,7 +2713,7 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(idxVal, slope, rating, game.course_par)
         : null;
-    await supabase
+    const { error: setupErr } = await supabase
       .from("game_players")
       .update({
         handicap_index: idxVal,
@@ -2723,6 +2723,7 @@ function GameRoom({
         course_handicap: ch,
       })
       .eq("id", me.id);
+    if (!saved(setupErr, "save your handicap")) return;
     setNeedsSetup(false);
     await load();
   };
@@ -2730,6 +2731,14 @@ function GameRoom({
   const setupDecision = (action: SetupAction): SetupDecision => {
     if (!game) return { decision: "block", reason: "Game is not loaded." };
     return decideSetupChange({ game, players, action });
+  };
+  // 212.51 (owner, Oct 26: "It doesn't look like it saved … there is no message either way"): a setup save says when the
+  // server refuses it — in the server's own words — and, where asked, confirms when it lands. Since 0221/0222 the server
+  // refuses what the app refuses; a save that ignored the answer became a silent failure.
+  const saved = (error: { message?: string } | null | undefined, what: string, ok?: string): boolean => {
+    if (error) { notifyError(`Couldn't ${what} — ${error.message || "please try again"}`); return false; }
+    if (ok) notifyInfo(ok);
+    return true;
   };
   const allowSetupChange = (action: SetupAction): boolean => {
     const d = setupDecision(action);
@@ -2752,13 +2761,14 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(idxVal, slope, rating, game.course_par)
         : null;
-    await supabase
+    const { error: hcpErr } = await supabase
       .from("game_players")
       .update({
         handicap_index: idxVal,
         course_handicap: ch,
       })
       .eq("id", p.id);
+    if (!saved(hcpErr, `save ${p.display_name}'s handicap`, `${p.display_name}'s handicap saved${idxVal != null ? ` (index ${idxVal}${ch != null ? `, course handicap ${ch}` : ""})` : ""}.`)) { await load(); return; }
     // Notify the player their game handicap was set by the organizer (if it's not the organizer themselves).
     if (p.user_id && p.user_id !== user.id) {
       try {
@@ -2920,7 +2930,7 @@ function GameRoom({
     if (players.some((p) => (p.scores || []).some((x) => x != null)) || game.alt_shot_scoring_started_at) { notifyError("Scramble settings can't change once scoring has started."); return; }
     const { error } = await supabase.from("games").update({ ...patch, ...(clearTeams ? { foursomes: [] } : {}) }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the scramble settings — please try again."); return; }
-    if (clearTeams) await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: players.map((p) => ({ player: p.id, group: null })) });
+    if (clearTeams) { const { error: clrErr } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: players.map((p) => ({ player: p.id, group: null })) }); saved(clrErr, "clear the scramble groups"); }
     await load();
   };
 
@@ -3167,7 +3177,8 @@ function GameRoom({
     const patch = value == null
       ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
       : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: user?.id ?? null, course_handicap_set_at: new Date().toISOString() };
-    await supabase.from("game_players").update(patch).eq("id", p.id);
+    const { error: manErr } = await supabase.from("game_players").update(patch).eq("id", p.id);
+    saved(manErr, `save ${p.display_name}'s course handicap`, `${p.display_name}'s course handicap ${value == null ? "cleared" : "saved"}.`);
     await load();
   };
 
@@ -3182,7 +3193,7 @@ function GameRoom({
       game.course_par != null
         ? courseHandicap(p.handicap_index, tee.slope, tee.rating, game.course_par)
         : null;
-    await supabase
+    const { error: teeErr } = await supabase
       .from("game_players")
       .update({
         rating: tee.rating,
@@ -3191,6 +3202,7 @@ function GameRoom({
         course_handicap: ch,
       })
       .eq("id", p.id);
+    saved(teeErr, `change ${p.display_name}'s tee`, `${p.display_name} now plays the ${tee.name} tees.`);
     await load();
   };
 
@@ -3224,7 +3236,8 @@ function GameRoom({
     if (!game) return;
     const next = !p.no_show;
     if (!allowSetupChange({ type: "toggle_no_show", player: p, next })) return;
-    await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
+    const { error: nsErr } = await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
+    saved(nsErr, next ? `mark ${p.display_name} out` : `return ${p.display_name} to play`);
     await load();
   };
 
@@ -3241,7 +3254,10 @@ function GameRoom({
         b: (f.b || []).filter((uid) => uid !== removedKey),
       }));
     }
-    if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
+    if (Object.keys(updates).length) {
+      const { error: rmStructErr } = await supabase.from("games").update(updates).eq("id", game.id);
+      if (!saved(rmStructErr, `remove ${p.display_name}`)) { await load(); return; }
+    }
     // Notify BEFORE removing the row, so the organizer<->player relationship the
     // create_notification check relies on still exists at insert time.
     if (p.user_id && p.user_id !== user.id) {
@@ -3252,17 +3268,19 @@ function GameRoom({
         });
       } catch {}
     }
-    await supabase.from("game_players").delete().eq("id", p.id);
+    const { error: rmErr } = await supabase.from("game_players").delete().eq("id", p.id);
+    if (!saved(rmErr, `remove ${p.display_name}`)) { await load(); return; }
     await load();
   };
 
   // Organizer: rename the game.
   const renameGame = async (newName: string) => {
     if (!game || !newName.trim() || !allowSetupChange({ type: "rename_game" })) return;
-    await supabase
+    const { error: nameErr } = await supabase
       .from("games")
       .update({ name: newName.trim() })
       .eq("id", game.id);
+    saved(nameErr, "rename the game");
     await load();
   };
 
@@ -3297,7 +3315,7 @@ function GameRoom({
     if (error) { alert(failureMessage("Couldn't change the date", error)); return; }
     // 208.5: an automatic "Format / Course / Date" name follows the new date (a typed name is kept).
     const nextName = GC.refreshedAutoName(game as any, { date: newDate });
-    if (nextName) await supabase.from("games").update({ name: nextName }).eq("id", game.id);
+    if (nextName) { const { error: renErr } = await supabase.from("games").update({ name: nextName }).eq("id", game.id); saved(renErr, "update the game's name to the new date"); }
     await load();
   };
 
@@ -3307,7 +3325,8 @@ function GameRoom({
     if (!game) return;
     const v = Math.max(0, Math.min(100, Math.round(pct)));
     if ((game.allowance_pct ?? 100) === v || !allowSetupChange({ type: "set_allowance", pct: v })) return;
-    await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
+    const { error: allowErr } = await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
+    saved(allowErr, "change the handicap allowance", `Handicap allowance set to ${v}%.`);
     await load();
   };
 
@@ -3458,7 +3477,8 @@ function GameRoom({
   // Organizer: reopen an ended game if it was ended by mistake.
   const reopenGame = async () => {
     if (!game) return;
-    await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    const { error: reopenErr } = await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    saved(reopenErr, "reopen the game", "Game reopened.");
     await load();
   };
 

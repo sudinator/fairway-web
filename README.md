@@ -1,3 +1,7 @@
+## 212.51.261026 — No more silent saves: refused changes say why, edits confirm, and the add-player forms show the reason
+
+Owner (Oct 26, testing staging): "Once the game has started, I can still enter details for a guest, including their handicap. It doesn't look like it saved successfully, there is no message either way."
+
 ## 212.50.261026 — The phone's late-score handling, tested
 
 Owner (Oct 26): "have you done automated testing on 212.49? if not do it". 212.49 had the full CI, every database test from a fresh database, and preflight — but the PHONE's reaction to a refused late score was only checked as present in the code, not run. Now it is: the decisions moved verbatim into lib/late-scores (which code means "the game has ended", the one-time message, hold while ended / resume on reopen, which formats keep team scores) and the game screen applies them on all three scoring routes (player scores, scramble and alternate-shot team scores).
