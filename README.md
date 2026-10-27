@@ -1,3 +1,7 @@
+## 212.53.261027 — Permission audit, part 1: what a player can change on player rows matches the app (migration 0224)
+
+Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 1 of 4 (players' own rows; then every direct save by role, the scoring roles, and clubs / membership / Money / tee times / profiles).
+
 ## 212.52.261027 — Game setup is the organizer's (and system admins'), not every club admin's; who-can-do-what is tested (migration 0223)
 
 Owner (Oct 26): "a club admin can save a game's teams and groups even if they are not a part of the game? that doesn't make sense" → "Organizer + system admins only (match the app)", and "audit 'who can do what' and add it to the sync check".

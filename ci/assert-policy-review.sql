@@ -32,14 +32,17 @@ begin
   perform set_config('request.headers', '{"x-bnn-scoring-device":"20700000-0000-0000-0000-0000000000f4"}', true);
   delete from game_players where id = guest; get diagnostics n = row_count;
   if n <> 0 then raise exception 'a club member not in the game removed the guest'; end if;
-  begin insert into game_players(game_id, user_id, display_name, is_guest, tee_group) values (gm, null, 'Sneaky', true, 1); ok := false; exception when others then ok := sqlerrm like '%row-level security%'; end;
+  begin insert into game_players(game_id, user_id, display_name, is_guest, tee_group) values (gm, null, 'Sneaky', true, 1); ok := false; exception when others then ok := true; end;   -- refused (0224: only the organizer adds guests)
   if not ok then raise exception 'a club member not in the game added a guest'; end if;
   perform set_config('request.jwt.claim.sub', p1::text, true);
   execute 'reset role'; perform public.claim_scoring_device('20700000-0000-0000-0000-0000000000f2'); execute 'set local role authenticated';
   perform set_config('request.headers', '{"x-bnn-scoring-device":"20700000-0000-0000-0000-0000000000f2"}', true);
-  insert into game_players(game_id, user_id, display_name, is_guest, tee_group) values (gm, null, 'Second Guest', true, 1);
-  delete from game_players where game_id = gm and display_name = 'Second Guest'; get diagnostics n = row_count;
-  if n <> 1 then raise exception 'a player in the guest''s group could not remove their guest'; end if;
+  -- 0224 (owner, Oct 26: "lets do this the right way"): the app lets only the ORGANIZER add or remove guests — a player in
+  -- the guest's group can't either (they still score the guest: ci/assert-guest-scoring.sql)
+  begin insert into game_players(game_id, user_id, display_name, is_guest, tee_group) values (gm, null, 'Second Guest', true, 1); ok := false; exception when others then ok := sqlerrm like '%Only the organizer can add%'; end;
+  if not ok then raise exception 'a player in the guest''s group added a guest (only the organizer may)'; end if;
+  begin delete from game_players where id = guest; get diagnostics n = row_count; ok := n = 0; exception when others then ok := sqlerrm like '%Only the organizer can remove%'; end;
+  if not ok then raise exception 'a player in the guest''s group removed the guest (only the organizer may)'; end if;
   execute 'reset role';
   update games set status = 'ended' where id = gm;
   execute 'set local role authenticated';
@@ -88,5 +91,5 @@ begin
   delete from game_players where game_id = gm; delete from games where id = gm;
   delete from group_members where group_id in (ga, gb, gc); delete from groups where id in (ga, gb, gc);
   delete from profiles where id in (adm, p1, p2, o); delete from auth.users where id in (adm, p1, p2, o);
-  raise notice 'POLICY_REVIEW_PASS guests only by their group (not after the end; the organizer once reopened); badges read-only; activity by meaning; club deletions recorded';
+  raise notice 'POLICY_REVIEW_PASS guests added and removed only by the organizer (once reopened, if ended); badges read-only; activity by meaning; club deletions recorded';
 end $$;

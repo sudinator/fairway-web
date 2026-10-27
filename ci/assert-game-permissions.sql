@@ -76,6 +76,53 @@ begin
   end loop;
   if bad is distinct from '' then raise exception 'WHO-CAN-DO-WHAT mismatch:%', bad; end if;
 
+  -- ── 0224 (212.53): DIRECT saves to player rows — a player who isn't the organizer can only do what the app offers ──
+  declare
+    mem uuid := '22300000-0000-0000-0000-0000000000a3';
+    direct text; ok_rows int;
+  begin
+    -- the player's handicap is set (as the organizer's setup would); a guest plays in the player's group
+    perform pg_temp.as_maintenance();
+    update public.game_players set course_handicap = 12, handicap_index = 10.2, tee_group = 1 where id = prow;
+    update public.game_players set tee_group = 1 where game_id = g;
+    insert into public.game_players(id, game_id, display_name, is_guest, tee_group) values ('22302000-0000-0000-0000-000000000009', g, 'Guest', true, 1);
+    for act in select * from (values
+      -- (what, who may: O = organizer only, P = the player too, the SQL as the app — or someone bypassing it — would send)
+      ('player changes own handicap (already set)', 'O', format('update public.game_players set handicap_index = 1, course_handicap = 0 where id = %L', prow)),
+      ('player changes own team',                   'O', format('update public.game_players set team = ''A'' where id = %L', prow)),
+      ('player marks self no-show',                 'O', format('update public.game_players set no_show = true where id = %L', prow)),
+      ('player renames own row',                    'O', format('update public.game_players set display_name = ''Tiger'' where id = %L', prow)),
+      ('player changes own tee',                    'O', format('update public.game_players set tee_name = ''Red'', rating = 70, slope = 120 where id = %L', prow)),
+      ('player edits the guest''s handicap',        'O', format('update public.game_players set handicap_index = 3 where id = %L', '22302000-0000-0000-0000-000000000009')),
+      ('player adds a guest',                       'O', format('insert into public.game_players(game_id, display_name, is_guest, tee_group) values (%L, ''Pal'', true, 1)', g)),
+      ('player removes the guest',                  'O', format('delete from public.game_players where id = %L', '22302000-0000-0000-0000-000000000009')),
+      ('player removes themselves',                 'O', format('delete from public.game_players where id = %L', prow)),
+      ('player scores own card',                    'P', format('select public.save_game_score_bundle(%L::uuid, %s, %L::jsonb, false)', prow, (select scoring_version from public.games where id = g), '{"scores":[5]}'))
+    ) as a(what, who, q) loop
+      foreach i in array array[1, 2] loop
+        perform pg_temp.as_user(people[i]);
+        -- a direct write that matches no row (hidden by the table rules) counts as refused
+        direct := case when act.q like 'update%' or act.q like 'delete%' then format('do $y$ declare n int; begin %s; get diagnostics n = row_count; if n = 0 then raise exception ''no row''; end if; end $y$', act.q) else act.q end;
+        got := pg_temp.allowed(direct);
+        perform pg_temp.as_maintenance();
+        want := i = 1 or act.who = 'P';
+        if got is distinct from want then bad := bad || format(E'\n  %s: %s was %s (expected %s)', act.what, names[i], case when got then 'ALLOWED' else 'refused' end, case when want then 'allowed' else 'refused' end); end if;
+      end loop;
+    end loop;
+    -- "Complete your setup": with the handicap MISSING the player fills it in once; after that it's set
+    update public.game_players set course_handicap = null, handicap_index = null where id = prow;
+    perform pg_temp.as_user(pl);
+    got := pg_temp.allowed(format('do $y$ declare n int; begin update public.game_players set handicap_index = 8.4, course_handicap = 10, tee_name = ''Blue'', rating = 72, slope = 130 where id = %L; get diagnostics n = row_count; if n = 0 then raise exception ''no row''; end if; end $y$', prow));
+    perform pg_temp.as_maintenance();
+    if not got then bad := bad || E'\n  complete your setup: the player could not fill in their missing handicap'; end if;
+    -- joining: a club member joins with the standard fields; not with a team (or a handicap) already set
+    perform pg_temp.as_user(mem);
+    if not pg_temp.allowed(format('insert into public.game_players(game_id, user_id, display_name, rating, slope, tee_name, bets, is_marker, group_locked, scores) values (%L, %L, ''Member'', 72, 130, ''Blue'', true, false, false, ''[]''::jsonb)', g, mem)) then bad := bad || E'\n  joining: a club member could not join with the standard fields'; end if;
+    if pg_temp.allowed(format('insert into public.game_players(game_id, user_id, display_name, team, course_handicap) values (%L, %L, ''Member'', ''A'', 0)', g, mem)) then bad := bad || E'\n  joining: a member joined with a team and handicap already set'; end if;
+    perform pg_temp.as_maintenance();
+  end;
+  if bad is distinct from '' then raise exception 'WHO-CAN-DO-WHAT mismatch (direct saves):%', bad; end if;
+
   -- THE REGISTER: every game function signed-in members can call is classified (and, if it changes setup, tested above)
   select string_agg(p.proname, ', ' order by p.proname) into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -98,6 +145,6 @@ begin
        -- the club's Money tab (club admins manage money; not game setup)
        'save_bet_expense_atomic', 'delete_bet_expense_atomic');
   if bad is not null then raise exception 'UNCLASSIFIED game functions (decide who may call them, test it, and list them here): %', bad; end if;
-  raise notice 'GAME_PERMISSIONS_PASS 13 actions x 6 people match the app (organizer; system admin for the six setup rules; a club admin not in the game can''t); every game function is classified';
+  raise notice 'GAME_PERMISSIONS_PASS 13 actions x 6 people + 10 direct saves match the app (organizer; system admin for the six setup rules; a club admin not in the game can''t); every game function is classified';
 end $$;
 rollback;
