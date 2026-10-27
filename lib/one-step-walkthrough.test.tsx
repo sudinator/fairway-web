@@ -51,7 +51,7 @@ const clickText = async (el: HTMLElement, text: string, sel = "button") => {
   if (!t) throw new Error(`no ${sel} with "${text}" — screen says: ${(el.textContent || "").slice(0, 300)}`);
   await act(async () => { t.click(); }); await flush(3);
 };
-const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) => (b.textContent || "").replace(/^[0-9✓]+/, "").trim()).filter((x) => ["Course", "Game", "Players", "Teams", "Review"].includes(x));
+const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) => (b.textContent || "").replace(/^[0-9✓]+/, "").trim()).filter((x) => ["Course", "Game", "Players", "Teams", "Matchups", "Groups", "Review"].includes(x));
 
 (async () => {
   const el = document.createElement("div"); document.body.appendChild(el);
@@ -60,7 +60,8 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
   await act(async () => { root.render(<CreateGame user={ME} displayName="Amit Sud" activeGroupId="00000000-0000-0000-0000-00000000c1b0" onCancel={() => {}} onCreated={(...a: unknown[]) => { created = a; }} />); });
   await flush();
   // 1. GAME: course, date, tee — the first thing chosen
-  ok(JSON.stringify(stepBar(el)) === JSON.stringify(["Course", "Game", "Players", "Review"]), `steps before a format is picked: Course, Game, Players, Review (got ${stepBar(el).join(", ")})`);
+  // 212.59: the default format (Stableford) is one-step, so a Groups step shows from the start — every format has five steps now
+  ok(JSON.stringify(stepBar(el)) === JSON.stringify(["Course", "Game", "Players", "Groups", "Review"]), `steps before a format is picked: Course, Game, Players, Groups, Review (got ${stepBar(el).join(", ")})`);
   await clickText(el, "Oak Hollow");
   ok(!(el.textContent || "").includes("Your handicap index"), "the Course step has no 'your handicap index' field (owner, Oct 25)");
   ok(!(el.textContent || "").includes("Game name"), "Game name is not on the Course step (owner, Oct 25)");
@@ -300,7 +301,7 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
     r.unmount();
   }
   // ── 212.58: MATCH PLAY (individual and team) and SKINS, one step — matchups built inside Create ──
-  for (const shape of ["Individual match", "Team match", "Individual skins"] as const) {
+  for (const shape of ["Individual match", "Team match", "Individual skins", "Stableford", "Stroke play"] as const) {
     window.localStorage.clear();
     const e = document.createElement("div"); document.body.appendChild(e);
     const r = createRoot(e);
@@ -308,17 +309,23 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
     await flush();
     await clickText(e, "Oak Hollow"); await clickText(e, "Continue");
     if (shape === "Individual skins") { await clickText(e, "Stroke play"); await clickText(e, "Skins"); }
+    else if (shape === "Stableford" || shape === "Stroke play") { await clickText(e, "Stroke play"); await clickText(e, shape); }
     else { await clickText(e, "Match play"); await clickText(e, "Individual"); if (shape === "Team match") await clickText(e, "Team match", "label"); }   // team match play = singles + the "Team match" switch
-    ok(JSON.stringify(stepBar(e)) === JSON.stringify(["Course", "Game", "Players", "Teams", "Review"]), `${shape}: one step — a Teams step before Review (got ${stepBar(e).join(", ")})`);
+    // 212.59: the step is named for what it holds — Teams, Matchups (individual match play) or Groups
+    const stepName = shape === "Team match" ? "Teams" : shape === "Individual match" ? "Matchups" : "Groups";
+    ok(JSON.stringify(stepBar(e)) === JSON.stringify(["Course", "Game", "Players", stepName, "Review"]), `${shape}: one step — a ${stepName} step before Review (got ${stepBar(e).join(", ")})`);
     if (shape === "Team match") ok(!e.querySelector('input[placeholder="Team 1 name"]') && (e.textContent || "").includes("name the teams"), "team match: the teams are named on the Teams step, not here");
     await clickText(e, "Continue");
-    for (const name of ["Raj Mehta", "Nihar Shah", "Karan Patel"]) await clickText(e, name, "label");   // 4 players with me
+    // 212.61: six players for Stableford and individual match play — more than four, so groups are REQUIRED
+    const six = shape === "Stableford" || shape === "Individual match";
+    for (const name of six ? ["Raj Mehta", "Nihar Shah", "Karan Patel", "Sam Lee", "Vikram Rao"] : ["Raj Mehta", "Nihar Shah", "Karan Patel"]) await clickText(e, name, "label");
     const hint = e.querySelector("[data-player-count-hint]")?.textContent || "";
-    ok(shape === "Individual skins" ? hint.includes("individual skins") : shape === "Team match" ? hint.includes("two teams of 2") : hint.includes("2 matches"), `${shape}: the Players hint reads the count (got "${hint}")`);
+    ok(shape === "Individual skins" ? hint.includes("individual skins") : shape === "Team match" ? hint.includes("two teams of 2") : shape === "Individual match" ? hint.includes("3 matches") : shape === "Stableford" ? hint.includes("2 groups of 3 or 4") : hint.includes("one group"), `${shape}: the Players hint reads the count (got "${hint}")`);
     await clickText(e, "Continue");
     ok(!!e.querySelector("[data-match-one-step]"), `${shape}: the Teams step is the match-play one`);
     ok(!!e.querySelector("[data-compact-teams]") === (shape === "Team match"), `${shape}: the compact team card ${shape === "Team match" ? "is" : "isn't"} there`);
-    ok([...e.querySelectorAll("button")].some((b) => (b.textContent || "").includes("Build balanced matches")) === (shape !== "Individual skins"), `${shape}: the matchups builder ${shape === "Individual skins" ? "isn't" : "is"} there`);
+    const hasMatchups = shape === "Individual match" || shape === "Team match";
+    ok([...e.querySelectorAll("button")].some((b) => (b.textContent || "").includes("Build balanced matches")) === hasMatchups, `${shape}: the matchups builder ${hasMatchups ? "is" : "isn't"} there`);
     if (shape === "Team match") {
       await clickText(e, "Continue");
       const rv0 = e.querySelector("[data-one-step-review]")?.textContent || "";
@@ -326,26 +333,62 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
       await clickText(e, "Teams");
       await clickText(e, "Balance by handicap");
     }
-    if (shape !== "Individual skins") {
+    if (hasMatchups) {
       await clickText(e, "Continue");
       const rv1 = e.querySelector("[data-one-step-review]")?.textContent || "";
       ok(rv1.includes("matchups") || rv1.includes("Pair everyone up"), `${shape}: Review is blocked until the matchups are set (got "${rv1.slice(0, 160)}")`);
-      await clickText(e, "Teams");
+      await clickText(e, stepName);
       await clickText(e, "Build balanced matches");
+    }
+    if (shape === "Individual match") {
+      // 212.60 (owner, Oct 27): a MATCHUP is the unit of a group — put a match in Group 1, then move it to Group 2: BOTH
+      // players move; Start over is offered for the matchups and for the groups; a split match blocks Review
+      const unitSelect = () => [...e.querySelectorAll("select")].find((sel) => [...(sel as HTMLSelectElement).options].some((o) => o.textContent === "No group")) as HTMLSelectElement;
+      const pick = async (sel: HTMLSelectElement, value: string) => { await act(async () => { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }); await flush(3); };
+      await pick(unitSelect(), "1");
+      const grouped = () => [...e.querySelectorAll("select")].filter((sel) => [...(sel as HTMLSelectElement).options].some((o) => o.textContent === "No group")).map((sel) => (sel as HTMLSelectElement).value);
+      ok(grouped()[0] === "1", `individual match: the first match went into Group 1 (got ${JSON.stringify(grouped())})`);
+      await pick(unitSelect(), "2");
+      ok(grouped()[0] === "2", `individual match: moving the match to Group 2 moved BOTH players — the match stays one unit (got ${JSON.stringify(grouped())})`);
+      ok(!!e.querySelector("[data-matchups-start-over]") && !!e.querySelector("[data-groups-start-over]"), "individual match: Start over is offered for the matchups and for the groups");
+      await clickText(e, "Continue");
+      const rvG = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(rvG.includes("3 matches") && rvG.includes("Put everyone in a group"), `individual match: a grouped match but four players still without one — Review says so (got "${rvG.slice(0, 200)}")`);
+      await clickText(e, stepName);
+      await clickText(e, "Start over", "button[data-groups-start-over]");
+      ok(grouped().every((v) => v === ""), "individual match: Start over clears the groups");
+      // 212.61: six players need groups — Review is blocked until everyone is in one; "Build groups" seats the matches two to a group
+      await clickText(e, "Continue");
+      const rvN = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(rvN.includes("Put everyone in a group"), `individual match: with 6 players Review is blocked until everyone is in a group (got "${rvN.slice(0, 160)}")`);
+      await clickText(e, stepName);
+      await clickText(e, "Build groups");
+      ok(JSON.stringify(grouped()) === JSON.stringify(["1", "1", "2"]), `individual match: Build groups seats the three matches two to a group (got ${JSON.stringify(grouped())})`);
+    }
+    if (shape === "Stableford") {
+      // 212.61: six players — Review blocked until everyone is grouped; Build even groups makes threes and fours; Start over clears
+      await clickText(e, "Continue");
+      const rvS = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(rvS.includes("Put everyone in a group — 6 players"), `stableford: Review is blocked until everyone is in a group (got "${rvS.slice(0, 160)}")`);
+      await clickText(e, stepName);
+      await clickText(e, "Randomize groups");
+      const groupsOf = () => [...e.querySelectorAll("select")].filter((sel) => [...(sel as HTMLSelectElement).options].some((o) => o.textContent === "No group")).map((sel) => (sel as HTMLSelectElement).value);
+      ok(groupsOf().length === 6 && groupsOf().every((v) => v !== "") && new Set(groupsOf()).size === 2, `stableford: six players into two groups of three (got ${JSON.stringify(groupsOf())})`);
+      ok(!!e.querySelector("[data-groups-start-over]"), "stableford: Start over is offered once groups are built");
     }
     await clickText(e, "Continue");
     const rv = e.querySelector("[data-one-step-review]")?.textContent || "";
-    ok(shape === "Individual skins" ? rv.includes("Not set (optional)") : rv.includes("2 matches"), `${shape}: Review is ready (got "${rv.slice(0, 200)}")`);
+    ok(hasMatchups ? rv.includes(shape === "Individual match" ? "3 matches" : "2 matches") : six ? rv.includes("2 groups") : rv.includes("One group (4 or fewer)"), `${shape}: Review is ready (got "${rv.slice(0, 200)}")`);
     const createBtn = [...e.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Create game") as HTMLButtonElement;
     ok(!!createBtn && !createBtn.disabled, `${shape}: Create game is enabled`);
     calls.length = 0;
     await clickText(e, "Create game");
     const b = calls.find((x) => x.url.includes("/rpc/create_game_complete"))?.body as { p_game?: { game_type?: string; pairings?: unknown[]; teams?: unknown[] | null }; p_players?: unknown[]; p_teams?: unknown[] } | undefined;
-    const wantType = shape === "Individual skins" ? "skins" : "match";
-    ok(!!b && b.p_game?.game_type === wantType && (b.p_players ?? []).length === 4
-      && (shape === "Individual skins" ? !(b.p_game?.pairings ?? []).length : (b.p_game?.pairings ?? []).length === 2)
+    const wantType = shape === "Individual skins" ? "skins" : shape === "Stableford" ? "stableford" : shape === "Stroke play" ? "stroke" : "match";
+    ok(!!b && b.p_game?.game_type === wantType && (b.p_players ?? []).length === (six ? 6 : 4)
+      && (hasMatchups ? (b.p_game?.pairings ?? []).length === (six ? 3 : 2) : !(b.p_game?.pairings ?? []).length)
       && (b.p_teams ?? []).length === (shape === "Team match" ? 4 : 0),
-      `${shape}: ONE call — the game, 4 players, ${shape === "Individual skins" ? "no" : "2"} matchups, ${shape === "Team match" ? "4 team places" : "no teams"} (got ${JSON.stringify({ t: b?.p_game?.game_type, p: b?.p_players?.length, pr: b?.p_game?.pairings?.length, tm: b?.p_teams?.length })})`);
+      `${shape}: ONE call — the game, ${six ? 6 : 4} players, ${hasMatchups ? (six ? "3" : "2") : "no"} matchups, ${shape === "Team match" ? "4 team places" : "no teams"} (got ${JSON.stringify({ t: b?.p_game?.game_type, p: b?.p_players?.length, pr: b?.p_game?.pairings?.length, tm: b?.p_teams?.length })})`);
     r.unmount();
   }
 

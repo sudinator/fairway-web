@@ -808,7 +808,7 @@ function GroupsStartOver({ onClear, blocked, disabled }: { onClear: () => Promis
   );
 }
 
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, onClearGroups, clearGroupsBlocked, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetUnitGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, onClearGroups, clearGroupsBlocked, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -819,6 +819,8 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
   onBalanceMatchups?: () => Promise<void>;
   /** 212.45 (owner, Oct 26): clear every group choice — "if I build balanced groups and don't like it, start over". */
+  /** 212.61: move every member of a unit in one save (Manage Game: one server call; Create: one draft change). */
+  onSetUnitGroup?: (members: Player[], group: number | null) => Promise<void>;
   onClearGroups?: () => Promise<void>;
   /** Why Start over isn't allowed right now (scores entered) — shown when tapped. */
   clearGroupsBlocked?: string | null;
@@ -852,7 +854,9 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
     const gs = Array.from(new Set(u.members.map((m) => m.tee_group ?? null)));
     return gs.length === 1 ? gs[0] : null;
   };
+  // 212.61: a unit (a matchup, a foursome) moves as ONE save when the caller offers it; otherwise member by member
   const assign = async (u: Unit, g: number | null) => {
+    if (onSetUnitGroup && u.members.length > 1) { await onSetUnitGroup(u.members, g); return; }
     for (const m of u.members) await onSetTeeGroup(m, g);
   };
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
@@ -880,6 +884,14 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
         </div>
       )}
 
+      {/* 212.60 (owner, Oct 27): match play — the units are the matchups, so no shuffle (it would split them), but Start over */}
+      {!!pairings.length && (onRandomize || onClearGroups) ? (
+        <div style={{ marginTop: 12 }}>
+          {onRandomize ? <button data-build-match-groups onClick={() => { if (canRandomize) onRandomize(); }} disabled={!canRandomize || randomizing}
+            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>{randomizing ? "Building…" : "🎲 Build groups — two matches each"}</button> : null}
+          {onClearGroups && players.some((p) => p.tee_group != null) ? <GroupsStartOver onClear={onClearGroups} blocked={clearGroupsBlocked} disabled={randomizing} /> : null}
+        </div>
+      ) : null}
       {onRandomize && (teamGroupsOwnStructure || !foursomes.length) && !pairings.length && (
         <div style={{ marginTop: 12 }}>
           <button

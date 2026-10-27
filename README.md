@@ -1,3 +1,15 @@
+## 212.61.261027 — Groups are required above four players; a unit moves as one save in every format
+
+Owner (Oct 27): "make sure this logic works for other formats as well … go through all formats"; "why are groups optional? if there are 10 players playing stableford don't they need to be grouped into foursomes?"
+
+## 212.60.261027 — Match play in Create: a matchup moves as one unit; Start over for matchups and groups; a split match blocks Review
+
+Owner (Oct 27, testing 212.58/212.59): "If I create a singles match and then assign that match group 1, and subsequently change it to group 2, it only moves 1 player instead of the paired matchup … I cannot clear it out or fix it"; "the teams button is yellow but review is green"; "There is no start over button for build balanced matches or groups".
+
+## 212.59.261027 — Phase 4 complete: Stableford and stroke play in the one-step Create flow — every format is one step
+
+Owner (Oct 24–25): a game is created only when fully set up. With Stableford and stroke play, every club format now goes through the one-step flow (scramble 212.41, the four-ball family 212.43, match play and skins 212.58). Ryder Cup sessions keep the old flow.
+
 ## 212.58.261027 — Phase 4 part 2: match play and skins in the one-step Create flow
 
 Owner (Oct 24–25): a game is created only when fully set up. Scramble (212.41) and the four-ball family (212.43) went first; now MATCH PLAY (individual and team) and SKINS (individual and team 1:1) — the 2 v 2 team skins variant is reached through four-ball and was already one-step. Ryder Cup sessions keep the old flow.

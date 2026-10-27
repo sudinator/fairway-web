@@ -1,3 +1,34 @@
+## 212.61.261027 — Groups are required above four players; a unit moves as one save in every format
+
+Owner (Oct 27): "make sure this logic works for other formats as well … go through all formats"; "why are groups optional? if there are 10 players playing stableford don't they need to be grouped into foursomes?"
+
+**Groups required.** Stableford, stroke play, individual skins and individual match play: once there are more than four players, Review needs everyone in a group, groups of 2 to 4 ("Put everyone in a group — 6 players still without one"; "Group 1 has 5 players — groups are 2 to 4"); four or fewer play as one group and need nothing set ("One group (4 or fewer)"). The Players hint says what's needed ("10 players make 3 groups of 3 or 4"). Match play keeps its rule that a matchup's two players share a group, and the Review's Matchups and Groups lines now each report their own status. The four-ball family already required its 2 v 2 groups; scramble's teams are its groups.
+**Building groups.** Individual formats: "Randomize groups" in Create now makes balanced threes and fours (guests with their sponsor) — the same rule as Manage Game; it did nothing in Create before. Match play: "Build groups — two matches each" seats the matches two to a group (an odd count leaves one twosome).
+**The unit audit, every format.** Scramble: a team IS a group (saved whole). Four-ball, trifecta, alternate shot: a group is the 2 v 2 match itself; a player moves between slots one at a time, by design. Match play and team match play / team skins: the matchup is the unit — in Create it now moves in one draft change; in Manage Game it moves in ONE server call (set_tee_groups) instead of one call per player, so a failure can't leave half a match moved. Individual formats: the unit is the player.
+Tests: the Create walkthrough runs Stableford and individual match play with six players — Review blocked until everyone is grouped, Randomize groups → two groups of three, Build groups → the three matches seated two to a group, Start over, Review ready (135 checks). lib/groups-unit-move (4): moving a matchup in the groups builder is one save with both players when a unit save is offered, and member by member otherwise. No migration.
+
+Deploy: code only.
+
+## 212.60.261027 — Match play in Create: a matchup moves as one unit; Start over for matchups and groups; a split match blocks Review
+
+Owner (Oct 27, testing 212.58/212.59): "If I create a singles match and then assign that match group 1, and subsequently change it to group 2, it only moves 1 player instead of the paired matchup … I cannot clear it out or fix it"; "the teams button is yellow but review is green"; "There is no start over button for build balanced matches or groups".
+
+**The bug.** The groups builder already treats a matchup as the unit — moving a match sets each of its two players' group in turn. Create's draft handler rebuilt the line-up from a STALE copy on each call, so the second player's move overwrote the first's: one player moved, the match was split, and nothing could put it right. (In Manage Game each call saves to the server, so both land.) Now every draft change — team, group, slot moves, Start over — is applied to the LATEST line-up, so a matchup's two players move together.
+**Review.** Groups are optional, but a matchup's two players must be in the same group (or both ungrouped): "Raj Mehta and Karan Patel play each other, so they belong in the same group." — so a split match now turns the step and Review amber instead of leaving Review green while the Teams step showed a problem. (In the step bar the CURRENT step is gold and a visited, complete step is green; before this release the split groups didn't count as a problem, which is why Review stayed green.)
+**Start over:** the matchups builder offers "Start over" (clears every matchup, and so the groups built from them) in Create; the groups card offers Start over for match play too — it was hidden there with the Randomize button, which stays hidden because shuffling individuals would split matches.
+Why it was missed: the walkthrough built the matchups and checked Review, but never assigned a match to a group, never moved one, and never checked the step colours — and I had reused the generic groups builder without checking what the unit of a group is in match play. Tests now: the Create walkthrough puts a match in Group 1, moves it to Group 2 and checks BOTH players moved, both Start over buttons, Review ready with the match grouped, and Start over clearing the groups (130 checks); negative-tested — with the old handler the move leaves the match split and Review blocked. No migration.
+
+Deploy: code only.
+
+## 212.59.261027 — Phase 4 complete: Stableford and stroke play in the one-step Create flow — every format is one step
+
+Owner (Oct 24–25): a game is created only when fully set up. With Stableford and stroke play, every club format now goes through the one-step flow (scramble 212.41, the four-ball family 212.43, match play and skins 212.58). Ryder Cup sessions keep the old flow.
+
+**Create:** Course → Game → Players → Groups → Review. The step is named for what it holds — "Teams" when there are teams to pick, "Matchups" for individual match play, "Groups" for Stableford, stroke play and individual skins. Groups are optional (the Players hint says so: "4 players — groups are optional"); Review shows "Groups: Not set (optional)" or "2 groups"; flights work as before (the shared payload). Create game → one call → the scorecard. The step bar has five steps for every format from the start (the default format, Stableford, is one-step), so it never changes shape mid-way.
+Tests: the Create walkthrough gains two shapes (Stableford, stroke play — 16 checks) and reads the step names (Teams / Matchups / Groups); 125 checks in all. No migration.
+
+Deploy: code only.
+
 ## 212.58.261027 — Phase 4 part 2: match play and skins in the one-step Create flow
 
 Owner (Oct 24–25): a game is created only when fully set up. Scramble (212.41) and the four-ball family (212.43) went first; now MATCH PLAY (individual and team) and SKINS (individual and team 1:1) — the 2 v 2 team skins variant is reached through four-ball and was already one-step. Ryder Cup sessions keep the old flow.

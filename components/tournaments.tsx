@@ -113,7 +113,7 @@ import * as GC from "@/lib/game-create";
 import * as SO from "@/lib/structure-ops";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { countsForIndividualStats } from "@/lib/round-rules";
-import { isOneStep, createSectionsFor, SECTION_LABEL, playerCountHint, defaultScrambleSize, isTeamGroupOneStep, teamGroupLineupProblem, isMatchOneStep, matchLineupProblem } from "@/lib/one-step-create";
+import { isOneStep, createSectionsFor, SECTION_LABEL, teamsStepLabel, groupsProblem, groupsFromMatches, playerCountHint, defaultScrambleSize, isTeamGroupOneStep, teamGroupLineupProblem, isMatchOneStep, matchLineupProblem, matchupsProblem } from "@/lib/one-step-create";
 import { PlayerCountHint, OneStepReview } from "@/components/game/setup/one-step";
 import { ScrambleTeamsBuilder as DraftTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { balanceScrambleTeams, scrambleSetupProblem } from "@/lib/scramble-teams";
@@ -747,11 +747,20 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   }, [createSection, oneStep, draftKeys.join("|"), scrambleTeamSize, scrambleModeNow]);
   // ── 212.43: the four-ball family's draft line-up — Manage Game's own editors, given draft handlers that apply the
   // SAME shared rules as its save handlers (lib/structure-ops, lib/grouping, lib/balance-teams) to the phone's draft.
-  const applyLineup = (nextPlayers: any[]) => {
+  // 212.60 (owner, Oct 27: moving a matchup moved only one player): every change is applied to the LATEST line-up — the
+  // groups builder sets each member of a unit in turn, and a change built from a stale copy lost all but the last.
+  const draftRows = draft?.players ?? [];
+  const updateLineup = (change: (current: any[]) => any[]) => {
     if (!draft) return;
-    const foursomes = SO.teamPlayFoursomesAfter(draft.game as never, nextPlayers as never) ?? ((draft.game.foursomes ?? []) as any[]);
-    setDraftLineup((l) => ({ team: Object.fromEntries(nextPlayers.map((x) => [x.id, x.team ?? null])), group: Object.fromEntries(nextPlayers.map((x) => [x.id, x.tee_group ?? null])), foursomes, pairings: l?.pairings }));
+    setDraftLineup((l) => {
+      const current = draftRows.map((x: any) => ({ ...x, team: l?.team[x.id] ?? x.team ?? null, tee_group: l ? (l.group[x.id] ?? null) : (x.tee_group ?? null) }));
+      const next = change(current);
+      const game = { ...draft.game, foursomes: l?.foursomes ?? draft.game.foursomes };
+      const foursomes = SO.teamPlayFoursomesAfter(game as never, next as never) ?? ((game.foursomes ?? []) as any[]);
+      return { team: Object.fromEntries(next.map((x) => [x.id, x.team ?? null])), group: Object.fromEntries(next.map((x) => [x.id, x.tee_group ?? null])), foursomes, pairings: l?.pairings };
+    });
   };
+  const applyLineup = (nextPlayers: any[]) => updateLineup(() => nextPlayers);
   const playingHcp = (x: any) => applyAllowance(chBasis(x, draft!.game.course_par, (draft!.game.holes_meta as unknown[]).length), draft!.game.allowance_pct ?? 100);
   const suggestGroups = (ps: any[]) => {
     const t = draft!.game.teams as { key: string }[] | null;
@@ -763,7 +772,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   const draftHandlers = {
     // 212.58: the matchups builder saves on every change — into the draft
     onSetPairings: async (pairings: { a: string; b: string }[]) => { setDraftLineup((l) => ({ team: l?.team ?? {}, group: l?.group ?? {}, foursomes: l?.foursomes ?? [], pairings })); },
-    onSetTeam: async (pl: any, team: string | null) => { if (draft) applyLineup(draft.players.map((x: any) => (x.id === pl.id ? { ...x, team } : x))); },
+    onSetTeam: async (pl: any, team: string | null) => { updateLineup((ps) => ps.map((x: any) => (x.id === pl.id ? { ...x, team } : x))); },
     onBalanceTeams: async () => {
       if (!draft) return null;
       const r = balanceTeams(draft.game as never, draft.players as never, new Set());
@@ -772,11 +781,24 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       applyLineup(draft.players.map((x: any) => { const a = r.assignments.find((y) => y.id === x.id); return a ? { ...x, team: a.team } : x; }));
       return { changed: r.assignments.length, summary: balanceSummary(r), unrated: [] };
     },
-    onSetTeeGroup: async (pl: any, group: number | null) => { if (draft) applyLineup(draft.players.map((x: any) => (x.id === pl.id ? { ...x, tee_group: group } : x))); },
-    onSetTeamGroupSlot: async (current: any, next: any, group: number) => { if (draft) applyLineup(applyTeamGroupSlotMove(draft.players as never, current?.id || null, next?.id || null, group) as any[]); },
+    onSetTeeGroup: async (pl: any, group: number | null) => { updateLineup((ps) => ps.map((x: any) => (x.id === pl.id ? { ...x, tee_group: group } : x))); },
+    onSetTeamGroupSlot: async (current: any, next: any, group: number) => { updateLineup((ps) => applyTeamGroupSlotMove(ps as never, current?.id || null, next?.id || null, group) as any[]); },
     onSetAltShotFirstDriver: async (fid: string, side: "a" | "b", key: string) => { if (draft) setDraftLineup((l) => l && { ...l, foursomes: SO.altShotFirstDriverFoursomes((draft.game.foursomes ?? []) as never, fid, side, key) }); },
     onSetTrifectaPairing: async (fid: string, cross: boolean) => { if (draft) setDraftLineup((l) => l && { ...l, foursomes: SO.trifectaSwapFoursomes((draft.game.foursomes ?? []) as never, fid, cross) }); },
-    onBalanceGroups: async () => { if (draft) applyLineup(suggestGroups(draft.players)); },
+    onBalanceGroups: async () => {
+      if (!draft) return;
+      const t = draft.game.teams as { key: string }[] | null;
+      if (t && t.length === 2) { applyLineup(suggestGroups(draft.players)); return; }
+      // 212.61: match play — the matches two to a group; individual formats — balanced threes and fours (guests with their sponsor)
+      const pairings = ((draft.game.pairings ?? []) as { a: string; b: string }[]).filter((x) => x.a && x.b);
+      if (pairings.length) { const by = groupsFromMatches(pairings); updateLineup((ps) => ps.map((x: any) => ({ ...x, tee_group: by.get(pkey(x)) ?? null }))); return; }
+      const field: GPlayer[] = draft.players.filter((x: any) => !x.no_show).map((x: any) => ({ id: x.id, userId: x.user_id ?? null, isGuest: !!x.is_guest, guestOf: x.guest_of ?? null }));
+      const r = randomTeeGroups(field, 4);
+      const by = new Map(r.assignments.map((a) => [a.playerId, a.group]));
+      updateLineup((ps) => ps.map((x: any) => ({ ...x, tee_group: by.get(x.id) ?? null })));
+    },
+    // 212.61: a unit (a matchup) moves in ONE draft change
+    onSetUnitGroup: async (members: any[], group: number | null) => { const ids = new Set(members.map((m) => m.id)); updateLineup((ps) => ps.map((x: any) => (ids.has(x.id) ? { ...x, tee_group: group } : x))); },
     // "Build balanced matchups": like plays like — the same rule as Manage Game (lib/grouping + lib/structure-ops)
     onBalanceMatchups: async () => {
       if (!draft) return;
@@ -789,8 +811,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         foursomes: SO.balancedMatchupFoursomes(draft.game as never, next as never, playingHcp as never) });
     },
     // Start over (owner, Oct 26): clear every team choice (and so the groups), or just the groups
-    onStartOverTeams: async () => { if (draft) applyLineup(draft.players.map((x: any) => ({ ...x, team: null, tee_group: null }))); },
-    onClearGroups: async () => { if (draft) applyLineup(draft.players.map((x: any) => ({ ...x, tee_group: null }))); },
+    onStartOverTeams: async () => { updateLineup((ps) => ps.map((x: any) => ({ ...x, team: null, tee_group: null }))); },
+    onClearGroups: async () => { updateLineup((ps) => ps.map((x: any) => ({ ...x, tee_group: null }))); },
+    // 212.60: Start over for the matchups (and so the groups, which are built from them)
+    onClearPairings: async () => { setDraftLineup((l) => ({ team: l?.team ?? {}, group: Object.fromEntries(Object.keys(l?.group ?? {}).map((k) => [k, null])), foursomes: l?.foursomes ?? [], pairings: [] })); },
   };
   // Groups open once the teams are set: everyone on a team, both teams the same size, and an even number each
   // (owner, Oct 26) — a 2 v 2 group needs two from each side.
@@ -825,8 +849,9 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         { ok: !!gameType, label: "Game", value: formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, scrambleTeamSize, scrambleHandicap, scrambleMinDrives, fmtFamily } as never) },
         { ok: draft.players.length > 0, label: "Players", value: String(draft.players.length) },
         ...(teamMode ? [{ ok: draft.players.every((x: any) => !!x.team), label: "Teams", value: t.map((x) => `${x.name} ${draft.players.filter((y: any) => y.team === x.key).length}`).join(" · ") }] : []),
-        ...(matchHasMatchups ? [{ ok: !draftProblem, label: "Matchups", value: !draftProblem ? `${pairs.length} ${pairs.length === 1 ? "match" : "matches"}` : (draftProblem as string) }] : []),
-        { ok: true, label: "Groups", value: grouped ? `${groupCount} ${groupCount === 1 ? "group" : "groups"}` : "Not set (optional)" },
+        ...(matchHasMatchups ? [(() => { const mp = matchupsProblem(gameType as GC.GameTypeOpt, { teamMode, players: draft.players as never, pairings: (draft.game.pairings ?? []) as never, teams: (draft.game.teams ?? null) as never, keyOf: pkey as never });
+          return { ok: !mp, label: "Matchups", value: mp ?? `${pairs.length} ${pairs.length === 1 ? "match" : "matches"}` }; })()] : []),
+        { ok: !groupsProblem(draft.players as never), label: "Groups", value: groupsProblem(draft.players as never) ?? (grouped ? `${groupCount} ${groupCount === 1 ? "group" : "groups"}` : "One group (4 or fewer)") },
         { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
       ];
     }
@@ -1034,7 +1059,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       <CreateGameWorkspace
         activeSection={createSection}
         onSectionChange={setCreateSection}
-        sections={createSteps.map((k) => ({ key: k, label: SECTION_LABEL[k], done: visitedSteps.has(k) && k !== createSection && (
+        sections={createSteps.map((k) => ({ key: k, label: k === "teams" ? teamsStepLabel(gameType as GC.GameTypeOpt, teamMode) : SECTION_LABEL[k], done: visitedSteps.has(k) && k !== createSection && (
           k === "game" ? !!pickedFav && !!tee
           : k === "players" ? (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0
           : k === "format" ? !!gameType
@@ -1711,7 +1736,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               onRenameTeams={async ([a, b]) => { setTeam1(a); setTeam2(b); }} onSetTeamColours={(c) => setTeamColours(c)} />
             <div style={{ marginTop: 12 }}>
               {groupsOpen ? (
-                <GroupsBuilder game={draft.game as any} players={draft.players as any} onSetTeeGroup={draftHandlers.onSetTeeGroup} onSetTeamGroupSlot={draftHandlers.onSetTeamGroupSlot}
+                <GroupsBuilder game={draft.game as any} players={draft.players as any} onSetTeeGroup={draftHandlers.onSetTeeGroup} onSetUnitGroup={draftHandlers.onSetUnitGroup} onSetTeamGroupSlot={draftHandlers.onSetTeamGroupSlot}
                   onSetAltShotFirstDriver={draftHandlers.onSetAltShotFirstDriver} onSetTrifectaPairing={draftHandlers.onSetTrifectaPairing}
                   onRandomize={draftHandlers.onBalanceGroups} onBalanceMatchups={draftHandlers.onBalanceMatchups} onClearGroups={draftHandlers.onClearGroups} canRandomize />
               ) : (
@@ -1731,7 +1756,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         {createSection === "teams" && matchOneStep && draft && (
           <div data-one-step-teams data-match-one-step>
             <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
-              {teamMode ? "Put each player on a team, then set the matchups and (optionally) the groups." : gameType === "skins" ? "Set the groups (optional)." : "Set the matchups, then (optionally) the groups."} Nothing is saved until you create the game.
+              {teamMode ? "Put each player on a team, then set the matchups and (optionally) the groups." : gameType === "match" ? "Set the matchups, then (optionally) the groups." : "Set the groups (optional)."} Nothing is saved until you create the game.
             </div>
             {teamMode && (
               <CompactTeamEditor game={draft.game as any} players={draft.players as any}
@@ -1740,11 +1765,12 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
             )}
             {matchHasMatchups && (
               <div style={{ marginTop: 12 }}>
-                <MatchSetupBuilder game={draft.game as any} players={draft.players as any} teams={teamMode ? ((draft.game.teams ?? null) as any) : null} blocked={false} onSave={draftHandlers.onSetPairings} />
+                <MatchSetupBuilder game={draft.game as any} players={draft.players as any} teams={teamMode ? ((draft.game.teams ?? null) as any) : null} blocked={false} onSave={draftHandlers.onSetPairings}
+                  onStartOver={draftHandlers.onClearPairings} />
               </div>
             )}
             <div style={{ marginTop: 12 }}>
-              <GroupsBuilder game={draft.game as any} players={draft.players as any} onSetTeeGroup={draftHandlers.onSetTeeGroup}
+              <GroupsBuilder game={draft.game as any} players={draft.players as any} onSetTeeGroup={draftHandlers.onSetTeeGroup} onSetUnitGroup={draftHandlers.onSetUnitGroup}
                 onRandomize={draftHandlers.onBalanceGroups} onClearGroups={draftHandlers.onClearGroups} canRandomize />
             </div>
           </div>
@@ -1759,7 +1785,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
           </div>
         )}
         {createSection === "review" && oneStep && (
-          <OneStepReview busy={busy} problem={draftProblem ? `${draftProblem} Fix it on the Teams step — or create now and finish later.` : null}
+          <OneStepReview busy={busy} problem={draftProblem ? `${draftProblem} Fix it on the ${teamsStepLabel(gameType as GC.GameTypeOpt, teamMode)} step — or create now and finish later.` : null}
             lines={oneStepReviewLines()} onCancel={onCancel}
             onCreate={() => void createOneStep(true)} onCreateLater={() => void createOneStep(false)} />
         )}
@@ -2973,6 +2999,18 @@ function GameRoom({
   };
 
   // Organizer: update a player's tee group from the unified setup roster.
+  // 212.61: a unit (a matchup, a foursome) moves in ONE server call — set_tee_groups — never half of it
+  const setUnitTeeGroup = async (members: Player[], group: number | null) => {
+    if (!game) return;
+    for (const p of members) { if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return; }
+    const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: members.map((p) => ({ player: p.id, group })) });
+    if (!saved(error, "move that group")) return;
+    const ids = new Set(members.map((m) => m.id));
+    const nextPlayers = players.map((x) => (ids.has(x.id) ? { ...x, tee_group: group } : x));
+    setPlayers(nextPlayers);
+    await syncTeamPlayFoursomes(nextPlayers);
+    await load();
+  };
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
     if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return;
     const { error } = await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
@@ -4068,7 +4106,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, onSetUnitGroup: setUnitTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, onSetScrambleTeams: setScrambleTeams, isCompetitionGame: !!competitionLink,
           onClearGroups: clearGroups,
           // 212.41: a saved draft — tell every player at once (announce_game_players, 0219), which makes it visible to them

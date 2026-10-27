@@ -1,5 +1,5 @@
 {
-  "total": 440062,
+  "total": 440092,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -37,6 +37,7 @@
     "golf/computeBetting tests": 53,
     "grouping tests": 301,
     "groups start over": 6,
+    "groups unit move": 4,
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
     "hole result consistency": 981,
@@ -57,7 +58,7 @@
     "nine-hole payload": 12,
     "nine-hole posting": 20,
     "odd field": 26,
-    "one-step walkthrough": 109,
+    "one-step walkthrough": 135,
     "player-scoring": 71,
     "round stat completeness": 8,
     "save trace toggle": 3,
