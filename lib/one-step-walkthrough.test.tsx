@@ -45,7 +45,9 @@ const shot = (el: HTMLElement, name: string) => {
   fs.writeFileSync(path.join(OUT, `${name}.html`), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=390"><style>${css}</style><div id="wrap">${el.innerHTML}</div>`);
 };
 const clickText = async (el: HTMLElement, text: string, sel = "button") => {
-  const t = [...el.querySelectorAll(sel)].find((b) => (b.textContent || "").trim().includes(text)) as HTMLElement | undefined;
+  // an exact label first (212.58: "Team" the format must not match the "Teams" step button), then a label containing it
+  const all = [...el.querySelectorAll(sel)];
+  const t = (all.find((b) => (b.textContent || "").replace(/^[0-9]+/, "").trim() === text) ?? all.find((b) => (b.textContent || "").trim().includes(text))) as HTMLElement | undefined;
   if (!t) throw new Error(`no ${sel} with "${text}" — screen says: ${(el.textContent || "").slice(0, 300)}`);
   await act(async () => { t.click(); }); await flush(3);
 };
@@ -297,5 +299,55 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
     }
     r.unmount();
   }
+  // ── 212.58: MATCH PLAY (individual and team) and SKINS, one step — matchups built inside Create ──
+  for (const shape of ["Individual match", "Team match", "Individual skins"] as const) {
+    window.localStorage.clear();
+    const e = document.createElement("div"); document.body.appendChild(e);
+    const r = createRoot(e);
+    await act(async () => { r.render(<CreateGame user={ME} displayName="Amit Sud" activeGroupId="00000000-0000-0000-0000-00000000c1b0" onCancel={() => {}} onCreated={() => {}} />); });
+    await flush();
+    await clickText(e, "Oak Hollow"); await clickText(e, "Continue");
+    if (shape === "Individual skins") { await clickText(e, "Stroke play"); await clickText(e, "Skins"); }
+    else { await clickText(e, "Match play"); await clickText(e, "Individual"); if (shape === "Team match") await clickText(e, "Team match", "label"); }   // team match play = singles + the "Team match" switch
+    ok(JSON.stringify(stepBar(e)) === JSON.stringify(["Course", "Game", "Players", "Teams", "Review"]), `${shape}: one step — a Teams step before Review (got ${stepBar(e).join(", ")})`);
+    if (shape === "Team match") ok(!e.querySelector('input[placeholder="Team 1 name"]') && (e.textContent || "").includes("name the teams"), "team match: the teams are named on the Teams step, not here");
+    await clickText(e, "Continue");
+    for (const name of ["Raj Mehta", "Nihar Shah", "Karan Patel"]) await clickText(e, name, "label");   // 4 players with me
+    const hint = e.querySelector("[data-player-count-hint]")?.textContent || "";
+    ok(shape === "Individual skins" ? hint.includes("individual skins") : shape === "Team match" ? hint.includes("two teams of 2") : hint.includes("2 matches"), `${shape}: the Players hint reads the count (got "${hint}")`);
+    await clickText(e, "Continue");
+    ok(!!e.querySelector("[data-match-one-step]"), `${shape}: the Teams step is the match-play one`);
+    ok(!!e.querySelector("[data-compact-teams]") === (shape === "Team match"), `${shape}: the compact team card ${shape === "Team match" ? "is" : "isn't"} there`);
+    ok([...e.querySelectorAll("button")].some((b) => (b.textContent || "").includes("Build balanced matches")) === (shape !== "Individual skins"), `${shape}: the matchups builder ${shape === "Individual skins" ? "isn't" : "is"} there`);
+    if (shape === "Team match") {
+      await clickText(e, "Continue");
+      const rv0 = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(rv0.includes("Put 4 players on a team"), `team match: Review is blocked until the players are on teams (got "${rv0.slice(0, 160)}")`);
+      await clickText(e, "Teams");
+      await clickText(e, "Balance by handicap");
+    }
+    if (shape !== "Individual skins") {
+      await clickText(e, "Continue");
+      const rv1 = e.querySelector("[data-one-step-review]")?.textContent || "";
+      ok(rv1.includes("matchups") || rv1.includes("Pair everyone up"), `${shape}: Review is blocked until the matchups are set (got "${rv1.slice(0, 160)}")`);
+      await clickText(e, "Teams");
+      await clickText(e, "Build balanced matches");
+    }
+    await clickText(e, "Continue");
+    const rv = e.querySelector("[data-one-step-review]")?.textContent || "";
+    ok(shape === "Individual skins" ? rv.includes("Not set (optional)") : rv.includes("2 matches"), `${shape}: Review is ready (got "${rv.slice(0, 200)}")`);
+    const createBtn = [...e.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Create game") as HTMLButtonElement;
+    ok(!!createBtn && !createBtn.disabled, `${shape}: Create game is enabled`);
+    calls.length = 0;
+    await clickText(e, "Create game");
+    const b = calls.find((x) => x.url.includes("/rpc/create_game_complete"))?.body as { p_game?: { game_type?: string; pairings?: unknown[]; teams?: unknown[] | null }; p_players?: unknown[]; p_teams?: unknown[] } | undefined;
+    const wantType = shape === "Individual skins" ? "skins" : "match";
+    ok(!!b && b.p_game?.game_type === wantType && (b.p_players ?? []).length === 4
+      && (shape === "Individual skins" ? !(b.p_game?.pairings ?? []).length : (b.p_game?.pairings ?? []).length === 2)
+      && (b.p_teams ?? []).length === (shape === "Team match" ? 4 : 0),
+      `${shape}: ONE call — the game, 4 players, ${shape === "Individual skins" ? "no" : "2"} matchups, ${shape === "Team match" ? "4 team places" : "no teams"} (got ${JSON.stringify({ t: b?.p_game?.game_type, p: b?.p_players?.length, pr: b?.p_game?.pairings?.length, tm: b?.p_teams?.length })})`);
+    r.unmount();
+  }
+
   report("one-step walkthrough");
 })();

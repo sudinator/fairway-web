@@ -1,3 +1,7 @@
+## 212.58.261027 — Phase 4 part 2: match play and skins in the one-step Create flow
+
+Owner (Oct 24–25): a game is created only when fully set up. Scramble (212.41) and the four-ball family (212.43) went first; now MATCH PLAY (individual and team) and SKINS (individual and team 1:1) — the 2 v 2 team skins variant is reached through four-ball and was already one-step. Ryder Cup sessions keep the old flow.
+
 ## 212.57.261027 — Permission audit, part 4: posted rounds and profile flags match the app (migrations 0228, 0229)
 
 Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 4 (outside games) begins with the table rules.

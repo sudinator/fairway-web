@@ -1,3 +1,12 @@
+## 212.58.261027 — Phase 4 part 2: match play and skins in the one-step Create flow
+
+Owner (Oct 24–25): a game is created only when fully set up. Scramble (212.41) and the four-ball family (212.43) went first; now MATCH PLAY (individual and team) and SKINS (individual and team 1:1) — the 2 v 2 team skins variant is reached through four-ball and was already one-step. Ryder Cup sessions keep the old flow.
+
+**Create:** Course → Game → Players → Teams → Review. On the Game step the "Team match" / "Team skins" switch stays, but team names and colours move to the Teams step (as for four-ball). The Players hint reads the count ("4 players make 2 matches"; "— one player has a bye"; "two teams of 2, with 2 matches"; an odd team field: "can't split into two equal teams"). **The Teams step**, by shape: individual match play — the matchups builder (the scorecard's own 1 v 1 builder, "Build balanced matches", every change into the draft), then groups (optional); team match play and team skins — the compact team card (teams, names, colours, Balance by handicap, Start over), the matchups across the teams, then groups; individual skins — groups only. **Review** is blocked until everyone is on a team (team variants), the teams are the same size, every player is paired (an odd individual field: one bye) and each matchup pairs one player from each team; it shows Teams, Matchups ("2 matches") and Groups ("Not set (optional)"). Create game → one call (create_game_complete, with the matchups and team places) → the scorecard. A draft left mid-way comes back with its matchups.
+Tests: the Create walkthrough gains 28 checks across the three shapes (individual match, team match, individual skins): step bar, the Game step names teams later, the Players hint, the right builders on the Teams step, Review blocked before teams / before matchups, Review ready, Create enabled, one call with 2 matchups and 4 team places (team match) or none. Its click helper now prefers an exact label ("Team" the format vs the "Teams" step). lib/one-step-create: matchLineupProblem, the hint. No migration.
+
+Deploy: code only.
+
 ## 212.57.261027 — Permission audit, part 4: posted rounds and profile flags match the app (migrations 0228, 0229)
 
 Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 4 (outside games) begins with the table rules.

@@ -9,7 +9,9 @@ import { groupShapesOk, allowsOneShortGroup, fieldFitsTeamGroups, teamGroupField
 import type { CreateGameSection } from "@/components/game/setup/create-game-workspace";
 
 /** Formats whose Create flow is one step. Moved family by family, each after the owner approves it on staging. */
-export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble", "fourball", "trifecta", "alt_shot"]);   // 212.43: + the four-ball family
+export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble", "fourball", "trifecta", "alt_shot", "match", "skins"]);   // 212.43: + the four-ball family; 212.58: + match play and skins
+/** 212.58: match play (individual or team) and skins (individual or team 1:1) — matchups built inside Create. */
+export const isMatchOneStep = (t: GameTypeOpt) => t === "match" || t === "skins";
 /** The team formats whose groups ARE the matches (two a side) — four-ball, trifecta, alternate shot. */
 export const isTeamGroupOneStep = (t: GameTypeOpt) => t === "fourball" || t === "trifecta" || t === "alt_shot";
 export const isOneStep = (t: GameTypeOpt) => ONE_STEP_FORMATS.has(t);
@@ -35,8 +37,14 @@ function describeSizes(sizes: number[]): string {
 }
 /** The live hint on the Players step: what this many players can make in the chosen format. Scramble team sizes are
  * chosen on the Teams step ("Every player"), or each player is a captain ("Captains only"). */
-export function playerCountHint(t: GameTypeOpt, o: { players: number; captains?: boolean; scrambleMode?: "field" | "match" }): { text: string; ok: boolean } | null {
+export function playerCountHint(t: GameTypeOpt, o: { players: number; captains?: boolean; scrambleMode?: "field" | "match"; teamMode?: boolean }): { text: string; ok: boolean } | null {
   const n = o.players;
+  if (isMatchOneStep(t)) {   // 212.58
+    if (n < 2) return { text: "Add at least 2 players.", ok: false };
+    if (o.teamMode) return n % 2 === 0 ? { text: `${players(n)} two teams of ${n / 2}, with ${n / 2} matches.`, ok: true } : { text: `${n} players can't split into two equal teams — add or remove one.`, ok: false };
+    if (t === "skins") return { text: `${players(n)} an individual skins game.`, ok: true };
+    return n % 2 === 0 ? { text: `${players(n)} ${word(n / 2, "match", "matches")}.`, ok: true } : { text: `${players(n)} ${word((n - 1) / 2, "match", "matches")} — one player has a bye.`, ok: true };
+  }
   if (isTeamGroupOneStep(t)) {
     // 212.47 (owner, Oct 26: keep it strict): say up front whether this many players works for the format
     const label = t === "alt_shot" ? "Alternate shot" : t === "trifecta" ? "Trifecta" : "Four-ball";
@@ -101,5 +109,34 @@ export function teamGroupLineupProblem(gameType: GameTypeOpt,
     return `Each group needs two players from each team${allowsOneShortGroup(gameType) ? " (with an odd number, one group plays 2 v 1)" : ""}${bad ? ` — ${bad.name ?? "a group"} has ${(bad.a ?? []).length} v ${(bad.b ?? []).length}` : ""}.`;
   }
   if (gameType === "alt_shot" && foursomes.some((f) => !f.a_first || !f.b_first)) return "Choose who drives first for each side in every group.";
+  return null;
+}
+
+
+/**
+ * 212.58 — Review's rule for match play and skins. Team variants: everyone on a team, both teams the same size, and a
+ * complete set of 1 v 1 matchups across the teams. Individual match play: everyone paired (with an odd number, one player
+ * has a bye). Individual skins: nothing to pair. Groups are optional, as in Manage Game.
+ */
+export function matchLineupProblem(t: GameTypeOpt, o: { teamMode: boolean; players: { id: string; team?: string | null; no_show?: boolean | null }[]; pairings: { a: string; b: string }[]; teams: { key: string; name: string }[] | null; keyOf: (p: { id: string }) => string }): string | null {
+  const ps = o.players.filter((p) => !p.no_show);
+  const pairs = o.pairings.filter((x) => x.a && x.b && x.a !== x.b);
+  if (ps.length < 2) return "Add at least 2 players.";
+  if (o.teamMode) {
+    const teams = o.teams ?? [];
+    if (teams.length !== 2) return "Name the two teams.";
+    const un = ps.filter((p) => !p.team).length;
+    if (un) return `Put ${un === 1 ? "1 player" : `${un} players`} on a team.`;
+    const [na, nb] = teams.map((x) => ps.filter((p) => p.team === x.key).length);
+    if (na !== nb) return `The teams need the same number of players — now ${teams[0].name} ${na} v ${teams[1].name} ${nb}.`;
+    const keyTeam = new Map(ps.map((p) => [o.keyOf(p), p.team]));
+    if (pairs.some((x) => keyTeam.get(x.a) === keyTeam.get(x.b))) return "Each matchup pairs one player from each team.";
+    if (pairs.length < na) return `Set all ${na} matchups — ${pairs.length} so far.`;
+    return null;
+  }
+  if (t === "skins") return null;
+  const paired = new Set(pairs.flatMap((x) => [x.a, x.b]));
+  const left = ps.filter((p) => !paired.has(o.keyOf(p))).length;
+  if (left > (ps.length % 2 === 1 ? 1 : 0)) return `Pair everyone up — ${left} ${left === 1 ? "player" : "players"} still without a match.`;
   return null;
 }

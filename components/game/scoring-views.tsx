@@ -377,7 +377,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
 
 type MatchDraft = { a: string; b: string };
 
-function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave }: {
+export function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave }: {   // 212.58: exported for the one-step Create flow
   game: Game;
   players: Player[];
   teams: { key: string; name: string }[] | null;
