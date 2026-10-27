@@ -1,3 +1,13 @@
+## 212.62.261027 — Match play in the game room: everything by match, not by group
+
+Owner (Oct 27, staging game 411862): "in team matches (individual) once the game has been created, it should just show the matches, and not the groups anymore. what matters is match 1 or 2 etc. the app shows your group, other group and then match 1 and match 2. also the way my group is being shown is confusing".
+
+**What was shown.** The same four players three ways: the scoring groups ("Group 1", "Group 2" — now always present, since Create requires groups), the Strokes card with "YOUR GROUP / OTHER GROUPS" (which for match play were your match and the others, mislabelled), and the match list.
+**Now, in match play, everything is organised by match.** The group is only who keeps the card, so it is NAMED by its matches: the group buttons and the card read "Matches 1 & 2" or "Match 3" instead of "Group 1". The card's columns are ordered by match — opponents side by side — with a MATCH 1 / MATCH 2 tag over each pair and a divider between matches. The Strokes card says "YOUR MATCH / OTHER MATCHES". Every scoring message follows ("Take over scoring for Matches 1 & 2", "You're keeping score for Match 3"). Nothing changes underneath: a card per group, one scorer per group, the match list as before.
+Tests: lib/match-card-layout (5) — columns ordered by match, a tag over the first column of each match only, opponents side by side, a divider between matches, the card named by its matches. No migration.
+
+Deploy: code only.
+
 ## 212.61.261027 — Groups are required above four players; a unit moves as one save in every format
 
 Owner (Oct 27): "make sure this logic works for other formats as well … go through all formats"; "why are groups optional? if there are 10 players playing stableford don't they need to be grouped into foursomes?"

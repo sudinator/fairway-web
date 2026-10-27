@@ -1,3 +1,7 @@
+## 212.62.261027 — Match play in the game room: everything by match, not by group
+
+Owner (Oct 27, staging game 411862): "in team matches (individual) once the game has been created, it should just show the matches, and not the groups anymore. what matters is match 1 or 2 etc. the app shows your group, other group and then match 1 and match 2. also the way my group is being shown is confusing".
+
 ## 212.61.261027 — Groups are required above four players; a unit moves as one save in every format
 
 Owner (Oct 27): "make sure this logic works for other formats as well … go through all formats"; "why are groups optional? if there are 10 players playing stableford don't they need to be grouped into foursomes?"

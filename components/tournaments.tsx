@@ -2008,7 +2008,23 @@ function GameRoom({
     if (game?.status !== "ended" && on !== prevGroupScoring.current) setCardView(on);
     prevGroupScoring.current = on;
   }, [game?.marker_user_id, myGroupHasMarker]);
-  const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
+  // 212.62 (owner, Oct 27: "once the game has been created, it should just show the matches, and not the groups"): in match
+  // play a group is named by its matches and the card is laid out match by match — the group is only who keeps the card.
+  const matchIndexOf = (() => {
+    if (game?.game_type !== "match" || !Array.isArray(game.pairings) || !game.pairings.length) return null;
+    const by = new Map<string, number>();
+    game.pairings.forEach((pr, i) => { by.set(pr.a, i + 1); by.set(pr.b, i + 1); });
+    return (p: Player): number | null => by.get(pkey(p)) ?? null;
+  })();
+  const matchesLabel = (grp: number): string => {
+    if (!matchIndexOf) return `Group ${grp}`;
+    const nums = [...new Set(players.filter((p) => p.tee_group === grp).map(matchIndexOf).filter((n): n is number => n != null))].sort((a, b) => a - b);
+    return nums.length === 0 ? `Group ${grp}` : nums.length === 1 ? `Match ${nums[0]}` : `Matches ${nums.join(" & ")}`;
+  };
+  const cardPlayers = (() => {
+    const list = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
+    return matchIndexOf ? [...list].sort((a, b) => (matchIndexOf(a) ?? 99) - (matchIndexOf(b) ?? 99)) : list;
+  })();
   const gameEnded = game?.status === "ended";
   // 212.54 (owner, Oct 27): after the game has ENDED, its organizer can switch on "Correct scores" and edit ANY score in any
   // group — logged by the score audit — then re-post the players' rounds once they confirm. Nobody else can (0225).
@@ -4321,7 +4337,7 @@ function GameRoom({
                 const hasMarker = grpPlayers.some((p) => p.is_marker) || organizerHolds(g);   // 212.55: the organizer counts
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
-                    Group {g}{locked ? " 🔒" : hasMarker ? " ✓" : " · needs scorer"}
+                    {matchesLabel(g)}{locked ? " 🔒" : hasMarker ? " ✓" : " · needs scorer"}
                   </button>
                 );
               })}
@@ -4332,33 +4348,33 @@ function GameRoom({
           {teeGroupsInUse && viewGroup != null && !gameEnded && !viewedGroupLocked && iAmOrganizer && (
             organizerHolds(viewGroup) ? (
               <div data-organizer-holds style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
-                <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>You're keeping score for Group {viewGroup}</div>
+                <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>You're keeping score for {matchesLabel(viewGroup)}</div>
                 <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>The group's players can still enter their own stats. Hand it back when you're done — anyone in the group can then keep score.</div>
                 <button disabled={!primary || offline} onClick={async () => {
-                  if (!confirm(`Hand back scoring for Group ${viewGroup}? Its players will be told they can keep score again.`)) return;
+                  if (!confirm(`Hand back scoring for ${matchesLabel(viewGroup!)}? Its players will be told they can keep score again.`)) return;
                   const { error } = await supabase.rpc("organizer_release_group_scoring", { p_game: game.id, p_group: viewGroup });
-                  saved(error, `hand back Group ${viewGroup}'s scoring`, `Group ${viewGroup} can choose a new scorer.`);
+                  saved(error, `hand back ${matchesLabel(viewGroup!)}'s scoring`, `${matchesLabel(viewGroup!)} can choose a new scorer.`);
                   await load();
                 }} style={{ ...btn(false), fontSize: 13, marginTop: 10 }}>Hand back scoring</button>
               </div>
             ) : (myRow?.tee_group !== viewGroup || !iAmViewedMarker) ? (
               <button data-organizer-take-over disabled={!primary || offline} onClick={async () => {
                 const who = viewedMarkerPlayer?.display_name;
-                if (!confirm(`Take over scoring for Group ${viewGroup}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`)) return;
+                if (!confirm(`Take over scoring for ${matchesLabel(viewGroup!)}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`)) return;
                 const { error } = await supabase.rpc("organizer_take_group_scoring", { p_game: game.id, p_group: viewGroup });
-                saved(error, `take over Group ${viewGroup}'s scoring`, `You're keeping score for Group ${viewGroup}.`);
+                saved(error, `take over ${matchesLabel(viewGroup!)}'s scoring`, `You're keeping score for ${matchesLabel(viewGroup!)}.`);
                 await load();
-              }} style={{ ...btn(false), fontSize: 13, marginTop: 12 }}>Take over scoring for Group {viewGroup}</button>
+              }} style={{ ...btn(false), fontSize: 13, marginTop: 12 }}>Take over scoring for {matchesLabel(viewGroup)}</button>
             ) : null
           )}
           {teeGroupsInUse && viewGroup != null && !gameEnded && !iAmOrganizer && organizerHolds(viewGroup) && (
             <div data-organizer-holds-notice style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: 14, marginTop: 12, color: C.sage, fontSize: 12.5, lineHeight: 1.5 }}>
-              The organizer is keeping score for Group {viewGroup}. You can still enter your own stats; they'll hand the card back when they're done.
+              The organizer is keeping score for {matchesLabel(viewGroup)}. You can still enter your own stats; they'll hand the card back when they're done.
             </div>
           )}
           {canClaimViewed && !viewedMarkerPlayer && (
             <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
-              <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📋 Who's keeping {viewGroup != null ? `Group ${viewGroup}` : "this group"}'s card?</div>
+              <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📋 Who's keeping {viewGroup != null ? `${matchesLabel(viewGroup!)}` : "this group"}'s card?</div>
               <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
                 One person enters everyone's scores for the group — usually quicker than four phones, and everyone still sees it update live. Or skip it and each player scores their own.
               </div>
@@ -4383,7 +4399,8 @@ function GameRoom({
             onSetAltShotScore={setAltShotSideHole}
             onSetScrambleScore={setScrambleSideHole}
             teeMode={teeGroupsInUse}
-            groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
+            groupLabel={viewGroup != null ? matchesLabel(viewGroup) : ""}
+            matchOf={matchIndexOf ?? undefined}
             groupLocked={correctingScores ? false : (viewedGroupLocked || gameEnded)}
             canClaim={primary && canClaimViewed}
             onClaimGroup={claimGroupMarker}

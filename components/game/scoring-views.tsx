@@ -1709,7 +1709,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
           <div style={{ boxShadow: `0 0 0 1px ${C.gold} inset`, borderRadius: 8, padding: "8px 8px 6px", marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div>
-                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{foursomes.length ? "YOUR GROUP" : "YOUR MATCH"}</div>
                 {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
               </div>
               {toggleBtn}
@@ -1720,7 +1720,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
 
           {showAll && (otherPairings.length > 0 || otherFoursomes.length > 0) && (
             <>
-              <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>OTHER GROUPS</div>
+              <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>{foursomes.length ? "OTHER GROUPS" : "OTHER MATCHES"}</div>
               {otherPairings.map(({ pr, i }) => <div key={`op${i}`} style={{ opacity: 0.62 }}>{oneVone(pr.a, pr.b, `p${i}`)}</div>)}
               {otherFoursomes.map(({ f, i }) => foursomeBlock(f, i, { dim: true }))}
             </>

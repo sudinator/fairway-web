@@ -82,7 +82,7 @@ import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
-export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, onSetScrambleScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, onSetScrambleScore, matchOf, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
   readOnly?: boolean;
   game: Game; players: Player[];
   /** Every player in the game. `players` is filtered by tee group for DISPLAY; stroke bases
@@ -97,6 +97,8 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   /** 211.1: scramble — a team's hole score and whose drive (null keeps none). */
   onSetScrambleScore?: (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null, driveKey: string | null) => void;
   teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
+  /** 212.62 (owner, Oct 27): match play — which match (1-based) each column belongs to; columns arrive ordered by match. */
+  matchOf?: (p: Player) => number | null;
   onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
   onMarkOut?: (p: Player) => void;
   courseTees?: CourseTee[];
@@ -651,8 +653,13 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
           {cols.map((c, ci) => {
             if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 6, margin: "0 1px" }} />;
             const p = c.p;
+            const prevP = (cols.slice(0, ci).reverse().find((x) => x.type !== "divider") as { p?: Player } | undefined)?.p ?? null;   // 212.62
             return (
-              <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
+              <div key={p.id} data-match-col={matchOf?.(p) ?? undefined} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}`,
+                  ...(matchOf && prevP && matchOf(p) !== matchOf(prevP) ? { borderLeft: `1px solid ${C.borderCard}`, marginLeft: 4 } : {}) }}>
+                {matchOf && (!prevP || matchOf(p) !== matchOf(prevP)) && matchOf(p) != null
+                  ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 3 }}>MATCH {matchOf(p)}</div>
+                  : matchOf ? <div style={{ fontSize: 11, marginBottom: 3 }}>&nbsp;</div> : null}
                 {c.altSide ? (
                   <>
                     <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>

@@ -1,5 +1,5 @@
 {
-  "total": 440092,
+  "total": 440097,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -50,6 +50,7 @@
     "live skins": 19,
     "manual course handicap": 17,
     "manual handicap simulation": 76807,
+    "match card layout": 5,
     "match length": 49,
     "match length picker": 18,
     "money refresh": 9,
