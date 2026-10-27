@@ -1,3 +1,7 @@
+## 212.52.261027 — Game setup is the organizer's (and system admins'), not every club admin's; who-can-do-what is tested (migration 0223)
+
+Owner (Oct 26): "a club admin can save a game's teams and groups even if they are not a part of the game? that doesn't make sense" → "Organizer + system admins only (match the app)", and "audit 'who can do what' and add it to the sync check".
+
 ## 212.51.261026 — No more silent saves: refused changes say why, edits confirm, and the add-player forms show the reason
 
 Owner (Oct 26, testing staging): "Once the game has started, I can still enter details for a guest, including their handicap. It doesn't look like it saved successfully, there is no message either way."

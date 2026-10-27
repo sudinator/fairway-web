@@ -49,9 +49,9 @@ begin
       ('favorite_courses'::text, 'favorite_courses_group_member_all'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'ALL'::text, 'is_group_member(group_id, auth.uid())'::text, 'is_group_member(group_id, auth.uid())'::text),
       ('favorite_courses'::text, 'favorite_courses_select_global_non_deleted'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '(COALESCE(deleted, false) = false)'::text, null::text),
       ('favorite_courses'::text, 'read vetted courses'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, '((vetted = true) AND (auth.uid() IS NOT NULL))'::text, null::text),
-      -- 0220 (212.41, owner Oct 25): a saved DRAFT is private — RESTRICTIVE, ANDed with every rule above, so nothing
+      -- 0220 (212.41, owner Oct 25) / 0223 (212.52: club admins removed): a saved DRAFT is private — RESTRICTIVE, ANDed with every rule above, so nothing
       -- about announced games changes. Recorded deliberately; ci/assert-draft-private.sql proves the behaviour.
-      ('games'::text, 'drafts_private'::text, 'RESTRICTIVE'::text, 'authenticated'::text, 'ALL'::text, '((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())'::text, '((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_group_admin(group_id, auth.uid()) OR is_admin())'::text),
+      ('games'::text, 'drafts_private'::text, 'RESTRICTIVE'::text, 'authenticated'::text, 'ALL'::text, '((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_admin())'::text, '((players_notified_at IS NOT NULL) OR (created_by = auth.uid()) OR is_admin())'::text),
       ('game_players'::text, 'drafts_private'::text, 'RESTRICTIVE'::text, 'authenticated'::text, 'ALL'::text, 'game_announced_or_mine(game_id)'::text, 'game_announced_or_mine(game_id)'::text),
       ('game_players'::text, 'edit own scores'::text, 'PERMISSIVE'::text, 'public'::text, 'UPDATE'::text, '(auth.uid() = user_id)'::text, '(auth.uid() = user_id)'::text),
       ('game_players'::text, 'join as self'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '((auth.uid() = user_id) AND is_group_member(( SELECT g.group_id

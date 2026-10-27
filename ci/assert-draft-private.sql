@@ -51,9 +51,9 @@ begin
 
   -- who can see the DRAFT (game rows / player rows)
   v := pg_temp.sees(org, draft);      if v is distinct from '1/2' then raise exception 'organizer should see the draft: %', v; end if;
-  -- a club admin sees the draft game, exactly as they see any club game; the PLAYER LIST stays as it always was —
-  -- visible to the game's own players only (the existing "see co-players" rule; a restrictive rule can't widen access)
-  v := pg_temp.sees(adm, draft);      if v is distinct from '1/0' then raise exception 'club admin should see the draft game (as any club game): %', v; end if;
+  -- 0223 (owner, Oct 26: "Organizer + system admins only"): a club admin who isn't the organizer doesn't see a draft
+  -- either — "only I see it until I send it". (An announced club game they still see, as before — checked below.)
+  v := pg_temp.sees(adm, draft);      if v is distinct from '0/0' then raise exception 'a club admin (not the organizer) should NOT see the draft: %', v; end if;
   if pg_temp.sees(adm, sent) is distinct from '1/0' then raise exception 'club admin access to an announced game changed: %', pg_temp.sees(adm, sent); end if;
   v := pg_temp.sees(player, draft);   if v is distinct from '0/0' then raise exception 'a player in the draft must not see it yet: %', v; end if;
   v := pg_temp.sees(mate, draft);     if v is distinct from '0/0' then raise exception 'a clubmate must not see the draft: %', v; end if;
@@ -95,6 +95,6 @@ begin
   v := pg_temp.sees(player, draft);   if v is distinct from '1/2' then raise exception 'after sending, the player should see it: %', v; end if;
   v := pg_temp.sees(mate, draft);     if v is distinct from '1/0' then raise exception 'after sending, the club should see it as any game (game yes, player list no): %', v; end if;
 
-  raise notice 'DRAFT_PRIVATE_PASS a draft is seen only by its organizer and admins (not its players, clubmates, outsiders or anon); nobody else can join or edit it; it cannot be shared; once sent it behaves like any game';
+  raise notice 'DRAFT_PRIVATE_PASS a draft is seen only by its organizer and system admins (not club admins, its players, clubmates, outsiders or anon); nobody else can join or edit it; it cannot be shared; once sent it behaves like any game';
 end $$;
 rollback;

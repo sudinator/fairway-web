@@ -42,6 +42,12 @@ for needle, what in [('if (isLateScoreRefusal(error)) { endedRejectedRef.current
                      ('alert(lateScoreNotice(holes));', "the message comes from lib/late-scores")]:
     if needle not in t: bad.append(f"late scores: {what} (components/tournaments.tsx)")
 if t.count('if (isLateScoreRefusal(error))') < 3: bad.append("late scores: player scores AND both team-score routes (scramble, alternate shot) must handle the refusal")
+# 212.52 (owner, Oct 26: "Organizer + system admins only (match the app)") — WHO: the app shows Manage Game to the game's
+# creator only; the server's side of who-can-do-what is ci/assert-game-permissions.sql (every game function classified)
+for needle, what in [('const isOrganizer = game.created_by === user.id;', "the organizer is the game's creator"),
+                     ('{roomTab === "setup" && isOrganizer && (() => {', "Manage Game is shown to the organizer only")]:
+    if needle not in t: bad.append(f"who: {what} (components/tournaments.tsx) — if this changes, change the server's rules and ci/assert-game-permissions.sql to match")
+if "BNN_ALLOWED" not in (R / "ci/assert-game-permissions.sql").read_text(encoding="utf-8"): bad.append("who: ci/assert-game-permissions.sql is missing its who-can-do-what matrix")
 if len(blocking) < 10: bad.append(f"only {len(blocking)} blocking actions found in lib/game-setup-policy — the parser needs updating")
 if bad: print("SETUP RULES ↔ SERVER: FAIL\n  " + "\n  ".join(bad)); sys.exit(1)
 print(f"setup rules ↔ server: PASS ({len(blocking)} blocking app rules, each with a server test)")
