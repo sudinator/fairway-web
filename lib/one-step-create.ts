@@ -17,7 +17,7 @@ export const isMatchOneStep = (t: GameTypeOpt) => t === "match" || t === "skins"
 export const teamsStepLabel = (t: GameTypeOpt, teamMode: boolean): string =>
   !isMatchOneStep(t) || teamMode ? "Teams" : t === "match" ? "Matchups" : "Groups";
 /** The team formats whose groups ARE the matches (two a side) — four-ball, trifecta, alternate shot. */
-export const isTeamGroupOneStep = (t: GameTypeOpt) => t === "fourball" || t === "trifecta" || t === "alt_shot";
+export const isTeamGroupOneStep = (t: GameTypeOpt) => t === "fourball" || t === "trifecta" || t === "alt_shot";   // + best-ball team skins, decided by the Create screen (212.65)
 export const isOneStep = (t: GameTypeOpt) => ONE_STEP_FORMATS.has(t);
 
 /** The Create steps, in order: Game → Format → Players → Review; one-step formats add Teams before Review. */
@@ -47,7 +47,7 @@ export function playerCountHint(t: GameTypeOpt, o: { players: number; captains?:
     if (n < 2) return { text: "Add at least 2 players.", ok: false };
     if (o.teamMode) return n % 2 === 0 ? { text: `${players(n)} two teams of ${n / 2}, with ${n / 2} matches.`, ok: true } : { text: `${n} players can't split into two equal teams — add or remove one.`, ok: false };
     if (t === "skins") return { text: `${players(n)} an individual skins game.`, ok: true };
-    if (t === "stableford" || t === "stroke") return n <= 4 ? { text: `${n} ${n === 1 ? "player" : "players"} — one group.`, ok: true } : { text: `${players(n)} ${word(groupsNeeded(n), "group")} of 3 or 4.`, ok: true };
+    if (t === "stableford" || t === "stroke") return { text: `${n} ${n === 1 ? "player" : "players"} — everyone keeps their own card; groups are optional (${word(groupsNeeded(n), "group")} of 3 or 4 if you want one scorer per group).`, ok: true };
     return n % 2 === 0 ? { text: `${players(n)} ${word(n / 2, "match", "matches")}.`, ok: true } : { text: `${players(n)} ${word((n - 1) / 2, "match", "matches")} — one player has a bye.`, ok: true };
   }
   if (isTeamGroupOneStep(t)) {
@@ -124,7 +124,12 @@ export function teamGroupLineupProblem(gameType: GameTypeOpt,
  * has a bye). Individual skins: nothing to pair. Groups are optional, as in Manage Game.
  */
 export function matchLineupProblem(t: GameTypeOpt, o: Parameters<typeof matchupsProblem>[1]): string | null {
-  return matchupsProblem(t, o) ?? groupsProblem(o.players.filter((p) => !p.no_show));
+  // 212.63 (owner, Oct 27: "There shouldn't be a difference once the game has been created"): groups are OPTIONAL here, as in
+  // v1.0 — Stableford, stroke play, skins and match play went straight to the scorecard with everyone keeping their own card;
+  // groups were for organizers who wanted one person keeping a foursome's card (Manage Game → Groups). If groups ARE used,
+  // they must be complete and sized 2–4 (groupsProblem), and a matchup can't be split (matchupsProblem).
+  const ps = o.players.filter((p) => !p.no_show);
+  return matchupsProblem(t, o) ?? (ps.some((p) => p.tee_group != null) ? groupsProblem(ps) : null);
 }
 /** The matchups part alone (Review's Matchups line): teams, pairings, and no matchup split across groups. */
 export function matchupsProblem(t: GameTypeOpt, o: { teamMode: boolean; players: { id: string; team?: string | null; no_show?: boolean | null; tee_group?: number | null }[]; pairings: { a: string; b: string }[]; teams: { key: string; name: string }[] | null; keyOf: (p: { id: string }) => string }): string | null {
@@ -165,7 +170,7 @@ export function matchupsProblem(t: GameTypeOpt, o: { teamMode: boolean; players:
  */
 export function groupsProblem(ps: { tee_group?: number | null }[]): string | null {
   const grouped = ps.filter((p) => p.tee_group != null);
-  if (ps.length <= 4) return grouped.length && grouped.length < ps.length ? "Either put everyone in a group, or nobody — four or fewer play as one group." : null;
+  if (!grouped.length) return null;   // 212.63: no groups at all is fine — everyone keeps their own card, as in v1.0
   const left = ps.length - grouped.length;
   if (left) return `Put everyone in a group — ${left} ${left === 1 ? "player" : "players"} still without one.`;
   const sizes = new Map<number, number>(); grouped.forEach((p) => sizes.set(p.tee_group!, (sizes.get(p.tee_group!) ?? 0) + 1));

@@ -25,7 +25,9 @@ export function teamMoveArgs(gameId: string, game: G, nextPlayers: Player[], mov
 /** syncTeamPlayFoursomes: after a tee-group change, the foursomes to save (null = nothing to save for this format). */
 export function teamPlayFoursomesAfter(game: G, nextPlayers: Player[]): Foursome[] | null {
   if (!Array.isArray(game.teams) || game.teams.length !== 2) return null;
-  if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble") return null;
+  // 212.65: + best-ball team skins (teams, foursomes present) — a 2 v 2 game like four-ball
+  const bestBallSkins = game.game_type === "skins" && Array.isArray(game.foursomes);
+  if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble" && !bestBallSkins) return null;
   return deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
 }
 

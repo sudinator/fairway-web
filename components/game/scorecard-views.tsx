@@ -840,7 +840,8 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetUnitGroup, on
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   let units: Unit[];
   const sh = shapeOf(game);
-  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble");   // 212.5: + a Ryder Cup scramble
+  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta" || game.game_type === "scramble"
+    || sh.skinsStyle === "team_2v2");   // 212.5: + a Ryder Cup scramble; 212.65: + best-ball team skins (a 2 v 2 game — its groups ARE its matches)
   const scoringStarted = players.some((p) => (p.scores || []).some((x) => x != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
   if (sh.usesFoursomes && foursomes.length && !teamGroupsOwnStructure) {
     units = foursomes.map((f, i) => ({

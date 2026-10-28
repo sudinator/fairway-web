@@ -656,6 +656,130 @@ do $$ begin
     'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001a'));
 end $$;
 
+-- cup session · fourball  (14 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213927","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":85,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"fourball","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":[],"team_score_mode":"best_ball","trifecta_scoring":null,"stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-00000000001b","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001b-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001b-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001b-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001b-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001b-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001b-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001b","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001b-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000000'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000001'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000004'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000005'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000002'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000003'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001b-000000000006'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001b';  -- syncTeamPlayFoursomes → games.foursomes
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · fourball', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-00000000001b'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001b'));
+end $$;
+
+-- cup session · trifecta  (15 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213928","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":85,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"trifecta","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":[],"team_score_mode":"best_ball","trifecta_scoring":"match","stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-00000000001c","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001c-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001c-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001c-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001c-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001c-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001c-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001c","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001c-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000000'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000001'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000004'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000005'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000002'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000003'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001c-000000000006'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- syncTeamPlayFoursomes → games.foursomes
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"],"swap":true}]'::jsonb where id = '21391000-0000-0000-0000-00000000001c';  -- setTrifectaPairing → games.foursomes
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · trifecta', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-00000000001c'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001c'));
+end $$;
+
+-- cup session · alt_shot  (18 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213929","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":50,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"alt_shot","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":[],"team_score_mode":"best_ball","trifecta_scoring":null,"stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-00000000001d","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001d-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001d-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001d-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001d-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001d-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001d-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001d","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001d-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000000'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000001'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000004'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000005'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000002'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000003'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":[]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  perform public.set_tee_group('21392000-0000-0000-001d-000000000006'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- syncTeamPlayFoursomes → games.foursomes
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"],"a_first":"21390000-0000-0000-0000-0000000000a0"},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- setAltShotFirstDriver → games.foursomes
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"],"a_first":"21390000-0000-0000-0000-0000000000a0","b_first":"21390000-0000-0000-0000-0000000000a4"},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- setAltShotFirstDriver → games.foursomes
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"],"a_first":"21390000-0000-0000-0000-0000000000a0","b_first":"21390000-0000-0000-0000-0000000000a4"},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"],"a_first":"21390000-0000-0000-0000-0000000000a2"}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- setAltShotFirstDriver → games.foursomes
+  update public.games set foursomes = '[{"id":"group-1","name":"Group 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"],"a_first":"21390000-0000-0000-0000-0000000000a0","b_first":"21390000-0000-0000-0000-0000000000a4"},{"id":"group-2","name":"Group 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"],"a_first":"21390000-0000-0000-0000-0000000000a2","b_first":"21390000-0000-0000-0000-0000000000a6"}]'::jsonb where id = '21391000-0000-0000-0000-00000000001d';  -- setAltShotFirstDriver → games.foursomes
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · alt_shot', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-00000000001d'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001d'));
+end $$;
+
+-- cup session · singles  (7 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213930","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":100,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"match","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":null,"team_score_mode":"best_ball","trifecta_scoring":null,"stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-00000000001e","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001e-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001e-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001e-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001e-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001e-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001e-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001e","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001e-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  update public.games set pairings = '[{"a":"21390000-0000-0000-0000-0000000000a0","b":"21390000-0000-0000-0000-0000000000a4"},{"a":"21390000-0000-0000-0000-0000000000a1","b":"21390000-0000-0000-0000-0000000000a5"},{"a":"21390000-0000-0000-0000-0000000000a2","b":"21390000-0000-0000-0000-0000000000a6"}]'::jsonb where id = '21391000-0000-0000-0000-00000000001e';  -- MatchSetupBuilder → games.pairings
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000000'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000004'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000001'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000005'::uuid, 1::smallint);  -- setPlayerTeeGroup → set_tee_group
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000002'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  perform public.set_tee_group('21392000-0000-0000-001e-000000000006'::uuid, 2::smallint);  -- setPlayerTeeGroup → set_tee_group
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · singles', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-00000000001e'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001e'));
+end $$;
+
+-- cup session · scramble teams of 2  (2 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, scramble_team_size, scramble_handicap, scramble_min_drives, scramble_mode, scramble_allowance, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, scramble_team_size, scramble_handicap, scramble_min_drives, scramble_mode, scramble_allowance, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213931","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":100,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"scramble","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":[],"team_score_mode":"best_ball","trifecta_scoring":null,"stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"scramble_team_size":2,"scramble_handicap":"usga","scramble_min_drives":null,"scramble_mode":"match","scramble_allowance":null,"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-00000000001f","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001f-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001f-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001f-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-001f-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001f-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001f-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-00000000001f","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-001f-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  update public.games set foursomes = '[{"id":"match-1","name":"Match 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5"]},{"id":"match-2","name":"Match 2","a":["21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-00000000001f';  -- setScrambleTeams → games.foursomes
+  perform public.set_tee_groups('21391000-0000-0000-0000-00000000001f'::uuid, '[{"player":"21392000-0000-0000-001f-000000000000","group":1},{"player":"21392000-0000-0000-001f-000000000001","group":1},{"player":"21392000-0000-0000-001f-000000000002","group":2},{"player":"21392000-0000-0000-001f-000000000003","group":2},{"player":"21392000-0000-0000-001f-000000000004","group":1},{"player":"21392000-0000-0000-001f-000000000005","group":1},{"player":"21392000-0000-0000-001f-000000000006","group":2}]'::jsonb);  -- setScrambleTeams → set_tee_groups
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · scramble teams of 2', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-00000000001f'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-00000000001f'));
+end $$;
+
+-- cup session · scramble teams of 4  (2 calls)
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '21390000-0000-0000-0000-0000000000a0', true); perform set_config('request.jwt.claims', '{"sub":"21390000-0000-0000-0000-0000000000a0","role":"authenticated"}', true); execute 'set local role authenticated';
+  insert into public.games (code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, scramble_team_size, scramble_handicap, scramble_min_drives, scramble_mode, scramble_allowance, flight_mode, flights, id, created_by) select code, group_id, name, course, course_par, played_at, allowance_pct, holes_meta, game_type, pairings, teams, foursomes, team_score_mode, trifecta_scoring, stroke_basis, skins_mode, leg_config, scramble_team_size, scramble_handicap, scramble_min_drives, scramble_mode, scramble_allowance, flight_mode, flights, id, created_by from jsonb_populate_record(null::public.games, '{"code":"213932","group_id":"21390000-0000-0000-0000-00000000c1b0","name":"Baseline Cup · Session 1","course":"Baseline Course","course_par":72,"played_at":"2026-10-24","allowance_pct":100,"holes_meta":[{"n":1,"par":4,"si":7,"yards":350},{"n":2,"par":5,"si":1,"yards":357},{"n":3,"par":3,"si":17,"yards":364},{"n":4,"par":4,"si":11,"yards":371},{"n":5,"par":4,"si":3,"yards":378},{"n":6,"par":3,"si":15,"yards":385},{"n":7,"par":5,"si":9,"yards":392},{"n":8,"par":4,"si":5,"yards":399},{"n":9,"par":4,"si":13,"yards":406},{"n":10,"par":4,"si":8,"yards":413},{"n":11,"par":4,"si":2,"yards":420},{"n":12,"par":3,"si":18,"yards":427},{"n":13,"par":5,"si":6,"yards":434},{"n":14,"par":4,"si":12,"yards":441},{"n":15,"par":4,"si":4,"yards":448},{"n":16,"par":3,"si":16,"yards":455},{"n":17,"par":4,"si":10,"yards":462},{"n":18,"par":5,"si":14,"yards":469}],"game_type":"scramble","pairings":[],"teams":[{"key":"A","name":"Americas"},{"key":"B","name":"Europe"}],"foursomes":[],"team_score_mode":"best_ball","trifecta_scoring":null,"stroke_basis":null,"skins_mode":null,"leg_config":{"scheme":"none","metric":"net","points":{}},"scramble_team_size":4,"scramble_handicap":"usga","scramble_min_drives":null,"scramble_mode":"match","scramble_allowance":null,"flight_mode":"off","flights":null,"id":"21391000-0000-0000-0000-000000000020","created_by":"21390000-0000-0000-0000-0000000000a0"}'::jsonb);
+  insert into public.game_players (game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group) select game_id, user_id, is_guest, bets, penalties, sand, is_marker, group_locked, display_name, avatar_url, handicap_index, rating, slope, tee_name, course_handicap, flight, scores, putts, fairways, team, id, guest_of, tee_group from jsonb_populate_recordset(null::public.game_players, '[{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a0","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Amit Sud","avatar_url":null,"handicap_index":14.7,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":18,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-0020-000000000000","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a1","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Raj Mehta","avatar_url":null,"handicap_index":4.2,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":5,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-0020-000000000001","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a2","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Nihar Shah","avatar_url":null,"handicap_index":19.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":23,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-0020-000000000002","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a3","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Karan Patel","avatar_url":null,"handicap_index":6.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":8,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"A","id":"21392000-0000-0000-0020-000000000003","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a4","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Sam Lee","avatar_url":null,"handicap_index":22.4,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":27,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-0020-000000000004","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a5","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Vikram Rao","avatar_url":null,"handicap_index":11.3,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":14,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-0020-000000000005","guest_of":null,"tee_group":null},{"game_id":"21391000-0000-0000-0000-000000000020","user_id":"21390000-0000-0000-0000-0000000000a6","is_guest":false,"bets":true,"penalties":[],"sand":[],"is_marker":false,"group_locked":false,"display_name":"Bo Li","avatar_url":null,"handicap_index":null,"rating":72.3,"slope":133,"tee_name":"Blue","course_handicap":null,"flight":null,"scores":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"putts":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"fairways":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"team":"B","id":"21392000-0000-0000-0020-000000000006","guest_of":null,"tee_group":null}]'::jsonb);
+  update public.games set foursomes = '[{"id":"match-1","name":"Match 1","a":["21390000-0000-0000-0000-0000000000a0","21390000-0000-0000-0000-0000000000a1","21390000-0000-0000-0000-0000000000a2","21390000-0000-0000-0000-0000000000a3"],"b":["21390000-0000-0000-0000-0000000000a4","21390000-0000-0000-0000-0000000000a5","21390000-0000-0000-0000-0000000000a6"]}]'::jsonb where id = '21391000-0000-0000-0000-000000000020';  -- setScrambleTeams → games.foursomes
+  perform public.set_tee_groups('21391000-0000-0000-0000-000000000020'::uuid, '[{"player":"21392000-0000-0000-0020-000000000000","group":1},{"player":"21392000-0000-0000-0020-000000000001","group":1},{"player":"21392000-0000-0000-0020-000000000002","group":1},{"player":"21392000-0000-0000-0020-000000000003","group":1},{"player":"21392000-0000-0000-0020-000000000004","group":1},{"player":"21392000-0000-0000-0020-000000000005","group":1},{"player":"21392000-0000-0000-0020-000000000006","group":1}]'::jsonb);  -- setScrambleTeams → set_tee_groups
+  execute 'reset role';
+  insert into bnn_structure_state(id, state) select 'cup session · scramble teams of 4', jsonb_build_object(
+    'game', (select jsonb_build_object('teams', teams, 'pairings', pairings, 'foursomes', foursomes, 'allowance_pct', allowance_pct, 'team_score_mode', team_score_mode, 'skins_mode', skins_mode, 'scramble_mode', scramble_mode, 'scramble_team_size', scramble_team_size) from public.games where id = '21391000-0000-0000-0000-000000000020'),
+    'players', (select jsonb_agg(jsonb_build_object('id', id, 'name', display_name, 'team', team, 'tee_group', tee_group, 'is_marker', is_marker, 'course_handicap', course_handicap) order by display_name) from public.game_players where game_id = '21391000-0000-0000-0000-000000000020'));
+end $$;
+
 do $$
 declare
   now_state jsonb := (select jsonb_object_agg(id, state) from bnn_structure_state);
@@ -887,6 +1011,610 @@ declare
    {
     "course_handicap": 14,
     "id": "21392000-0000-0000-0016-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 alt_shot": {
+  "game": {
+   "allowance_pct": 50,
+   "foursomes": [
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a0",
+      "21390000-0000-0000-0000-0000000000a1"
+     ],
+     "a_first": "21390000-0000-0000-0000-0000000000a0",
+     "b": [
+      "21390000-0000-0000-0000-0000000000a4",
+      "21390000-0000-0000-0000-0000000000a5"
+     ],
+     "b_first": "21390000-0000-0000-0000-0000000000a4",
+     "id": "group-1",
+     "name": "Group 1"
+    },
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a2",
+      "21390000-0000-0000-0000-0000000000a3"
+     ],
+     "a_first": "21390000-0000-0000-0000-0000000000a2",
+     "b": [
+      "21390000-0000-0000-0000-0000000000a6"
+     ],
+     "b_first": "21390000-0000-0000-0000-0000000000a6",
+     "id": "group-2",
+     "name": "Group 2"
+    }
+   ],
+   "pairings": [],
+   "scramble_mode": null,
+   "scramble_team_size": null,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-001d-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-001d-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-001d-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-001d-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-001d-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-001d-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-001d-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 fourball": {
+  "game": {
+   "allowance_pct": 85,
+   "foursomes": [
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a0",
+      "21390000-0000-0000-0000-0000000000a1"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a4",
+      "21390000-0000-0000-0000-0000000000a5"
+     ],
+     "id": "group-1",
+     "name": "Group 1"
+    },
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a2",
+      "21390000-0000-0000-0000-0000000000a3"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a6"
+     ],
+     "id": "group-2",
+     "name": "Group 2"
+    }
+   ],
+   "pairings": [],
+   "scramble_mode": null,
+   "scramble_team_size": null,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-001b-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-001b-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-001b-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-001b-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-001b-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-001b-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-001b-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 scramble teams of 2": {
+  "game": {
+   "allowance_pct": 100,
+   "foursomes": [
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a0",
+      "21390000-0000-0000-0000-0000000000a1"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a4",
+      "21390000-0000-0000-0000-0000000000a5"
+     ],
+     "id": "match-1",
+     "name": "Match 1"
+    },
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a2",
+      "21390000-0000-0000-0000-0000000000a3"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a6"
+     ],
+     "id": "match-2",
+     "name": "Match 2"
+    }
+   ],
+   "pairings": [],
+   "scramble_mode": "match",
+   "scramble_team_size": 2,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-001f-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-001f-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-001f-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-001f-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-001f-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-001f-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-001f-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 scramble teams of 4": {
+  "game": {
+   "allowance_pct": 100,
+   "foursomes": [
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a0",
+      "21390000-0000-0000-0000-0000000000a1",
+      "21390000-0000-0000-0000-0000000000a2",
+      "21390000-0000-0000-0000-0000000000a3"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a4",
+      "21390000-0000-0000-0000-0000000000a5",
+      "21390000-0000-0000-0000-0000000000a6"
+     ],
+     "id": "match-1",
+     "name": "Match 1"
+    }
+   ],
+   "pairings": [],
+   "scramble_mode": "match",
+   "scramble_team_size": 4,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-0020-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-0020-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-0020-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-0020-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-0020-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-0020-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-0020-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 singles": {
+  "game": {
+   "allowance_pct": 100,
+   "foursomes": null,
+   "pairings": [
+    {
+     "a": "21390000-0000-0000-0000-0000000000a0",
+     "b": "21390000-0000-0000-0000-0000000000a4"
+    },
+    {
+     "a": "21390000-0000-0000-0000-0000000000a1",
+     "b": "21390000-0000-0000-0000-0000000000a5"
+    },
+    {
+     "a": "21390000-0000-0000-0000-0000000000a2",
+     "b": "21390000-0000-0000-0000-0000000000a6"
+    }
+   ],
+   "scramble_mode": null,
+   "scramble_team_size": null,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-001e-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-001e-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-001e-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": null
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-001e-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-001e-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-001e-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-001e-000000000005",
+    "is_marker": false,
+    "name": "Vikram Rao",
+    "team": "B",
+    "tee_group": 1
+   }
+  ]
+ },
+ "cup session \u00b7 trifecta": {
+  "game": {
+   "allowance_pct": 85,
+   "foursomes": [
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a0",
+      "21390000-0000-0000-0000-0000000000a1"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a4",
+      "21390000-0000-0000-0000-0000000000a5"
+     ],
+     "id": "group-1",
+     "name": "Group 1"
+    },
+    {
+     "a": [
+      "21390000-0000-0000-0000-0000000000a2",
+      "21390000-0000-0000-0000-0000000000a3"
+     ],
+     "b": [
+      "21390000-0000-0000-0000-0000000000a6"
+     ],
+     "id": "group-2",
+     "name": "Group 2",
+     "swap": true
+    }
+   ],
+   "pairings": [],
+   "scramble_mode": null,
+   "scramble_team_size": null,
+   "skins_mode": null,
+   "team_score_mode": "best_ball",
+   "teams": [
+    {
+     "key": "A",
+     "name": "Americas"
+    },
+    {
+     "key": "B",
+     "name": "Europe"
+    }
+   ]
+  },
+  "players": [
+   {
+    "course_handicap": 18,
+    "id": "21392000-0000-0000-001c-000000000000",
+    "is_marker": false,
+    "name": "Amit Sud",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": null,
+    "id": "21392000-0000-0000-001c-000000000006",
+    "is_marker": false,
+    "name": "Bo Li",
+    "team": "B",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 8,
+    "id": "21392000-0000-0000-001c-000000000003",
+    "is_marker": false,
+    "name": "Karan Patel",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 23,
+    "id": "21392000-0000-0000-001c-000000000002",
+    "is_marker": false,
+    "name": "Nihar Shah",
+    "team": "A",
+    "tee_group": 2
+   },
+   {
+    "course_handicap": 5,
+    "id": "21392000-0000-0000-001c-000000000001",
+    "is_marker": false,
+    "name": "Raj Mehta",
+    "team": "A",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 27,
+    "id": "21392000-0000-0000-001c-000000000004",
+    "is_marker": false,
+    "name": "Sam Lee",
+    "team": "B",
+    "tee_group": 1
+   },
+   {
+    "course_handicap": 14,
+    "id": "21392000-0000-0000-001c-000000000005",
     "is_marker": false,
     "name": "Vikram Rao",
     "team": "B",

@@ -693,9 +693,14 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   const stepAt = (d: number) => createSteps[Math.min(createSteps.length - 1, Math.max(0, createSteps.indexOf(createSection) + d))];
   const idFor = (k: string) => (draftIds.current[k] ??= crypto.randomUUID());
   const scrambleModeNow: "field" | "match" = fmtFamily === "match" ? "match" : "field";
-  const teamGroupOneStep = oneStep && isTeamGroupOneStep(gameType as GC.GameTypeOpt);
+  // 212.65 (v1.0 parity): BEST-BALL team skins is a 2 v 2 game — teams plus foursomes, built with the four-ball builders
+  // (Match play → Team → Skins); head-to-head team skins is teams plus 1 v 1 matchups (Stroke play → Skins → Team skins)
+  const bestBallTeamSkins = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball";
+  const teamGroupOneStep = oneStep && (isTeamGroupOneStep(gameType as GC.GameTypeOpt) || bestBallTeamSkins);
   // 212.58: match play and skins — teams (when on), 1 v 1 matchups and groups inside Create
-  const matchOneStep = oneStep && isMatchOneStep(gameType as GC.GameTypeOpt);
+  const matchOneStep = oneStep && isMatchOneStep(gameType as GC.GameTypeOpt) && !bestBallTeamSkins;
+  // the format the four-ball-family rules (field sizes, groups unlocking, Review) should apply: best-ball team skins plays as four-ball
+  const lineupKind = (bestBallTeamSkins ? "fourball" : gameType) as GC.GameTypeOpt;
   const matchHasMatchups = matchOneStep && (gameType === "match" || teamMode);
   const draft = (() => {
     if (!oneStep || !pickedFav || !tee) return null;
@@ -725,14 +730,17 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   })();
   const draftKeys = draft ? draft.players.map((p: any) => pkey(p)) : [];
   const draftProblem: string | null = !oneStep ? null : !draft ? "Pick a course first."
-    : teamGroupOneStep ? teamGroupLineupProblem(gameType as GC.GameTypeOpt, draft.players as never, (draft.game.foursomes ?? []) as never)
+    : teamGroupOneStep ? teamGroupLineupProblem(lineupKind, draft.players as never, (draft.game.foursomes ?? []) as never)
     : matchOneStep ? matchLineupProblem(gameType as GC.GameTypeOpt, { teamMode, players: draft.players as never, pairings: (draft.game.pairings ?? []) as never, teams: (draft.game.teams ?? null) as never, keyOf: pkey as never })
     : !(draftGroups ?? []).length ? "Put the players into teams."
     : scrambleSetupProblem(draftGroups, draftKeys, scrambleModeNow, { size: scrambleTeamSize === 1 ? 1 : null, method: scrambleTeamSize === 1 ? "agreed" : scrambleHandicap });
   // The Teams step opens on balanced teams. If players are added later the teams are suggested afresh (and it says
   // so); a removed player simply leaves their team.
   useEffect(() => {
-    if (createSection !== "teams" || !oneStep || !draft) return;
+    // 212.64 (owner, Oct 27, staging game 411862): SCRAMBLE only — this suggests scramble teams; when match play, skins,
+    // Stableford and stroke play joined the one-step flow it ran for them too, and the save stored its "teams" as
+    // foursomes, which the game room then drew as 2 v 2 match boxes on top of the real singles matchups.
+    if (createSection !== "teams" || !oneStep || teamGroupOneStep || matchOneStep || !draft) return;
     const keys = draftKeys, placed = new Set((draftGroups ?? []).flatMap((g) => [...g.a, ...g.b]));
     const unplaced = keys.some((k) => !placed.has(k));
     if (!draftGroups || unplaced) {
@@ -824,7 +832,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
     return { names: t.map((x) => x.name), counts: t.map((x) => draft.players.filter((y: any) => y.team === x.key).length), unassigned: draft.players.filter((y: any) => !y.team).length };
   })();
   // 212.45 (owner, Oct 26): an odd four-ball / trifecta field opens the groups at 4 v 3, 6 v 5 … — one group plays 2 v 1
-  const groupsOpen = !!teamCounts && teamCounts.unassigned === 0 && teamCounts.counts.length === 2 && teamSizesFitGroups(gameType, teamCounts.counts[0], teamCounts.counts[1]);
+  const groupsOpen = !!teamCounts && teamCounts.unassigned === 0 && teamCounts.counts.length === 2 && teamSizesFitGroups(lineupKind, teamCounts.counts[0], teamCounts.counts[1]);
   const oneShort = allowsOneShortGroup(gameType);
   // 212.45 (owner, Oct 26): NOTHING is picked by default — the organizer puts players on teams (or taps "Balance by
   // handicap"), then builds the groups (or taps "Build balanced matchups" / "Build even groups"). Choices already made
@@ -851,7 +859,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         ...(teamMode ? [{ ok: draft.players.every((x: any) => !!x.team), label: "Teams", value: t.map((x) => `${x.name} ${draft.players.filter((y: any) => y.team === x.key).length}`).join(" · ") }] : []),
         ...(matchHasMatchups ? [(() => { const mp = matchupsProblem(gameType as GC.GameTypeOpt, { teamMode, players: draft.players as never, pairings: (draft.game.pairings ?? []) as never, teams: (draft.game.teams ?? null) as never, keyOf: pkey as never });
           return { ok: !mp, label: "Matchups", value: mp ?? `${pairs.length} ${pairs.length === 1 ? "match" : "matches"}` }; })()] : []),
-        { ok: !groupsProblem(draft.players as never), label: "Groups", value: groupsProblem(draft.players as never) ?? (grouped ? `${groupCount} ${groupCount === 1 ? "group" : "groups"}` : "One group (4 or fewer)") },
+        { ok: !groupsProblem(draft.players as never), label: "Groups", value: groupsProblem(draft.players as never) ?? (grouped ? `${groupCount} ${groupCount === 1 ? "group" : "groups"}` : "None — everyone keeps their own card") },
         { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
       ];
     }
@@ -887,6 +895,11 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
     if (!pickedFav || !tee || !draft) { setErr("Pick a course (from your favorites)."); return; }
     if (announce && draftProblem) { setErr(draftProblem); return; }
     if (flightBlocked) { setErr("Some players need a handicap index before this event can be flighted — set them under Flights, or turn flights off."); return; }
+    // 212.66 (the v1.0 parity check): v1.0's Create refused split skins above four players — the one-step save must too
+    if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, draft.players.length)) {
+      setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
@@ -895,7 +908,8 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       const payload = { ...buildCreatePayload(makeCode()), id: gameId, ...(matchOneStep ? { pairings: (draft.game.pairings ?? []) } : {}) };
       const rows = draft.rows.map(({ game_id: _g, ...r }: any) => r);
       // scramble: its teams ARE the foursomes; the four-ball family: each player's team, plus the 2 v 2 foursomes
-      const foursomes = teamGroupOneStep ? ((draft.game.foursomes ?? []) as any[]) : (draftGroups ?? []);
+      // 212.64: match play, skins, Stableford, stroke play never have foursomes (v1.0 parity)
+      const foursomes = teamGroupOneStep ? ((draft.game.foursomes ?? []) as any[]) : matchOneStep ? [] : (draftGroups ?? []);
       const { error } = await supabase.rpc("create_game_complete", {
         p_game: payload, p_players: rows,
         p_teams: (teamGroupOneStep || (matchOneStep && teamMode)) ? draft.players.filter((x: any) => !!x.team).map((x: any) => ({ player: x.id, team: x.team })) : [],
@@ -1169,7 +1183,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         {createSection === "players" && (
           <div>
       {/* 212.41: what this many players can make in the chosen format (scramble first) */}
-      <PlayerCountHint hint={oneStep ? playerCountHint(gameType as GC.GameTypeOpt, { players: groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length, captains: scrambleTeamSize === 1, scrambleMode: fmtFamily === "match" ? "match" : "field", teamMode }) : null} />
+      <PlayerCountHint hint={oneStep ? playerCountHint(lineupKind, { players: groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length, captains: scrambleTeamSize === 1, scrambleMode: fmtFamily === "match" ? "match" : "field", teamMode }) : null} />
       <div style={{ marginTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
@@ -1743,8 +1757,8 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
                 <div data-groups-locked style={{ background: C.greenLight, borderRadius: 14, padding: 16, color: C.sage, fontSize: 12.5, lineHeight: 1.45 }}>
                   <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Groups</div>
                   {/* 212.47: when the NUMBER of players can't work for this format, say so — the same words as the Players step */}
-                  {teamCounts && !fieldFitsTeamGroups(gameType, draft.players.length) ? (
-                    <div data-groups-wrong-size style={{ color: C.gold, marginBottom: 6 }}>{playerCountHint(gameType as GC.GameTypeOpt, { players: draft.players.length })?.text}</div>
+                  {teamCounts && !fieldFitsTeamGroups(lineupKind, draft.players.length) ? (
+                    <div data-groups-wrong-size style={{ color: C.gold, marginBottom: 6 }}>{playerCountHint(lineupKind, { players: draft.players.length })?.text}</div>
                   ) : null}
                   Groups open once every player is on a team and both teams have the same, even number of players{oneShort ? <> — or, with an odd number, one more on one side with that side even (4 v 3, 6 v 5) so one group plays 2 v 1</> : null}
                   {teamCounts ? <> — now <b style={{ color: C.cream }}>{teamCounts.names[0]} {teamCounts.counts[0]} v {teamCounts.names[1]} {teamCounts.counts[1]}</b>{teamCounts.unassigned ? <>, {teamCounts.unassigned} without a team</> : null}</> : null}.

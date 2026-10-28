@@ -57,6 +57,7 @@
     "lib/add-player-blocked.test.tsx",
     "lib/groups-unit-move.test.tsx",
     "lib/match-card-layout.test.tsx",
+    "lib/one-step-v1-parity.test.tsx",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",
     "lib/scramble-simulation.test.tsx",
