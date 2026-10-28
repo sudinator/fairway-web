@@ -36,7 +36,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
   const players = rec.players.map((r, k) => ({ ...(r as Record<string, unknown>), id: rowId(n, k), game_id: gid,
     user_id: (r as { user_id: string | null }).user_id ? USERS[(r as { user_id: string }).user_id] : null,
     guest_of: (r as { guest_of?: string | null }).guest_of ? USERS[(r as { guest_of: string }).guest_of] : (r as { guest_of?: unknown }).guest_of ?? null,
-    team: null, tee_group: (r as { tee_group?: number | null }).tee_group ?? null })) as unknown as Player[];
+    team: (r as { team?: string | null }).team ?? null, tee_group: (r as { tee_group?: number | null }).tee_group ?? null })) as unknown as Player[];   // 212.67: a Cup session's rows arrive with their sides
   const key = (p: Player) => p.user_id ?? p.id;
   const ops: Op[] = [];
   let state: { game: Game; players: Player[] } = { game, players };
@@ -59,9 +59,12 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
     if (f) setGame({ foursomes: f }, "syncTeamPlayFoursomes → games.foursomes");
   };
   const P = (name: string) => state.players.find((p) => p.display_name === name)!;
-  const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"], BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar"];
+  const has = (name: string) => state.players.some((p) => p.display_name === name);
+  // 212.67: a Cup session has no guest — the fixed names skip whoever isn't in the field
+  const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"].filter(has), BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar"].filter(has);
   const ORDER = [...RED, ...BLUE];
-  const MATCHES: [string, string][] = [["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", "Guest Kumar"]];
+  const MATCHES: [string, string][] = ([["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", "Guest Kumar"]] as [string, string][]).filter(([x, y]) => has(x) && has(y));
+  const teamsPreset = c.session != null;   // v1.0: the Cup set the sides; the organizer never did
   const g = state.game, type = g.game_type, hasTeams = Array.isArray(g.teams) && g.teams.length === 2, has4 = Array.isArray(g.foursomes);
 
   if (type === "scramble") {   // setScrambleTeams: the teams, then each player's group from scrambleTeeGroups
@@ -75,7 +78,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
     ops.push({ route: "setScrambleTeams → set_tee_groups", sql: `perform public.set_tee_groups('${gid}'::uuid, ${q(assign)}::jsonb);` });
     state = { ...state, players: state.players.map((x) => { const t = assign.find((y) => y.player === x.id); return t ? { ...x, tee_group: t.group } : x; }) };
   } else if (hasTeams && has4 && type === "skins") {   // 2 v 2 skins: teams, then the foursome editor (saveFoursomes)
-    ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
+    if (!teamsPreset) ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
     let fs: Foursome[] = (state.game.foursomes ?? []) as Foursome[];
     const save = (next: Foursome[]) => {
       setGame({ foursomes: next }, "saveFoursomes → games.foursomes");
@@ -91,9 +94,9 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
      ["fs-2", "a", "Nihar Shah"], ["fs-2", "a", "Karan Patel"], ["fs-2", "b", "Bo Li"], ["fs-2", "b", "Guest Kumar"]]
       .forEach(([f, side, nm]) => save(assignFoursomePlayer(fs, f, side as "a" | "b", key(P(nm)))));
   } else if (hasTeams && has4) {   // four-ball, trifecta, alternate shot: teams, then groups of two a side
-    ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
+    if (!teamsPreset) ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
     [["Amit Sud", 1], ["Raj Mehta", 1], ["Sam Lee", 1], ["Vikram Rao", 1], ["Nihar Shah", 2], ["Karan Patel", 2], ["Bo Li", 2], ["Guest Kumar", 2]]
-      .forEach(([nm, gr]) => setTeeGroup(P(nm as string), gr as number));
+      .filter(([nm]) => has(nm as string)).forEach(([nm, gr]) => setTeeGroup(P(nm as string), gr as number));
     const f = (state.game.foursomes ?? []) as Foursome[];
     if (type === "alt_shot") for (const x of f) {   // setAltShotFirstDriver, both sides
       setGame({ foursomes: altShotFirstDriverFoursomes(state.game.foursomes as Foursome[], x.id, "a", (x.a ?? [])[0]) }, "setAltShotFirstDriver → games.foursomes");
@@ -101,7 +104,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
     }
     if (type === "trifecta" && f[1]) setGame({ foursomes: trifectaSwapFoursomes(state.game.foursomes as Foursome[], f[1].id, true) }, "setTrifectaPairing → games.foursomes");
   } else {
-    if (hasTeams) ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));   // team match play, 1:1 skins
+    if (hasTeams && !teamsPreset) ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));   // team match play, 1:1 skins
     const usesMatchups = type === "match" || (type === "skins" && hasTeams);
     if (usesMatchups) setGame({ pairings: MATCHES.map(([a, b]) => ({ a: key(P(a)), b: key(P(b)) })) }, "MatchSetupBuilder → games.pairings");
     const groupOrder = usesMatchups ? MATCHES.flat() : ORDER;   // two matches a group, or four in roster order

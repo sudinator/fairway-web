@@ -42,7 +42,7 @@ export type SetupDraft = {
   /** 212.41: one-step Create — the draft's teams and the fixed ids its players have. Optional: older drafts load as before. */
   oneStepTeams?: { groups: { id: string; name: string; a: string[]; b: string[]; tee?: number | null }[]; ids: Record<string, string> };
   /** 212.43: one-step four-ball family — each player's team and group, the 2 v 2 foursomes, and the fixed player ids. */
-  oneStepLineup?: { team: Record<string, string | null>; group: Record<string, number | null>; foursomes: unknown[] | null; ids: Record<string, string> };
+  oneStepLineup?: { team: Record<string, string | null>; group: Record<string, number | null>; foursomes: unknown[] | null; pairings?: { a: string; b: string }[]; ids: Record<string, string> };   // 212.58: + pairings
   selectedPlayers: Record<string, boolean>;
   guestPlayers: { id: string; display_name: string; handicap_index: number | null; guest_of: string }[];
 };

@@ -1,3 +1,43 @@
+## 212.67.261028 — Ryder Cup sessions: the v1.0 snapshot, before any change to their flow
+
+Owner (Oct 28): sessions should plug into the one-step Create — and, after this week, no flow changes without a v1.0 yardstick first.
+
+## 212.66.261028 — The v1.0 parity check: every golden scenario, driven through the real Create screen, compared field by field
+
+Owner (Oct 28): "When we started this project we took a snapshot of what the existing workflow and output looked like and the goal was to compare this to the new workflow and output. I want to ensure this has been done thoroughly and completely for all scenarios."
+
+## 212.65.261027 — v1.0 parity, every format: best-ball team skins is a 2 v 2 game (teams + foursomes), not matchups
+
+Owner (Oct 27): "Have you checked other game types to see where 2.0 might differ from 1.0? Focus on what the code displays in both versions for each game type."
+
+## 212.64.261027 — The double view in match play: foursomes stored where v1.0 never had them (migration 0230 repairs existing games)
+
+Owner (Oct 27, staging game 411862, screenshots): the Strokes section showed the singles matchups AND "MATCH 1 / 2 / 3" boxes laid out as 2 v 2 team matches (MEET v ZOOM per group) — "shows groups and match which has the same data twice … This was certainly not the behavior in v1.0."
+
+## 212.63.261027 — v1.0 parity after creation: groups are optional again for Stableford, stroke play, skins and match play
+
+Owner (Oct 27): "see how we showed the pairings and scorecards in the prior set up (v1.0) and then compare that to version 2.0 … There shouldn't be a difference once the game has been created."
+
+## 212.62.261027 — Match play in the game room: everything by match, not by group
+
+Owner (Oct 27, staging game 411862): "in team matches (individual) once the game has been created, it should just show the matches, and not the groups anymore. what matters is match 1 or 2 etc. the app shows your group, other group and then match 1 and match 2. also the way my group is being shown is confusing".
+
+## 212.61.261027 — Groups are required above four players; a unit moves as one save in every format
+
+Owner (Oct 27): "make sure this logic works for other formats as well … go through all formats"; "why are groups optional? if there are 10 players playing stableford don't they need to be grouped into foursomes?"
+
+## 212.60.261027 — Match play in Create: a matchup moves as one unit; Start over for matchups and groups; a split match blocks Review
+
+Owner (Oct 27, testing 212.58/212.59): "If I create a singles match and then assign that match group 1, and subsequently change it to group 2, it only moves 1 player instead of the paired matchup … I cannot clear it out or fix it"; "the teams button is yellow but review is green"; "There is no start over button for build balanced matches or groups".
+
+## 212.59.261027 — Phase 4 complete: Stableford and stroke play in the one-step Create flow — every format is one step
+
+Owner (Oct 24–25): a game is created only when fully set up. With Stableford and stroke play, every club format now goes through the one-step flow (scramble 212.41, the four-ball family 212.43, match play and skins 212.58). Ryder Cup sessions keep the old flow.
+
+## 212.58.261027 — Phase 4 part 2: match play and skins in the one-step Create flow
+
+Owner (Oct 24–25): a game is created only when fully set up. Scramble (212.41) and the four-ball family (212.43) went first; now MATCH PLAY (individual and team) and SKINS (individual and team 1:1) — the 2 v 2 team skins variant is reached through four-ball and was already one-step. Ryder Cup sessions keep the old flow.
+
 ## 212.57.261027 — Permission audit, part 4: posted rounds and profile flags match the app (migrations 0228, 0229)
 
 Owner (Oct 26): "its fine do a full audit — lets do this the right way". Part 4 (outside games) begins with the table rules.

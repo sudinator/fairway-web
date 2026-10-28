@@ -377,13 +377,15 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
 
 type MatchDraft = { a: string; b: string };
 
-function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave }: {
+export function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave, onStartOver }: {   // 212.58: exported for the one-step Create flow
   game: Game;
   players: Player[];
   teams: { key: string; name: string }[] | null;
   blocked: boolean;
   blockedReason?: string;
   onSave: (pairings: MatchDraft[]) => Promise<void>;
+  /** 212.60: clear every matchup (Create's draft offers it, as the Teams and Groups cards do). */
+  onStartOver?: () => Promise<void>;
 }) {
   const isTeam = !!(teams && teams.length === 2);
   const activePlayers = players.filter((p) => !p.no_show);
@@ -453,6 +455,10 @@ function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSav
       </div>
 
       <button onClick={buildBalanced} disabled={blocked || busy} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 13, opacity: blocked || busy ? .58 : 1 }}>{busy ? "Saving…" : "🎲 Build balanced matches"}</button>
+      {onStartOver && readyCount > 0 ? (
+        <button data-matchups-start-over disabled={blocked || busy} onClick={() => { if (confirm("Clear every matchup and start over?")) void onStartOver(); }}
+          style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>Start over</button>
+      ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: C.sage, fontSize: 11, marginTop: 12 }}><b style={{ color: C.cream }}>{readyCount} of {desiredRows} matches ready</b><span>{activePlayers.length} players</span></div>
 
       {drafts.map((pair, row) => {
@@ -1703,7 +1709,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
           <div style={{ boxShadow: `0 0 0 1px ${C.gold} inset`, borderRadius: 8, padding: "8px 8px 6px", marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div>
-                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{foursomes.length ? "YOUR GROUP" : "YOUR MATCH"}</div>
                 {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
               </div>
               {toggleBtn}
@@ -1714,7 +1720,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
 
           {showAll && (otherPairings.length > 0 || otherFoursomes.length > 0) && (
             <>
-              <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>OTHER GROUPS</div>
+              <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>{foursomes.length ? "OTHER GROUPS" : "OTHER MATCHES"}</div>
               {otherPairings.map(({ pr, i }) => <div key={`op${i}`} style={{ opacity: 0.62 }}>{oneVone(pr.a, pr.b, `p${i}`)}</div>)}
               {otherFoursomes.map(({ f, i }) => foursomeBlock(f, i, { dim: true }))}
             </>

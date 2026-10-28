@@ -11,7 +11,7 @@ checks = {
     "workspace rendered": '<CreateGameWorkspace' in t,
     # 212.41 (one-step creation): the steps come from ONE list in lib/one-step-create — Course, Game, Players, Review,
     # plus Teams for one-step formats — and the step bar, Back and Continue all follow it.
-    "steps from the one shared list": 'createSteps.map((k) => ({ key: k, label: SECTION_LABEL[k]' in create and 'setCreateSection(stepAt(1))' in create and 'setCreateSection(stepAt(-1))' in create
+    "steps from the one shared list": 'createSteps.map((k) => ({ key: k, label: k === "teams" ? teamsStepLabel(gameType as GC.GameTypeOpt, teamMode) : SECTION_LABEL[k]' in create and 'setCreateSection(stepAt(1))' in create and 'setCreateSection(stepAt(-1))' in create
         and '["game", "format", "players", "teams", "review"]' in (root / "lib/one-step-create.ts").read_text() and '["game", "format", "players", "review"]' in (root / "lib/one-step-create.ts").read_text(),
     "no pre-create structure section": 'key: "structure"' not in create and '{createSection === "structure"' not in create,
     "navigation state": 'useState<CreateGameSection>("game")' in create,

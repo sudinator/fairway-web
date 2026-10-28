@@ -37,6 +37,8 @@ export type GameSetupWorkspaceProps = {
   courseOptions: Course[];
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  /** 212.61: a unit (a matchup, a foursome) moves in one server call. */
+  onSetUnitGroup?: (members: Player[], group: number | null) => Promise<void>;
   /** 212.46: Groups → Start over — clear every group (only before scores; see the setup rule "clear_groups"). */
   onClearGroups?: () => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -77,6 +79,7 @@ export function GameSetupWorkspace({
   courseOptions,
   onChangeCourse,
   onSetTeeGroup,
+  onSetUnitGroup,
   onSetTeamGroupSlot,
   onSetScrambleTeams,
   onSetAltShotFirstDriver,
@@ -353,7 +356,7 @@ export function GameSetupWorkspace({
               onRenameTeams={organizerPanelProps.onRenameTeams} onSetTeamColours={organizerPanelProps.onSetTeamColours}
               isBlocked={(p) => { const d = decideSetupChange({ game, players, action: { type: "set_team", player: p, team: null } } as never); return d.decision === "block" ? (d as { reason?: string }).reason ?? "Can't change team now." : null; }} />
           ))}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetUnitGroup={onSetUnitGroup}
             onClearGroups={onClearGroups} clearGroupsBlocked={(() => { const d = decideSetupChange({ game, players, action: { type: "clear_groups" } } as never); return d.decision === "block" ? (d as { reason?: string }).reason ?? null : null; })()} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && (isScramble
             ? <div style={cardStyle}><ScrambleTeamsBuilder game={game} players={players} readOnly={anyScores || !onSetScrambleTeams} onSave={(g) => onSetScrambleTeams?.(g)} /></div>
