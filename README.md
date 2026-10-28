@@ -1,3 +1,12 @@
+## 212.69.261028 — The Ryder Cup session walkthrough: Eagles v Hawks, 5 a side, through the real Create screen
+
+Owner (Oct 28): "simulate a Ryder Cup with 10 players 5 a side … two teams Eagles and Hawks". 212.68 left the Cup-aware hint and the planned-match line untested; now the Create walkthrough runs that exact session.
+A four-ball session planned as 2 matches, the Cup's seed with 5 Eagles and 5 Hawks: one step; the Players hint reads "Eagles 5 · Hawks 5 — … Eagles: untick 1 (4 play); Hawks: untick 1 (4 play)"; one sit-out unticked a side → "Eagles 4 · Hawks 4 — 2 matches of pairs"; the Teams step's team card is LOCKED ("The Cup set the sides …", no Edit names, no Start over, every side button disabled, Eagles / Hawks shown); Build even groups; Review shows "2 of 2 planned ✓"; Create game is ONE save with the Cup's name and team names, 8 players with their sides, 2 foursomes and side contests off; the game is linked to the session only if still unlinked. 154 checks in the walkthrough; the v1.0 parity check unchanged at 32 of 32.
+
+## 212.68.261028 — Ryder Cup sessions in the one-step Create flow, checked field by field against the v1.0 record
+
+Owner (Oct 28): sessions plug into the one-step Create; the Cup's sides locked; sit-outs unticked on the Players step for every format (a scramble session keeps its team size); a planned-match check on Review; the link to the session with v1.0's safety; side contests off; straight to the scorecard.
+
 ## 212.67.261028 — Ryder Cup sessions: the v1.0 snapshot, before any change to their flow
 
 Owner (Oct 28): sessions should plug into the one-step Create — and, after this week, no flow changes without a v1.0 yardstick first.

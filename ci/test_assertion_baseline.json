@@ -1,5 +1,5 @@
 {
-  "total": 440120,
+  "total": 440128,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -59,7 +59,7 @@
     "nine-hole payload": 12,
     "nine-hole posting": 20,
     "odd field": 26,
-    "one-step walkthrough": 146,
+    "one-step walkthrough": 154,
     "player-scoring": 71,
     "round stat completeness": 8,
     "save trace toggle": 3,

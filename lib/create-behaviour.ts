@@ -26,10 +26,12 @@ export const BEHAVIOUR_GUESTS: GuestEntry[] = [{ id: "guest-1", display_name: "G
 /** 212.67: a Ryder Cup SESSION, as the Cup hands it to Create (seed.competitionSession + teamNames + participantTeams). */
 export type SessionSeed = { format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble"; scrambleTeamSize?: 2 | 3 | 4; cupName: string; sessionName: string; sessionId: string; competitionId: string; teams: { A: string; B: string } };
 export const BEHAVIOUR_CUP = { cupName: "Baseline Cup", sessionName: "Session 1", sessionId: "sess-1", competitionId: "cup-1", teams: { A: "Americas", B: "Europe" } };
+/** 212.68: a session is played 4 a side — the behaviour roster (7 members + the creator) gains an eighth member and has no guest. */
+export const BEHAVIOUR_CUP_EXTRA = { id: "u-dev", display_name: "Dev Kapoor", handicap_index: 12.5 };
 export type CreateCase = { id: string; key: string; matchLength?: MatchLength; scrambleTeamSize?: 1 | 2 | 3 | 4; members?: number; guests?: number; session?: SessionSeed };
 export function createBehaviour(c: CreateCase) {
   const f: ReplayedFormat = replayFormatKey(c.key, { matchLength: c.matchLength, scrambleTeamSize: c.scrambleTeamSize });
-  const roster = BEHAVIOUR_ROSTER.slice(0, c.members ?? BEHAVIOUR_ROSTER.length), guests = c.session ? [] : BEHAVIOUR_GUESTS.slice(0, c.guests ?? BEHAVIOUR_GUESTS.length);
+  const roster = c.session ? [...BEHAVIOUR_ROSTER, BEHAVIOUR_CUP_EXTRA] : BEHAVIOUR_ROSTER.slice(0, c.members ?? BEHAVIOUR_ROSTER.length), guests = c.session ? [] : BEHAVIOUR_GUESTS.slice(0, c.guests ?? BEHAVIOUR_GUESTS.length);
   const fieldCount = 1 + roster.length + guests.length;
   const courseHoles = holesForLength(BEHAVIOUR_COURSE.holes as never, f.matchLength);
   const tee = BEHAVIOUR_COURSE.tees[0];
@@ -51,7 +53,7 @@ export function createBehaviour(c: CreateCase) {
     gameId: "GAME", userId: BEHAVIOUR_CREATOR.id, displayName: BEHAVIOUR_CREATOR.display_name, idxVal: BEHAVIOUR_CREATOR.handicap_index,
     selectedPlayers: Object.fromEntries(roster.map((m) => [m.id, true])), groupRoster: roster, guestPlayers: guests, hcpOverrides: {},
     tee, tees: BEHAVIOUR_COURSE.tees, defaultTeeIdx: 0, coursePar: BEHAVIOUR_COURSE.par, holesCount: courseHoles.length,
-    flightsSupported: false, flightMode: "off", flightBands: null, tgcBettingEnabled: false, sideContestsEnabled: true, includeCreator: true,
+    flightsSupported: false, flightMode: "off", flightBands: null, tgcBettingEnabled: false, sideContestsEnabled: !ses, includeCreator: true,   // 212.68: v1.0's session rows start side contests off
   });
   if (ses) {   // v1.0: each row's team from the Cup
     const teamOf = sessionTeams();
@@ -67,7 +69,7 @@ export function createBehaviour(c: CreateCase) {
 }
 /** The Cup's sides for the behaviour roster: the first four (with the creator) on A, the rest on B. */
 export function sessionTeams(): Record<string, "A" | "B"> {
-  const ids = [BEHAVIOUR_CREATOR.id, ...BEHAVIOUR_ROSTER.map((m) => m.id)];
+  const ids = [BEHAVIOUR_CREATOR.id, ...BEHAVIOUR_ROSTER.map((m) => m.id), BEHAVIOUR_CUP_EXTRA.id];
   return Object.fromEntries(ids.map((id, i) => [id, i < 4 ? "A" : "B"])) as Record<string, "A" | "B">;
 }
 

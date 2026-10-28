@@ -1,3 +1,21 @@
+## 212.69.261028 — The Ryder Cup session walkthrough: Eagles v Hawks, 5 a side, through the real Create screen
+
+Owner (Oct 28): "simulate a Ryder Cup with 10 players 5 a side … two teams Eagles and Hawks". 212.68 left the Cup-aware hint and the planned-match line untested; now the Create walkthrough runs that exact session.
+A four-ball session planned as 2 matches, the Cup's seed with 5 Eagles and 5 Hawks: one step; the Players hint reads "Eagles 5 · Hawks 5 — … Eagles: untick 1 (4 play); Hawks: untick 1 (4 play)"; one sit-out unticked a side → "Eagles 4 · Hawks 4 — 2 matches of pairs"; the Teams step's team card is LOCKED ("The Cup set the sides …", no Edit names, no Start over, every side button disabled, Eagles / Hawks shown); Build even groups; Review shows "2 of 2 planned ✓"; Create game is ONE save with the Cup's name and team names, 8 players with their sides, 2 foursomes and side contests off; the game is linked to the session only if still unlinked. 154 checks in the walkthrough; the v1.0 parity check unchanged at 32 of 32.
+
+Deploy: code only (tests).
+
+## 212.68.261028 — Ryder Cup sessions in the one-step Create flow, checked field by field against the v1.0 record
+
+Owner (Oct 28): sessions plug into the one-step Create; the Cup's sides locked; sit-outs unticked on the Players step for every format (a scramble session keeps its team size); a planned-match check on Review; the link to the session with v1.0's safety; side contests off; straight to the scorecard.
+
+**Create for a session:** Course → Game (format fixed by the session) → Players (every Cup member on their side, pre-ticked; the hint reads the sides — "Eagles 5 · Hawks 5 — a 2 v 2 session needs the same number a side in pairs: Eagles: untick 1 (4 play); Hawks: untick 1 (4 play)") → Teams (the Cup's sides, names and colours shown on a LOCKED team card — no picking, renaming, balancing or Start over; then the captain's choices: the 2 v 2 groups and first drivers, the trifecta pairings, the singles matchups, or the scramble teams built within each side at the session's team size, side v side) → Review (the usual lines plus the session's planned matches: "2 of 2 planned ✓", or amber "1 match — the session planned 2") → Create game: one save that carries every player's side (a scramble's too — Cup scoring reads it), then the link to the session exactly as v1.0 made it (only if the session is still unlinked; otherwise the game is removed again and the organizer told), then the scorecard.
+**The record corrected on the way** (212.67's transcription): v1.0 built a session's rows with side contests OFF (bets false); and a session is played 4 a side, so the session scenarios gained an eighth member (Dev Kapoor) in place of the absent guest — v1.0's record with 7 would have stored a 2 v 1 group that Cup scoring skips. Every club record is byte-for-byte unchanged; the three records (Create, structure, server equivalence) agree.
+**The v1.0 parity check now runs all 32 scenarios** — the 26 club formats and the 6 sessions, each driven through the real Create screen with the Cup's seed — and compares the game row, every player row, teams, groups, foursomes, matchups AND the session link with v1.0's record: 32 of 32 match. It caught two gaps while the step was built: a Cup scramble sent no sides (Cup scoring needs them), and the session rows' bets.
+Not yet under test: the Cup-aware Players hint's wording and the planned-match line (the record has no planned count) — covered by the staging check below.
+
+Deploy: code only. Staging: open a Cup session → Create game: the locked team card, the groups, Review's planned-match line, Create game, then the Cup page shows the session linked.
+
 ## 212.67.261028 — Ryder Cup sessions: the v1.0 snapshot, before any change to their flow
 
 Owner (Oct 28): sessions should plug into the one-step Create — and, after this week, no flow changes without a v1.0 yardstick first.

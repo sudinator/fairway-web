@@ -334,7 +334,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       gameType: session.format,
       teamNames: { A: competition.team_a_name, B: competition.team_b_name },
       participantTeams,
-      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, scrambleTeamSize: session.format === "scramble" ? (session.scramble_team_size ?? 2) : undefined, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match) },
+      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, scrambleTeamSize: session.format === "scramble" ? (session.scramble_team_size ?? 2) : undefined, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match), plannedMatchCount: Number(session.planned_match_count || 0) },
     });
   };
 
