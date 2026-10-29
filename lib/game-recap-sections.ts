@@ -13,6 +13,7 @@ import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
 import { isFullCard } from "@/lib/round-rules";
 import { scrambleResults } from "@/lib/scramble-game";
+import { indivSegScheme, segRanges, segValues, segLeadersFor } from "@/lib/segments";
 
 export type MatchRow = { winners: string[]; losers: string[]; result: string; team: string | null; halved: boolean; lead: number; thru: number };
 export type SkinRow = { name: string; holes: { n: number; value: number }[]; skins: number };
@@ -30,6 +31,10 @@ export type RecapSections = {
   /** 211.1: a scramble's final leaderboard, or its matches. */
   scramble?: { mode: "field" | "match"; gross: boolean; rows: { pos: string; name: string; members: string; gross: number; handicap: number; net: number; toPar: number; thru: number; holes?: number }[]; matches: { name: string; line: string; a: string; b: string }[] };
   tiles: Tile[];
+  /** 212.71: the game's segments (sixes / nines) — each segment's winner(s) and value — when the game had a scheme. */
+  segments?: { label: string; short: string; who: string[]; val: number; unit: "pts" | "net" }[];
+  /** 212.71: stat and streak tiles, every one entered (the share image keeps the notable ones, two at most). */
+  statTiles: (Tile & { notable: boolean })[];
 };
 
 const other = (t: string) => (t === "A" ? "B" : "A");
@@ -74,7 +79,7 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
     if (h.bestNetHole) tiles.push({ label: "Best net hole", who: h.bestNetHole.name, what: `${h.bestNetHole.grossVsPar <= -2 ? "eagle" : h.bestNetHole.grossVsPar === -1 ? "birdie" : h.bestNetHole.grossVsPar === 0 ? "par" : "bogey"} on ${h.bestNetHole.n} · net ${h.bestNetHole.netVsPar <= -2 ? "eagle" : "birdie"}` });
     if (h.mostParsOrBetter) tiles.push({ label: "Most pars or better", who: h.mostParsOrBetter.names.join(" · "), what: String(h.mostParsOrBetter.count) });
   };
-  const out: RecapSections = { sub: null, individualStats: true, tiles };
+  const out: RecapSections = { sub: null, individualStats: true, tiles, statTiles: [] };
   if (game.game_type === "scramble") {
     // 211.1: team scores only — no individual stats; the same results as the game screen.
     const r = scrambleResults(game, players, altShotScores);
@@ -157,17 +162,22 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
   // ---- Trifecta (team): the singles count; tiles from the singles ----
   if (game.game_type === "trifecta") {
     let singles = 0, to18 = 0;
+    const rows: MatchRow[] = [];   // 212.71 (owner): the trifecta had no results table — each foursome's two singles and its four-ball
     (game.foursomes || []).forEach((f: any) => {
       if (!f.a?.length || !f.b?.length) return;
       const mode = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
+      const teamA = playerOf(f.a[0])?.team ?? null;
       const r = computeTrifecta(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, mode, !!f.swap);
       (r.contests as any[]).forEach((c, ci) => {
-        if (c.kind !== "single" || !c.settled) return;
-        singles++; if (c.thru === holes) to18++;
+        if (!c.settled) return;
         const aN = c.aIds.map(nm), bN = c.bIds.map(nm);
+        rows.push(toRow(aN, bN, teamA, c.lead, c.thru, c.result || (c.lead === 0 ? "AS" : `${Math.abs(c.lead)} UP`)));
+        if (c.kind !== "single") return;
+        singles++; if (c.thru === holes) to18++;
         consider(comeback(game, (k) => (computeTrifecta(game.holes_meta, membersOf(game, truncate(players, k), f), f.a, f.b, game.allowance_pct ?? 100, mode, !!f.swap).contests as any[])[ci].lead, c.lead, aN, bN));
       });
     });
+    if (rows.length) out.matches = { title: "THE MATCHES · 2 SINGLES + A FOUR-BALL PER FOURSOME", rows: orderTeamRows(rows, dayWinner) };
     out.sub = toLast(to18, singles, "singles", holes); out.sub = out.sub.charAt(0).toUpperCase() + out.sub.slice(1);
   }
   // ---- Skins ----
@@ -236,5 +246,24 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
   if (out.individualStats) common();
   if (h.bestGroup && tiles.length < 4) tiles.push({ label: "Best group", who: `Group ${h.bestGroup.group}`, what: `net ${h.bestGroup.avgNet.toFixed(1)} avg` });
   out.tiles = tiles.slice(0, 4);
+  // ── 212.71 (owner, Oct 29): the pieces the recap was missing ──
+  if (out.individualStats) {
+    const names = (xs: string[]) => xs.join(" · ");
+    const st = h.stats;
+    if (st.fewestPutts) out.statTiles.push({ label: "Fewest putts", who: names(st.fewestPutts.names), what: `${st.fewestPutts.putts} putts`, notable: st.fewestPutts.notable });
+    if (st.parStreak) out.statTiles.push({ label: "Longest par streak", who: names(st.parStreak.names), what: `${st.parStreak.holes} holes`, notable: st.parStreak.notable });
+    if (st.mostFairways) out.statTiles.push({ label: "Most fairways", who: names(st.mostFairways.names), what: `${st.mostFairways.hit} of ${st.mostFairways.of}`, notable: st.mostFairways.notable });
+    if (st.bounceBack) out.statTiles.push({ label: "Bounce-back birdie", who: names(st.bounceBack.names), what: `after a double on ${st.bounceBack.hole - 1}`, notable: true });
+    // segments: Stableford and stroke play with a scheme (a money game is always three sixes — never money here, points only)
+    if (game.game_type === "stableford" || game.game_type === "stroke") {
+      const scheme = indivSegScheme(game, false);
+      if (scheme !== "none") {
+        const ranges = segRanges(scheme, holes);
+        const live = players.filter((p) => !p.no_show && isFullCard(p.scores as never, holes));
+        const leaders = segLeadersFor(live.map((p) => ({ p, seg: segValues(p, game, ranges) })), game, ranges);
+        if (leaders.some((l) => l.complete && l.val != null)) out.segments = leaders.filter((l) => l.complete && l.val != null).map((l, i) => ({ label: l.label, short: ranges[i].short, who: l.who, val: l.val as number, unit: game.game_type === "stableford" ? "pts" : "net" }));
+      }
+    }
+  }
   return out;
 }

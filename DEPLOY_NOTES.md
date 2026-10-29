@@ -1,3 +1,20 @@
+## 212.71.261029 — The game recap: segments, side contests in the email, stats and streaks, standouts on the share; no money anywhere
+
+Owner (Oct 29): segments were missing from game 494730's summary; "lets exclude money from all summaries period"; stats tiles and streaks; the share image is one phone screen (today's card, 943px, is the limit — "flex the amount of people to show in Net birdies … to top 3 if we need space (or eliminate it entirely)"); standout rounds bump the net birdies; the field average as "Field average (net) · 73 (+1) · front 36 (E) · back 37 (+1)"; the toughest / easiest holes say who made par or better. Iterated on rendered mock-ups (the design gallery: lib/recap-mockups), every format reviewed on its own card.
+
+**Modified, not rebuilt** — the recap engine (lib/game-highlights, lib/game-recap-sections), the body (components/game/recap-body), the card and the round-summary email:
+- **Segments** — Stableford and stroke play, following the game screen (sixes unless set to nines or off): on the share a line ("Sixes · 1–6 Raj 14 · 7–12 Nihar & Amit 13 · …", or "<name> swept all three"), in the app a box, in the email a section. Points or net strokes; never money.
+- **Side contests** — now in the email too (one shared loader, lib/contests loadContestLines, for the card and the sender).
+- **Stats and streaks** — fewest putts, most fairways, longest par streak, a bounce-back birdie (a birdie straight after a double): only stats the field entered. The app and email show every one; the share keeps the NOTABLE ones (putts ≤ 30, streak 5+, fairways 10+, any bounce-back), two at most, in the tile grid. Shown for team formats too ("shows who really played well").
+- **The share image** — net birdies top 3; standout rounds take net birdies' place when there are any; tighter rows in the leaderboard and net-birdies boxes; "Tied at the top" dropped when it repeats the headline; toughest and easiest on one line with par-or-better counts. Heights (the 943px limit): Stableford / stroke 844–866, match 897, four-ball 894, alternate shot 844, skins 883–913, Cup session 955, trifecta 995 (accepted: its six results).
+- **Field average (net) · 70.8 (−1.3) · front 35.3 (−0.8) · back 35.5 (−0.5)** — net nines (new: frontBackNet) against each nine's par; app, share and email.
+- **Trifecta** had no results table (in v1.0 either): now its six contests — two singles and the four-ball per foursome — ordered by the winning side.
+- **No money in any summary**: the card's "Winnings posted in Money" line removed; the email never had it.
+Reviewed and unchanged: match play, team match play, four-ball, alternate shot (no individual stats, by the shared-ball rule), the three skins styles, scramble (field and team v team — drives not shown, by decision), the Ryder Cup session card (the Cup standing box).
+Tests: lib/recap-additions (20) — segments (sixes, nines in net, off), stat tiles (entered only; notable on the share, two at most), the net nines adding to the field average, the share's field and hole lines, segments line vs box, contests line, standouts in net birdies' place and top 3 without, the app's box and tiles, the email's sections, NO money in app / share / email, trifecta's six results; negative-tested. Every existing test passes unchanged.
+
+Deploy: code only.
+
 ## 212.70.261029 — The App Testing club's games don't exist for stats (migration 0231)
 
 Owner (Oct 29): "exclude all matches played by the app testing group — that is literally meant for testing only, all stats in that club must be excluded like they don't exist."

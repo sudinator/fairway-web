@@ -1,3 +1,7 @@
+## 212.71.261029 — The game recap: segments, side contests in the email, stats and streaks, standouts on the share; no money anywhere
+
+Owner (Oct 29): segments were missing from game 494730's summary; "lets exclude money from all summaries period"; stats tiles and streaks; the share image is one phone screen (today's card, 943px, is the limit — "flex the amount of people to show in Net birdies … to top 3 if we need space (or eliminate it entirely)"); standout rounds bump the net birdies; the field average as "Field average (net) · 73 (+1) · front 36 (E) · back 37 (+1)"; the toughest / easiest holes say who made par or better. Iterated on rendered mock-ups (the design gallery: lib/recap-mockups), every format reviewed on its own card.
+
 ## 212.70.261029 — The App Testing club's games don't exist for stats (migration 0231)
 
 Owner (Oct 29): "exclude all matches played by the app testing group — that is literally meant for testing only, all stats in that club must be excluded like they don't exist."

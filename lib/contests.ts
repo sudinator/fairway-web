@@ -119,3 +119,18 @@ export function fmtContestValue(unit: ContestUnit, value: number | null | undefi
 export function ftInToInches(feet: number, inches: number): number {
   return Math.max(0, Math.round((Number(feet) || 0) * 12 + (Number(inches) || 0)));
 }
+
+
+/** 212.71: the side contests' winners as the recap shows them — one line per contest hole with a winner. Used by the
+ *  recap card (the app) and the round-summary email sender, so both show the same thing. */
+export async function loadContestLines(db: { from: (t: string) => any }, gameId: string): Promise<{ label: string; hole: number; name: string; value: string }[]> {
+  // bounded: one game's contests
+  const { data: cs, error } = await db.from("game_contests").select("*").eq("game_id", gameId);
+  if (error || !cs?.length) return [];
+  // bounded: one game's contest entries
+  const { data: es } = await db.from("game_contest_entries").select("*").in("contest_id", cs.map((c: Contest) => c.id));
+  const out: { label: string; hole: number; name: string; value: string }[] = [];
+  (cs as Contest[]).forEach((c) => contestLeaderboard(c, ((es || []) as ContestEntry[]).filter((e) => e.contest_id === c.id && !e.voided))
+    .forEach((w) => { if (w.best) out.push({ label: c.label, hole: w.hole, name: w.best.player_name, value: fmtContestValue(c.unit, w.best.value) }); }));
+  return out;
+}

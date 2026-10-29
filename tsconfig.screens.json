@@ -58,6 +58,8 @@
     "lib/groups-unit-move.test.tsx",
     "lib/match-card-layout.test.tsx",
     "lib/test-clubs.test.ts",
+    "lib/recap-additions.test.tsx",
+    "lib/recap-additions.test.tsx",
     "lib/one-step-v1-parity.test.tsx",
     "lib/member-stats-server.test.ts",
     "lib/cup-scramble.test.tsx",

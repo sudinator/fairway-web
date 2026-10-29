@@ -2,7 +2,7 @@
 // one-click "turn off" link. Server only (uses node:crypto and the service key).
 import crypto from "node:crypto";
 import { buildRecap } from "@/lib/game-recap";
-import { recapEmailHtml } from "@/lib/recap-email";
+import { recapEmailHtml, type EmailContest } from "@/lib/recap-email";
 import { chBasis, pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import type { EmailGameContext } from "@/lib/round-email";
@@ -10,7 +10,7 @@ import type { CupLine } from "@/lib/cup-standing";
 import { isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
-export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null): { context: EmailGameContext; groupHtml: string } | null {
+export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null, contests: EmailContest[] = []): { context: EmailGameContext; groupHtml: string } | null {
   const me = players.find((p) => (p as any).user_id === userId);
   if (!me) return null;
   const recap = buildRecap(game, players);
@@ -29,7 +29,7 @@ export function gameContextFor(game: Game, players: Player[], userId: string, cu
       standoutBetter: myStandout ? myStandout.better : null, standoutBasis: st?.basis ?? null,
       shortenedHoles: isValidRound(me.scores, nh) && !isFullCard(me.scores, nh) ? scoredHoles(me.scores, nh) : null,
       fieldNote: st?.basis === "field" ? fieldNote : null },
-    groupHtml: recapEmailHtml(recap, cup),
+    groupHtml: recapEmailHtml(recap, cup, contests),   // 212.71: the side contests join the email
   };
 }
 

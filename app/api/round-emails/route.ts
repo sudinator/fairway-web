@@ -11,6 +11,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import crypto from "node:crypto";
 import { buildRoundEmail } from "@/lib/round-email";
+import { loadContestLines } from "@/lib/contests";
 import { gameContextFor, unsubscribeToken } from "@/lib/round-email-server";
 import { loadCupForGame } from "@/lib/cup-load";
 import { buildClubReport, type ClubReport } from "@/lib/club-report";
@@ -71,7 +72,8 @@ export async function POST(req: Request) {
         // 209.5: a Cup session's email carries the Cup's standing (shared loader + lib/cup-standing).
         const cupData = game ? await loadCupForGame(db, d.game_id) : null;
         const cup = cupData ? cupStandingAfter(cupData.competition, cupData.sessions, d.game_id) : null;
-        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id, cup);
+        const contests = game ? await loadContestLines(db, d.game_id) : [];   // 212.71: the side contests join the email
+        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id, cup, contests);
         gameCode = (game as any)?.code ?? null;
       }
       // The app opens a game by its 6-digit code (201.1 deep link); a solo round has no direct link — open the app.

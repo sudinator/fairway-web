@@ -22,6 +22,20 @@ export type Highlights = {
   scoring: { birdies: number; pars: number; bogeys: number; doublesPlus: number };   // gross; eagles count as birdies
   fieldNet: number | null;                     // average net of finishers; null under 8 players
   frontBack: { front: number; back: number } | null;
+  /** 212.71 (owner): the field's NET front and back nine averages (full course handicap, like fieldNet); 18 holes, 2+ finishers. */
+  frontBackNet: { front: number; back: number } | null;
+  /** 212.71: the same averages against par — the course's for the total, each nine's holes for front and back. */
+  netVsPar: { total: number | null; front: number | null; back: number | null };
+  /** 212.71 (owner, Oct 29): stats the field entered, and streaks — each null when nobody entered that stat. `notable`
+   *  is the share image's bar (fewest putts ≤ 30, a par streak of 5+, fairways 10+, any bounce-back); the app and
+   *  email show every stat that was entered. */
+  stats: {
+    entered: number;                                                     // players who entered any stat
+    fewestPutts: { names: string[]; putts: number; notable: boolean } | null;
+    mostFairways: { names: string[]; hit: number; of: number; notable: boolean } | null;
+    parStreak: { names: string[]; holes: number; notable: boolean } | null;
+    bounceBack: { names: string[]; hole: number } | null;               // a birdie straight after a double or worse
+  };
   toughest: HoleStat | null; easiest: HoleStat | null;
   netEagleHole: { n: number; par: number; si: number | null; count: number; total: number } | null;
   bestNetHole: { name: string; n: number; par: number; si: number | null; gross: number; grossVsPar: number; netVsPar: number } | null;
@@ -152,6 +166,9 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
   const fieldNet = finishers.length >= 8 ? finishers.reduce((s, p) => s + net(p), 0) / finishers.length : null;
   const nine = (p: Player, from: number) => holes.slice(from, from + 9).reduce((s, _, i) => s + (played(p, from + i) || 0), 0);
   const frontBack = nh === 18 && finishers.length >= 2 ? { front: finishers.reduce((s, p) => s + nine(p, 0), 0) / finishers.length, back: finishers.reduce((s, p) => s + nine(p, 9), 0) / finishers.length } : null;
+  const nineNet = (p: Player, from: number) => { const al = alloc.get(pkey(p)) || {}; return holes.slice(from, from + 9).reduce((s, h, i) => s + ((played(p, from + i) || 0) - (al[h.n] || 0)), 0); };
+  const parOf = (from: number, count: number) => holes.slice(from, from + count).reduce((t, h) => t + h.par, 0);
+  const frontBackNet = nh === 18 && finishers.length >= 2 ? { front: finishers.reduce((s, p) => s + nineNet(p, 0), 0) / finishers.length, back: finishers.reduce((s, p) => s + nineNet(p, 9), 0) / finishers.length } : null;
 
   // Best group: lowest average net among tee groups of 2+ finishers (when there are 2+ groups).
   const groups = new Map<number, Player[]>();
@@ -173,6 +190,22 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
     const differential = Math.round(((113 / slope) * (ags - rating)) * 10) / 10;
     return { name: p.display_name, userId: (p as any).user_id ?? null, index: hi, differential, gap: differential - hi };
   }).filter((x): x is { name: string; userId: string | null; index: number; differential: number; gap: number } => !!x);
+  // 212.71: stats and streaks over FINISHERS (a full card), only where entered
+  const puttsOf = (p: Player) => { const ps = (p.putts || []) as (number | null)[]; const n = ps.filter((x) => x != null).length; return n >= nh ? ps.reduce((t, x) => (t as number) + (x || 0), 0) as number : null; };
+  const fwOf = (p: Player) => { const fw = (p.fairways || []) as (boolean | null)[]; const asked = holes.filter((h) => h.par >= 4).length; const answered = fw.filter((x, i) => x != null && holes[i] && holes[i].par >= 4).length; return answered >= asked && asked > 0 ? { hit: fw.filter((x, i) => x === true && holes[i]?.par >= 4).length, of: asked } : null; };
+  const best = <T,>(rows: { p: Player; v: T | null }[], key: (v: T) => number, pick: "low" | "high") => { const ok = rows.filter((r): r is { p: Player; v: T } => r.v != null); if (!ok.length) return null; const target = pick === "low" ? Math.min(...ok.map((r) => key(r.v))) : Math.max(...ok.map((r) => key(r.v))); const w = ok.filter((r) => key(r.v) === target); return { names: w.map((r) => r.p.display_name), v: w[0].v }; };
+  const fewestPutts = best(finishers.map((p) => ({ p, v: puttsOf(p) })), (v) => v, "low");
+  const mostFairways = best(finishers.map((p) => ({ p, v: fwOf(p) })), (v) => v.hit, "high");
+  const streakOf = (p: Player) => { let b = 0, run = 0; holes.forEach((h, i) => { const sc = played(p, i); run = sc != null && sc <= h.par ? run + 1 : 0; b = Math.max(b, run); }); return b; };
+  const parStreak = best(finishers.map((p) => ({ p, v: streakOf(p) })), (v) => v, "high");
+  const bounce = finishers.map((p) => { for (let i = 1; i < holes.length; i++) { const prev = played(p, i - 1), cur = played(p, i); if (prev != null && cur != null && prev >= holes[i - 1].par + 2 && cur <= holes[i].par - 1) return { p, hole: holes[i].n }; } return null; }).filter((x): x is { p: Player; hole: number } => !!x);
+  const stats: Highlights["stats"] = {
+    entered: finishers.filter((p) => puttsOf(p) != null || fwOf(p) != null).length,
+    fewestPutts: fewestPutts ? { names: fewestPutts.names, putts: fewestPutts.v, notable: fewestPutts.v <= 30 } : null,
+    mostFairways: mostFairways ? { names: mostFairways.names, hit: mostFairways.v.hit, of: mostFairways.v.of, notable: mostFairways.v.hit >= 10 } : null,
+    parStreak: parStreak && parStreak.v >= 3 ? { names: parStreak.names, holes: parStreak.v, notable: parStreak.v >= 5 } : null,
+    bounceBack: bounce.length ? { names: bounce.map((b) => b.p.display_name), hole: bounce[0].hole } : null,
+  };
   const standouts = standoutsFrom(scored);
   const fieldRows = fieldComparison(scored);
 
@@ -180,7 +213,8 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
     standouts, fieldRows,
     finishers: finishers.length, shortened, topGross, topNet,
     netBirdies: { top, all, birdies: all.reduce((s, r) => s + r.birdies, 0), eagles: totalEagles, players: all.length },
-    scoring, fieldNet, frontBack, toughest, easiest, netEagleHole, bestNetHole,
+    scoring, fieldNet, frontBack, frontBackNet, stats, toughest,
+    netVsPar: { total: fieldNet != null ? fieldNet - parOf(0, nh) : null, front: frontBackNet ? frontBackNet.front - parOf(0, 9) : null, back: frontBackNet ? frontBackNet.back - parOf(9, 9) : null }, easiest, netEagleHole, bestNetHole,
     mostParsOrBetter: bestOf(parsOrBetter, names), mostBirdies: bestOf(birdies, names), bestGroup,
     roundMinutes: roundMinutes != null && roundMinutes > 0 && roundMinutes < 12 * 60 ? roundMinutes : null,
   };

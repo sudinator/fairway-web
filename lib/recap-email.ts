@@ -15,13 +15,16 @@ const sgn = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
 /** The "how the field played" lines, as plain text — identical to the recap card's lines. */
 export function fieldLines(r: Recap): string[] {
   const h = r.highlights, s = r.sections, out: string[] = [];
-  if (s.individualStats && (h.fieldNet != null || h.frontBack)) {
-    const fb = h.frontBack ? (Math.abs(h.frontBack.front - h.frontBack.back) < 0.05 ? "even front and back"
-      : `${h.frontBack.back < h.frontBack.front ? "back" : "front"} nine ${Math.abs(h.frontBack.front - h.frontBack.back).toFixed(1)} better`) : null;
-    out.push([h.fieldNet != null ? `Field average net ${h.fieldNet.toFixed(1)}` : null, fb].filter(Boolean).join(" · "));
+  if (s.individualStats && (h.fieldNet != null || h.frontBackNet)) {   // 212.71 (owner): "Field average (net) · 73.2 (+1.2) · front 36.6 (E) · back 36.6 (+0.6)" — the card's wording
+    const vs = (d: number) => Math.abs(d) < 0.05 ? "E" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
+    out.push(["Field average (net)", h.fieldNet != null ? `${h.fieldNet.toFixed(1)} (${vs(h.netVsPar.total ?? 0)})` : null,
+      h.frontBackNet ? `front ${h.frontBackNet.front.toFixed(1)} (${vs(h.netVsPar.front ?? 0)}) · back ${h.frontBackNet.back.toFixed(1)} (${vs(h.netVsPar.back ?? 0)})` : null].filter(Boolean).join(" · "));
   }
-  if (h.toughest) out.push(`Toughest: Hole ${h.toughest.n} · par ${h.toughest.par}${h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged ${h.toughest.avg.toFixed(1)} (${sgn(h.toughest.vsPar)})${h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}`);
-  if (h.easiest && h.easiest.n !== h.toughest?.n) out.push(`Easiest: Hole ${h.easiest.n} · par ${h.easiest.par}${h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged ${h.easiest.avg.toFixed(1)} (${sgn(h.easiest.vsPar)})${h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}`);
+  // 212.71: the same compact line the share image shows — toughest and easiest together, with who made par or better
+  if (h.toughest) {
+    const d = (x: { par: number; avg: number; vsPar: number; parsOrBetter: number; birdies: number }) => `par ${x.par}, avg ${x.avg.toFixed(1)}, ${x.vsPar >= 0 ? "+" : ""}${x.vsPar.toFixed(1)}; ${x.parsOrBetter === 0 ? "nobody made par" : `${x.parsOrBetter} made par or better${x.birdies ? `, ${x.birdies} birdie${x.birdies === 1 ? "" : "s"}` : ""}`}`;
+    out.push(`Toughest hole ${h.toughest.n} (${d(h.toughest)})${h.easiest && h.easiest.n !== h.toughest.n ? ` · easiest hole ${h.easiest.n} (${d(h.easiest)})` : ""}`);
+  }
   if (s.individualStats && h.netEagleHole) out.push(`Net eagles: ${h.netEagleHole.total} — ${h.netEagleHole.count} on hole ${h.netEagleHole.n} (par ${h.netEagleHole.par}${h.netEagleHole.si ? `, stroke index ${h.netEagleHole.si}` : ""})`);
   return out;
 }
@@ -48,7 +51,9 @@ function SCR_TABLE(rows: { pos: string; name: string; members: string; gross: nu
   return `<table role="presentation" style="width:100%;border-collapse:collapse;margin-top:6px">${head}${body}</table>`;
 }
 
-export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
+/** 212.71: the side contests, as the card shows them (the sender reads them from the game). */
+export type EmailContest = { label: string; hole: number; name: string; value: string };
+export function recapEmailHtml(r: Recap, cup?: CupLine | null, contests: EmailContest[] = []): string {
   const h = r.highlights, s = r.sections, parts: string[] = [];
   // 0. a Cup session: the Cup's standing after it (209.5 — same wording as the recap card)
   if (cup) parts.push(`<div style="border:1px solid #C9A227;background:#FBF6E6;border-radius:10px;padding:10px 12px;margin-top:10px">`
@@ -71,6 +76,15 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
       .map(([l, v]) => `<td style="text-align:center;width:25%"><div style="font-family:Georgia,serif;font-size:20px;font-weight:800">${v}</div><div style="font-size:11px;color:#5d6f66">${l}</div></td>`).join("");
     parts.push(H("HOW THE FIELD PLAYED") + `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${strip}</tr></table>`
       + fieldLines(r).map((l) => `<div style="font-size:13px;color:#33433b;margin-top:5px;line-height:1.45">${esc(l)}</div>`).join(""));
+  // 212.71 (owner, Oct 29): segments, side contests, stats and streaks — never money
+  const sx = r.sections;
+  const andList = (xs: string[]) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+  if (sx.segments) parts.push(`<div style="margin-top:10px"><div style="font-size:11px;letter-spacing:1px;font-weight:700;color:#8a6d1f">SEGMENTS · ${sx.segments.length === 3 ? "THREE SIXES" : "TWO NINES"}</div>`
+    + sx.segments.map((x) => `<div style="font-size:13px;color:#33433b;margin-top:4px">${esc(x.short)} — <b>${esc(andList(x.who))}${x.who.length > 1 ? " tied" : ""}</b> ${x.val} ${x.unit}</div>`).join("") + `</div>`);
+  if (contests.length) parts.push(`<div style="margin-top:10px"><div style="font-size:11px;letter-spacing:1px;font-weight:700;color:#8a6d1f">SIDE CONTESTS</div>`
+    + contests.map((c) => `<div style="font-size:13px;color:#33433b;margin-top:4px">${esc(c.label)} · hole ${c.hole} — <b>${esc(c.name)}</b> ${esc(c.value)}</div>`).join("") + `</div>`);
+  if (sx.statTiles.length) parts.push(`<div style="margin-top:10px"><div style="font-size:11px;letter-spacing:1px;font-weight:700;color:#8a6d1f">STATS &amp; STREAKS</div>`
+    + sx.statTiles.map((t) => `<div style="font-size:13px;color:#33433b;margin-top:4px">${esc(t.label)} — <b>${esc(t.who)}</b> ${esc(t.what)}</div>`).join("") + `</div>`);
   }
   // 3. highlight tiles
   if (s.tiles.length) parts.push(H("HIGHLIGHTS") + `<table role="presentation" width="100%" cellspacing="6" cellpadding="0" style="border-collapse:separate">`
