@@ -1,5 +1,5 @@
 {
-  "total": 440128,
+  "total": 440130,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -85,6 +85,7 @@
     "team colour dot": 10,
     "team rounds": 11,
     "tee yardage": 7,
+    "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20
   }

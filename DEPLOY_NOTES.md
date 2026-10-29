@@ -1,3 +1,13 @@
+## 212.70.261029 — The App Testing club's games don't exist for stats (migration 0231)
+
+Owner (Oct 29): "exclude all matches played by the app testing group — that is literally meant for testing only, all stats in that club must be excluded like they don't exist."
+
+**Where they were counted.** Test clubs (groups.is_test, 0106) never post rounds, so everything built on the Rounds table — the Rounds tab, handicap index, trends, profile stats, standout checks, badges — already left them out, and the admin analytics honour the flag. Two readers are built on the GAMES themselves and had no filter: head-to-head / member insights (every ended game the member played, across clubs) and Season Wrapped (matches, "played with most", team rounds). And a test club's quarterly report could be emailed.
+**Now:** one shared rule (lib/test-clubs: the test clubs' ids, and "drop their games") applied to head-to-head and Season Wrapped — and to be applied to every game-based stat that follows (personal bests, streaks). Migration 0231: due_club_report_emails skips test clubs.
+Tests: lib/test-clubs (2); ci/assert-test-clubs.sql — a test club's report is never emailed, a real club's is; negative-tested. Full migration chain + every assertion pass on local PostgreSQL 16.
+
+**Deploy: apply migration 0231** (after 0218–0230; "Run without RLS"), then the package. Head-to-head and Season Wrapped recompute on open, so test-club games vanish from them immediately.
+
 ## 212.69.261028 — The Ryder Cup session walkthrough: Eagles v Hawks, 5 a side, through the real Create screen
 
 Owner (Oct 28): "simulate a Ryder Cup with 10 players 5 a side … two teams Eagles and Hawks". 212.68 left the Cup-aware hint and the planned-match line untested; now the Create walkthrough runs that exact session.

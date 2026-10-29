@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
+import { fetchTestClubIds, withoutTestClubs } from "@/lib/test-clubs";
 import { matchOutcomes, memberRecord, BEST_PARTNER_MIN, formatsLabel, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import type { Game, Player } from "@/lib/game-types";
@@ -31,7 +32,9 @@ export function HeadToHead({ user }: { user: { id: string } }) {
           fetchAllIn<Player>(supabase, "game_players", "game_id", ids),
           fetchAllIn<AltShotScoreRow>(supabase, "game_alt_shot_scores", "game_id", ids),
         ]) : [[], [], []] as [Game[], Player[], AltShotScoreRow[]];
-        const ended = games.filter((g) => (g as { status?: string }).status === "ended");
+        // 212.70: test clubs' games don't exist for stats (owner, Oct 29)
+        const testClubs = await fetchTestClubIds(supabase);
+        const ended = withoutTestClubs(games.filter((g) => (g as { status?: string }).status === "ended"), testClubs);
         const outcomes = ended.flatMap((g) => matchOutcomes(g, players.filter((p) => p.game_id === g.id), alt.filter((x) => x.game_id === g.id)));
         if (live) setRec(memberRecord(outcomes, user.id));
       } catch (e) {
