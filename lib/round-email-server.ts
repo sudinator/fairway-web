@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import { buildRecap } from "@/lib/game-recap";
 import { recapEmailHtml, type EmailContest } from "@/lib/recap-email";
+import { beatLine, type Best } from "@/lib/personal-bests";
 import { chBasis, pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import type { EmailGameContext } from "@/lib/round-email";
@@ -10,7 +11,7 @@ import type { CupLine } from "@/lib/cup-standing";
 import { isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
-export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null, contests: EmailContest[] = []): { context: EmailGameContext; groupHtml: string } | null {
+export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null, contests: EmailContest[] = [], newBests: Best[] = []): { context: EmailGameContext; groupHtml: string } | null {
   const me = players.find((p) => (p as any).user_id === userId);
   if (!me) return null;
   const recap = buildRecap(game, players);
@@ -29,7 +30,7 @@ export function gameContextFor(game: Game, players: Player[], userId: string, cu
       standoutBetter: myStandout ? myStandout.better : null, standoutBasis: st?.basis ?? null,
       shortenedHoles: isValidRound(me.scores, nh) && !isFullCard(me.scores, nh) ? scoredHoles(me.scores, nh) : null,
       fieldNote: st?.basis === "field" ? fieldNote : null },
-    groupHtml: recapEmailHtml(recap, cup, contests),   // 212.71: the side contests join the email
+    groupHtml: pbEmailHtml(newBests) + recapEmailHtml(recap, cup, contests),   // 212.71: the side contests join the email; personal bests: the recipient's own new ones first
   };
 }
 
@@ -43,3 +44,12 @@ export const validUnsubscribe = (userId: string, token: string, kind: EmailKind 
   const a = Buffer.from(unsubscribeToken(userId, kind)), b = Buffer.from(String(token || ""));
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
+
+
+/** "🏆 New personal best" — the recipient's own, at the top of the email; nothing when none. */
+export function pbEmailHtml(bests: Best[]): string {
+  if (!bests.length) return "";
+  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `<div style="border:1px solid #C9A227;background:#FBF6E6;border-radius:10px;padding:10px 12px;margin:0 0 12px"><div style="font-size:11px;letter-spacing:1px;font-weight:700;color:#8a6d1f">🏆 NEW PERSONAL ${bests.length === 1 ? "BEST" : "BESTS"}</div>`
+    + bests.map((b) => `<div style="font-size:13px;color:#33433b;margin-top:4px"><b>${esc(b.label)}</b> · ${esc(b.display)} — ${esc(beatLine(b))}</div>`).join("") + `</div>`;
+}

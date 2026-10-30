@@ -60,6 +60,7 @@
     "lib/test-clubs.test.ts",
     "lib/recap-additions.test.tsx",
     "lib/share-links-form.test.tsx",
+    "lib/personal-bests.test.tsx",
     "lib/recap-additions.test.tsx",
     "lib/one-step-v1-parity.test.tsx",
     "lib/member-stats-server.test.ts",

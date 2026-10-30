@@ -7,8 +7,11 @@ const out = "/tmp/bnn-gallery-overflow";
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 if (!fs.existsSync(".testout-screens/lib/design-gallery.js")) { execSync("npx tsc -p tsconfig.screens.json", { stdio: "pipe" }); execSync("node ci/patch_test_aliases.mjs .testout-screens", { stdio: "pipe" }); }
 execSync("node .testout-screens/lib/design-gallery.js " + out, { stdio: "pipe" });
-const found = fs.readdirSync("/opt/pw-browsers").filter((x) => x.startsWith("chromium_headless_shell")).map((x) => path.join("/opt/pw-browsers", x, "chrome-linux", "headless_shell"))[0];
-const browser = await chromium.launch({ executablePath: found });
+// Chromium: Playwright's own install (GitHub: `npx playwright install chromium`), or a pre-provisioned /opt/pw-browsers
+const provisioned = fs.existsSync("/opt/pw-browsers") ? fs.readdirSync("/opt/pw-browsers").filter((x) => x.startsWith("chromium_headless_shell")).map((x) => path.join("/opt/pw-browsers", x, "chrome-linux", "headless_shell"))[0] : undefined;
+let browser;
+try { browser = await chromium.launch(provisioned ? { executablePath: provisioned } : {}); }
+catch (e) { console.log("GALLERY OVERFLOW: FAIL — Chromium is not available to Playwright (run `npx playwright install chromium`): " + (e && e.message ? e.message.split("\n")[0] : e)); process.exit(1); }
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const bad = [];
 for (const f of fs.readdirSync(out).filter((x) => x.endsWith(".html")).sort()) {

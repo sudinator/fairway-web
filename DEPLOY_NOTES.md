@@ -1,3 +1,14 @@
+## 212.73.261029 — GitHub's CI fixed (the overflow guard finds Chromium); personal bests: the dashboard card and the celebration
+
+**The CI failure on 212.72** (owner, Oct 30): ci/check_gallery_overflow.mjs looked for Chromium at /opt/pw-browsers — the development machine's pre-provisioned path, which GitHub's runner doesn't have. The guard now uses Playwright's own Chromium when nothing is pre-provisioned, and names the fix plainly if neither exists; the workflows (ci.yml and staging-integration.yml) install it (`npx playwright install chromium --with-deps`) after `npm ci`. The guard itself is unchanged in what it checks.
+
+**Personal bests** (approved Oct 23; the design chosen Oct 30 from three rendered mock-ups: variant C). From a member's finished rounds, exactly as the dashboard loads them (test clubs never post rounds, so none of theirs count): lowest gross, lowest net, best Stableford, most birdies in a round, best nine (front or back, or a nine-hole round), fewest putts (when every hole has them), longest par streak (3+). Eighteen-hole rounds set the round bests; nine-hole rounds set only "best nine"; in-progress and deleted rounds set nothing. Each best knows the round it came from, the best it beat ("beat your 81 by three shots" / "your first"), and whether it is NEW (set within the last 30 days).
+- **The dashboard card** (above Recent rounds): the latest new best as a hero — "78 · New lowest gross · Oak Hollow · Blue · Oct 25 · beat your 81 by three shots" — and the rest as rows with a NEW tag where earned; with nothing new in 30 days, rows only. Tapping a best opens that round. The card is absent until the member has a full round.
+- **The celebration:** a gold "🏆 New personal best" box at the top of the game recap (the app view, the viewer's own; never on the share image) and at the top of the round-summary email (the recipient's own), each line naming the best, the value and what it beat. lib/personal-bests-load: one loader for the card, the recap and the email.
+Tests: lib/personal-bests (16) — the engine on synthetic rounds (which best, which round, what it beat, 9-hole and in-progress rules, NEW within 30 days, the bests one round set, the beat lines), the card (hero / rows-only, tap opens the round), the email box. The design gallery renders the real card (53-pb-card-real); every gallery screen passes the overflow guard.
+
+Deploy: code only. Staging: the dashboard shows the card from your real rounds; end a game whose round beats one of your bests and the recap shows the gold box.
+
 ## 212.72.261029 — Recap's field total, the live link's form, the Cup roster's width (and a guard against sideways overflow)
 
 Owner (Oct 29, staging 212.71): "the Field avg dropped the total, i only see front and back"; "the live scores link should have the same format" as the line-up link; "Ryder Cup Roster Selection does not fit in the width of the phone screen. This breaks the display rule we already have in place".

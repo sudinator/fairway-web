@@ -27,6 +27,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # 212.73: the gallery overflow guard (ci/check_gallery_overflow.mjs) lays every design-gallery screen out in Chromium
+      - run: npx playwright install chromium --with-deps
 
       - uses: supabase/setup-cli@v3
         with:

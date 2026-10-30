@@ -11,6 +11,8 @@ import { cupStandingAfter, type CupLine } from "@/lib/cup-standing";
 import { pkey, chBasis } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
 import { loadContestLines } from "@/lib/contests";
+import { newBestsForGame } from "@/lib/personal-bests-load";
+import { beatLine, type Best } from "@/lib/personal-bests";
 import { useCardExport } from "@/components/share-card";
 import { RecapBody, type RecapContest } from "@/components/game/recap-body";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
@@ -23,6 +25,13 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
   const recap = useMemo(() => buildRecap(game, players, altShotScores), [game, players, altShotScores]);
   const supabase = useMemo(() => createClient(), []);
   const [contests, setContests] = useState<RecapContest[]>([]);
+  const [newBests, setNewBests] = useState<Best[]>([]);   // personal bests this game's round set for the viewer
+  useEffect(() => {
+    let live = true;
+    if (game.status !== "ended" || !userId) { setNewBests([]); return; }
+    (async () => { try { const out = await newBestsForGame(supabase, userId, game.id); if (live) setNewBests(out); } catch { if (live) setNewBests([]); } })();
+    return () => { live = false; };
+  }, [game.id, game.status, userId]);
   useEffect(() => {
     let live = true;
     (async () => { const out = await loadContestLines(supabase, game.id); if (live) setContests(out); })();   // 212.71: the shared loader
@@ -60,6 +69,12 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
 
   return (
     <div data-game-recap style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginBottom: 12 }}>
+      {newBests.length ? (
+        <div data-recap-personal-bests style={{ border: `1px solid ${C.gold}`, background: C.greenMid, borderRadius: 12, padding: "8px 12px", marginBottom: 10 }}>
+          <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>🏆 NEW PERSONAL {newBests.length === 1 ? "BEST" : "BESTS"}</div>
+          {newBests.map((b) => <div key={b.key} style={{ color: C.cream, fontSize: 13, marginTop: 4 }}><b>{b.label}</b> · {b.display} — {beatLine(b)}</div>)}
+        </div>
+      ) : null}
       <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} cup={cup} />
       {changed ? <div data-recap-changed style={{ color: C.gold, fontSize: 12.5, marginTop: 8, fontWeight: 700 }}>Results changed since they were announced — scores were corrected.</div> : null}
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>

@@ -1,3 +1,7 @@
+## 212.73.261029 — GitHub's CI fixed (the overflow guard finds Chromium); personal bests: the dashboard card and the celebration
+
+**The CI failure on 212.72** (owner, Oct 30): ci/check_gallery_overflow.mjs looked for Chromium at /opt/pw-browsers — the development machine's pre-provisioned path, which GitHub's runner doesn't have. The guard now uses Playwright's own Chromium when nothing is pre-provisioned, and names the fix plainly if neither exists; the workflows (ci.yml and staging-integration.yml) install it (`npx playwright install chromium --with-deps`) after `npm ci`. The guard itself is unchanged in what it checks.
+
 ## 212.72.261029 — Recap's field total, the live link's form, the Cup roster's width (and a guard against sideways overflow)
 
 Owner (Oct 29, staging 212.71): "the Field avg dropped the total, i only see front and back"; "the live scores link should have the same format" as the line-up link; "Ryder Cup Roster Selection does not fit in the width of the phone screen. This breaks the display rule we already have in place".

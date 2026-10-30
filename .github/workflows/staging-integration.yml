@@ -39,6 +39,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
       - run: npm ci
+      - run: npx playwright install chromium --with-deps   # the gallery overflow guard (212.73)
       - name: Verify live staging migration parity
         run: node ci/check_live_migration_parity.mjs staging
       - run: npm run ci:staging
