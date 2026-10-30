@@ -14,7 +14,7 @@ import { ShareLineupModal } from "@/components/share-card";
 import type { CourseTee } from "@/lib/courses";
 import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
-import { pkey, shapeOf, scrambleMethodOf } from "@/lib/game-shape";
+import { pkey, shapeOf, scrambleMethodOf, hasCourseHandicap } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import { courseLabel, type Course } from "@/lib/courses";
 import { ShareControl } from "@/components/game/scorecard-views";
@@ -127,7 +127,7 @@ export function GameSetupWorkspace({
     ...pairings.flatMap((pr) => [pr.a, pr.b]),
     ...foursomes.flatMap((f) => [...f.a, ...f.b]),
   ]);
-  const cWithHcp = players.filter((p) => p.course_handicap != null).length;
+  const cWithHcp = players.filter((p) => hasCourseHandicap(p, game.course_par)).length;
   const cWithTeam = players.filter((p) => p.team).length;
   const cPlaced = players.filter((p) => placedKeys.has(pkey(p))).length;
   const cGrouped = players.filter((p) => p.tee_group != null).length;

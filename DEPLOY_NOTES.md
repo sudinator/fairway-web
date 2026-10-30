@@ -1,3 +1,31 @@
+## 212.76.261030 — One source for a live player's course handicap; the handicap audit (index, tees); audits 3–7 (names reach games, Cup points on the recap)
+
+Owner (Oct 30, after 947286): "shouldn't the handicap be derived from one place for all calculations and displays? … is it worth doing an audit?" Yes; and the index and tee rules confirmed as designed.
+
+**The audit of 31 direct reads of a stored `course_handicap`:** 12 are a posted ROUND's snapshot (correct, kept: round detail and editor, round prep, the round maths, personal bests, season summary, badges, the round fingerprint); 4 were stale-prone DISPLAYS of a live player — the leaderboard label (212.75), the organizer panel's "course handicap N · plays M" line, its group list, the setup summary; 9 were PRESENCE checks reading the stored number; 3 are deliberate reads of the stored / previous figure (the manual editor's starting value, the "was N" message, the row passed into the accessor). The public line-up and team balancing already computed correctly.
+**Now:** `courseHandicapOf` and `hasCourseHandicap` (lib/game-shape, beside the scoring basis) serve every label, summary, line-up, balance and presence check — the scoring basis, rounded for display. The stored number is written by joins, tee changes and overrides, and read only as a round's snapshot. **Guard:** ci/check_course_handicap_reads.py fails on any other read (it catches the old leaderboard line when put back). **Round-trip test** (lib/course-handicap-one-source, 6): join → override 13 → clear → a stale row from the old code → a tee change → no handicap; at every step the leaderboard label, the organizer line, the setup summary, the accessor and the scoring basis agree. With the old leaderboard line restored, two steps fail.
+**Audit 1 — handicap index:** no game screen reads the profile's index; every game read uses the row, filled from the roster at creation or by the organizer; the creator's index at Create writes back to the profile. The running index is never used by a game. Working as designed.
+**Audit 2 — tee rating and slope:** scoring reads the row's snapshot (9 reads, under the accessor); the live tee table serves only the tee picker's options (merged with row snapshots), the scorecard's yardages and setting a tee (which refreshes the row); the daily freshness check reports and never touches game rows. Consistent; now written down in APP_RULES.md ("Handicap figures — where each one comes from").
+**Audits 3–7 (owner: "proceed with the audit for 3-7"):**
+- 3 course par and holes — CLEAN: every read (223) uses the game's own copy; the live course serves only the tee picker and yardages.
+- 4 names and avatars — INCONSISTENT, fixed: an avatar change reached the profile, every game row and the club memberships (set_my_avatar); a NAME change updated only the profile, so every game kept the old name on the leaderboard, recap and emails. **Migration 0232:** set_my_display_name mirrors set_my_avatar (the profile and every game row, finished games too); the Profile's name save calls it. Test: ci/assert-name-change.sql (the profile and both game rows carry the new name; another member's row untouched). The security contract snapshot records the one new grant.
+- 5 stored totals — CLEAN: posting sums the holes, the repost reuses it, the personal editor lets the server recompute.
+- 6 money postings — CLEAN by construction: "stale" means posted nets differ from the live nets, so an organizer correction after the end flips it.
+- 7 Cup standings — INCONSISTENT, fixed: the Cup page and the email score each session at its points per match; the recap scored every match as 1 point (a 2-point session read "1–1" on the recap, "2–2" on the Cup page), and only scramble sessions used the session score at all. buildRecap takes the session's points (the card and the email sender pass them from the Cup data they already load) and applies them to every team format. Test: a four-ball session at 2 points a match reads 2–2.
+Also carries 212.75 (clearing an override stores the derived figure) and its repair script (docs/sql/repair_derived_course_handicaps.sql, one-time).
+
+**Deploy: apply migration 0232** (after 0231; "Run without RLS"), then the package; the repair script once, if not yet run.
+
+## 212.75.261030 — Clearing a course-handicap override left the old number behind (production game 947286)
+
+Owner (Oct 30): on 947286, Ankur Tiku (index 13, course handicap 18 on his tee) showed CH 18 on the group card but CH 13 on the leaderboard, after an override of 13 had been set and then cleared.
+
+**Cause:** clearing an override set the row's source back to "derived" but left the manual number in `course_handicap`. The group card recomputes the figure from the index and tee (18); the leaderboard prints the stored number (13). The two screens read the same row two ways and the clear left it inconsistent.
+**Fix:** clearing now stores the DERIVED figure in the row (the same formula a join or a tee change uses), so every screen agrees. The save is a pure helper (lib/manual-handicap: manualHandicapPatch) — tested: clearing stores the derived figure; setting stores the manual number, who and when; clearing with no tee data stores no figure. The 0153 rules test (lib/manual-handicap.test.ts) is unchanged.
+**Repair for rows already in that state:** docs/sql/repair_derived_course_handicaps.sql — step 1 lists every derived row on an unended game, for a player with no scores yet, whose stored figure differs from the derived one (expect Ankur on 947286: 13 → 18); step 2 corrects them. Run on production, "Run without RLS".
+
+Deploy: code only, plus the repair script once.
+
 ## 212.74.261029 — The recap's field line on one line; the Cup roster row with avatars, 10+ characters of the name, short team labels
 
 Owner (Oct 30): "the round summary Field Average needs to fit on one line, maybe call it Field Avg (net), and can do out / in"; "the selector for the Ryder Cup must show the avatar picture and keep at least 10 characters before the name is truncated. Instead of spelling out the full team name, truncate them to the first few letters"; variant C of the personal bests card (already in 212.73).

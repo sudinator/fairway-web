@@ -75,7 +75,8 @@ export async function POST(req: Request) {
         const cup = cupData ? cupStandingAfter(cupData.competition, cupData.sessions, d.game_id) : null;
         const contests = game ? await loadContestLines(db, d.game_id) : [];   // 212.71: the side contests join the email
         const newBests = game ? await newBestsForGame(db, d.user_id, d.game_id).catch(() => []) : [];   // the recipient's own new personal bests
-        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id, cup, contests, newBests);
+        const ppm = cupData?.sessions.find((x) => x.game_id === d.game_id)?.points_per_match;   // 212.76: the session's points per match
+        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id, cup, contests, newBests, ppm != null ? Number(ppm) || 1 : undefined);
         gameCode = (game as any)?.code ?? null;
       }
       // The app opens a game by its 6-digit code (201.1 deep link); a solo round has no direct link — open the app.

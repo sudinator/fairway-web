@@ -15,12 +15,15 @@
  * strings could only be checked by scraping the DOM.
  */
 import type { GameType } from "./game-shape";
+import { courseHandicapOf } from "./game-shape";
 import { gameTypeLabel } from "./game-create";
 
 export type SummaryPlayer = {
   display_name: string;
   handicap_index?: number | null;
   course_handicap?: number | null;
+  /** 212.76: the course-handicap basis (the one accessor reads these; a stored figure alone is never shown) */
+  rating?: number | null; slope?: number | null; course_handicap_source?: "derived" | "manual" | null;
   tee_name?: string | null;
   team?: string | null;
   tee_group?: number | null;
@@ -32,6 +35,7 @@ export type SummaryGame = {
   course?: string | null;
   game_type: GameType;
   allowance_pct?: number | null;
+  course_par?: number | null;
   played_at?: string | null;
   teams?: { key: string; name: string }[] | null;
   holes_meta?: { n: number }[] | null;
@@ -130,7 +134,7 @@ export function buildSetupSummary(game: SummaryGame, players: SummaryPlayer[]): 
     if (tn) bits.push(tn);
     // BOTH numbers: the index is what a player recognises as "theirs", the course handicap is what
     // they will actually play off, and the gap between them is what surprises people mid-round.
-    bits.push(`CH ${val(p.course_handicap)}`);
+    bits.push(`CH ${val(courseHandicapOf({ ...p, course_handicap: p.course_handicap ?? null } as never, game.course_par, game.holes_meta?.length))}`);   // 212.76: the one accessor
     bits.push(`idx ${val(p.handicap_index)}`);
     // The tee appears ONLY when it differs from the one named in the header.
     if (!dom || p.tee_name !== dom.tee) bits.push(`${val(p.tee_name)} tees`);

@@ -11,7 +11,7 @@
 // snake runs across all of them. Players already locked to a team (scored) stay where they are and
 // are counted in their team's total before the rest are dealt.
 import { applyAllowance } from "./golf";
-import { chBasis, pkey } from "./game-shape";
+import { chBasis, pkey, hasCourseHandicap } from "./game-shape";
 
 export type BalancePlayer = {
   id: string; user_id?: string | null; display_name: string;
@@ -30,8 +30,8 @@ export type BalanceResult = {
 };
 
 export function playingHandicapOf(game: BalanceGame, p: BalancePlayer): number | null {
-  if (p.course_handicap == null) return null;
-  const ch = chBasis({ ...p, course_handicap: p.course_handicap, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined, course_handicap_source: p.course_handicap_source ?? undefined }, game.course_par, game.holes_meta?.length);
+  if (!hasCourseHandicap({ ...p, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined } as never, game.course_par ?? null)) return null;   // 212.76
+  const ch = chBasis({ ...p, course_handicap: p.course_handicap ?? null, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined, course_handicap_source: p.course_handicap_source ?? undefined }, game.course_par, game.holes_meta?.length);
   return applyAllowance(ch, game.allowance_pct ?? 100);
 }
 

@@ -8,7 +8,7 @@
 // The former card printed the course handicap in bold with no allowance applied, no slope or
 // rating, and no opponent: a player on a 90% game read "15" and played off 14 without being told.
 import { applyAllowance, applyAllowanceExact, matchAllowance, trifectaSingles } from "./golf";
-import { chBasis, pkey, altShotSides } from "./game-shape";
+import { chBasis, pkey, altShotSides, hasCourseHandicap } from "./game-shape";
 import type { CourseTee } from "./courses";
 
 export type LineupPlayer = {
@@ -70,8 +70,8 @@ export function buildLineup(game: LineupGame, players: LineupPlayer[], courseTee
   const allowance = game.allowance_pct ?? 100;
   const byKey = new Map(players.map((p) => [pkey(p), p]));
   const nameOf = (k: string) => byKey.get(k)?.display_name ?? "?";
-  const chOf = (p: LineupPlayer) => (p.course_handicap != null
-    ? chBasis({ ...p, course_handicap: p.course_handicap, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined, course_handicap_source: p.course_handicap_source ?? undefined }, game.course_par, holes)
+  const chOf = (p: LineupPlayer) => (hasCourseHandicap({ ...p, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined } as never, game.course_par ?? null)
+    ? chBasis({ ...p, course_handicap: p.course_handicap ?? null, handicap_index: p.handicap_index ?? undefined, slope: p.slope ?? undefined, rating: p.rating ?? undefined, course_handicap_source: p.course_handicap_source ?? undefined }, game.course_par, holes)
     : null);
   const teamName = (key: string | null | undefined) => {
     if (!key) return null;

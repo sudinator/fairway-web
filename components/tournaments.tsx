@@ -63,7 +63,7 @@ import {
   type BetSplit,
   markerOwnsMyRow,
   mergeBackupRow } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, hasCourseHandicap } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, allowsOneShortGroup, teamSizesFitGroups, fieldFitsTeamGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError, notifyInfo } from "@/components/toast";
@@ -113,6 +113,7 @@ import * as GC from "@/lib/game-create";
 import * as SO from "@/lib/structure-ops";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { countsForIndividualStats } from "@/lib/round-rules";
+import { manualHandicapPatch } from "@/lib/manual-handicap";
 import { isOneStep, createSectionsFor, SECTION_LABEL, teamsStepLabel, cupSessionHint, plannedMatchesLine, groupsProblem, groupsFromMatches, playerCountHint, defaultScrambleSize, isTeamGroupOneStep, teamGroupLineupProblem, isMatchOneStep, matchLineupProblem, matchupsProblem } from "@/lib/one-step-create";
 import { PlayerCountHint, OneStepReview } from "@/components/game/setup/one-step";
 import { ScrambleTeamsBuilder as DraftTeamsBuilder } from "@/components/game/scramble-teams-builder";
@@ -2181,7 +2182,7 @@ function GameRoom({
       const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
       setMe(mineOff);
       if (snap.courseTees) setCourseTees(snap.courseTees as any);
-      if (mineOff && mineOff.course_handicap == null && n0) setNeedsSetup(true);
+      if (mineOff && !hasCourseHandicap(mineOff, (snap.game as { course_par?: number | null } | null)?.course_par ?? null) && n0) setNeedsSetup(true);
       setLoading(false);
       return true;
     };
@@ -2277,7 +2278,7 @@ function GameRoom({
     setPlayers(reconciled);
     setMe(mine);
     if (safeGame) saveGameSnapshot(gameId, { game: safeGame, players: reconciled, altShotScores: loadedAlt });
-    if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
+    if (mine && !hasCourseHandicap(mine, (safeGame as { course_par?: number | null } | null)?.course_par ?? null) && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
     recoveryReadyRef.current = isPrimaryScoringDevice();
@@ -3241,7 +3242,7 @@ function GameRoom({
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
     const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     if (!teamFormat) return;
-    const missing = players.filter((p) => !p.no_show && p.course_handicap == null).map((p) => p.display_name);
+    const missing = players.filter((p) => !p.no_show && !hasCourseHandicap(p, game.course_par)).map((p) => p.display_name);
     if (missing.length) { notifyError(`Set a course handicap for ${missing.join(", ")} first, then build matchups.`); return; }
     const ph = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
     const result = balancedTeamMatchups(
@@ -3337,9 +3338,8 @@ function GameRoom({
     if (!game) return;
     const holes = game.holes_meta?.length === 9 ? 9 : 18;
     if (!allowSetupChange({ type: "set_manual_handicap", playerName: p.display_name, value, holes })) return;
-    const patch = value == null
-      ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
-      : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: user?.id ?? null, course_handicap_set_at: new Date().toISOString() };
+    // 212.75 (owner, Oct 30, game 947286): clearing an override puts the DERIVED figure back in the row (lib/manual-handicap)
+    const patch = manualHandicapPatch(p, game.course_par, value, user?.id ?? null);
     const { error: manErr } = await supabase.from("game_players").update(patch).eq("id", p.id);
     saved(manErr, `save ${p.display_name}'s course handicap`, `${p.display_name}'s course handicap ${value == null ? "cleared" : "saved"}.`);
     await load();
@@ -3803,7 +3803,7 @@ function GameRoom({
     if (total === 0) return [];
     const gt = game.game_type;
     const out: string[] = [];
-    const noHcp = players.filter((p) => p.course_handicap == null).length;
+    const noHcp = players.filter((p) => !hasCourseHandicap(p, game.course_par)).length;
     if (noHcp > 0) out.push(`${noHcp} player${noHcp > 1 ? "s" : ""} without a handicap — scored off scratch (0) until you set it in the Players tab`);
     const { usesTeams, usesMatchups } = shapeOf(game);
     if (usesTeams) { const n = players.filter((p) => !p.team).length; if (n > 0) out.push(`${n} player${n > 1 ? "s" : ""} not assigned to a team`); }
@@ -3832,7 +3832,7 @@ function GameRoom({
   const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
   const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
   const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => (
-    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag} showBetStatus={effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID}
+    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag} coursePar={game?.course_par ?? null} holeCount={game?.holes_meta?.length} showBetStatus={effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID}
       user={user} isStroke={isStroke} strokeNet={strokeNet}
       playerPoints={playerPoints} playerThru={playerThru} playerNet={playerNet}
       playerGross={playerGross} parThru={parThru} relToParStr={relToParStr} leaderName={leaderName} />
@@ -4732,7 +4732,7 @@ function GameRoom({
                   : 0,
               }));
             })()}
-            hasHandicap={me.course_handicap != null}
+            hasHandicap={hasCourseHandicap(me, game.course_par)}
             showIndivDots={shapeOf(game).dotBasis !== "absolute"}
             matchStrokeLabel={game.game_type === "fourball" ? "Four-Ball" : game.game_type === "trifecta" ? "Trifecta" : "match"}
             matchMode={game.game_type === "match"}

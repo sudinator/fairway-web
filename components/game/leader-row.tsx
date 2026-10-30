@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { courseHandicapOf } from "@/lib/game-shape";
 import type { Player } from "@/lib/game-types";
 import { C } from "@/lib/golf";
 import { Avatar } from "@/components/ui";
@@ -20,9 +21,11 @@ type LeaderRowProps = {
   parThru: (p: Player) => number;
   relToParStr: (p: Player) => string;
   leaderName: (full: string) => string;
+  /** 212.76: the course par and hole count, for the one course-handicap accessor */
+  coursePar: number | null; holeCount?: number | null;
 };
 
-export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke, strokeNet, playerPoints, playerThru, playerNet, playerGross, parThru, relToParStr, leaderName }: LeaderRowProps) {
+export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke, strokeNet, playerPoints, playerThru, playerNet, playerGross, parThru, relToParStr, leaderName, coursePar, holeCount }: LeaderRowProps) {
     const pts = playerPoints(p);
     const thru = playerThru(p);
     const fkey = (p as any).flight as string | null;
@@ -42,7 +45,7 @@ export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke
             {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
           </div>
           <div style={{ color: C.sage, fontSize: 11 }}>
-            {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
+            {courseHandicapOf(p, coursePar, holeCount) != null ? `CH ${courseHandicapOf(p, coursePar, holeCount)}` : "no hcp"}   {/* 212.76: the one accessor */}
             {showBetStatus && p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
           </div>
         </div>

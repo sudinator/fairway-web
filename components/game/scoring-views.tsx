@@ -49,7 +49,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides, skinsTieOf } from "@/lib/game-shape";
+import { pkey, chBasis, hasCourseHandicap, shapeOf, dotStrokes, fullStrokes, altShotSides, skinsTieOf } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
@@ -1478,7 +1478,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     return ti >= 0 ? teamColour(teams[ti], ti) : C.gold;
   };
 
-  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par, game.holes_meta?.length), allowance)));
+  const phStr = (pp: Player) => (!hasCourseHandicap(pp, game.course_par) ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par, game.holes_meta?.length), allowance)));
   // phStr uses the unrounded course handicap (WHS: allowance applied to unrounded, rounded once).
 
   const strokeText = (n: number): string => {
