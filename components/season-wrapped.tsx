@@ -11,6 +11,7 @@ import { C, type Round } from "@/lib/golf";
 import { btn, BottomSheet } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { buildSeasonSummary, type SeasonSummary } from "@/lib/season-summary";
+import { fetchTestClubIds, withoutTestClubs } from "@/lib/test-clubs";
 import { seasonMatches, wrappedYearOn, lookbackYears, type SeasonGame } from "@/lib/season-matches";
 import { SeasonStory } from "@/components/season-story";
 import { SeasonShareCard } from "@/components/season-share-card";
@@ -35,7 +36,8 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
       const gamesRead = fetchAllIn<any>(supabase, "games", "id", ids), playersRead = fetchAllIn<any>(supabase, "game_players", "game_id", ids);
       gs = await gamesRead; gp = await playersRead;
     } catch { gs = []; gp = []; }
-    games = gs.filter((g: any) => g.status === "ended").map((g: any) => ({ ...g, players: gp.filter((p: any) => p.game_id === g.id) }));
+    const testClubs = await fetchTestClubIds(supabase);   // 212.70: test clubs' games don't exist for stats
+    games = withoutTestClubs(gs.filter((g: any) => g.status === "ended"), testClubs).map((g: any) => ({ ...g, players: gp.filter((p: any) => p.game_id === g.id) }));
   }
   const { matches, playedWith } = seasonMatches(games, userId);
   let clubs: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[] = [];

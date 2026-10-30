@@ -34,7 +34,7 @@ ok(JSON.stringify(visibleGames(games, null, false).map((g) => g.id)) === '["sent
   off.unmount();
   const on = renderScreen(<ShareLinks lineupToken="oak-hollow-oct25-ab12cd" liveToken="tok123" onShare={async (v) => { ons.push(v); }} />);
   const rows = [...on.el.querySelectorAll("[data-share-link]")].map((r) => r.textContent || "");
-  ok(rows.length === 2 && rows[0].includes("Line-up link") && rows[0].includes("/lineup/oak-hollow-oct25-ab12cd") && rows[1].includes("Live scores link") && rows[1].includes("/live/tok123"), `sharing on: the line-up and live scores links (got ${JSON.stringify(rows)})`);
+  ok(rows.length === 2 && rows[0].includes("Line-up link") && rows[0].includes("/lineup/oak-hollow-oct25-ab12cd") && rows[1].includes("Live scores link") && rows[1].includes("/live/oak-hollow-oct25-ab12cd"), `sharing on: the line-up and live scores links, both in the readable form (212.72) (got ${JSON.stringify(rows)})`);
   const stop = [...on.el.querySelectorAll("button")].find((x) => (x.textContent || "").includes("Stop sharing")) as HTMLButtonElement;
   await act(async () => { stop.click(); await Promise.resolve(); });
   ok(ons[1] === false && (stop.textContent || "").includes("both"), "one Stop sharing turns off both links");

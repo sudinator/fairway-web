@@ -1,3 +1,81 @@
+## 212.74.261029 — The recap's field line on one line; the Cup roster row with avatars, 10+ characters of the name, short team labels
+
+Owner (Oct 30): "the round summary Field Average needs to fit on one line, maybe call it Field Avg (net), and can do out / in"; "the selector for the Ryder Cup must show the avatar picture and keep at least 10 characters before the name is truncated. Instead of spelling out the full team name, truncate them to the first few letters"; variant C of the personal bests card (already in 212.73).
+
+- **Field line:** "Field avg (net) 70.8 (−1.3) · out 35.3 (−0.8) · in 35.5 (−0.5)" — one line (never wraps; ellipsis if a phone is narrower still), on the share image, in the app and in the email.
+- **Cup roster row:** the member's avatar (initials when none); the name column never narrower than 10 characters; the team buttons carry a short label — the name itself up to 7 characters, otherwise the first four letters of its first real word ("Americas" → "Amer", "The Magnificent Eagles" → "Magn", "Hawks" stays) — with the full name as the button's title. The design gallery renders the row with avatars and long names; the overflow guard passes.
+Tests: lib/cup-roster-row (5): the short labels, the avatar, the 10-character minimum, the buttons' labels and titles; lib/recap-additions (22): the field line's wording and that it is one line, in the app, the share and the email.
+
+Deploy: code only.
+
+## 212.73.261029 — GitHub's CI fixed (the overflow guard finds Chromium); personal bests: the dashboard card and the celebration
+
+**The CI failure on 212.72** (owner, Oct 30): ci/check_gallery_overflow.mjs looked for Chromium at /opt/pw-browsers — the development machine's pre-provisioned path, which GitHub's runner doesn't have. The guard now uses Playwright's own Chromium when nothing is pre-provisioned, and names the fix plainly if neither exists; the workflows (ci.yml and staging-integration.yml) install it (`npx playwright install chromium --with-deps`) after `npm ci`. The guard itself is unchanged in what it checks.
+
+**Personal bests** (approved Oct 23; the design chosen Oct 30 from three rendered mock-ups: variant C). From a member's finished rounds, exactly as the dashboard loads them (test clubs never post rounds, so none of theirs count): lowest gross, lowest net, best Stableford, most birdies in a round, best nine (front or back, or a nine-hole round), fewest putts (when every hole has them), longest par streak (3+). Eighteen-hole rounds set the round bests; nine-hole rounds set only "best nine"; in-progress and deleted rounds set nothing. Each best knows the round it came from, the best it beat ("beat your 81 by three shots" / "your first"), and whether it is NEW (set within the last 30 days).
+- **The dashboard card** (above Recent rounds): the latest new best as a hero — "78 · New lowest gross · Oak Hollow · Blue · Oct 25 · beat your 81 by three shots" — and the rest as rows with a NEW tag where earned; with nothing new in 30 days, rows only. Tapping a best opens that round. The card is absent until the member has a full round.
+- **The celebration:** a gold "🏆 New personal best" box at the top of the game recap (the app view, the viewer's own; never on the share image) and at the top of the round-summary email (the recipient's own), each line naming the best, the value and what it beat. lib/personal-bests-load: one loader for the card, the recap and the email.
+Tests: lib/personal-bests (16) — the engine on synthetic rounds (which best, which round, what it beat, 9-hole and in-progress rules, NEW within 30 days, the bests one round set, the beat lines), the card (hero / rows-only, tap opens the round), the email box. The design gallery renders the real card (53-pb-card-real); every gallery screen passes the overflow guard.
+
+Deploy: code only. Staging: the dashboard shows the card from your real rounds; end a game whose round beats one of your bests and the recap shows the gold box.
+
+## 212.72.261029 — Recap's field total, the live link's form, the Cup roster's width (and a guard against sideways overflow)
+
+Owner (Oct 29, staging 212.71): "the Field avg dropped the total, i only see front and back"; "the live scores link should have the same format" as the line-up link; "Ryder Cup Roster Selection does not fit in the width of the phone screen. This breaks the display rule we already have in place".
+
+- **Field average total:** it only showed with 8+ finishers (an older rule) while the new net nines show from 2 — so smaller games lost the total. Now the total shows whenever the nines do (2+ finishers). lib/game-highlights test updated (7 players: a field average; 1 player: none).
+- **Live scores link** in the same readable form as the line-up link ("…/live/oak-hollow-oct25-k7m2px"); the server already resolved the slug for the live page (get_live_scorecard accepts it), so this is the app's link only. The long private token is never shown. Test: lib/share-links-form (2); the draft-games links test updated.
+- **Cup roster selection** ran off the phone: each row holds the name, "In" and two TEAM-NAME buttons, and the buttons never shrank. The row is now its own component (CupRosterRow): the name truncates, the two team buttons share the remaining width and truncate, so a row is never wider than the phone.
+- **The guard the rule needed:** ci/check_gallery_overflow.mjs — every design-gallery screen is laid out at 390px and the right edge of every element is measured (a clipping frame hides sideways scroll, so content, not scroll, is what's checked); any screen wider than the phone fails. The Cup roster joins the gallery with long team names — with the old buttons it fails at 540px. Runs with the guards.
+Also answered: the game recap in the app is on the Play tab of every ended game, for everyone who can open the game — every player and their clubmates, not only the organizer.
+
+Deploy: code only.
+
+## 212.71.261029 — The game recap: segments, side contests in the email, stats and streaks, standouts on the share; no money anywhere
+
+Owner (Oct 29): segments were missing from game 494730's summary; "lets exclude money from all summaries period"; stats tiles and streaks; the share image is one phone screen (today's card, 943px, is the limit — "flex the amount of people to show in Net birdies … to top 3 if we need space (or eliminate it entirely)"); standout rounds bump the net birdies; the field average as "Field average (net) · 73 (+1) · front 36 (E) · back 37 (+1)"; the toughest / easiest holes say who made par or better. Iterated on rendered mock-ups (the design gallery: lib/recap-mockups), every format reviewed on its own card.
+
+**Modified, not rebuilt** — the recap engine (lib/game-highlights, lib/game-recap-sections), the body (components/game/recap-body), the card and the round-summary email:
+- **Segments** — Stableford and stroke play, following the game screen (sixes unless set to nines or off): on the share a line ("Sixes · 1–6 Raj 14 · 7–12 Nihar & Amit 13 · …", or "<name> swept all three"), in the app a box, in the email a section. Points or net strokes; never money.
+- **Side contests** — now in the email too (one shared loader, lib/contests loadContestLines, for the card and the sender).
+- **Stats and streaks** — fewest putts, most fairways, longest par streak, a bounce-back birdie (a birdie straight after a double): only stats the field entered. The app and email show every one; the share keeps the NOTABLE ones (putts ≤ 30, streak 5+, fairways 10+, any bounce-back), two at most, in the tile grid. Shown for team formats too ("shows who really played well").
+- **The share image** — net birdies top 3; standout rounds take net birdies' place when there are any; tighter rows in the leaderboard and net-birdies boxes; "Tied at the top" dropped when it repeats the headline; toughest and easiest on one line with par-or-better counts. Heights (the 943px limit): Stableford / stroke 844–866, match 897, four-ball 894, alternate shot 844, skins 883–913, Cup session 955, trifecta 995 (accepted: its six results).
+- **Field average (net) · 70.8 (−1.3) · front 35.3 (−0.8) · back 35.5 (−0.5)** — net nines (new: frontBackNet) against each nine's par; app, share and email.
+- **Trifecta** had no results table (in v1.0 either): now its six contests — two singles and the four-ball per foursome — ordered by the winning side.
+- **No money in any summary**: the card's "Winnings posted in Money" line removed; the email never had it.
+Reviewed and unchanged: match play, team match play, four-ball, alternate shot (no individual stats, by the shared-ball rule), the three skins styles, scramble (field and team v team — drives not shown, by decision), the Ryder Cup session card (the Cup standing box).
+Tests: lib/recap-additions (20) — segments (sixes, nines in net, off), stat tiles (entered only; notable on the share, two at most), the net nines adding to the field average, the share's field and hole lines, segments line vs box, contests line, standouts in net birdies' place and top 3 without, the app's box and tiles, the email's sections, NO money in app / share / email, trifecta's six results; negative-tested. Every existing test passes unchanged.
+
+Deploy: code only.
+
+## 212.70.261029 — The App Testing club's games don't exist for stats (migration 0231)
+
+Owner (Oct 29): "exclude all matches played by the app testing group — that is literally meant for testing only, all stats in that club must be excluded like they don't exist."
+
+**Where they were counted.** Test clubs (groups.is_test, 0106) never post rounds, so everything built on the Rounds table — the Rounds tab, handicap index, trends, profile stats, standout checks, badges — already left them out, and the admin analytics honour the flag. Two readers are built on the GAMES themselves and had no filter: head-to-head / member insights (every ended game the member played, across clubs) and Season Wrapped (matches, "played with most", team rounds). And a test club's quarterly report could be emailed.
+**Now:** one shared rule (lib/test-clubs: the test clubs' ids, and "drop their games") applied to head-to-head and Season Wrapped — and to be applied to every game-based stat that follows (personal bests, streaks). Migration 0231: due_club_report_emails skips test clubs.
+Tests: lib/test-clubs (2); ci/assert-test-clubs.sql — a test club's report is never emailed, a real club's is; negative-tested. Full migration chain + every assertion pass on local PostgreSQL 16.
+
+**Deploy: apply migration 0231** (after 0218–0230; "Run without RLS"), then the package. Head-to-head and Season Wrapped recompute on open, so test-club games vanish from them immediately.
+
+## 212.69.261028 — The Ryder Cup session walkthrough: Eagles v Hawks, 5 a side, through the real Create screen
+
+Owner (Oct 28): "simulate a Ryder Cup with 10 players 5 a side … two teams Eagles and Hawks". 212.68 left the Cup-aware hint and the planned-match line untested; now the Create walkthrough runs that exact session.
+A four-ball session planned as 2 matches, the Cup's seed with 5 Eagles and 5 Hawks: one step; the Players hint reads "Eagles 5 · Hawks 5 — … Eagles: untick 1 (4 play); Hawks: untick 1 (4 play)"; one sit-out unticked a side → "Eagles 4 · Hawks 4 — 2 matches of pairs"; the Teams step's team card is LOCKED ("The Cup set the sides …", no Edit names, no Start over, every side button disabled, Eagles / Hawks shown); Build even groups; Review shows "2 of 2 planned ✓"; Create game is ONE save with the Cup's name and team names, 8 players with their sides, 2 foursomes and side contests off; the game is linked to the session only if still unlinked. 154 checks in the walkthrough; the v1.0 parity check unchanged at 32 of 32.
+
+Deploy: code only (tests).
+
+## 212.68.261028 — Ryder Cup sessions in the one-step Create flow, checked field by field against the v1.0 record
+
+Owner (Oct 28): sessions plug into the one-step Create; the Cup's sides locked; sit-outs unticked on the Players step for every format (a scramble session keeps its team size); a planned-match check on Review; the link to the session with v1.0's safety; side contests off; straight to the scorecard.
+
+**Create for a session:** Course → Game (format fixed by the session) → Players (every Cup member on their side, pre-ticked; the hint reads the sides — "Eagles 5 · Hawks 5 — a 2 v 2 session needs the same number a side in pairs: Eagles: untick 1 (4 play); Hawks: untick 1 (4 play)") → Teams (the Cup's sides, names and colours shown on a LOCKED team card — no picking, renaming, balancing or Start over; then the captain's choices: the 2 v 2 groups and first drivers, the trifecta pairings, the singles matchups, or the scramble teams built within each side at the session's team size, side v side) → Review (the usual lines plus the session's planned matches: "2 of 2 planned ✓", or amber "1 match — the session planned 2") → Create game: one save that carries every player's side (a scramble's too — Cup scoring reads it), then the link to the session exactly as v1.0 made it (only if the session is still unlinked; otherwise the game is removed again and the organizer told), then the scorecard.
+**The record corrected on the way** (212.67's transcription): v1.0 built a session's rows with side contests OFF (bets false); and a session is played 4 a side, so the session scenarios gained an eighth member (Dev Kapoor) in place of the absent guest — v1.0's record with 7 would have stored a 2 v 1 group that Cup scoring skips. Every club record is byte-for-byte unchanged; the three records (Create, structure, server equivalence) agree.
+**The v1.0 parity check now runs all 32 scenarios** — the 26 club formats and the 6 sessions, each driven through the real Create screen with the Cup's seed — and compares the game row, every player row, teams, groups, foursomes, matchups AND the session link with v1.0's record: 32 of 32 match. It caught two gaps while the step was built: a Cup scramble sent no sides (Cup scoring needs them), and the session rows' bets.
+Not yet under test: the Cup-aware Players hint's wording and the planned-match line (the record has no planned count) — covered by the staging check below.
+
+Deploy: code only. Staging: open a Cup session → Create game: the locked team card, the groups, Review's planned-match line, Create game, then the Cup page shows the session linked.
+
 ## 212.67.261028 — Ryder Cup sessions: the v1.0 snapshot, before any change to their flow
 
 Owner (Oct 28): sessions should plug into the one-step Create — and, after this week, no flow changes without a v1.0 yardstick first.

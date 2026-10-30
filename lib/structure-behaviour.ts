@@ -17,7 +17,7 @@ const hex = (n: number, w: number) => n.toString(16).padStart(w, "0");
 export const ORGANIZER = "21390000-0000-0000-0000-0000000000a0";
 export const CLUB = "21390000-0000-0000-0000-00000000c1b0";
 const USERS: Record<string, string> = { "u-amit": ORGANIZER };
-["u-raj", "u-nihar", "u-karan", "u-sam", "u-vikram", "u-bo"].forEach((u, i) => { USERS[u] = `21390000-0000-0000-0000-0000000000a${i + 1}`; });
+["u-raj", "u-nihar", "u-karan", "u-sam", "u-vikram", "u-bo", "u-dev"].forEach((u, i) => { USERS[u] = `21390000-0000-0000-0000-0000000000a${i + 1}`; });
 export const MEMBER_USERS = USERS;
 const gameId = (n: number) => `21391000-0000-0000-0000-${hex(n, 12)}`;
 const rowId = (n: number, k: number) => `21392000-0000-0000-${hex(n, 4)}-${hex(k, 12)}`;
@@ -61,9 +61,9 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
   const P = (name: string) => state.players.find((p) => p.display_name === name)!;
   const has = (name: string) => state.players.some((p) => p.display_name === name);
   // 212.67: a Cup session has no guest — the fixed names skip whoever isn't in the field
-  const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"].filter(has), BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar"].filter(has);
+  const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"].filter(has), BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar", "Dev Kapoor"].filter(has);   // a session: Dev Kapoor in the guest's place
   const ORDER = [...RED, ...BLUE];
-  const MATCHES: [string, string][] = ([["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", "Guest Kumar"]] as [string, string][]).filter(([x, y]) => has(x) && has(y));
+  const MATCHES: [string, string][] = ([["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", has("Guest Kumar") ? "Guest Kumar" : "Dev Kapoor"]] as [string, string][]).filter(([x, y]) => has(x) && has(y));
   const teamsPreset = c.session != null;   // v1.0: the Cup set the sides; the organizer never did
   const g = state.game, type = g.game_type, hasTeams = Array.isArray(g.teams) && g.teams.length === 2, has4 = Array.isArray(g.foursomes);
 
@@ -95,7 +95,7 @@ export function structureCase(c: CreateCase, n: number): StructureCase | null {
       .forEach(([f, side, nm]) => save(assignFoursomePlayer(fs, f, side as "a" | "b", key(P(nm)))));
   } else if (hasTeams && has4) {   // four-ball, trifecta, alternate shot: teams, then groups of two a side
     if (!teamsPreset) ORDER.forEach((nm, i) => setTeam(P(nm), i < 4 ? "A" : "B"));
-    [["Amit Sud", 1], ["Raj Mehta", 1], ["Sam Lee", 1], ["Vikram Rao", 1], ["Nihar Shah", 2], ["Karan Patel", 2], ["Bo Li", 2], ["Guest Kumar", 2]]
+    [["Amit Sud", 1], ["Raj Mehta", 1], ["Sam Lee", 1], ["Vikram Rao", 1], ["Nihar Shah", 2], ["Karan Patel", 2], ["Bo Li", 2], ["Guest Kumar", 2], ["Dev Kapoor", 2]]
       .filter(([nm]) => has(nm as string)).forEach(([nm, gr]) => setTeeGroup(P(nm as string), gr as number));
     const f = (state.game.foursomes ?? []) as Foursome[];
     if (type === "alt_shot") for (const x of f) {   // setAltShotFirstDriver, both sides

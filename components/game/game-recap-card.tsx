@@ -3,14 +3,16 @@
 // every player can send the 9:16 image (RecapBody in share mode) through the phone's share sheet.
 // One recap (lib/game-recap) drives both, so the in-app recap and the image never disagree.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { C, effectiveGroupId, TGC_GROUP_ID } from "@/lib/golf";
+import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { loadCupForGame } from "@/lib/cup-load";
 import { cupStandingAfter, type CupLine } from "@/lib/cup-standing";
 import { pkey, chBasis } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
-import { contestLeaderboard, fmtContestValue, type Contest, type ContestEntry } from "@/lib/contests";
+import { loadContestLines } from "@/lib/contests";
+import { newBestsForGame } from "@/lib/personal-bests-load";
+import { beatLine, type Best } from "@/lib/personal-bests";
 import { useCardExport } from "@/components/share-card";
 import { RecapBody, type RecapContest } from "@/components/game/recap-body";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
@@ -22,26 +24,19 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
 }) {
   const recap = useMemo(() => buildRecap(game, players, altShotScores), [game, players, altShotScores]);
   const supabase = useMemo(() => createClient(), []);
-  const hasBet = effectiveGroupId((game as any).group_id) === TGC_GROUP_ID;
-  const [posted, setPosted] = useState<boolean | null>(null);
   const [contests, setContests] = useState<RecapContest[]>([]);
+  const [newBests, setNewBests] = useState<Best[]>([]);   // personal bests this game's round set for the viewer
   useEffect(() => {
     let live = true;
-    if (hasBet) supabase.from("expenses").select("id").eq("source_game_id", game.id).eq("source_kind", "tgc_bet").is("deleted_at", null).maybeSingle()
-      .then(({ data, error }) => { if (live && !error) setPosted(!!data); });
-    (async () => {
-      // bounded: one game's contests
-      const { data: cs, error } = await supabase.from("game_contests").select("*").eq("game_id", game.id);
-      if (error || !cs?.length) return;
-      // bounded: one game's contest entries
-      const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", cs.map((c: any) => c.id));
-      const out: RecapContest[] = [];
-      (cs as Contest[]).forEach((c) => contestLeaderboard(c, ((es || []) as ContestEntry[]).filter((e) => e.contest_id === c.id && !e.voided))
-        .forEach((w) => { if (w.best) out.push({ label: c.label, hole: w.hole, name: w.best.player_name, value: fmtContestValue(c.unit, w.best.value) }); }));
-      if (live) setContests(out);
-    })();
+    if (game.status !== "ended" || !userId) { setNewBests([]); return; }
+    (async () => { try { const out = await newBestsForGame(supabase, userId, game.id); if (live) setNewBests(out); } catch { if (live) setNewBests([]); } })();
     return () => { live = false; };
-  }, [supabase, game.id, hasBet]);
+  }, [game.id, game.status, userId]);
+  useEffect(() => {
+    let live = true;
+    (async () => { const out = await loadContestLines(supabase, game.id); if (live) setContests(out); })();   // 212.71: the shared loader
+    return () => { live = false; };
+  }, [supabase, game.id]);
   // 209.5: a Cup session shows the Cup's standing after it (shared loader + lib/cup-standing — the Cup page's numbers).
   const [cup, setCup] = useState<CupLine | null>(null);
   const competitionId = competition?.competition_id ?? null;
@@ -65,7 +60,6 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
     const nb = recap.highlights.netBirdies.all.find((r) => r.key === pkey(me));
     return `You shot ${gross} (net ${net})${nb ? ` · ${nb.birdies} net birdie${nb.birdies === 1 ? "" : "s"}${nb.eagles ? `, ${nb.eagles} net eagle${nb.eagles === 1 ? "" : "s"}` : ""}` : ""}.`;
   })();
-  const money = !hasBet || posted === null ? null : betStale ? "Winnings need review — scores changed after posting" : posted ? "Winnings posted in Money" : "Winnings not posted yet";
   const changed = (game as any).recap_signature && (game as any).recap_signature !== recap.signature;
   const shown = { ...game, players_count: players.filter((p) => !p.no_show).length } as Game;
 
@@ -75,7 +69,13 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
 
   return (
     <div data-game-recap style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginBottom: 12 }}>
-      <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} money={money} cup={cup} />
+      {newBests.length ? (
+        <div data-recap-personal-bests style={{ border: `1px solid ${C.gold}`, background: C.greenMid, borderRadius: 12, padding: "8px 12px", marginBottom: 10 }}>
+          <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>🏆 NEW PERSONAL {newBests.length === 1 ? "BEST" : "BESTS"}</div>
+          {newBests.map((b) => <div key={b.key} style={{ color: C.cream, fontSize: 13, marginTop: 4 }}><b>{b.label}</b> · {b.display} — {beatLine(b)}</div>)}
+        </div>
+      ) : null}
+      <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} cup={cup} />
       {changed ? <div data-recap-changed style={{ color: C.gold, fontSize: 12.5, marginTop: 8, fontWeight: 700 }}>Results changed since they were announced — scores were corrected.</div> : null}
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         <button type="button" data-recap-share onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 14 }}>{busy ? "Preparing…" : "📤 Share with the group"}</button>
@@ -85,7 +85,7 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
       {/* The share image: the same recap in share mode, 9:16, rendered off-screen and exported as a picture. */}
       <div aria-hidden style={{ position: "absolute", left: -10000, top: 0 }}>
         <div ref={shareRef} data-recap-share-image style={{ width: 402, minHeight: 715, boxSizing: "border-box", background: C.green, padding: 16, display: "flex", flexDirection: "column" }}>
-          <RecapBody game={shown} recap={recap} mode="share" contests={contests} cup={cup} />
+          <RecapBody game={shown} recap={recap} mode="share" contests={contests} cup={cup} netBirdiesTop={3} />   {/* 212.71: one phone screen — net birdies top 3 (or standouts in their place) */}
         </div>
       </div>
     </div>

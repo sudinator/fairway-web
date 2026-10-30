@@ -41,6 +41,37 @@ function formatDate(v: string) {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** 212.72 (owner, Oct 29: "Ryder Cup Roster Selection does not fit in the width of the phone screen"): one roster row —
+ *  the name shrinks and truncates, the two team buttons share the remaining width and truncate, so the row is never wider
+ *  than the phone. Rendered in the design gallery with long team names, where the overflow guard watches it. */
+/** 212.74 (owner): a team's short label for the roster's buttons — the name itself up to 7 characters, otherwise the first
+ *  four letters of its first real word ("The Magnificent Eagles" → "Magn", "Americas" → "Amer", "Hawks" → "Hawks"). */
+export function shortTeamLabel(name: string, fallback: string): string {
+  const n = (name || "").trim() || fallback;
+  if (n.length <= 7) return n;
+  const words = n.split(/\s+/).filter((w) => !/^(the|team|of|and)$/i.test(w));
+  return (words[0] || n).slice(0, 4);
+}
+
+export function CupRosterRow({ p, t, playing, teamA, teamB, onIn, onOut, onAssign }: {
+  p: { id: string; display_name: string; handicap_index: number | null; avatar_url?: string | null }; t: string; playing: boolean; teamA: string; teamB: string;
+  onIn: () => void; onOut: () => void; onAssign: (team: "A" | "B") => void;
+}) {
+  // 212.74 (owner, Oct 30): the avatar shows; the name keeps at least 10 characters before it truncates; the team
+  // buttons carry a SHORT label (shortTeamLabel) so a long team name never squeezes the name
+  return <div style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, minWidth: 0, maxWidth: "100%" }} data-cup-roster-row>
+    <Avatar src={p.avatar_url ?? null} name={p.display_name} size={30} enlargeable={false} />
+    <div style={{ minWidth: "10ch", flex: 1 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} data-cup-roster-name>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index != null ? `HI ${p.handicap_index}` : "no index"}</div></div>
+    {playing ? (
+      <button onClick={onOut} aria-pressed title="Playing — tap to leave out" style={{ ...btn(false), background: C.gold, color: C.green, border: `1px solid ${C.gold}`, padding: "8px 12px", fontSize: 12, minWidth: 44, flexShrink: 0 }}>✓ In</button>
+    ) : (
+      <button onClick={onIn} aria-pressed={false} title="Not playing — tap to include" style={{ ...btn(false), background: C.greenMid, color: C.cream, border: `1px solid ${C.borderCard}`, padding: "8px 12px", fontSize: 12, minWidth: 44, flexShrink: 0 }}>In</button>
+    )}
+    <button onClick={() => onAssign("A")} title={teamA || "Team 1"} data-cup-team-btn="A" style={{ ...btn(false), background: C.greenMid, border: t === "A" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream, flexShrink: 0, whiteSpace: "nowrap" }}>{shortTeamLabel(teamA, "Team 1")}</button>
+    <button onClick={() => onAssign("B")} title={teamB || "Team 2"} data-cup-team-btn="B" style={{ ...btn(false), background: C.greenMid, border: t === "B" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream, flexShrink: 0, whiteSpace: "nowrap" }}>{shortTeamLabel(teamB, "Team 2")}</button>
+  </div>;
+}
+
 export function Competitions({
   user,
   activeGroupId,
@@ -189,19 +220,10 @@ export function Competitions({
         <div style={{ display: "grid", gap: 8 }}>
           {roster.map((p) => {
             const t = assign[p.id] || "";
-            return <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
-              <Avatar src={p.avatar_url} name={p.display_name} size={30} />
-              <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index == null ? "No handicap" : `Index ${p.handicap_index}`}</div></div>
-              {isIn(p) ? (
-                <button onClick={() => { setPlaying((x) => ({ ...x, [p.id]: false })); setAssign((a) => ({ ...a, [p.id]: "" })); }} aria-pressed title="Playing — tap to leave out"
-                  style={{ ...btn(false), background: C.gold, color: C.green, border: `1px solid ${C.gold}`, padding: "8px 12px", fontSize: 12, minWidth: 44 }}>✓ In</button>
-              ) : (
-                <button onClick={() => setPlaying((x) => ({ ...x, [p.id]: true }))} aria-pressed={false} title="Not playing — tap to include"
-                  style={{ ...btn(false), background: C.greenMid, color: C.cream, border: `1px solid ${C.borderCard}`, padding: "8px 12px", fontSize: 12, minWidth: 44 }}>In</button>
-              )}
-              <button onClick={() => { setAssign((a) => ({ ...a, [p.id]: t === "A" ? "" : "A" })); setPlaying((x) => ({ ...x, [p.id]: true })); }} style={{ ...btn(false), background: C.greenMid, border: t === "A" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamA || "Team 1"}</button>
-              <button onClick={() => { setAssign((a) => ({ ...a, [p.id]: t === "B" ? "" : "B" })); setPlaying((x) => ({ ...x, [p.id]: true })); }} style={{ ...btn(false), background: C.greenMid, border: t === "B" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamB || "Team 2"}</button>
-            </div>;
+            return <CupRosterRow key={p.id} p={p as never} t={t} playing={isIn(p)} teamA={teamA} teamB={teamB}
+              onOut={() => { setPlaying((x) => ({ ...x, [p.id]: false })); setAssign((a) => ({ ...a, [p.id]: "" })); }}
+              onIn={() => setPlaying((x) => ({ ...x, [p.id]: true }))}
+              onAssign={(team) => { setAssign((a) => ({ ...a, [p.id]: t === team ? "" : team })); setPlaying((x) => ({ ...x, [p.id]: true })); }} />;
           })}
         </div>
         {err ? <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 12 }}>{err}</div> : null}
@@ -334,7 +356,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       gameType: session.format,
       teamNames: { A: competition.team_a_name, B: competition.team_b_name },
       participantTeams,
-      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, scrambleTeamSize: session.format === "scramble" ? (session.scramble_team_size ?? 2) : undefined, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match) },
+      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, scrambleTeamSize: session.format === "scramble" ? (session.scramble_team_size ?? 2) : undefined, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match), plannedMatchCount: Number(session.planned_match_count || 0) },
     });
   };
 

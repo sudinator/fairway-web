@@ -24,10 +24,11 @@ eq(rankTies([{ s: 70 }, { s: 71 }, { s: 72 }, { s: 72 }], (x) => x.s, 3).map((r)
   const h = buildHighlights(game(), [par, bird] as any);
   eq([h.bestNetHole?.name, h.bestNetHole?.n], ["BirdieWithOne", 4], "a real birdie beats a par with two strokes, even on an easier hole");
 }
-// Field average only with 8+ finishers; front v back only on 18 holes.
+// Field average with 2+ finishers (212.72, owner: the total shows whenever the nines do; it was 8+); front v back only on 18 holes.
 {
   const seven = Array.from({ length: 7 }, (_, i) => pl(`s${i}`, `P${i}`, fill(18, 5)));
-  eq(buildHighlights(game(), seven as any).fieldNet, null, "7 players: no field average");
+  eq(buildHighlights(game(), seven as any).fieldNet, 90, "7 players: field average (2+ finishers)");
+  eq(buildHighlights(game(), seven.slice(0, 1) as any).fieldNet, null, "1 player: no field average");
   ok(buildHighlights(game(), [...seven, pl("s7", "P7", fill(18, 5))] as any).fieldNet === 90, "8 players: field average");
   eq(buildHighlights(game(H(9)), seven as any).frontBack, null, "nine holes: no front v back");
 }

@@ -140,22 +140,25 @@ for (const [label, g, teamed] of formats) {
   ok(!!app?.querySelector("[data-recap-you]"), "in-app: Your day");
   ok(!img?.querySelector("[data-recap-you]") && !img?.querySelector("[data-recap-money]"), "share image: no personal line, no money status");
   ok(!/\$\d/.test(img?.textContent || ""), "share image: no amounts");
-  ok(!!img?.querySelector("[data-recap-top3]") && !!img?.querySelector("[data-recap-net-birdies]") && !!img?.querySelector("[data-recap-tiles]"), "share image: top 3, net birdies, tiles");
+  // 212.71: on the share image a STANDOUT day shows standout rounds in net birdies' place
+  const hasStandouts = !!img?.querySelector("[data-recap-standouts]");
+  ok(!!img?.querySelector("[data-recap-top3]") && (hasStandouts || !!img?.querySelector("[data-recap-net-birdies]")) && !!img?.querySelector("[data-recap-tiles]"), "share image: top 3, net birdies (or standouts), tiles");
   const nbImg = img?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0, nbApp = app?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0;
   ok(nbApp >= nbImg, "the app's net-birdie list is at least as long as the image's top 5");
   ok((img?.textContent || "").includes("Net uses each player's full Course Handicap — you against the course. Match results use the game's allowance."), "net footnote on the image (USGA terms)");
-  ok((img?.textContent || "").includes("Net birdies") && (img?.textContent || "").includes("Net eagles"), "columns say Net birdies / Net eagles");
+  ok(hasStandouts || ((img?.textContent || "").includes("Net birdies") && (img?.textContent || "").includes("Net eagles")), "columns say Net birdies / Net eagles (when the box is shown)");
   // 209.3: the round-summary email's "how the field played" lines read exactly like the recap card's,
   // for the same game — the email mirrors the card's wording, and this keeps the two from drifting.
   {
     const cardLines = Array.from(img?.querySelector("[data-recap-course]")?.children || [])
-      .filter((el) => !(el as HTMLElement).hasAttribute("data-recap-contests")).map((el) => (el.textContent || "").trim());
+      .filter((el) => !(el as HTMLElement).hasAttribute("data-recap-contests") && !(el as HTMLElement).hasAttribute("data-recap-segments")).map((el) => (el.textContent || "").trim());   // 212.71: segments have their own email section
     const emailLines = fieldLines(buildRecap({ ...game, status: "ended" } as any, players as any)).map((l) => l.trim());
     ok(cardLines.length > 0 && JSON.stringify(cardLines) === JSON.stringify(emailLines), `email field lines match the card (card ${JSON.stringify(cardLines)} vs email ${JSON.stringify(emailLines)})`);
   }
   // 209.0 order: how the field played → highlights → (standout rounds) → top 3 → net birdies.
   const at = (sel: string) => { const el = img?.querySelector(sel); return el ? Array.from(img!.querySelectorAll("*")).indexOf(el) : -1; };
-  const order = ["[data-recap-scoring]", "[data-recap-course]", "[data-recap-tiles]", "[data-recap-top3]", "[data-recap-net-birdies]"].map(at);
+  // 209.0 order, 212.71: on a standout day the standouts box (which sits before top 3) stands in for net birdies
+  const order = (hasStandouts ? ["[data-recap-scoring]", "[data-recap-course]", "[data-recap-tiles]", "[data-recap-standouts]", "[data-recap-top3]"] : ["[data-recap-scoring]", "[data-recap-course]", "[data-recap-tiles]", "[data-recap-top3]", "[data-recap-net-birdies]"]).map(at);
   ok(order.every((v) => v >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]), `share image in the owner's order (${order.join(" < ")})`);
   const so = at("[data-recap-standouts]");
   ok(so === -1 || (so > at("[data-recap-tiles]") && so < at("[data-recap-top3]")), "standout rounds, when shown, sit between the highlights and the top 3");

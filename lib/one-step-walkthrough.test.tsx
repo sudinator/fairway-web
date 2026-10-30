@@ -12,9 +12,9 @@ import { CreateGame } from "@/components/tournaments";
 const COURSE = { id: "c1", data: { id: "c1", name: "Oak Hollow", location: "Livingston, NJ",
   holes: Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: [4, 5, 3, 4, 4, 3, 5, 4, 4, 4, 4, 3, 5, 4, 4, 3, 4, 5][i], si: [7, 1, 17, 11, 3, 15, 9, 5, 13, 8, 2, 18, 6, 12, 4, 16, 10, 14][i] })),
   tees: [{ name: "Blue", rating: 72.3, slope: 133, par: 72, yardages: Array(18).fill(380) }, { name: "White", rating: 70.7, slope: 132, par: 72, yardages: Array(18).fill(355) }] } };
-var ROSTER_IDX: Record<string, number> = { "u-amit": 1, "u-raj": 2, "u-nihar": 3, "u-karan": 4, "u-sam": 5, "u-vikram": 6, "u-bo": 7, "u-lex": 8 };
+var ROSTER_IDX: Record<string, number> = { "u-amit": 1, "u-raj": 2, "u-nihar": 3, "u-karan": 4, "u-sam": 5, "u-vikram": 6, "u-bo": 7, "u-lex": 8, "u-dev": 9, "u-arjun": 10 };
 const ROSTER = [["u-amit", "Amit Sud", 14.7], ["u-raj", "Raj Mehta", 4.2], ["u-nihar", "Nihar Shah", 19.4], ["u-karan", "Karan Patel", 6.4],
-  ["u-sam", "Sam Lee", 22.4], ["u-vikram", "Vikram Rao", 11.3], ["u-bo", "Bo Li", 9.1], ["u-lex", "Lex Rivera", 16.8]]
+  ["u-sam", "Sam Lee", 22.4], ["u-vikram", "Vikram Rao", 11.3], ["u-bo", "Bo Li", 9.1], ["u-lex", "Lex Rivera", 16.8], ["u-dev", "Dev Kapoor", 12.5], ["u-arjun", "Arjun Nair", 8.8]]
   .map(([id, display_name, handicap_index]) => ({ id: `00000000-0000-0000-0000-0000000000${String(ROSTER_IDX[id as string]).padStart(2, "0")}`, display_name, handicap_index, avatar_url: null }));
 const calls: { url: string; body: unknown }[] = [];
 const createBodies: unknown[] = [];   // 212.65: every one-step save, for the v1.0 parity analysis
@@ -23,6 +23,7 @@ const createBodies: unknown[] = [];   // 212.65: every one-step save, for the v1
   calls.push({ url, body });
   if (String(url).includes("/rpc/create_game_complete")) createBodies.push(body);
   const json = (d: unknown) => new Response(JSON.stringify(d), { status: 200, headers: { "content-type": "application/json", "content-range": "0-99/*" } });
+  if (url.includes("/rest/v1/competition_sessions")) return new Response(JSON.stringify({ id: "sess-1" }), { status: 200, headers: { "content-type": "application/json" } });
   if (url.includes("/rest/v1/group_courses")) return json([{ course_id: "c1" }]);
   if (url.includes("/rest/v1/favorite_courses")) return json([COURSE]);
   if (url.includes("/rpc/group_roster")) return json(ROSTER);
@@ -333,6 +334,45 @@ const stepBar = (el: HTMLElement) => [...el.querySelectorAll("button")].map((b) 
       `best-ball team skins stores teams + 2 foursomes and no matchups, as v1.0 did (got foursomes ${b?.p_foursomes?.length}, pairings ${b?.p_game?.pairings?.length})`);
     else ok(!!b && b.p_game?.game_type === "skins" && (b.p_teams ?? []).length === 8 && b.p_foursomes == null && (b.p_game?.pairings ?? []).length === 4,
       `head-to-head team skins stores teams + 4 matchups and no foursomes, as v1.0 did (got foursomes ${JSON.stringify(b?.p_foursomes)}, pairings ${b?.p_game?.pairings?.length})`);
+    r.unmount();
+  }
+
+  // ── 212.68: a RYDER CUP SESSION, 5 a side (Eagles v Hawks), four-ball planned as 2 matches — the Cup's seed, the Cup-aware
+  // hint, one sit-out unticked per side, the LOCKED team card, the planned-match line, one save with every side, the link ──
+  {
+    window.localStorage.clear();
+    const idOf = (k: string) => `00000000-0000-0000-0000-0000000000${String(ROSTER_IDX[k]).padStart(2, "0")}`;
+    const eagles = ["u-amit", "u-raj", "u-nihar", "u-karan", "u-sam"], hawks = ["u-vikram", "u-bo", "u-lex", "u-dev", "u-arjun"];
+    const seed = {
+      playDate: "2026-10-24", course: null, memberIds: [...eagles, ...hawks].map(idOf), guests: [], name: "Eagles v Hawks · Four-ball",
+      gameType: "fourball", teamNames: { A: "Eagles", B: "Hawks" }, participantTeams: Object.fromEntries([...eagles.map((k) => [idOf(k), "A"]), ...hawks.map((k) => [idOf(k), "B"])]),
+      competitionSession: { sessionId: "sess-1", competitionId: "cup-1", name: "Four-ball", sessionOrder: 1, format: "fourball", playDate: "2026-10-24", pointsPerMatch: 1, plannedMatchCount: 2 },
+    };
+    const e = document.createElement("div"); document.body.appendChild(e);
+    const r = createRoot(e);
+    await act(async () => { r.render(<CreateGame user={ME} displayName="Amit Sud" activeGroupId="00000000-0000-0000-0000-00000000c1b0" seed={seed as never} onCancel={() => {}} onCreated={() => {}} />); });
+    await flush();
+    await clickText(e, "Oak Hollow"); await clickText(e, "Continue");
+    ok(JSON.stringify(stepBar(e)) === JSON.stringify(["Course", "Game", "Players", "Teams", "Review"]), `cup session: one step (got ${stepBar(e).join(", ")})`);
+    await clickText(e, "Continue");
+    const hint0 = e.querySelector("[data-player-count-hint]")?.textContent || "";
+    ok(hint0.includes("Eagles 5 · Hawks 5") && hint0.includes("Eagles: untick 1 (4 play)") && hint0.includes("Hawks: untick 1 (4 play)"), `cup session: the hint reads the sides and says who to untick (got "${hint0}")`);
+    await clickText(e, "Sam Lee", "label"); await clickText(e, "Arjun Nair", "label");   // one sit-out a side
+    const hint1 = e.querySelector("[data-player-count-hint]")?.textContent || "";
+    ok(hint1.includes("Eagles 4 · Hawks 4") && hint1.includes("2 matches of pairs"), `cup session: after the sit-outs, 2 matches of pairs (got "${hint1}")`);
+    await clickText(e, "Continue");
+    ok(!!e.querySelector("[data-teams-locked]") && !e.querySelector("[data-edit-names]") && !e.querySelector("[data-teams-start-over]") && (e.textContent || "").includes("The Cup set the sides"), "cup session: the team card is locked — the Cup set the sides");
+    ok((e.textContent || "").includes("Eagles") && (e.textContent || "").includes("Hawks") && [...e.querySelectorAll("button")].filter((b) => (b.textContent || "").trim() === "Eagles" && (b as HTMLButtonElement).disabled).length === 8, "cup session: the sides show as Eagles / Hawks, every side button disabled");
+    await clickText(e, "Build even groups");
+    await clickText(e, "Continue");
+    const rv = e.querySelector("[data-one-step-review]")?.textContent || "";
+    ok(rv.includes("Four-ball") && rv.includes("2 of 2 planned ✓"), `cup session: Review shows the session's planned matches met (got "${rv.slice(0, 220)}")`);
+    const before = createBodies.length;
+    await clickText(e, "Create game");
+    const b = createBodies[before] as { p_game?: { name?: string; teams?: { name: string }[] }; p_players?: { bets?: boolean }[]; p_teams?: unknown[]; p_foursomes?: unknown[] } | undefined;
+    ok(!!b && b.p_game?.name === "Eagles v Hawks · Four-ball" && (b.p_game?.teams ?? []).map((t) => t.name).join("/") === "Eagles/Hawks" && (b.p_players ?? []).length === 8 && (b.p_teams ?? []).length === 8 && (b.p_foursomes ?? []).length === 2 && (b.p_players ?? []).every((x) => x.bets === false),
+      `cup session: ONE save — the Cup's name and teams, 8 players with their sides, 2 foursomes, side contests off (got ${JSON.stringify({ n: b?.p_game?.name, t: b?.p_game?.teams?.map((x) => x.name), p: b?.p_players?.length, tm: b?.p_teams?.length, f: b?.p_foursomes?.length })})`);
+    ok(calls.some((x) => x.url.includes("/rest/v1/competition_sessions") && x.url.includes("game_id=is.null")), "cup session: the game is linked to the session (only if still unlinked)");
     r.unmount();
   }
 

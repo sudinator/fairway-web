@@ -14,7 +14,7 @@ import { TeamColourDot, type TeamColours } from "@/components/team-colour-dot";
 import { inputStyle } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 
-export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, onRenameTeams, onSetTeamColours, onStartOver, isBlocked }: {
+export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, onRenameTeams, onSetTeamColours, onStartOver, isBlocked, locked }: {
   game: Game; players: Player[];
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
   onBalanceTeams?: () => Promise<{ changed: number; summary: string; unrated: string[] } | null>;
@@ -23,6 +23,8 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
   /** Clear every team choice (owner, Oct 26: "if I select balance and don't like it, we need a start over"). */
   onStartOver?: () => Promise<void>;
   isBlocked?: (p: Player) => string | null;
+  /** 212.68: a Ryder Cup session — the Cup set the sides, names and colours; shown, not editable. */
+  locked?: { reason: string };
 }) {
   const teams = (Array.isArray(game.teams) ? game.teams : []).slice(0, 2);
   const [msg, setMsg] = React.useState<string | null>(null), [busy, setBusy] = React.useState(false);
@@ -51,7 +53,7 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
                   onChange={(e) => { const v = e.target.value; setNames((n) => (n ? (ti === 0 ? [v, n[1]] : [n[0], v]) : n)); }}
                   style={{ ...inputStyle, fontWeight: 800 }} />
               ) : onSetTeamColours ? (
-                <TeamColourDot index={ti as 0 | 1} teams={both} onChange={onSetTeamColours}>
+                <TeamColourDot index={ti as 0 | 1} teams={both} onChange={locked ? () => {} : onSetTeamColours}>
                   <div style={{ color: C.cream, fontWeight: 800, fontSize: 15, paddingTop: 6 }}>{t.name}</div>
                 </TeamColourDot>
               ) : <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{t.name}</div>}
@@ -72,11 +74,14 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
               <button onClick={() => setNames(null)} style={{ ...pill(false) }}>Cancel</button>
             </>
           ) : (
-            <button data-edit-names onClick={() => setNames([teams[0]?.name ?? "", teams[1]?.name ?? ""])} style={{ ...pill(false) }}>✎ Edit names</button>
+            locked ? null : <button data-edit-names onClick={() => setNames([teams[0]?.name ?? "", teams[1]?.name ?? ""])} style={{ ...pill(false) }}>✎ Edit names</button>
           )}
         </div>
       ) : null}
-      {onBalanceTeams || onStartOver ? (
+      {locked ? (
+        <div data-teams-locked style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>{locked.reason}</div>
+      ) : null}
+      {!locked && (onBalanceTeams || onStartOver) ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
           {onBalanceTeams ? <button disabled={busy} onClick={async () => { setBusy(true); setMsg(null); try { const r = await onBalanceTeams(); if (r) setMsg(r.unrated.length ? `Set a course handicap for ${r.unrated.join(", ")} first.` : r.changed ? r.summary : "Already balanced."); } finally { setBusy(false); } }}
             style={{ background: "none", border: `1px solid ${C.gold}`, color: C.gold, borderRadius: 999, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -100,7 +105,7 @@ export function CompactTeamEditor({ game, players, onSetTeam, onBalanceTeams, on
               {teams.map((t, ti) => {
                 const on = p.team === t.key, col = teamColour(t, ti);
                 return (
-                  <button key={t.key} title={why ?? undefined} disabled={!!why} onClick={() => onSetTeam(p, on ? null : t.key)}
+                  <button key={t.key} title={why ?? undefined} disabled={!!why || !!locked} onClick={() => { if (!locked) void onSetTeam(p, on ? null : t.key); }}
                     // 14px bold (large text) in the ink that reads on THIS team's colour — every team colour reaches 3:1 (test)
                     style={{ minWidth: 76, borderRadius: 999, padding: "8px 12px", fontSize: 14, fontWeight: 800, cursor: why ? "not-allowed" : "pointer",
                       background: on ? col : "transparent", color: on ? readableInk(col) : C.sage, border: `1px solid ${on ? col : C.borderGreen}`, opacity: why ? 0.5 : 1 }}>

@@ -74,7 +74,7 @@ export function ShareLinks({ lineupToken, liveToken, onShare }: { lineupToken: s
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const links = liveToken ? [
     { key: "lineup", label: "Line-up link", note: "Who's playing, their tees, handicaps and teams", url: `${origin}/lineup/${lineupToken ?? liveToken}` },
-    { key: "live", label: "Live scores link", note: "The scorecard and leaderboard as they happen", url: `${origin}/live/${liveToken}` },
+    { key: "live", label: "Live scores link", note: "The scorecard and leaderboard as they happen", url: `${origin}/live/${lineupToken ?? liveToken}` },   // 212.72 (owner): the same readable form as the line-up link
   ] : [];
   const toggle = async (on: boolean) => { setBusy(true); setFailed(null); try { await onShare(on); } catch (e) { setFailed(e instanceof Error ? e.message : "Couldn't update the links — try again."); } finally { setBusy(false); } };
   const share = async (label: string, url: string) => {

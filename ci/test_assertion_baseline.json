@@ -1,5 +1,5 @@
 {
-  "total": 440120,
+  "total": 440197,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -25,6 +25,7 @@
     "create game complete": 3,
     "create-game format": 12,
     "cup on the recap": 8,
+    "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
     "failure messages": 24,
@@ -59,8 +60,10 @@
     "nine-hole payload": 12,
     "nine-hole posting": 20,
     "odd field": 26,
-    "one-step walkthrough": 146,
+    "one-step walkthrough": 154,
+    "personal bests": 16,
     "player-scoring": 71,
+    "recap additions": 44,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,
@@ -75,6 +78,7 @@
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,
+    "share links form": 2,
     "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,
@@ -85,6 +89,7 @@
     "team colour dot": 10,
     "team rounds": 11,
     "tee yardage": 7,
+    "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20
   }

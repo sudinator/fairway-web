@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { InsightsCard } from "@/components/insights";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
@@ -547,6 +548,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </div>
         </div>
       )}
+
+      {/* Personal bests (owner, Oct 30): the latest new best as a hero, the rest as rows; each opens its round */}
+      <PersonalBestsCard rounds={rounds} onOpen={onOpen} />
 
       <div style={{ marginTop: 20 }}>
         <Eyebrow>RECENT ROUNDS</Eyebrow>

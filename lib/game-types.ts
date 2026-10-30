@@ -108,5 +108,7 @@ export type GameSeed = {
     format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble"; scrambleTeamSize?: number;
     playDate: string;
     pointsPerMatch: number;
+    /** 212.68: the matches the session planned (a trifecta foursome counts 3) — Review checks the line-up against it. */
+    plannedMatchCount?: number;
   };
 };

@@ -186,3 +186,25 @@ export function groupsFromMatches(pairings: { a: string; b: string }[]): Map<str
   pairings.filter((x) => x.a && x.b).forEach((x, i) => { const g = Math.floor(i / 2) + 1; by.set(x.a, g); by.set(x.b, g); });
   return by;
 }
+
+
+/**
+ * 212.68 — a Ryder Cup session's Players hint (owner, Oct 28: sit-outs are unticked on the Players step for every format;
+ * a scramble session keeps the session's team size). `sides` is each ticked player's side (A / B / null).
+ */
+export function cupSessionHint(format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble", scrambleTeamSize: number | undefined, sides: (string | null)[], nameA: string, nameB: string): { text: string; ok: boolean } {
+  const a = sides.filter((x) => x === "A").length, b = sides.filter((x) => x === "B").length;
+  const who = `${nameA} ${a} · ${nameB} ${b}`;
+  if (format === "match") return a === b && a > 0 ? { text: `${who} — ${a} singles ${a === 1 ? "match" : "matches"}.`, ok: true } : { text: `${who} — singles need the same number a side; untick the player sitting out.`, ok: false };
+  const unit = format === "scramble" ? (scrambleTeamSize ?? 2) : 2;
+  const label = format === "scramble" ? `teams of ${unit}` : "pairs";
+  if (a === b && a > 0 && a % unit === 0) return { text: `${who} — ${a / unit} ${a / unit === 1 ? "match" : "matches"} of ${label}.`, ok: true };
+  const fix = (n: number) => n % unit === 0 ? "" : `untick ${n % unit} (${n - (n % unit)} play)`;
+  return { text: `${who} — a ${format === "scramble" ? `scramble of ${label}` : "2 v 2 session"} needs the same number a side in ${label}: ${[a % unit ? `${nameA}: ${fix(a)}` : "", b % unit ? `${nameB}: ${fix(b)}` : ""].filter(Boolean).join("; ") || "untick the player sitting out on each side"}.`, ok: false };
+}
+
+/** 212.68 — Review's planned-match line: the session planned N matches; the line-up makes M (a trifecta foursome = 3). */
+export function plannedMatchesLine(planned: number | undefined, made: number): { ok: boolean; value: string } {
+  if (!planned) return { ok: true, value: `${made} ${made === 1 ? "match" : "matches"}` };
+  return made === planned ? { ok: true, value: `${made} of ${planned} planned ✓` } : { ok: false, value: `${made} ${made === 1 ? "match" : "matches"} — the session planned ${planned}` };
+}

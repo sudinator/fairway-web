@@ -26,25 +26,33 @@ const S = {
   num: { fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap" } as React.CSSProperties,
   line: { color: C.sage, fontSize: 12.5, lineHeight: 1.4 } as React.CSSProperties,
 };
+/** 212.71: "+1.2", "E", "−0.4" against par; a nine's par is the sum of its holes' pars. */
+const vsParLabel = (d: number) => Math.abs(d) < 0.05 ? "E" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
+const ninePar = (game: Game, from: number) => (game.holes_meta ?? []).slice(from, from + 9).reduce((s, h) => s + (h.par ?? 0), 0);
 const teamColor = (game: Game, key: string | null) => {
   const teams = Array.isArray(game.teams) ? game.teams : [];
   const i = teams.findIndex((t: any) => t.key === key);
   return i >= 0 ? teamColour(teams[i], i) : C.sage;
 };
+const andList = (xs: string[]) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 const Dot = ({ color }: { color: string }) => <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: color, marginRight: 6, marginTop: 4, flexShrink: 0 }} />;
 
-export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, money, cup }: {
+export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, cup, netBirdiesTop, extraTiles = [], afterTiles }: {
   game: Game; recap: Recap; mode: "share" | "app"; contests?: RecapContest[];
-  myLine?: string | null; myScore?: string | null; money?: string | null;
+  /** 212.71: the share image's net-birdies rows (default: the engine's top 5); extra tiles join the tile grid; sections after it. */
+  netBirdiesTop?: number; extraTiles?: { label: string; who: string; what: string }[]; afterTiles?: React.ReactNode;
+  myLine?: string | null; myScore?: string | null;   // 212.71 (owner): never money
   /** 209.5: a Cup session — the Cup's standing after it (lib/cup-standing; numbers made there, shown here). */
   cup?: CupLine | null;
 }) {
   const { highlights: h, sections: s } = recap;
   const share = mode === "share";
+  // 212.71 (owner, Oct 29: the share image is one phone screen — "tighten the spacing of the leaderboard and net birdie boxes")
+  const rowS: React.CSSProperties = share ? { ...S.row, paddingTop: 2, paddingBottom: 2 } : S.row;
   const live = (game as any).players_count as number | undefined; // set by the caller
   const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? (cup.sessionCount ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : `Session ${cup.sessionNo}`) : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
   const head = recap.headline.match(/^(.*?)([\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+–[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+|net \d+|[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+ skins?|\d+ points)$/);   // 212.37: skins counts can be fractions (lib/skins-format)
-  const nbRows = share ? h.netBirdies.top : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
+  const nbRows = share ? (netBirdiesTop != null ? h.netBirdies.top.filter((r) => Number(String(r.pos).replace("T", "")) <= netBirdiesTop) : h.netBirdies.top) : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
   return (
     <div data-recap-body={mode} style={{ display: "flex", flexDirection: "column", gap: 10, color: C.cream }}>
       <div>
@@ -54,7 +62,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
       <div data-recap-headline style={{ fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800, lineHeight: 1.15 }}>
         {head ? <>{head[1]}<span style={{ color: C.gold }}>{head[2]}</span></> : recap.headline}
       </div>
-      {s.sub ? <div style={{ color: C.sage, fontSize: 13, marginTop: -4 }}>{s.sub}</div> : null}
+      {s.sub && !(share && s.sub === "Tied at the top") ? <div style={{ color: C.sage, fontSize: 13, marginTop: -4 }}>{s.sub}</div> : null}
       {recap.notes.map((n, i) => <div key={i} style={{ color: C.gold, fontSize: 12.5 }}>{n}</div>)}
       {cup ? (
         <div data-recap-cup style={{ ...S.box, border: `1px solid ${C.gold}` }}>
@@ -160,7 +168,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
         <div style={S.box} data-recap-leaderboard>
           <div style={S.th}>LEADERBOARD · {s.leaderboard.basis === "points" ? "POINTS" : s.leaderboard.basis.toUpperCase()}</div>
           {s.leaderboard.rows.map((r, i) => (
-            <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
+            <div key={i} style={rowS}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
               {s.leaderboard!.basis === "net" ? <span style={{ color: C.sage, fontSize: 12, whiteSpace: "nowrap" }}>{r.item.gross} gross</span> : null}
               <span style={S.num}>{r.item.score}</span></div>
           ))}
@@ -191,23 +199,42 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
         </div>
       ) : null}
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-course>
-        {s.individualStats && (h.fieldNet != null || h.frontBack) ? (
-          <div style={S.line}>{h.fieldNet != null ? <>Field average <b style={{ color: C.cream }}>net {h.fieldNet.toFixed(1)}</b></> : null}{h.fieldNet != null && h.frontBack ? " · " : null}{h.frontBack ? (Math.abs(h.frontBack.front - h.frontBack.back) < 0.05 ? "even front and back" : `${h.frontBack.back < h.frontBack.front ? "back" : "front"} nine ${Math.abs(h.frontBack.front - h.frontBack.back).toFixed(1)} better`) : null}</div>
+        {/* 212.71 (owner): "Field average (net) · 73.2 (+1.2) · front 36.6 (E) · back 36.6 (+0.6)" — each against its par */}
+        {/* 212.74 (owner): ONE line — "Field avg (net) 70.8 (−1.3) · out 35.3 (−0.8) · in 35.5 (−0.5)" */}
+        {s.individualStats && (h.fieldNet != null || h.frontBackNet) ? (
+          <div style={{ ...S.line, whiteSpace: "nowrap" }} data-recap-field>Field avg (net){h.fieldNet != null ? <> <b style={{ color: C.cream }}>{h.fieldNet.toFixed(1)}</b> ({vsParLabel(h.fieldNet - (game.course_par ?? 72))})</> : null}{h.frontBackNet ? <> · out <b style={{ color: C.cream }}>{h.frontBackNet.front.toFixed(1)}</b> ({vsParLabel(h.frontBackNet.front - ninePar(game, 0))}) · in <b style={{ color: C.cream }}>{h.frontBackNet.back.toFixed(1)}</b> ({vsParLabel(h.frontBackNet.back - ninePar(game, 9))})</> : null}</div>
         ) : null}
-        {h.toughest ? <div style={S.line}>Toughest: <b style={{ color: C.cream }}>Hole {h.toughest.n}</b> · par {h.toughest.par}{h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.toughest.avg.toFixed(1)} ({h.toughest.vsPar >= 0 ? "+" : ""}{h.toughest.vsPar.toFixed(1)})</b>{h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}</div> : null}
-        {h.easiest && h.easiest.n !== h.toughest?.n ? <div style={S.line}>Easiest: <b style={{ color: C.cream }}>Hole {h.easiest.n}</b> · par {h.easiest.par}{h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.easiest.avg.toFixed(1)} ({h.easiest.vsPar >= 0 ? "+" : ""}{h.easiest.vsPar.toFixed(1)})</b>{h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}</div> : null}
+        {/* 212.71: the share image puts toughest and easiest on one line */}
+        {share && h.toughest ? (() => { const d = (h: { par: number; avg: number; vsPar: number; parsOrBetter: number; birdies: number }) => `par ${h.par}, avg ${h.avg.toFixed(1)}, ${h.vsPar >= 0 ? "+" : ""}${h.vsPar.toFixed(1)}; ${h.parsOrBetter === 0 ? "nobody made par" : `${h.parsOrBetter} made par or better${h.birdies ? `, ${h.birdies} birdie${h.birdies === 1 ? "" : "s"}` : ""}`}`; return <div style={S.line}>Toughest <b style={{ color: C.cream }}>hole {h.toughest.n}</b> ({d(h.toughest)}){h.easiest && h.easiest.n !== h.toughest.n ? <> · easiest <b style={{ color: C.cream }}>hole {h.easiest.n}</b> ({d(h.easiest)})</> : null}</div>; })() : null}
+        {!share && h.toughest ? <div style={S.line}>Toughest: <b style={{ color: C.cream }}>Hole {h.toughest.n}</b> · par {h.toughest.par}{h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.toughest.avg.toFixed(1)} ({h.toughest.vsPar >= 0 ? "+" : ""}{h.toughest.vsPar.toFixed(1)})</b>{h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}</div> : null}
+        {!share && h.easiest && h.easiest.n !== h.toughest?.n ? <div style={S.line}>Easiest: <b style={{ color: C.cream }}>Hole {h.easiest.n}</b> · par {h.easiest.par}{h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.easiest.avg.toFixed(1)} ({h.easiest.vsPar >= 0 ? "+" : ""}{h.easiest.vsPar.toFixed(1)})</b>{h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}</div> : null}
         {s.individualStats && h.netEagleHole ? <div style={S.line}>Net eagles: <b style={{ color: C.cream }}>{h.netEagleHole.total}</b> — <b style={{ color: C.cream }}>{h.netEagleHole.count} on hole {h.netEagleHole.n}</b> (par {h.netEagleHole.par}{h.netEagleHole.si ? `, stroke index ${h.netEagleHole.si}` : ""})</div> : null}
         {contests.length ? <div style={S.line} data-recap-contests>{contests.map((c, i) => <span key={i}>{i ? " · " : ""}{c.label} #{c.hole} <b style={{ color: C.cream }}>{c.name}</b> {c.value}</span>)}</div> : null}
+        {/* 212.71 (owner, Oct 29): the game's segments — a line on the share image, their own box in the app */}
+        {s.segments && share ? (
+          <div style={S.line} data-recap-segments>
+            <b style={{ color: C.cream }}>{s.segments.length === 3 ? "Sixes" : "Nines"}</b> · {s.segments.every((x) => x.who.length === 1 && x.who[0] === s.segments![0].who[0])
+              ? <><b style={{ color: C.cream }}>{s.segments[0].who[0]}</b> swept all {s.segments.length} ({s.segments.map((x) => x.val).join(" · ")} {s.segments[0].unit})</>
+              : <>{s.segments.map((x, i) => <span key={x.label}>{i ? " · " : ""}{x.short} <b style={{ color: C.cream }}>{x.who.map((w) => w.split(" ")[0]).join(" & ")}</b> {x.val}</span>)} {s.segments[0].unit}</>}
+          </div>
+        ) : null}
       </div>
-      {s.tiles.length ? (
+      {s.tiles.length || extraTiles.length || s.statTiles.length ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }} data-recap-tiles>
-          {s.tiles.map((t) => (
+          {[...s.tiles, ...(share ? s.statTiles.filter((t) => t.notable).slice(0, 2) : s.statTiles), ...extraTiles].map((t) => (
             <div key={t.label} style={{ ...S.box, display: "flex", flexDirection: "column" }}>
               <span style={{ color: C.sage, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.label}</span>
               <b style={{ fontSize: 13.5, overflowWrap: "anywhere" }}>{t.who}</b>
               <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{t.what}</span>
             </div>
           ))}
+        </div>
+      ) : null}
+      {afterTiles ?? null}
+      {s.segments && !share ? (
+        <div style={S.box} data-recap-segments-box>
+          <div style={S.th}>SEGMENTS · {s.segments.length === 3 ? "THREE SIXES" : "TWO NINES"} · {s.segments[0].unit === "pts" ? "STABLEFORD POINTS" : "NET STROKES"}</div>
+          {s.segments.map((x) => <div key={x.label} style={S.row}><span style={{ ...S.pos, minWidth: 64 }}>{x.short}</span><span style={S.name}>{andList(x.who)}{x.who.length > 1 ? " tied" : ""}</span><span style={S.num}>{x.val} {x.unit}</span></div>)}
         </div>
       ) : null}
       {s.individualStats && h.standouts && h.standouts.rows.length ? (
@@ -234,15 +261,15 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
       ) : null}
       {/* 210.6 (owner): only completed rounds count toward exceptional play — said plainly, by name. */}
       {shortenedNote(h.shortened) ? <div data-recap-shortened style={{ color: C.sage, fontSize: 12, lineHeight: 1.45 }}>{shortenedNote(h.shortened)}</div> : null}
-      {s.individualStats && h.netBirdies.players ? (
+      {s.individualStats && h.netBirdies.players && !(share && h.standouts && h.standouts.rows.length) ? (   // 212.71: the share image gives net birdies' place to standout rounds
         <div style={S.box} data-recap-net-birdies>
-          <div style={S.th}>NET BIRDIES &amp; EAGLES{share ? " · TOP 5" : ""}</div>
-          <div style={{ ...S.row, borderTop: "none", color: C.sage, fontSize: 11 }}><span style={S.pos} /><span style={S.name} /><span style={{ width: 60, textAlign: "right" }}>Net birdies</span><span style={{ width: 60, textAlign: "right" }}>Net eagles</span></div>
+          <div style={S.th}>NET BIRDIES &amp; EAGLES{share ? ` · TOP ${netBirdiesTop ?? 5}` : ""}</div>
+          {<div style={{ ...S.row, borderTop: "none", color: C.sage, fontSize: 11 }}><span style={S.pos} /><span style={S.name} /><span style={{ width: 60, textAlign: "right" }}>Net birdies</span><span style={{ width: 60, textAlign: "right" }}>Net eagles</span></div>}
           {nbRows.map((r, i) => (
-            <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
+            <div key={i} style={rowS}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
               <span style={{ ...S.num, width: 60, textAlign: "right" }}>{r.item.birdies}</span><span style={{ ...S.num, width: 60, textAlign: "right" }}>{r.item.eagles || "–"}</span></div>
           ))}
-          <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+          <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 4 }} data-recap-nb-footer>
             {h.netBirdies.birdies} net birdie{h.netBirdies.birdies === 1 ? "" : "s"} and {h.netBirdies.eagles} net eagle{h.netBirdies.eagles === 1 ? "" : "s"} by {h.netBirdies.players} player{h.netBirdies.players === 1 ? "" : "s"}{share && h.netBirdies.all.length > h.netBirdies.top.length ? " · full list in the game recap in Birdie Num Num" : ""}
           </div>
         </div>
@@ -250,7 +277,6 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
       {!share ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-app-extra>
         {!share && h.roundMinutes ? <div style={S.line}>Round length: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first tee to last putt</div> : null}
-        {!share && money ? <div style={{ ...S.line, color: money.includes("review") ? C.gold : C.sage }} data-recap-money>{money}</div> : null}
         </div>
       ) : null}
       <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? <>Net uses each player&apos;s full Course Handicap — you against the course. Match results use the game&apos;s allowance.<br /></> : null}⛳ Birdie Num Num</div>

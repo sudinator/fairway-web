@@ -113,7 +113,7 @@ import * as GC from "@/lib/game-create";
 import * as SO from "@/lib/structure-ops";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { countsForIndividualStats } from "@/lib/round-rules";
-import { isOneStep, createSectionsFor, SECTION_LABEL, teamsStepLabel, groupsProblem, groupsFromMatches, playerCountHint, defaultScrambleSize, isTeamGroupOneStep, teamGroupLineupProblem, isMatchOneStep, matchLineupProblem, matchupsProblem } from "@/lib/one-step-create";
+import { isOneStep, createSectionsFor, SECTION_LABEL, teamsStepLabel, cupSessionHint, plannedMatchesLine, groupsProblem, groupsFromMatches, playerCountHint, defaultScrambleSize, isTeamGroupOneStep, teamGroupLineupProblem, isMatchOneStep, matchLineupProblem, matchupsProblem } from "@/lib/one-step-create";
 import { PlayerCountHint, OneStepReview } from "@/components/game/setup/one-step";
 import { ScrambleTeamsBuilder as DraftTeamsBuilder } from "@/components/game/scramble-teams-builder";
 import { balanceScrambleTeams, scrambleSetupProblem } from "@/lib/scramble-teams";
@@ -683,7 +683,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   // The whole game — players, teams, groups — is a draft on the phone; nothing is saved until "Create game", which
   // saves it all in one server step (create_game_complete, 0219) and only then tells the players. Ryder Cup sessions
   // keep today's flow for now.
-  const oneStep = isOneStep(gameType as GC.GameTypeOpt) && !seed?.competitionSession;
+  // 212.68 (owner, Oct 28): Ryder Cup sessions take the one-step flow too — the Cup's sides locked, the captain's choices
+  // (groups, first drivers, matchups, scramble teams) made here, one save, the link to the session, the scorecard
+  const session = seed?.competitionSession ?? null;
+  const oneStep = isOneStep(gameType as GC.GameTypeOpt);
   // The steps in order — the step bar, Back and Continue all follow this one list.
   const createSteps = createSectionsFor(oneStep ? (gameType as GC.GameTypeOpt) : "stableford");
   // 212.41: a step is ticked only once you've been to it — Format and Players used to show ✓ before you'd seen them
@@ -747,7 +750,11 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       const size = scrambleTeamSize === 1 ? 1 : defaultScrambleSize(keys.length);
       // the same handicap rule the Teams screen balances with (chBasis — a manual course handicap wins)
       const nh = (draft.game.holes_meta as unknown[]).length;
-      setDraftGroups(balanceScrambleTeams(draft.players.map((p: any) => ({ key: pkey(p), ch: Number(chBasis(p, draft.game.course_par, nh >= 18 ? undefined : nh) ?? 0) })), size, scrambleModeNow) ?? []);
+      const tp = draft.players.map((p: any) => ({ key: pkey(p), ch: Number(chBasis(p, draft.game.course_par, nh >= 18 ? undefined : nh) ?? 0), side: p.user_id ? seed?.participantTeams?.[p.user_id] ?? null : null }));
+      // 212.68: a Cup scramble session — teams built WITHIN each side, side v side, at the session's team size
+      setDraftGroups(session
+        ? cupScrambleMatches(tp.filter((x) => x.side === "A"), tp.filter((x) => x.side === "B"), ((session.scrambleTeamSize ?? 2) as 2 | 3 | 4))
+        : (balanceScrambleTeams(tp, size, scrambleModeNow) ?? []));
       setDraftResuggested(!!draftGroups);
     } else if ([...placed].some((k) => !keys.includes(k))) {
       setDraftGroups(draftGroups.map((g) => ({ ...g, a: g.a.filter((k) => keys.includes(k)), b: g.b.filter((k) => keys.includes(k)) })).filter((g) => g.a.length + g.b.length > 0));
@@ -842,7 +849,8 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
     const ids = draft.players.map((x: any) => x.id);
     const known = draftLineup ? Object.keys(draftLineup.team) : [];
     if (draftLineup && !ids.some((id: string) => !known.includes(id)) && !known.some((id) => !ids.includes(id))) return;
-    applyLineup(draft.players.map((x: any) => ({ ...x, team: draftLineup?.team[x.id] ?? null, tee_group: draftLineup?.group[x.id] ?? null })));
+    const cupSide = (x: any): string | null => (session && x.user_id ? (seed?.participantTeams?.[x.user_id] ?? null) : null);   // 212.68: the Cup set the sides
+    applyLineup(draft.players.map((x: any) => ({ ...x, team: cupSide(x) ?? draftLineup?.team[x.id] ?? null, tee_group: draftLineup?.group[x.id] ?? null })));
   }, [createSection, teamGroupOneStep, draftKeys.join("|")]);
   const oneStepReviewLines = () => {
     if (matchOneStep && draft) {
@@ -860,6 +868,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         ...(matchHasMatchups ? [(() => { const mp = matchupsProblem(gameType as GC.GameTypeOpt, { teamMode, players: draft.players as never, pairings: (draft.game.pairings ?? []) as never, teams: (draft.game.teams ?? null) as never, keyOf: pkey as never });
           return { ok: !mp, label: "Matchups", value: mp ?? `${pairs.length} ${pairs.length === 1 ? "match" : "matches"}` }; })()] : []),
         { ok: !groupsProblem(draft.players as never), label: "Groups", value: groupsProblem(draft.players as never) ?? (grouped ? `${groupCount} ${groupCount === 1 ? "group" : "groups"}` : "None — everyone keeps their own card") },
+        ...(session ? [(() => { const made = matchOneStep ? ((draft.game.pairings ?? []) as { a: string; b: string }[]).filter((x) => x.a && x.b).length
+          : gameType === "scramble" ? (draftGroups ?? []).filter((g) => g.a.length && g.b.length).length
+          : ((draft.game.foursomes ?? []) as { a: string[]; b: string[] }[]).filter((f) => f.a.length === 2 && f.b.length === 2).length * (gameType === "trifecta" ? 3 : 1);
+          const pl = plannedMatchesLine(session.plannedMatchCount, made); return { ok: pl.ok, label: `${session.name}`, value: pl.value }; })()] : []),
         { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
       ];
     }
@@ -876,6 +888,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         { ok: draft.players.every((x: any) => !!x.team), label: "Teams", value: t.map((x) => `${x.name} ${draft.players.filter((y: any) => y.team === x.key).length}`).join(" · ") },
         { ok: lineupOk, label: "Groups", value: lineupOk ? (fs.some((f) => (f.a ?? []).length !== 2 || (f.b ?? []).length !== 2)
             ? `${fs.length} groups — one plays 2 v 1` : `${fs.length} group${fs.length === 1 ? "" : "s"} of 2 v 2`) : (draftProblem as string) },
+        ...(session ? [(() => { const made = matchOneStep ? ((draft.game.pairings ?? []) as { a: string; b: string }[]).filter((x) => x.a && x.b).length
+          : gameType === "scramble" ? (draftGroups ?? []).filter((g) => g.a.length && g.b.length).length
+          : ((draft.game.foursomes ?? []) as { a: string[]; b: string[] }[]).filter((f) => f.a.length === 2 && f.b.length === 2).length * (gameType === "trifecta" ? 3 : 1);
+          const pl = plannedMatchesLine(session.plannedMatchCount, made); return { ok: pl.ok, label: `${session.name}`, value: pl.value }; })()] : []),
         { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
       ];
     }
@@ -888,6 +904,10 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       { ok: n > 0, label: "Players", value: String(n) },
       { ok: !draftProblem, label: scrambleModeNow === "match" ? "Matches" : "Teams", value: draftProblem ? draftProblem : scrambleModeNow === "match" ? `${groups.length} match${groups.length === 1 ? "" : "es"}` : (new Set(sizes).size === 1 ? `${groups.length} team${groups.length === 1 ? "" : "s"} of ${sizes[0]}` : `${groups.length} teams of ${[...new Set(sizes)].sort().join(" and ")}`) },
       { ok: !draftProblem, label: "Groups", value: tees.size ? `${tees.size} group${tees.size === 1 ? "" : "s"} on the course` : "—" },
+        ...(session && draft ? [(() => { const made = matchOneStep ? ((draft.game.pairings ?? []) as { a: string; b: string }[]).filter((x) => x.a && x.b).length
+          : gameType === "scramble" ? (draftGroups ?? []).filter((g) => g.a.length && g.b.length).length
+          : ((draft.game.foursomes ?? []) as { a: string[]; b: string[] }[]).filter((f) => f.a.length === 2 && f.b.length === 2).length * (gameType === "trifecta" ? 3 : 1);
+          const pl = plannedMatchesLine(session.plannedMatchCount, made); return { ok: pl.ok, label: `${session.name}`, value: pl.value }; })()] : []),
       { ok: !flightBlocked, label: "Flights", value: flightMode === "oneoff" ? `${flightCount} flights ready` : "Off" },
     ];
   };
@@ -912,7 +932,9 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       const foursomes = teamGroupOneStep ? ((draft.game.foursomes ?? []) as any[]) : matchOneStep ? [] : (draftGroups ?? []);
       const { error } = await supabase.rpc("create_game_complete", {
         p_game: payload, p_players: rows,
-        p_teams: (teamGroupOneStep || (matchOneStep && teamMode)) ? draft.players.filter((x: any) => !!x.team).map((x: any) => ({ player: x.id, team: x.team })) : [],
+        // 212.68: a Cup session carries every player's side (Cup scoring reads it — a scramble's too); otherwise as before
+        p_teams: session ? draft.players.filter((x: any) => x.user_id && seed?.participantTeams?.[x.user_id]).map((x: any) => ({ player: x.id, team: seed!.participantTeams![x.user_id] }))
+          : (teamGroupOneStep || (matchOneStep && teamMode)) ? draft.players.filter((x: any) => !!x.team).map((x: any) => ({ player: x.id, team: x.team })) : [],
         p_groups: draft.assignments.filter((a) => a.group != null),
         p_foursomes: foursomes.length ? foursomes : null, p_announce: announce,
       });
@@ -922,6 +944,16 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       for (const [uid, hi] of Object.entries(hcpOverrides)) { if (uid !== user.id && hi != null) { try { await supabase.from("profiles").update({ handicap_index: hi }).eq("id", uid); } catch {} } }
       // the club's activity feed hears about a draft only when it is sent (Manage Game → Send to players)
       if (announce) await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${payload.name}" at ${pickedFav.name}` });
+      // 212.68: a Ryder Cup session — link the game to its session, only if the session is still unlinked (v1.0's rule);
+      // otherwise remove the game again and say so, so a session can never have two games
+      if (session) {
+        const { data: linkedSession, error: linkErr } = await supabase.from("competition_sessions").update({ game_id: gameId })
+          .eq("id", session.sessionId).eq("competition_id", session.competitionId).is("game_id", null).select("id").maybeSingle();
+        if (linkErr || !linkedSession) {
+          try { await supabase.rpc("delete_game", { p_game: gameId, p_delete_rounds: true }); } catch {}
+          throw new Error(`The game was not linked to the Ryder Cup session: ${linkErr?.message || "the session was already linked or no longer exists"}`);
+        }
+      }
       if (seed?.teeTimeId) {
         try {
           await supabase.rpc("link_tee_time_game", { p_tee_time_id: seed.teeTimeId, p_game_id: gameId });
@@ -1183,7 +1215,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
         {createSection === "players" && (
           <div>
       {/* 212.41: what this many players can make in the chosen format (scramble first) */}
-      <PlayerCountHint hint={oneStep ? playerCountHint(lineupKind, { players: groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length, captains: scrambleTeamSize === 1, scrambleMode: fmtFamily === "match" ? "match" : "field", teamMode }) : null} />
+      <PlayerCountHint hint={oneStep ? (session ? cupSessionHint(session.format, session.scrambleTeamSize, groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).map((p) => seed?.participantTeams?.[p.id] ?? null), team1, team2) : playerCountHint(lineupKind, { players: groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length, captains: scrambleTeamSize === 1, scrambleMode: fmtFamily === "match" ? "match" : "field", teamMode })) : null} />
       <div style={{ marginTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
@@ -1745,7 +1777,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               Put each player on a team — or tap Balance by handicap — then build the groups. Nothing is saved until you create the game.
             </div>
             {/* 212.44 (owner, Oct 26): the compact team card — names and colours are chosen here, with the players in view */}
-            <CompactTeamEditor game={draft.game as any} players={draft.players as any}
+            <CompactTeamEditor game={draft.game as any} players={draft.players as any} locked={session ? { reason: `The Cup set the sides, names and colours — ${team1} v ${team2}.` } : undefined}
               onSetTeam={draftHandlers.onSetTeam} onBalanceTeams={draftHandlers.onBalanceTeams} onStartOver={draftHandlers.onStartOverTeams}
               onRenameTeams={async ([a, b]) => { setTeam1(a); setTeam2(b); }} onSetTeamColours={(c) => setTeamColours(c)} />
             <div style={{ marginTop: 12 }}>
@@ -1773,7 +1805,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               {teamMode ? "Put each player on a team, then set the matchups and (optionally) the groups." : gameType === "match" ? "Set the matchups, then (optionally) the groups." : "Set the groups (optional)."} Nothing is saved until you create the game.
             </div>
             {teamMode && (
-              <CompactTeamEditor game={draft.game as any} players={draft.players as any}
+              <CompactTeamEditor game={draft.game as any} players={draft.players as any} locked={session ? { reason: `The Cup set the sides, names and colours — ${team1} v ${team2}.` } : undefined}
                 onSetTeam={draftHandlers.onSetTeam} onBalanceTeams={draftHandlers.onBalanceTeams} onStartOver={draftHandlers.onStartOverTeams}
                 onRenameTeams={async ([a, b]) => { setTeam1(a); setTeam2(b); }} onSetTeamColours={(c) => setTeamColours(c)} />
             )}

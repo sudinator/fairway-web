@@ -15,7 +15,7 @@ import * as React from "react";
 import { ok, report } from "./screen-harness";
 import { CreateGame } from "@/components/tournaments";
 import { saveSetupDraft } from "@/lib/setup-draft";
-import { BEHAVIOUR_COURSE, BEHAVIOUR_CREATOR, BEHAVIOUR_ROSTER, BEHAVIOUR_GUESTS, behaviourCases, type CreateCase } from "@/lib/create-behaviour";
+import { BEHAVIOUR_COURSE, BEHAVIOUR_CREATOR, BEHAVIOUR_ROSTER, BEHAVIOUR_GUESTS, BEHAVIOUR_CUP_EXTRA, behaviourCases, sessionTeams, type CreateCase } from "@/lib/create-behaviour";
 import { replayFormatKey, reachableFormatKeys } from "@/lib/create-game-format";
 
 const ROOT = process.cwd();
@@ -27,11 +27,13 @@ const structure = JSON.parse(gs.slice(1, gs.lastIndexOf("'")).replace(/''/g, "'"
 // ── the golden course and roster, served to the screen the way the app's server would ──
 const GROUP = "club-1";   // the golden record's club
 const COURSE = { id: "c1", data: { id: "c1", name: BEHAVIOUR_COURSE.name, location: "", holes: BEHAVIOUR_COURSE.holes, tees: BEHAVIOUR_COURSE.tees.map((t) => ({ ...t, par: BEHAVIOUR_COURSE.par })) } };
-const ROSTER = BEHAVIOUR_ROSTER.map((m) => ({ ...m, avatar_url: null }));
+const ROSTER = [...BEHAVIOUR_ROSTER, BEHAVIOUR_CUP_EXTRA].map((m) => ({ ...m, avatar_url: null }));   // the eighth member plays only in Cup sessions
 const createBodies: Record<string, unknown>[] = [];
+const linkCalls: { url: string; body: Record<string, unknown> }[] = [];   // 212.68: the session link, as v1.0 made it
 (globalThis as { fetch: unknown }).fetch = async (input: string | URL, init?: { body?: string }) => {
   const url = String(input); const body = init?.body ? JSON.parse(init.body) : null;
   if (url.includes("/rpc/create_game_complete")) createBodies.push(body);
+  if (url.includes("/rest/v1/competition_sessions") && init && (init as { method?: string }).method === "PATCH") { linkCalls.push({ url, body }); return new Response(JSON.stringify({ id: "sess-1" }), { status: 200, headers: { "content-type": "application/json" } }); }
   const json = (d: unknown) => new Response(JSON.stringify(d), { status: 200, headers: { "content-type": "application/json", "content-range": "0-99/*" } });
   if (url.includes("/rest/v1/group_courses")) return json([{ course_id: "c1" }]);
   if (url.includes("/rest/v1/favorite_courses")) return json([COURSE]);
@@ -50,14 +52,14 @@ const clickText = async (el: HTMLElement, text: string, sel = "button") => {
 };
 
 // ── the golden line-up choices (lib/structure-behaviour), keyed to the screen's fixed player ids ──
-const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"], BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar"];
+const RED = ["Amit Sud", "Raj Mehta", "Nihar Shah", "Karan Patel"], BLUE = ["Sam Lee", "Vikram Rao", "Bo Li", "Guest Kumar", "Dev Kapoor"];   // Dev Kapoor: sessions only
 const ORDER = [...RED, ...BLUE];
-const MATCHES: [string, string][] = [["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", "Guest Kumar"]];
+const MATCHES: [string, string][] = [["Amit Sud", "Sam Lee"], ["Raj Mehta", "Vikram Rao"], ["Nihar Shah", "Bo Li"], ["Karan Patel", "Guest Kumar"], ["Karan Patel", "Dev Kapoor"]];
 const uuid = (n: number) => `22660000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 
 function seed(c: CreateCase) {
   const f = replayFormatKey(c.key, { matchLength: c.matchLength, scrambleTeamSize: c.scrambleTeamSize });
-  const roster = BEHAVIOUR_ROSTER.slice(0, c.members ?? BEHAVIOUR_ROSTER.length), guests = BEHAVIOUR_GUESTS.slice(0, c.guests ?? BEHAVIOUR_GUESTS.length);
+  const roster = c.session ? [...BEHAVIOUR_ROSTER, BEHAVIOUR_CUP_EXTRA] : BEHAVIOUR_ROSTER.slice(0, c.members ?? BEHAVIOUR_ROSTER.length), guests = c.session ? [] : BEHAVIOUR_GUESTS.slice(0, c.guests ?? BEHAVIOUR_GUESTS.length);
   const people: { name: string; idKey: string; pkey: string }[] = [{ name: BEHAVIOUR_CREATOR.display_name, idKey: `u:${BEHAVIOUR_CREATOR.id}`, pkey: BEHAVIOUR_CREATOR.id },
     ...roster.map((m) => ({ name: m.display_name ?? "", idKey: `u:${m.id}`, pkey: m.id })),
     ...guests.map((g) => ({ name: g.display_name, idKey: `g:${g.id}`, pkey: "" }))];
@@ -67,12 +69,13 @@ function seed(c: CreateCase) {
   const present = (names: string[]) => names.filter((n) => people.some((p) => p.name === n));
   const gt = f.gameType, hasTeams = f.teamMode || gt === "fourball" || gt === "trifecta" || gt === "alt_shot";
   const draft: Record<string, unknown> = {
-    name: "", matchDate: "2026-10-24", teeIdx: 0, idxStr: String(BEHAVIOUR_CREATOR.handicap_index), favName: BEHAVIOUR_COURSE.name,
+    // a session: the Cup's name and team names, and the creator ticked (as the Cup's seed does)
+    name: c.session ? `${c.session.cupName} · ${c.session.sessionName}` : "", matchDate: "2026-10-24", teeIdx: 0, idxStr: String(BEHAVIOUR_CREATOR.handicap_index), favName: BEHAVIOUR_COURSE.name,
     gameType: gt, allowancePct: f.allowancePct, matchLength: f.matchLength, teamScoreMode: f.teamScoreMode, strokeBasis: f.strokeBasis, fmtFamily: f.fmtFamily,
-    matchKind: f.matchKind ?? "ind", teamMode: f.teamMode, skinsTeamStyle: f.skinsTeamStyle, skinsMode: f.skinsMode, team1: "", team2: "",
+    matchKind: f.matchKind ?? "ind", teamMode: c.session ? true : f.teamMode, skinsTeamStyle: f.skinsTeamStyle, skinsMode: f.skinsMode, team1: c.session?.teams.A ?? "", team2: c.session?.teams.B ?? "",
     scrambleTeamSize: f.scrambleTeamSize ?? 4, scrambleHandicap: f.scrambleHandicap ?? "usga", scrambleMinDrives: f.scrambleMinDrives ?? null, scrambleAllowance: null,
     flightMode: "off", createSection: "review",
-    selectedPlayers: Object.fromEntries(roster.map((m) => [m.id, true])), guestPlayers: guests.map((g) => ({ ...g })),
+    selectedPlayers: Object.fromEntries([...(c.session ? [BEHAVIOUR_CREATOR] : []), ...roster].map((m) => [m.id, true])), guestPlayers: guests.map((g) => ({ ...g })),
   };
   const team: Record<string, string | null> = {}, group: Record<string, number | null> = {};
   let foursomes: unknown[] | null = null, pairings: { a: string; b: string }[] | undefined;
@@ -88,11 +91,11 @@ function seed(c: CreateCase) {
   if (hasTeams) present(ORDER).forEach((nm, i) => { team[rowId(nm)] = i < 4 ? "A" : "B"; });
   const twoVtwo = gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || (gt === "skins" && f.teamMode && f.skinsTeamStyle === "best_ball");
   if (twoVtwo) {
-    [["Amit Sud", 1], ["Raj Mehta", 1], ["Sam Lee", 1], ["Vikram Rao", 1], ["Nihar Shah", 2], ["Karan Patel", 2], ["Bo Li", 2], ["Guest Kumar", 2]].forEach(([nm, g]) => { if (present([nm as string]).length) group[rowId(nm as string)] = g as number; });
-    const fsm = (id: string, name: string, a: string[], b: string[]) => ({ id, name, a: a.map(pk), b: b.map(pk) });
+    [["Amit Sud", 1], ["Raj Mehta", 1], ["Sam Lee", 1], ["Vikram Rao", 1], ["Nihar Shah", 2], ["Karan Patel", 2], ["Bo Li", 2], ["Guest Kumar", 2], ["Dev Kapoor", 2]].forEach(([nm, g]) => { if (present([nm as string]).length) group[rowId(nm as string)] = g as number; });
+    const fsm = (id: string, name: string, a: string[], b: string[]) => ({ id, name, a: present(a).map(pk), b: present(b).map(pk) });   // a session has no guest
     foursomes = gt === "skins"
-      ? [fsm("fs-1", "Foursome 1", ["Amit Sud", "Raj Mehta"], ["Sam Lee", "Vikram Rao"]), fsm("fs-2", "Foursome 2", ["Nihar Shah", "Karan Patel"], ["Bo Li", "Guest Kumar"])]
-      : [fsm("group-1", "Group 1", ["Amit Sud", "Raj Mehta"], ["Sam Lee", "Vikram Rao"]), fsm("group-2", "Group 2", ["Nihar Shah", "Karan Patel"], ["Bo Li", "Guest Kumar"])];
+      ? [fsm("fs-1", "Foursome 1", ["Amit Sud", "Raj Mehta"], ["Sam Lee", "Vikram Rao"]), fsm("fs-2", "Foursome 2", ["Nihar Shah", "Karan Patel"], ["Bo Li", "Guest Kumar", "Dev Kapoor"])]
+      : [fsm("group-1", "Group 1", ["Amit Sud", "Raj Mehta"], ["Sam Lee", "Vikram Rao"]), fsm("group-2", "Group 2", ["Nihar Shah", "Karan Patel"], ["Bo Li", "Guest Kumar", "Dev Kapoor"])];
     if (gt === "alt_shot") foursomes = (foursomes as { a: string[]; b: string[] }[]).map((x) => ({ ...x, a_first: x.a[0], b_first: x.b[0] }));
     if (gt === "trifecta") foursomes = (foursomes as Record<string, unknown>[]).map((x, i) => (i === 1 ? { ...x, swap: true } : x));
   } else {
@@ -105,18 +108,22 @@ function seed(c: CreateCase) {
   return { draft, f, people };
 }
 
-// Ryder Cup sessions (212.67 snapshot) take the old route until their one-step step is built (212.68); the check covers them then
-const cases = behaviourCases(reachableFormatKeys()).filter((c) => !c.session);
+const cases = behaviourCases(reachableFormatKeys());   // 212.68: Ryder Cup sessions included, driven with the Cup's seed
 (async () => {
   for (const c of cases) {
     const g = golden.find((x) => x.id === c.id);
     if (!g) { ok(false, `${c.id}: no golden record`); continue; }
     window.localStorage.clear();
     const { draft, f, people } = seed(c);
-    saveSetupDraft(GROUP, null, draft as never);
+    saveSetupDraft(GROUP, c.session ? `cup-${c.session.competitionId}-1` : null, draft as never);   // a session keeps its draft under its own key
     const e = document.createElement("div"); document.body.appendChild(e);
     const r = createRoot(e);
-    await act(async () => { r.render(<CreateGame user={ME} displayName={BEHAVIOUR_CREATOR.display_name} activeGroupId={GROUP} onCancel={() => {}} onCreated={() => {}} />); });
+    const cupSeed = c.session ? {
+      playDate: "2026-10-24", course: null, memberIds: [BEHAVIOUR_CREATOR.id, ...BEHAVIOUR_ROSTER.map((m) => m.id), BEHAVIOUR_CUP_EXTRA.id], guests: [],
+      name: `${c.session.cupName} · ${c.session.sessionName}`, gameType: c.session.format, teamNames: c.session.teams, participantTeams: sessionTeams(),
+      competitionSession: { sessionId: c.session.sessionId, competitionId: c.session.competitionId, name: c.session.sessionName, sessionOrder: 1, format: c.session.format, scrambleTeamSize: c.session.scrambleTeamSize, playDate: "2026-10-24", pointsPerMatch: 1 },
+    } : undefined;
+    await act(async () => { r.render(<CreateGame user={ME} displayName={BEHAVIOUR_CREATOR.display_name} activeGroupId={GROUP} seed={cupSeed as never} onCancel={() => {}} onCreated={() => {}} />); });
     await flush();
     const txt = () => e.textContent || "";
     if (txt().includes("Resume")) await clickText(e, "Resume");
@@ -142,7 +149,8 @@ const cases = behaviourCases(reachableFormatKeys()).filter((c) => !c.session);
     for (const k of Object.keys(b.p_game ?? {})) { if (!skip.has(k) && !(k in g.game) && b.p_game?.[k] != null) diffs.push(`game.${k}: v2.0 adds ${JSON.stringify(b.p_game?.[k])}`); }
     // ── 2. every player row ──
     const byName = (rows: Record<string, unknown>[]) => Object.fromEntries(rows.map((p) => [p.display_name as string, p]));
-    const gp = byName(g.players), vp = byName(b.p_players ?? []);
+    const teamOfRow = new Map((b.p_teams ?? []).map((t) => [t.player, t.team]));
+    const gp = byName(g.players), vp = byName((b.p_players ?? []).map((row) => ({ ...row, team: teamOfRow.get(row.id as string) ?? (row.team as string | null | undefined) ?? null })));
     for (const nm of Object.keys(gp)) {
       if (!vp[nm]) { diffs.push(`player ${nm}: missing`); continue; }
       for (const k of Object.keys(gp[nm])) { if (["game_id", "id"].includes(k)) continue; if (JSON.stringify(vp[nm][k]) !== JSON.stringify(gp[nm][k])) diffs.push(`player ${nm}.${k}: v1.0 ${JSON.stringify(gp[nm][k])} → v2.0 ${JSON.stringify(vp[nm][k])}`); }
@@ -166,6 +174,15 @@ const cases = behaviourCases(reachableFormatKeys()).filter((c) => !c.session);
       const v1P = normP(st.game.pairings, stName), v2P = normP(b.p_game?.pairings, rowName);
       if (v1P !== v2P) diffs.push(`matchups: v1.0 ${v1P} → v2.0 ${v2P}`);
     }
+    // ── 4. a session: the link to the session, exactly as v1.0 made it (only if the session is still unlinked) ──
+    const gl = (g as { link?: { where: Record<string, unknown>; set: Record<string, unknown> } }).link;
+    if (gl) {
+      const lc = linkCalls[linkCalls.length - 1];
+      const q = lc ? new URL(lc.url).searchParams : null;
+      if (!lc || q?.get("id") !== `eq.${gl.where.id}` || q?.get("competition_id") !== `eq.${gl.where.competition_id}` || q?.get("game_id") !== "is.null" || typeof lc.body?.game_id !== "string")
+        diffs.push(`session link: v1.0 ${JSON.stringify(gl)} → v2.0 ${lc ? `${new URL(lc.url).search} ${JSON.stringify(lc.body)}` : "no link call"}`);
+    } else if (linkCalls.length) diffs.push("a session link was made for a club game");
+    linkCalls.length = 0;
     ok(diffs.length === 0, `${c.id} (${f.gameType}${f.teamMode ? " · team" : ""}): v2.0's Create sends what v1.0 stored${diffs.length ? `\n      - ${diffs.join("\n      - ")}` : ""}`);
     r.unmount();
   }
