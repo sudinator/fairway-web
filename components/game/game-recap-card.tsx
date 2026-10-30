@@ -22,7 +22,8 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
   game: Game; players: Player[]; altShotScores: AltShotScoreRow[]; userId: string; betStale: boolean;
   competition?: { competition_id: string; name: string } | null; onOpenCompetition?: (id: string) => void;
 }) {
-  const recap = useMemo(() => buildRecap(game, players, altShotScores), [game, players, altShotScores]);
+  const [pointsPerMatch, setPointsPerMatch] = useState<number | undefined>(undefined);   // 212.76: a Cup session's points per match
+  const recap = useMemo(() => buildRecap(game, players, altShotScores, { pointsPerMatch }), [game, players, altShotScores, pointsPerMatch]);
   const supabase = useMemo(() => createClient(), []);
   const [contests, setContests] = useState<RecapContest[]>([]);
   const [newBests, setNewBests] = useState<Best[]>([]);   // personal bests this game's round set for the viewer
@@ -44,7 +45,7 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
     if (!competitionId) { setCup(null); return; }
     let live = true;
     // A failed load shows no Cup box (rather than partial numbers); the recap itself is unaffected.
-    loadCupForGame(supabase, game.id).then((c) => { if (live) setCup(c ? cupStandingAfter(c.competition, c.sessions, game.id) : null); })
+    loadCupForGame(supabase, game.id).then((c) => { if (live) { const ses = c?.sessions.find((x) => x.game_id === game.id); setPointsPerMatch(ses ? Number(ses.points_per_match) || 1 : undefined); } if (live) setCup(c ? cupStandingAfter(c.competition, c.sessions, game.id) : null); })
       .catch(() => { if (live) setCup(null); });
     return () => { live = false; };
   }, [supabase, game.id, competitionId, players]);

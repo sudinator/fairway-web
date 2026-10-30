@@ -145,6 +145,7 @@ const round = (over: Partial<Record<string, unknown>> = {}) => ({
     const s = renderScreen(
       <div style={{ background: C.greenLight }}>
         <LeaderRow
+          coursePar={72} holeCount={18}
           p={p as never}
           pos={1}
           tied={false}

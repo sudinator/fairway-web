@@ -1,5 +1,5 @@
 {
-  "total": 440197,
+  "total": 440208,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -19,6 +19,7 @@
     "competition": 16,
     "component render": 17,
     "contests": 26,
+    "course handicap one source": 6,
     "course history": 6,
     "course ordering": 4,
     "create behaviour": 74,
@@ -50,6 +51,7 @@
     "live cup parity": 49,
     "live skins": 19,
     "manual course handicap": 17,
+    "manual handicap": 3,
     "manual handicap simulation": 76807,
     "match card layout": 5,
     "match length": 49,
@@ -63,7 +65,7 @@
     "one-step walkthrough": 154,
     "personal bests": 16,
     "player-scoring": 71,
-    "recap additions": 44,
+    "recap additions": 46,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,

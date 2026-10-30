@@ -1,3 +1,11 @@
+## 212.76.261030 — One source for a live player's course handicap; the handicap audit (index, tees); audits 3–7 (names reach games, Cup points on the recap)
+
+Owner (Oct 30, after 947286): "shouldn't the handicap be derived from one place for all calculations and displays? … is it worth doing an audit?" Yes; and the index and tee rules confirmed as designed.
+
+## 212.75.261030 — Clearing a course-handicap override left the old number behind (production game 947286)
+
+Owner (Oct 30): on 947286, Ankur Tiku (index 13, course handicap 18 on his tee) showed CH 18 on the group card but CH 13 on the leaderboard, after an override of 13 had been set and then cleared.
+
 ## 212.74.261029 — The recap's field line on one line; the Cup roster row with avatars, 10+ characters of the name, short team labels
 
 Owner (Oct 30): "the round summary Field Average needs to fit on one line, maybe call it Field Avg (net), and can do out / in"; "the selector for the Ryder Cup must show the avatar picture and keep at least 10 characters before the name is truncated. Instead of spelling out the full team name, truncate them to the first few letters"; variant C of the personal bests card (already in 212.73).

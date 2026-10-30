@@ -1113,7 +1113,8 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
   const save = async () => {
     if (name.trim().length < 2) { setErr("Please enter your name."); return; }
     setSaving(true); setErr(null);
-    const { error } = await supabase.from("profiles").update({ display_name: titleCaseName(name.trim()) }).eq("id", user.id);
+    // 212.76 audit 4: the new name reaches every game row too (set_my_display_name, 0232), as an avatar change does
+    const { error } = await supabase.rpc("set_my_display_name", { p_name: titleCaseName(name.trim()) });
     setSaving(false);
     if (error) { setErr("Couldn't save your name. Please try again."); return; }
     onSaved();

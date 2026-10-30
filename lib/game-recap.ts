@@ -34,7 +34,9 @@ function teamLine(teams: { key: string; name: string }[], a: number, b: number) 
   return a > b ? { headline: `${ta.name} beat ${tb.name} ${pts(a)}–${pts(b)}`, winner: ta.key } : { headline: `${tb.name} beat ${ta.name} ${pts(b)}–${pts(a)}`, winner: tb.key };
 }
 
-function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotScoreRow[]): Omit<Recap, "highlights" | "sections"> & { winner: string | null } {
+/** 212.76 audit 7: a Cup session's points per match — the Cup page and the email score with it; the recap must too. */
+export type RecapOptions = { pointsPerMatch?: number };
+function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotScoreRow[], opts: RecapOptions = {}): Omit<Recap, "highlights" | "sections"> & { winner: string | null } {
   const shape = shapeOf(game);
   const teams = (Array.isArray(game.teams) && game.teams.length === 2 ? game.teams : null) as { key: string; name: string }[] | null;
   const holes = game.holes_meta?.length ?? 18;
@@ -59,7 +61,7 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
       // (scoreCompetitionGame: DECIDED matches only), leader first, "Blues 1½ – ½ Reds"; an unfinished match is said.
       const cup = cupSideNames(game);
       if (cup && done.length) {
-        const sc = scoreCompetitionGame(game, players, altShotScores, 1);
+        const sc = scoreCompetitionGame(game, players, altShotScores, opts.pointsPerMatch ?? 1);   // 212.76: the session's points, as the Cup page scores it
         const a = { name: cup[0], pts: sc.decidedA }, b = { name: cup[1], pts: sc.decidedB };
         const [x, y] = b.pts > a.pts ? [b, a] : [a, b];
         const open = sc.matchCount - sc.decidedCount;
@@ -87,7 +89,9 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
   // Team formats: decided points only — an unfinished match is never counted as settled.
   if (teams && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") && shape.usesTeams) {
     const st = game.game_type === "match" ? singlesTeamStandings(game, players) : foursomeTeamStandings(game, players, altShotScores);
-    const a = st.decidedPts[teams[0].key] ?? 0, b = st.decidedPts[teams[1].key] ?? 0;
+    // 212.76 audit 7: a Cup session scores each match at the SESSION's points (as the Cup page and email do); a club game at 1
+    const ppm = opts.pointsPerMatch ?? 1;
+    const a = (st.decidedPts[teams[0].key] ?? 0) * ppm, b = (st.decidedPts[teams[1].key] ?? 0) * ppm;
     const t = teamLine(teams, a, b);
     if (st.out > 0) notes.push(`${st.out} match${st.out === 1 ? "" : "es"} unfinished — not counted`);
     teamPersonal(t.winner);
@@ -96,7 +100,8 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
   if (teams && game.game_type === "trifecta") {
     const r = trifectaResults(game, players, [teams[0].key, teams[1].key]);
     const o = r.outlook;
-    const t = teamLine(teams, o.decidedA, o.decidedB);
+    const ppm = opts.pointsPerMatch ?? 1;   // 212.76 audit 7
+    const t = teamLine(teams, o.decidedA * ppm, o.decidedB * ppm);
     if (o.open > 0) notes.push(`${pts(o.open)} point${o.open === 1 ? "" : "s"} from unfinished contests — not counted`);
     teamPersonal(t.winner);
     return { headline: t.headline, endedEarly: o.open > 0, notes, personal, signature: `trifecta:${o.decidedA}:${o.decidedB}:${o.open}`, winner: t.winner };
@@ -160,8 +165,8 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
 
 /** The recap: headline, personal lines and signature (core), plus the shared highlights and the format's
  *  own section. Flighted Stableford / stroke play name each flight's winner in the headline. */
-export function buildRecap(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = []): Recap {
-  const core = buildRecapCore(game, players, altShotScores);
+export function buildRecap(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = [], opts: RecapOptions = {}): Recap {
+  const core = buildRecapCore(game, players, altShotScores, opts);
   const highlights = buildHighlights(game, players);
   const sections = buildRecapSections(game, players, altShotScores, highlights, core.winner != null || Array.isArray(game.teams) ? { winner: core.winner } : null);
   let headline = core.headline;

@@ -135,6 +135,20 @@ export const chBasis = (
 };
 
 /**
+ * 212.76 (owner, Oct 30: "shouldn't the handicap be derived from one place for all calculations and displays?") — the ONE
+ * accessor for a live player's course handicap, for every label, summary, line-up and balance, exactly the basis the
+ * scoring uses (chBasis: the manual figure when set, else the index on the tee), rounded for display. A player row's
+ * stored `course_handicap` is never read for display by anything else (ci/check_course_handicap_reads.py); it remains
+ * the figure written as the round's snapshot when the game posts.
+ */
+export const courseHandicapOf = (p: Parameters<typeof chBasis>[0], coursePar: number | null | undefined, holeCount?: number | null): number | null => {
+  const v = chBasisOrNull(p, coursePar, holeCount);
+  return v == null ? null : Math.round(v);
+};
+/** Whether a live player has a course handicap at all (a manual figure, an index on the tee, or a stored figure). */
+export const hasCourseHandicap = (p: Parameters<typeof chBasis>[0], coursePar: number | null | undefined): boolean => chBasisOrNull(p, coursePar) != null;
+
+/**
  * 212.18: chBasis for STATISTICS — the same rule, but a player with no handicap at all (no manual figure, no index to
  * derive from, no stored course handicap) is "no handicap" (null), never 0. chBasis returns 0 there because a game
  * needs a figure for everyone; an analysis must not treat a player with no handicap as a scratch golfer.

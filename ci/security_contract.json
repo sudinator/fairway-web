@@ -205,6 +205,7 @@
   "set_game_share(uuid,boolean)": "authenticated",
   "set_group_marker(uuid,boolean)": "authenticated",
   "set_my_avatar(text)": "authenticated",
+  "set_my_display_name(text)": "authenticated",
   "set_my_scorer(uuid,boolean)": "authenticated",
   "set_player_bets(uuid,boolean)": "authenticated",
   "set_tee_group(uuid,smallint)": "authenticated",

@@ -11,10 +11,10 @@ import type { CupLine } from "@/lib/cup-standing";
 import { isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
-export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null, contests: EmailContest[] = [], newBests: Best[] = []): { context: EmailGameContext; groupHtml: string } | null {
+export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null, contests: EmailContest[] = [], newBests: Best[] = [], pointsPerMatch?: number): { context: EmailGameContext; groupHtml: string } | null {
   const me = players.find((p) => (p as any).user_id === userId);
   if (!me) return null;
-  const recap = buildRecap(game, players);
+  const recap = buildRecap(game, players, [], { pointsPerMatch });   // 212.76: a Cup session's points per match
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
   // Net position among finishers, on the full course handicap (the recap's standing rule).
   const nets = players.filter((p) => !p.no_show && isFullCard(p.scores, nh))

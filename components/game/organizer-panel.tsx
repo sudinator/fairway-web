@@ -50,7 +50,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, courseHandicapOf, hasCourseHandicap } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -230,7 +230,7 @@ export function OrganizerPanel({
   const gameMembers = orderedPlayers.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
 
 
-  const withHcp = players.filter((p) => p.course_handicap != null).length;
+  const withHcp = players.filter((p) => hasCourseHandicap(p, game.course_par)).length;
   const allSet = players.length > 0 && withHcp === players.length;
 
   const teams = Array.isArray(game.teams) ? game.teams : [];
@@ -378,8 +378,8 @@ export function OrganizerPanel({
                       {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>guest</span> : null}
                     </div>
                     <div style={{ color: C.sage, fontSize: 12 }}>
-                      {p.course_handicap != null
-                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
+                      {courseHandicapOf(p, game.course_par, game.holes_meta?.length) != null
+                        ? `course handicap ${courseHandicapOf(p, game.course_par, game.holes_meta?.length)} · plays ${applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
                         : "no handicap yet"}
                       {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>
@@ -574,7 +574,7 @@ export function OrganizerPanel({
                     <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
                     <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
                     <div style={{ marginTop: 8, color: C.cream, fontSize: 13, lineHeight: 1.8 }}>
-                      {mem.length ? mem.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name} <span style={{ color: C.sage }}>CH {p.course_handicap ?? "—"}</span></span></div>) : <span style={{ color: C.sage }}>No players assigned</span>}
+                      {mem.length ? mem.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name} <span style={{ color: C.sage }}>CH {courseHandicapOf(p, game.course_par, game.holes_meta?.length) ?? "—"}</span></span></div>) : <span style={{ color: C.sage }}>No players assigned</span>}
                     </div>
                   </div>
                 );

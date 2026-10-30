@@ -60,4 +60,8 @@ ok((tf.sections.matches?.rows.length ?? 0) === 6, `trifecta: six results — two
 // 212.72 (owner): the field average TOTAL shows whenever the nines do — six players, not only eight
 const six = buildRecap(game, players.slice(0, 6), []);
 ok(six.highlights.fieldNet != null && six.highlights.frontBackNet != null, `six players: the field average total and nines both show (${six.highlights.fieldNet} · ${JSON.stringify(six.highlights.frontBackNet)})`);
+// ── 212.76 audit 7: a Cup session's points per match reach the recap's headline (the Cup page and email already used them)
+const fb = formatGames["fourball"];
+const one = buildRecap(fb.game, fb.players, []), two = buildRecap(fb.game, fb.players, [], { pointsPerMatch: 2 });
+ok(/1–1|1 – 1/.test(one.headline) && /2–2|2 – 2/.test(two.headline), `a Cup session at 2 points a match reads 2–2 on the recap, not 1–1 (got "${one.headline}" / "${two.headline}")`);
 report("recap additions");

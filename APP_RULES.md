@@ -69,6 +69,26 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 7b. **Audit log shows names, not emails.** Activity-log entries display the actor's `display_name`
    (resolved centrally in `lib/activity.ts` from `actor_id`), never their email. — code (logActivity)
 
+## Handicap figures — where each one comes from (212.76, owner, Oct 30)
+
+Three figures, three sources, deliberately kept apart. GHIN is the source of truth and it is up to the player to enter
+their number; the running index exists to converge with it over time.
+
+- **Handicap index.** The player's profile holds the number they entered (GHIN). A game copies it onto the player's
+  row when the game is created or the player joins; the organizer can change it for that game. Every game screen,
+  the line-up page, the recap and the emails read the ROW, never the profile — the handicap for a game is the one at
+  the time it was set up, as modified. The dashboard's running index is computed from rounds and is never used by a game.
+- **Course handicap.** ONE accessor for a live player: `courseHandicapOf` / `hasCourseHandicap` (lib/game-shape),
+  the same basis the scoring uses — the manual figure when the organizer set one, otherwise the index on the tee.
+  The row's stored `course_handicap` is written by joins, tee changes and overrides (and their clearing, which writes
+  the derived figure back), and is READ only as a posted round's snapshot. ci/check_course_handicap_reads.py fails
+  on any other read. Game 947286 (CH 18 on the card, CH 13 on the leaderboard) is why.
+- **Tee rating and slope.** Snapshotted onto the player's row when they join or the organizer sets a tee; scoring
+  reads the row. The live course tee table is used only for the tee picker's options (merged with row snapshots so
+  an old tee still appears), the scorecard's yardages, and setting a tee (which refreshes the row). The daily course
+  freshness check reports differences for an admin to apply to the course; it never touches game rows, so a
+  correction reaches an open game only when the organizer re-sets the tee — exactly as a posted round behaves.
+
 ## Data safety
 8. **Never blank a screen on a query error.** A failed/empty query must not delete data or drop the user
    onto a blank/new screen. Degrade gracefully (keep prior state, show a message). — manual
