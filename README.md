@@ -1,3 +1,7 @@
+## 212.74.261029 — The recap's field line on one line; the Cup roster row with avatars, 10+ characters of the name, short team labels
+
+Owner (Oct 30): "the round summary Field Average needs to fit on one line, maybe call it Field Avg (net), and can do out / in"; "the selector for the Ryder Cup must show the avatar picture and keep at least 10 characters before the name is truncated. Instead of spelling out the full team name, truncate them to the first few letters"; variant C of the personal bests card (already in 212.73).
+
 ## 212.73.261029 — GitHub's CI fixed (the overflow guard finds Chromium); personal bests: the dashboard card and the celebration
 
 **The CI failure on 212.72** (owner, Oct 30): ci/check_gallery_overflow.mjs looked for Chromium at /opt/pw-browsers — the development machine's pre-provisioned path, which GitHub's runner doesn't have. The guard now uses Playwright's own Chromium when nothing is pre-provisioned, and names the fix plainly if neither exists; the workflows (ci.yml and staging-integration.yml) install it (`npx playwright install chromium --with-deps`) after `npm ci`. The guard itself is unchanged in what it checks.

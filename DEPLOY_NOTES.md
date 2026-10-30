@@ -1,3 +1,13 @@
+## 212.74.261029 — The recap's field line on one line; the Cup roster row with avatars, 10+ characters of the name, short team labels
+
+Owner (Oct 30): "the round summary Field Average needs to fit on one line, maybe call it Field Avg (net), and can do out / in"; "the selector for the Ryder Cup must show the avatar picture and keep at least 10 characters before the name is truncated. Instead of spelling out the full team name, truncate them to the first few letters"; variant C of the personal bests card (already in 212.73).
+
+- **Field line:** "Field avg (net) 70.8 (−1.3) · out 35.3 (−0.8) · in 35.5 (−0.5)" — one line (never wraps; ellipsis if a phone is narrower still), on the share image, in the app and in the email.
+- **Cup roster row:** the member's avatar (initials when none); the name column never narrower than 10 characters; the team buttons carry a short label — the name itself up to 7 characters, otherwise the first four letters of its first real word ("Americas" → "Amer", "The Magnificent Eagles" → "Magn", "Hawks" stays) — with the full name as the button's title. The design gallery renders the row with avatars and long names; the overflow guard passes.
+Tests: lib/cup-roster-row (5): the short labels, the avatar, the 10-character minimum, the buttons' labels and titles; lib/recap-additions (22): the field line's wording and that it is one line, in the app, the share and the email.
+
+Deploy: code only.
+
 ## 212.73.261029 — GitHub's CI fixed (the overflow guard finds Chromium); personal bests: the dashboard card and the celebration
 
 **The CI failure on 212.72** (owner, Oct 30): ci/check_gallery_overflow.mjs looked for Chromium at /opt/pw-browsers — the development machine's pre-provisioned path, which GitHub's runner doesn't have. The guard now uses Playwright's own Chromium when nothing is pre-provisioned, and names the fix plainly if neither exists; the workflows (ci.yml and staging-integration.yml) install it (`npx playwright install chromium --with-deps`) after `npm ci`. The guard itself is unchanged in what it checks.

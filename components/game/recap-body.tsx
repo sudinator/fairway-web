@@ -28,6 +28,7 @@ const S = {
 };
 /** 212.71: "+1.2", "E", "−0.4" against par; a nine's par is the sum of its holes' pars. */
 const vsParLabel = (d: number) => Math.abs(d) < 0.05 ? "E" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
+const ninePar = (game: Game, from: number) => (game.holes_meta ?? []).slice(from, from + 9).reduce((s, h) => s + (h.par ?? 0), 0);
 const teamColor = (game: Game, key: string | null) => {
   const teams = Array.isArray(game.teams) ? game.teams : [];
   const i = teams.findIndex((t: any) => t.key === key);
@@ -199,8 +200,9 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
       ) : null}
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-course>
         {/* 212.71 (owner): "Field average (net) · 73.2 (+1.2) · front 36.6 (E) · back 36.6 (+0.6)" — each against its par */}
+        {/* 212.74 (owner): ONE line — "Field avg (net) 70.8 (−1.3) · out 35.3 (−0.8) · in 35.5 (−0.5)" */}
         {s.individualStats && (h.fieldNet != null || h.frontBackNet) ? (
-          <div style={S.line}>Field average (net){h.fieldNet != null ? <> · <b style={{ color: C.cream }}>{h.fieldNet.toFixed(1)}</b> ({vsParLabel(h.netVsPar.total ?? 0)})</> : null}{h.frontBackNet ? <> · front <b style={{ color: C.cream }}>{h.frontBackNet.front.toFixed(1)}</b> ({vsParLabel(h.netVsPar.front ?? 0)}) · back <b style={{ color: C.cream }}>{h.frontBackNet.back.toFixed(1)}</b> ({vsParLabel(h.netVsPar.back ?? 0)})</> : null}</div>
+          <div style={{ ...S.line, whiteSpace: "nowrap" }} data-recap-field>Field avg (net){h.fieldNet != null ? <> <b style={{ color: C.cream }}>{h.fieldNet.toFixed(1)}</b> ({vsParLabel(h.fieldNet - (game.course_par ?? 72))})</> : null}{h.frontBackNet ? <> · out <b style={{ color: C.cream }}>{h.frontBackNet.front.toFixed(1)}</b> ({vsParLabel(h.frontBackNet.front - ninePar(game, 0))}) · in <b style={{ color: C.cream }}>{h.frontBackNet.back.toFixed(1)}</b> ({vsParLabel(h.frontBackNet.back - ninePar(game, 9))})</> : null}</div>
         ) : null}
         {/* 212.71: the share image puts toughest and easiest on one line */}
         {share && h.toughest ? (() => { const d = (h: { par: number; avg: number; vsPar: number; parsOrBetter: number; birdies: number }) => `par ${h.par}, avg ${h.avg.toFixed(1)}, ${h.vsPar >= 0 ? "+" : ""}${h.vsPar.toFixed(1)}; ${h.parsOrBetter === 0 ? "nobody made par" : `${h.parsOrBetter} made par or better${h.birdies ? `, ${h.birdies} birdie${h.birdies === 1 ? "" : "s"}` : ""}`}`; return <div style={S.line}>Toughest <b style={{ color: C.cream }}>hole {h.toughest.n}</b> ({d(h.toughest)}){h.easiest && h.easiest.n !== h.toughest.n ? <> · easiest <b style={{ color: C.cream }}>hole {h.easiest.n}</b> ({d(h.easiest)})</> : null}</div>; })() : null}

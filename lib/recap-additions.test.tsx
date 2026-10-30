@@ -26,7 +26,8 @@ ok(!rb.sections.statTiles.some((t) => t.label === "Fewest putts" || t.label === 
 ok(!!h.frontBackNet && Math.abs(h.frontBackNet.front + h.frontBackNet.back - (h.fieldNet ?? 0)) < 0.01, `the net front and back add up to the field average (${h.frontBackNet?.front} + ${h.frontBackNet?.back} vs ${h.fieldNet})`);
 let t = renderScreen(<RecapBody game={game} recap={r} mode="share" contests={contests} netBirdiesTop={3} />);
 const share = t.el.textContent || "";
-ok(share.includes("Field average (net)") && /front [0-9.]+ \((E|[+−][0-9.]+)\)/.test(share), `share: "Field average (net) · … front 35.3 (−0.8) …" (got "${share.match(/Field average[^T]*/)?.[0]}")`);
+ok(share.includes("Field avg (net)") && /out [0-9.]+ \((E|[+−][0-9.]+)\) · in [0-9.]+ \((E|[+−][0-9.]+)\)/.test(share), `share: "Field avg (net) 70.8 (−1.3) · out 35.3 (−0.8) · in 35.5 (−0.5)" (got "${share.match(/Field avg[^T]*/)?.[0]}")`);
+ok((t.el.querySelector("[data-recap-field]") as HTMLElement)?.style.whiteSpace === "nowrap" && (t.el.querySelector("[data-recap-field]") as HTMLElement)?.style.textOverflow !== "ellipsis", "share: the field line stays on one line, never an ellipsis (212.74)");
 ok(/Toughest hole \d+ \(par \d, avg [0-9.]+, [+−]?[0-9.]+; (nobody made par|\d+ made par or better)/.test(share), "share: the toughest hole says who made par or better");
 ok(!!t.el.querySelector("[data-recap-segments]") && !t.el.querySelector("[data-recap-segments-box]"), "share: segments as a line; no box");
 ok(share.includes("Closest to the pin #12") && share.includes("Long drive #16"), "share: the side contests line");
@@ -50,7 +51,7 @@ t.unmount();
 // ── the email: segments, contests, stats; no money ──
 const html = recapEmailHtml(r, null, contests);
 ok(html.includes("SEGMENTS") && html.includes("SIDE CONTESTS") && html.includes("Closest to the pin") && html.includes("STATS &amp; STREAKS"), "email: segments, side contests, stats and streaks");
-ok(html.includes("Field average (net)"), "email: the field line in its new form");
+ok(html.includes("Field avg (net)") && html.includes("· out ") && html.includes("· in "), "email: the field line in its new form");
 for (const [label, out] of [["app", (() => { const x = renderScreen(<RecapBody game={game} recap={r} mode="app" contests={contests} />); const s = x.el.innerHTML; x.unmount(); return s; })()], ["share", share], ["email", html]] as const)
   ok(!/winnings|Money tab|\$\d|data-recap-money/i.test(out), `${label}: no money anywhere`);
 // ── trifecta: its results table ──

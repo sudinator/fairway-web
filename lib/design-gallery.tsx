@@ -212,7 +212,7 @@ add("53-pb-card-real", <PersonalBestsCard rounds={pbSampleRounds} onOpen={() => 
 // 212.72 — the Ryder Cup roster selection, long team names: must never be wider than the phone (the overflow guard)
 add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
   {[["Christopher Alexander Reed", 12.4], ["Amit Sud", 14.7], ["Michael Van Der Meer", 27.1]].map(([n, hi], i) => (
-    <CupRosterRow key={String(n)} p={{ id: String(i), display_name: String(n), handicap_index: Number(hi) }} t={i === 0 ? "A" : i === 1 ? "B" : ""} playing={i < 2}
+    <CupRosterRow key={String(n)} p={{ id: String(i), display_name: String(n), handicap_index: Number(hi), avatar_url: null }} t={i === 0 ? "A" : i === 1 ? "B" : ""} playing={i < 2}
       teamA="The Magnificent Eagles of Essex County" teamB="Hawks of Livingston and Short Hills" onIn={() => {}} onOut={() => {}} onAssign={() => {}} />
   ))}
 </div>);

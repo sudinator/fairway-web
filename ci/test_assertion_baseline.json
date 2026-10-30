@@ -1,5 +1,5 @@
 {
-  "total": 440190,
+  "total": 440197,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -25,6 +25,7 @@
     "create game complete": 3,
     "create-game format": 12,
     "cup on the recap": 8,
+    "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
     "failure messages": 24,
@@ -62,7 +63,7 @@
     "one-step walkthrough": 154,
     "personal bests": 16,
     "player-scoring": 71,
-    "recap additions": 42,
+    "recap additions": 44,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,

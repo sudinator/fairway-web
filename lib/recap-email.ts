@@ -17,8 +17,8 @@ export function fieldLines(r: Recap): string[] {
   const h = r.highlights, s = r.sections, out: string[] = [];
   if (s.individualStats && (h.fieldNet != null || h.frontBackNet)) {   // 212.71 (owner): "Field average (net) · 73.2 (+1.2) · front 36.6 (E) · back 36.6 (+0.6)" — the card's wording
     const vs = (d: number) => Math.abs(d) < 0.05 ? "E" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
-    out.push(["Field average (net)", h.fieldNet != null ? `${h.fieldNet.toFixed(1)} (${vs(h.netVsPar.total ?? 0)})` : null,
-      h.frontBackNet ? `front ${h.frontBackNet.front.toFixed(1)} (${vs(h.netVsPar.front ?? 0)}) · back ${h.frontBackNet.back.toFixed(1)} (${vs(h.netVsPar.back ?? 0)})` : null].filter(Boolean).join(" · "));
+    out.push([`Field avg (net)${h.fieldNet != null ? ` ${h.fieldNet.toFixed(1)} (${vs(h.netVsPar.total ?? 0)})` : ""}`,
+      h.frontBackNet ? `out ${h.frontBackNet.front.toFixed(1)} (${vs(h.netVsPar.front ?? 0)}) · in ${h.frontBackNet.back.toFixed(1)} (${vs(h.netVsPar.back ?? 0)})` : null].filter(Boolean).join(" · "));
   }
   // 212.71: the same compact line the share image shows — toughest and easiest together, with who made par or better
   if (h.toughest) {
