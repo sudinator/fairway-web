@@ -1,5 +1,5 @@
 {
-  "total": 440170,
+  "total": 440174,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -61,7 +61,7 @@
     "odd field": 26,
     "one-step walkthrough": 154,
     "player-scoring": 71,
-    "recap additions": 40,
+    "recap additions": 42,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "scoring matrix": 3698,
@@ -76,6 +76,7 @@
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,
+    "share links form": 2,
     "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,

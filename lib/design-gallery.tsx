@@ -16,6 +16,7 @@ import { GroupScorecard, TeamGroupsBuilder } from "@/components/game/scorecard-v
 import { ScrambleView } from "@/components/game/scramble-view";
 import { RecapBody } from "@/components/game/recap-body";
 import { mockups as recapMockups, formatMockups as recapFormatMockups } from "@/lib/recap-mockups";
+import { CupRosterRow } from "@/components/competitions";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 import { TeamRoundsList } from "@/components/rounds-list";
 import { SeasonCardView } from "@/components/season-story";
@@ -204,6 +205,13 @@ add("23-storage-meter", <StorageMeter sample={{ bytes: 1_310_000, items: 214, ki
 // 212.71 — the game recap: current vs proposed (lib/recap-mockups)
 for (const [name, node] of Object.entries(recapMockups())) add(name, node);
 for (const [name, node] of Object.entries(recapFormatMockups())) add(name, node);
+// 212.72 — the Ryder Cup roster selection, long team names: must never be wider than the phone (the overflow guard)
+add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
+  {[["Christopher Alexander Reed", 12.4], ["Amit Sud", 14.7], ["Michael Van Der Meer", 27.1]].map(([n, hi], i) => (
+    <CupRosterRow key={String(n)} p={{ id: String(i), display_name: String(n), handicap_index: Number(hi) }} t={i === 0 ? "A" : i === 1 ? "B" : ""} playing={i < 2}
+      teamA="The Magnificent Eagles of Essex County" teamB="Hawks of Livingston and Short Hills" onIn={() => {}} onOut={() => {}} onAssign={() => {}} />
+  ))}
+</div>);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

@@ -163,7 +163,7 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
   eaglesByHole.forEach((c, n) => { if (c >= 3 && c * 2 >= totalEagles && (!netEagleHole || c > netEagleHole.count)) { const h = holes.find((x) => x.n === n)!; netEagleHole = { n, par: h.par, si: h.si, count: c, total: totalEagles }; } });
 
   // Field average (8+ finishers) and front v back (18 holes).
-  const fieldNet = finishers.length >= 8 ? finishers.reduce((s, p) => s + net(p), 0) / finishers.length : null;
+  const fieldNet = finishers.length >= 2 ? finishers.reduce((s, p) => s + net(p), 0) / finishers.length : null;   // 212.72 (owner): the total shows whenever the nines do
   const nine = (p: Player, from: number) => holes.slice(from, from + 9).reduce((s, _, i) => s + (played(p, from + i) || 0), 0);
   const frontBack = nh === 18 && finishers.length >= 2 ? { front: finishers.reduce((s, p) => s + nine(p, 0), 0) / finishers.length, back: finishers.reduce((s, p) => s + nine(p, 9), 0) / finishers.length } : null;
   const nineNet = (p: Player, from: number) => { const al = alloc.get(pkey(p)) || {}; return holes.slice(from, from + 9).reduce((s, h, i) => s + ((played(p, from + i) || 0) - (al[h.n] || 0)), 0); };

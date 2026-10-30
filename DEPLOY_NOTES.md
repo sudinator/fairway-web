@@ -1,3 +1,15 @@
+## 212.72.261029 — Recap's field total, the live link's form, the Cup roster's width (and a guard against sideways overflow)
+
+Owner (Oct 29, staging 212.71): "the Field avg dropped the total, i only see front and back"; "the live scores link should have the same format" as the line-up link; "Ryder Cup Roster Selection does not fit in the width of the phone screen. This breaks the display rule we already have in place".
+
+- **Field average total:** it only showed with 8+ finishers (an older rule) while the new net nines show from 2 — so smaller games lost the total. Now the total shows whenever the nines do (2+ finishers). lib/game-highlights test updated (7 players: a field average; 1 player: none).
+- **Live scores link** in the same readable form as the line-up link ("…/live/oak-hollow-oct25-k7m2px"); the server already resolved the slug for the live page (get_live_scorecard accepts it), so this is the app's link only. The long private token is never shown. Test: lib/share-links-form (2); the draft-games links test updated.
+- **Cup roster selection** ran off the phone: each row holds the name, "In" and two TEAM-NAME buttons, and the buttons never shrank. The row is now its own component (CupRosterRow): the name truncates, the two team buttons share the remaining width and truncate, so a row is never wider than the phone.
+- **The guard the rule needed:** ci/check_gallery_overflow.mjs — every design-gallery screen is laid out at 390px and the right edge of every element is measured (a clipping frame hides sideways scroll, so content, not scroll, is what's checked); any screen wider than the phone fails. The Cup roster joins the gallery with long team names — with the old buttons it fails at 540px. Runs with the guards.
+Also answered: the game recap in the app is on the Play tab of every ended game, for everyone who can open the game — every player and their clubmates, not only the organizer.
+
+Deploy: code only.
+
 ## 212.71.261029 — The game recap: segments, side contests in the email, stats and streaks, standouts on the share; no money anywhere
 
 Owner (Oct 29): segments were missing from game 494730's summary; "lets exclude money from all summaries period"; stats tiles and streaks; the share image is one phone screen (today's card, 943px, is the limit — "flex the amount of people to show in Net birdies … to top 3 if we need space (or eliminate it entirely)"); standout rounds bump the net birdies; the field average as "Field average (net) · 73 (+1) · front 36 (E) · back 37 (+1)"; the toughest / easiest holes say who made par or better. Iterated on rendered mock-ups (the design gallery: lib/recap-mockups), every format reviewed on its own card.

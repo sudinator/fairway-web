@@ -56,4 +56,7 @@ for (const [label, out] of [["app", (() => { const x = renderScreen(<RecapBody g
 // ── trifecta: its results table ──
 const tf = buildRecap(formatGames["trifecta"].game, formatGames["trifecta"].players, []);
 ok((tf.sections.matches?.rows.length ?? 0) === 6, `trifecta: six results — two singles and a four-ball per foursome (got ${tf.sections.matches?.rows.length})`);
+// 212.72 (owner): the field average TOTAL shows whenever the nines do — six players, not only eight
+const six = buildRecap(game, players.slice(0, 6), []);
+ok(six.highlights.fieldNet != null && six.highlights.frontBackNet != null, `six players: the field average total and nines both show (${six.highlights.fieldNet} · ${JSON.stringify(six.highlights.frontBackNet)})`);
 report("recap additions");
