@@ -6,7 +6,9 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 208.0.261016
+## Current candidate: 212.77.261030 — NOT READY FOR DEPLOYMENT
+
+Four agreed audit fixes are implemented. See RELEASE_VERIFICATION_212.77.md for executed checks and outstanding gates; no live migration or deployment has been performed.
 
 - RULE: every new column that refers to an account goes into account_reference_columns (ci/assert-account-merge.sql fails otherwise).
 - RULE: guards are judged by the account/data affected, never by current_user (definer functions run as owner) and never by a session flag.

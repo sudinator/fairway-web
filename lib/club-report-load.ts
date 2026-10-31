@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { ReportGame, ReportPeriod } from "@/lib/club-report";
+import { loadReportNames, reportPlayerNames } from "./report-names";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 
 export async function loadClubGames(db: SupabaseClient, groupId: string, period: ReportPeriod): Promise<ReportGame[]> {
@@ -15,5 +16,7 @@ export async function loadClubGames(db: SupabaseClient, groupId: string, period:
     fetchAllIn<Player>(db, "game_players", "game_id", ids),
     fetchAllIn<AltShotScoreRow>(db, "game_alt_shot_scores", "game_id", ids),
   ]);
-  return games.map((game) => ({ game, players: players.filter((p) => p.game_id === game.id), altScores: alt.filter((x) => x.game_id === game.id) }));
+  const names = await loadReportNames(db, players.flatMap((p) => p.user_id ? [p.user_id] : []));
+  const reportPlayers = reportPlayerNames(players, names);
+  return games.map((game) => ({ game, players: reportPlayers.filter((p) => p.game_id === game.id), altScores: alt.filter((x) => x.game_id === game.id) }));
 }

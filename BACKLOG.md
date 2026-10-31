@@ -1,5 +1,17 @@
 ## 206.2 — backlog
 
+## Agreed audit fixes — 212.77 candidate
+
+Implemented in this candidate; deployment and remaining release gates are pending:
+
+- [ ] Target-club active membership required for settlement submissions; preserve legitimate historical counterparties and separate club/bucket balances.
+- [ ] Reject participant edits and complete clearing on ended games; preserve organizer corrections/resets and reset fencing.
+- [ ] Retain manual course-handicap authority in public game/Cup feeds and scoring adapters; clarify hole count and separate allowance.
+- [ ] Consolidate registered reporting identities by user ID and display current readable profile names; retain historical game names and existing published reports. Guests are never merged by name. Unavailable profiles retain the saved name; query failures stop generation.
+
+See RELEASE_VERIFICATION_212.77.md for executed evidence and blockers. Other review findings remain deferred.
+
+
 - **Choose which API changes to apply.** An approval takes only the changes the admin ticks (e.g. the new slope, not the provider's stroke indexes) and keeps every hand correction it does not touch; still bound to the reviewed revision of an unedited course.
 
 ## 205.0 — follow-up
@@ -1515,3 +1527,8 @@ Still open (lower priority, honestly assessed):
 - [ ] Privacy follow-up: replace broad co-member profile-row reads with a least-data member directory contract. This needs product/API design because current screens may rely on several profile fields.
 - [ ] CSP follow-up: design and test a nonce/hash policy compatible with the app's existing inline-style architecture.
 - [ ] Reliability follow-up: continue converting inherited silent Supabase reads/writes to checked repository helpers; this review found no direct authorization bypass from those calls.
+
+
+## 212.77 candidate — agreed audit follow-up
+
+Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.

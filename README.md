@@ -831,3 +831,8 @@ Create Game uses the Lean Create flow: **Game → Players → Format → Review*
 - Six-hole segment breakdown reuses the Group Results grid format (Player / Thru / segment columns / Total) for consistency.
 
 - **Minimum font size: 11px.** Never use a `fontSize` below 11 anywhere in the app (readability floor). If space is tight, shorten the label instead of shrinking the type.
+
+
+## 212.77 candidate — agreed audit follow-up
+
+Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.

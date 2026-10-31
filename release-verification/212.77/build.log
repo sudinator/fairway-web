@@ -1,0 +1,70 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 prebuild
+> node scripts/check-vapid-key.mjs && node scripts/write-version.mjs
+
+(node:19) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+VAPID contract: PASS (service worker and build environment agree)
+(node:27) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Wrote app version 212.77.261030 (local-20261031025018)
+
+> fairway-card@212.77.261030 build
+> next build
+
+(node:36) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+▲ Next.js 16.3.8 (Turbopack)
+✓ Running next.config.mjs took 17ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+- Experiments (use with caution):
+  · cpus: 1
+
+  Creating an optimized production build ...
+(node:36) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✓ Compiled successfully in 8.5s
+  Running TypeScript ...
+  Finished TypeScript in 34.1s ...
+  Collecting page data using 1 worker ...
+(node:83) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Generating static pages using 1 worker (0/6) ...
+  Generating static pages using 1 worker (1/6) 
+  Generating static pages using 1 worker (2/6) 
+  Generating static pages using 1 worker (4/6) 
+✓ Generating static pages using 1 worker (6/6) in 438ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/admin/merge-accounts
+├ ƒ /api/analyze-round
+├ ƒ /api/courses
+├ ƒ /api/courses/apply-selected
+├ ƒ /api/courses/freshness
+├ ƒ /api/games/[id]/completed
+├ ƒ /api/member-stats
+├ ƒ /api/push
+├ ƒ /api/push/test
+├ ƒ /api/round-emails
+├ ƒ /api/round-emails/unsubscribe
+├ ƒ /auth/callback
+├ ƒ /join/[code]
+├ ƒ /lineup/[token]
+├ ƒ /live/[token]
+├ ƒ /live/cup/[token]
+└ ƒ /organize/[gameId]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

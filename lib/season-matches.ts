@@ -16,11 +16,11 @@ export type SeasonGame = {
   players: { id?: string; user_id: string | null; display_name: string; scores: (number | null)[] | null; course_handicap?: number | null;
     handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap_source?: string | null }[];
 };
-export type SeasonMatch = { opponent: string; result: "won" | "lost" | "halved"; played_at: string };
+export type SeasonMatch = { opponent: string; opponentId?: string; result: "won" | "lost" | "halved"; played_at: string };
 
 export function seasonMatches(games: SeasonGame[], me: string): { matches: SeasonMatch[]; playedWith: { name: string; games: number }[] } {
   const matches: SeasonMatch[] = [];
-  const shared = new Map<string, number>();
+  const shared = new Map<string, { name: string; games: number }>();
   const outcome = (lead: number): SeasonMatch["result"] => (lead > 0 ? "won" : lead < 0 ? "lost" : "halved");
   for (const g of games) {
     const players = g.players || [];
@@ -29,7 +29,12 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
     // every match against a guest (review finding 8, 205.4).
     const key = (p: (typeof players)[number]) => p.user_id ?? p.id ?? "";
     if (!players.some((p) => p.user_id === me)) continue;
-    for (const p of players) if (key(p) && p.user_id !== me) shared.set(p.display_name, (shared.get(p.display_name) || 0) + 1);
+    const identity = (p: (typeof players)[number]) => p.user_id ? `user:${p.user_id}` : `guest:${g.id}:${p.id}`;
+    const seen = new Set<string>();
+    for (const p of players) if (key(p) && p.user_id !== me && !seen.has(identity(p))) {
+      const id = identity(p); seen.add(id);
+      shared.set(id, { name: p.display_name, games: (shared.get(id)?.games || 0) + 1 });
+    }
     const pOf = (k: string) => players.find((p) => key(p) === k);
     const ch = (p: any) => chBasis(p, g.course_par ?? undefined, g.holes_meta?.length);
     if (g.game_type === "match") {
@@ -38,7 +43,7 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
         const a = pOf(pr.a), b = pOf(pr.b); if (!a || !b) continue;
         const st = matchStatus(g.holes_meta, a.scores || [], b.scores || [], ch(a), ch(b), g.allowance_pct ?? 100);
         if (!st.result) continue;
-        matches.push({ opponent: (pr.a === me ? b : a).display_name, result: outcome(pr.a === me ? st.lead : -st.lead), played_at: g.played_at });
+        matches.push({ opponentId: identity(pr.a === me ? b : a), opponent: (pr.a === me ? b : a).display_name, result: outcome(pr.a === me ? st.lead : -st.lead), played_at: g.played_at });
       }
     }
     if (g.game_type === "trifecta") {
@@ -50,12 +55,13 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
         for (const c of r.contests) {
           if (c.kind !== "single" || !c.settled || (!c.aIds.includes(me) && !c.bIds.includes(me))) continue;
           const opp = (c.aIds.includes(me) ? c.bIds : c.aIds).map((id) => pOf(id)?.display_name ?? "?").join(" & ");
-          matches.push({ opponent: opp, result: outcome(iAmA ? c.lead : -c.lead), played_at: g.played_at });
+          const oppIds = (c.aIds.includes(me) ? c.bIds : c.aIds).map((id) => pOf(id)).filter((p): p is NonNullable<typeof p> => !!p).map(identity).sort();
+          matches.push({ opponentId: oppIds.length === 1 ? oppIds[0] : JSON.stringify(oppIds), opponent: opp, result: outcome(iAmA ? c.lead : -c.lead), played_at: g.played_at });
         }
       }
     }
   }
-  const playedWith = Array.from(shared.entries()).map(([name, games]) => ({ name, games })).sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
+  const playedWith = Array.from(shared.values()).sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
   return { matches, playedWith };
 }
 

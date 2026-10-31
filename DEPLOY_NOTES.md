@@ -1,3 +1,11 @@
+## 212.77.261030 — agreed audit fixes (candidate; not deployment-ready)
+
+- Settlements require the caller to be an active member of the payment's club, preserving party/admin authorization and historical counterparties.
+- Participants cannot clear ended cards. Organizer correction/reset and administrator paths remain authorized.
+- Public scoring retains manual course-handicap source across scoring adapters. The organizer notice explains hole count and separate format allowance.
+- New reports use registered user IDs and current readable profile names; historical game rows and published reports remain unchanged. Unavailable profiles keep the saved name; failed profile reads stop generation.
+- Migration: `0233_club_score_and_report_contracts.sql`. Staging first. See `RELEASE_VERIFICATION_212.77.md`; remote gates remain required.
+
 ## 212.76.261030 — One source for a live player's course handicap; the handicap audit (index, tees); audits 3–7 (names reach games, Cup points on the recap)
 
 Owner (Oct 30, after 947286): "shouldn't the handicap be derived from one place for all calculations and displays? … is it worth doing an audit?" Yes; and the index and tee rules confirmed as designed.

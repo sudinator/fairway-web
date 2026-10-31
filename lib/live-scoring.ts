@@ -31,6 +31,7 @@ export type LiveScoringMeta = { n: number; par: number; si: number | null };
 export type LiveScoringPlayer = {
   id: string;
   ch: number;
+  course_handicap_source?: string | null;
   team: string | null;
   no_show: boolean;
   scores: (number | null)[];
@@ -69,13 +70,13 @@ export type LiveLeg = {
 
 /**
  * The handicap the share page scores a player off.
- * `ch` from get_live_scorecard is the eighteen-hole figure; a nine-hole card halves it (matching
+ * `ch` is manual for the selected length, otherwise an eighteen-hole figure; only calculated nines halve (matching
  * chBasis). computePlayer on the page does this; the matchup helpers historically did not, which is
  * exactly the kind of gap the parity test exists to catch.
  */
-export function liveCh(ch: number | null, holes: number): number | null {
+export function liveCh(ch: number | null, holes: number, source?: string | null): number | null {
   if (ch == null) return null;
-  return holes === 9 ? ch / 2 : ch;
+  return holes === 9 && source !== "manual" ? ch / 2 : ch;
 }
 
 const asMeta = (meta: LiveScoringMeta[]): MatchHoleMeta[] =>
@@ -84,7 +85,7 @@ const asMeta = (meta: LiveScoringMeta[]): MatchHoleMeta[] =>
 const memberOf = (p: LiveScoringPlayer | undefined, id: string, holes: number): FourballMember => ({
   id,
   gross: p?.scores || [],
-  ch: liveCh(p?.ch ?? null, holes),
+  ch: liveCh(p?.ch ?? null, holes, p?.course_handicap_source),
   noShow: !!p?.no_show,
 });
 
@@ -117,7 +118,7 @@ export function liveLegs(
       .filter((pr) => pr.a && pr.b)
       .map((pr) => {
         const a = byId[pr.a as string], b = byId[pr.b as string];
-        const progress = matchProgress(m, a?.scores || [], b?.scores || [], liveCh(a?.ch ?? null, holes), liveCh(b?.ch ?? null, holes), allowance);
+        const progress = matchProgress(m, a?.scores || [], b?.scores || [], liveCh(a?.ch ?? null, holes, a?.course_handicap_source), liveCh(b?.ch ?? null, holes, b?.course_handicap_source), allowance);
         return fromProgress(progress, [pr.a as string], [pr.b as string], "single");
       });
   }
@@ -145,7 +146,7 @@ export function liveLegs(
         const rows = [...aIds, ...bIds].map((id) => byId[id]);
         if (rows.some((r) => !r)) return null;
         const shapeGame = { game_type: "alt_shot", course_par: game.course_par ?? null, allowance_pct: game.allowance_pct, holes_meta: meta, foursomes } as never;
-        const shapePlayers = Object.values(byId).map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.ch, team: p.team, no_show: p.no_show })) as never;
+        const shapePlayers = Object.values(byId).map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.ch, course_handicap_source: p.course_handicap_source, team: p.team, no_show: p.no_show })) as never;
         const sides = altShotSides(shapeGame, shapePlayers, { id: f.id, a: aIds, b: bIds } as never);
         const aLegacy = readAltShotSideScores(byId[aIds[0]].scores, byId[aIds[1]].scores, holes);
         const bLegacy = readAltShotSideScores(byId[bIds[0]].scores, byId[bIds[1]].scores, holes);
@@ -198,7 +199,7 @@ export function liveLegs(
  * the header and none of the team-leg strokes that produced it.
  *
  * `ch` from get_live_scorecard is the exact EIGHTEEN-hole figure, so it is passed as
- * course_handicap and chBasis halves it for a nine, matching liveCh.
+ * course_handicap with its source, so chBasis preserves manual values, matching liveCh.
  */
 export function liveStrokeSets(
   game: LiveScoringGame & { course_par: number | null },
@@ -221,7 +222,7 @@ export function liveStrokeSets(
   } as unknown as Parameters<typeof strokeSets>[0];
   const asShape = (p: LiveScoringPlayer & { display_name?: string | null }) => ({
     id: p.id, user_id: p.id, display_name: p.display_name ?? null,
-    course_handicap: p.ch, team: p.team, no_show: p.no_show,
+    course_handicap: p.ch, course_handicap_source: p.course_handicap_source, team: p.team, no_show: p.no_show,
   }) as unknown as Parameters<typeof strokeSets>[1];
   const me = byId[playerId];
   if (!me) return [];

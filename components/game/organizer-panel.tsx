@@ -451,8 +451,8 @@ export function OrganizerPanel({
                         </div>
                         <div style={{ color: isManual ? C.gold : C.sage, fontSize: 11, marginTop: 3 }}>
                           {isManual
-                            ? `manual \u00b7 used as entered for ${holes} holes`
-                            : `derived: ${derivedCh} \u00b7 leave blank to keep it`}
+                            ? `Manual course handicap: applied as entered for this ${holes}-hole game.${holes === 9 ? " It will not be halved." : ""} Format allowance: ${game.allowance_pct ?? 100}%.`
+                            : `Derived: ${derivedCh}. A manual entry applies as entered for ${holes} holes${holes === 9 ? "; it will not be halved" : ""}, before the ${game.allowance_pct ?? 100}% format allowance. Leave blank to keep derived.`}
                         </div>
                       </div>
                     );

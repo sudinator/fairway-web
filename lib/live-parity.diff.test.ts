@@ -29,7 +29,7 @@ const report = (ctx: string, field: string, app: unknown, live: unknown) => {
 // ── Fixture shape ────────────────────────────────────────────────────────────────────────────────
 type FixPlayer = {
   id: string; name: string; handicap_index: number; slope: number; rating: number;
-  course_handicap: number; team?: string | null; no_show?: boolean; scores: (number | null)[];
+  course_handicap: number; course_handicap_source?: "manual" | "derived" | null; team?: string | null; no_show?: boolean; scores: (number | null)[];
 };
 type Fixture = {
   label: string;
@@ -184,7 +184,7 @@ function appLegs(f: Fixture): LiveLeg[] {
   if (f.game_type === "alt_shot") {
     return (f.foursomes || []).map((fs) => {
       const aIds = fs.a.filter(Boolean) as string[], bIds = fs.b.filter(Boolean) as string[];
-      const shapePlayers = f.players.map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.course_handicap, handicap_index: p.handicap_index, slope: p.slope, rating: p.rating, team: p.team, no_show: false }));
+      const shapePlayers = f.players.map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.course_handicap, course_handicap_source: p.course_handicap_source, handicap_index: p.handicap_index, slope: p.slope, rating: p.rating, team: p.team, no_show: false }));
       const sides = altShotSides({ game_type: "alt_shot", course_par: f.course_par, allowance_pct: f.allowance_pct, holes_meta: f.holes } as never, shapePlayers as never, { a: aIds, b: bIds });
       const aLeg = readAltShotSideScores(byId[aIds[0]].scores, byId[aIds[1]].scores, f.holes.length);
       const bLeg = readAltShotSideScores(byId[bIds[0]].scores, byId[bIds[1]].scores, f.holes.length);
@@ -208,7 +208,8 @@ function liveFrom(f: Fixture): LiveLeg[] {
   const byId: Record<string, LiveScoringPlayer> = Object.fromEntries(
     f.players.map((p) => [p.id, {
       id: p.id,
-      ch: chBasis({ handicap_index: p.handicap_index, slope: p.slope, rating: p.rating, course_handicap: p.course_handicap }, f.course_par, 18),
+      ch: chBasis({ handicap_index: p.handicap_index, slope: p.slope, rating: p.rating, course_handicap: p.course_handicap, course_handicap_source: p.course_handicap_source }, f.course_par, 18),
+      course_handicap_source: p.course_handicap_source,
       team: p.team ?? null,
       no_show: !!p.no_show,
       scores: p.scores,
@@ -226,7 +227,11 @@ function liveFrom(f: Fixture): LiveLeg[] {
 }
 
 // ── Compare ──────────────────────────────────────────────────────────────────────────────────────
-for (const f of FIXTURES) {
+const MANUAL_FIXTURES: Fixture[] = FIXTURES.filter((f) => f.holes.length === 9).flatMap((f) => [100,85,50].map((allowance) => ({
+  ...f, label: `${f.label} manual ${allowance}%`, allowance_pct: allowance,
+  players: f.players.map((p,i) => ({ ...p, course_handicap_source: "manual" as const, course_handicap: i % 2 ? 12 : 0 })),
+})));
+for (const f of [...FIXTURES, ...MANUAL_FIXTURES]) {
   const app = appLegs(f), live = liveFrom(f);
   if (app.length !== live.length) { report(f.label, "leg count", app.length, live.length); continue; }
   for (let i = 0; i < app.length; i++) {

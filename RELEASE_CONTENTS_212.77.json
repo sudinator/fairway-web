@@ -1,0 +1,163 @@
+{
+  "version": "212.77.261030",
+  "base_version": "212.76.261030",
+  "status": "CANDIDATE_NOT_READY_FOR_DEPLOYMENT",
+  "files": [
+    {
+      "path": "APP_RULES.md",
+      "sha256": "fedb2f81d6d2ec8eec83fd41fa4a9cf5bab8ac5b84e01372eab313019e1b14b3"
+    },
+    {
+      "path": "BACKLOG.md",
+      "sha256": "9db0aa587c971c01b8944a3f4342fc9f077bbad4174bf2a44ef8385d2de8f754"
+    },
+    {
+      "path": "DEPLOY_NOTES.md",
+      "sha256": "a390d73c4e2150d40d2c2d19507dd25222927974721d8b19fc0df840388a45f0"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "e3b735fdcc14abeed5bd46bf9e69f2c01a16eee1bc28bd858c025a9486e2a186"
+    },
+    {
+      "path": "MIGRATIONS.md",
+      "sha256": "770aba8133c0842330919417a1e28e685967ad0b287725b642e19384afa0b886"
+    },
+    {
+      "path": "README.md",
+      "sha256": "ad0f100adb5e233feab5ac3dd07547ab4262f7107b6490e7dfea5c94bdedf927"
+    },
+    {
+      "path": "RELEASE_VERIFICATION_212.77.md",
+      "sha256": "0aa9c63425e74cf4b9063422f3580f8c35d35c766014367d45eaa8fc05a1de2c"
+    },
+    {
+      "path": "SCHEMA.md",
+      "sha256": "74a77ebd45144e111468ad4ee0969f230d5d38474560ff3124ad1c808c0d428b"
+    },
+    {
+      "path": "app/live/[token]/page.tsx",
+      "sha256": "933a83e22bccbc788632a074f6b7f86790141028610501d69c9fa52b649dfd52"
+    },
+    {
+      "path": "ci/assert-agreed-audit-fixes.sql",
+      "sha256": "0793c2d29ae081d6501e79e0f59ae97cd10165b4977c8366afa93bb7f65d90dd"
+    },
+    {
+      "path": "ci/assert-name-change.sql",
+      "sha256": "ac5a68d3c35a0000db9e92b50602c3454c9e1dca253d7eccaede54e6b59fcd64"
+    },
+    {
+      "path": "ci/test-live-manual-page.cjs",
+      "sha256": "90de919588da83a8a07ae1b4aeae177623e736b2f44b1d08241814e2194fffdc"
+    },
+    {
+      "path": "ci/test_assertion_baseline.json",
+      "sha256": "651dadbb9eb80a0cb1ac016dc86e66d38d5cd9999160e1772c7e36567b45301f"
+    },
+    {
+      "path": "ci/test_fresh_db_local.sh",
+      "sha256": "2fa254cc753a5f5b45814b5cbfc41ea5d6b0e655e205b2cd633d7911c1e9e7b6"
+    },
+    {
+      "path": "ci/test_fresh_db_rebuild.sh",
+      "sha256": "7dc7e47c20c46118ddf7b23d5688ef331d6acdc0593a39a9de7360725196d09d"
+    },
+    {
+      "path": "components/game/organizer-panel.tsx",
+      "sha256": "6d372af82f4ab6ab617ca6ac5c90496dfb57ea5bdd6c49bb0a8b743bc67329f6"
+    },
+    {
+      "path": "components/season-wrapped.tsx",
+      "sha256": "ca2289743bcdd1236c7992209c09995a595f0c09dc551b3706d496591ad0a7cc"
+    },
+    {
+      "path": "lib/agreed-audit-fixes.test.ts",
+      "sha256": "34f05a6b4826e56878dc778514a72e0c326e5f34546590de2d7e60d4051c07db"
+    },
+    {
+      "path": "lib/app-version.ts",
+      "sha256": "83b5756a7390013c7649557f2e5ff68205cd7290279c506fe732c8d3ee209c25"
+    },
+    {
+      "path": "lib/club-report-load.ts",
+      "sha256": "c0bc3d392bd31c900a2d735d9d02d62d1497755d2101ae7538d48274440baa08"
+    },
+    {
+      "path": "lib/live-parity.diff.test.ts",
+      "sha256": "20c53a2ff3cf1b5f4599aa4fe24a88ddbcd9153720d967347d7bb3881d84d6b5"
+    },
+    {
+      "path": "lib/live-scoring.ts",
+      "sha256": "8f91fa3b2fb257839167dad3289751b3479e3cda1ae27bb17b1e1e40003336fc"
+    },
+    {
+      "path": "lib/live-skins.ts",
+      "sha256": "8c87952b1d49ea49040f48a174144c35db29d16a81dc98e45b9780acdd090adc"
+    },
+    {
+      "path": "lib/manual-handicap-notice.test.tsx",
+      "sha256": "cb822ad621f1c1b8e8f2e14956419f9b64e2fc31b15cd0b9bf84fe505382a49a"
+    },
+    {
+      "path": "lib/report-names.ts",
+      "sha256": "3b6d35e9143852ce54c81fbeff79c8668be93c7256274bb8ae44a272745573c4"
+    },
+    {
+      "path": "lib/season-matches.ts",
+      "sha256": "f425b249244ae3665cdb9c8f7dd49c861f7a152f01c4e60ac612519f6da2f431"
+    },
+    {
+      "path": "lib/season-summary.ts",
+      "sha256": "8a476f663d76a9a3d55dc0c52197faf02d8171ca712de798fcd4f1ce02875536"
+    },
+    {
+      "path": "migrations/0233_club_score_and_report_contracts.sql",
+      "sha256": "877f57c0de6e8dbd623dd78406a481612080c57aa3401a3a4019ad5a807df35f"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "b9042982498596f3c16c5e136190ca7eea4a827e29634fa28c3ddaf31d017573"
+    },
+    {
+      "path": "package.json",
+      "sha256": "7ceb49931213673e22d5a0f6ab9ae9eec02b417d134fd522cbf1417beb52b616"
+    },
+    {
+      "path": "public/app-version.json",
+      "sha256": "367fb5028939ec7b36dad911b4ffb66b896ef4444b970f5991c84d11c79bbccc"
+    },
+    {
+      "path": "public/sw.js",
+      "sha256": "51e2145cbe1c95baf687b50cf4d1fa93b17db161e0e717dc139e68ad11cbc87b"
+    },
+    {
+      "path": "release-verification/212.77/browser-download.log",
+      "sha256": "7ce118662d5fa704491faed02e313c1d8167022bf5324b853b507debf8d680db"
+    },
+    {
+      "path": "release-verification/212.77/build.log",
+      "sha256": "08a4373d01f74681d4ff62c464a1784f5fcc204840666232fe73e60689f54212"
+    },
+    {
+      "path": "release-verification/212.77/isolated-database.log",
+      "sha256": "e2caa57117950898b755bf034b9f06a666c42966060514c6b649fb55dc2d4314"
+    },
+    {
+      "path": "release-verification/212.77/local-ci.log",
+      "sha256": "f2d3533d0f2de68778980c4bfc6838dbc3796d63fdffc978389c4041bf027ad1"
+    },
+    {
+      "path": "release-verification/212.77/security-contract.log",
+      "sha256": "a1158be8b038d447efb2c2b3a257dec264e80cec4a81469b38184e95b41f0545"
+    },
+    {
+      "path": "release-verification/212.77/unit-render.log",
+      "sha256": "7d97c16fde863bc02dd0cd4bd552576302e76a8b76da977fd6f81fc9f9f94c54"
+    },
+    {
+      "path": "tsconfig.screens.json",
+      "sha256": "027920e83188eb390a2751b9ca17b51342196c76c142ef64af1be3a53cc47c28"
+    }
+  ]
+}

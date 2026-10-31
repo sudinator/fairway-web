@@ -631,3 +631,8 @@ The 12 legacy core tables (`profiles`, `rounds`, `holes`, `games`, `game_players
 - `ci/test_fresh_db_rebuild.sh` — disposable fresh-Supabase migration-chain reconstruction used by required CI.
 
 The baseline intentionally reproduces current Production behavior. Any later privilege minimization (for example changing broad table grants) is a separate security behavior change and must be tested independently rather than hidden inside the reconstruction migration.
+
+
+## 212.77 candidate — agreed audit follow-up
+
+Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.

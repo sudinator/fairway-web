@@ -12,7 +12,7 @@ import {
   type FourballMember, type SkinPlayer,
   trifectaRowState,
 } from "@/lib/golf";
-import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
+import { liveCh, liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
 import { strokePace } from "@/lib/player-scoring";
 import { liveSkins } from "@/lib/live-skins";
 import { altShotSides } from "@/lib/game-shape";
@@ -29,7 +29,7 @@ const supabase = createClient();
 
 type LiveMeta = { n: number; par: number; si: number | null };
 type LivePlayer = {
-  id: string; display_name: string; avatar_url?: string | null; course_handicap: number | null; ch: number;
+  id: string; display_name: string; avatar_url?: string | null; course_handicap: number | null; ch: number; course_handicap_source?: string | null;
   team: string | null; tee_group: number | null; no_show: boolean;
   scores: (number | null)[]; putts: (number | null)[]; fairways: ("hit" | "miss" | "left" | "right" | null)[];
   penalties: (number | null)[]; sand: (boolean | null)[];
@@ -71,10 +71,7 @@ type PStat = {
 };
 
 function computePlayer(p: LivePlayer, meta: LiveMeta[], allowance: number): PStat {
-  // Halve for a nine BEFORE the allowance. p.ch is the stored eighteen-hole figure and this view
-  // never touched chBasis, so a nine showed roughly double the strokes — on the screen playing
-  // partners watch.
-  const playing = applyAllowance(meta.length === 9 ? p.ch / 2 : p.ch, allowance);
+  const playing = applyAllowance(liveCh(p.ch, meta.length, p.course_handicap_source), allowance);
   const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
   let gross = 0, parPlayed = 0, thru = 0, points = 0, net = 0, putts = 0, pen = 0, fwHit = 0, fwTot = 0, fwLeft = 0, fwRight = 0, girHit = 0, girTot = 0;
   let puttsT = false, penT = false, fwT = false;
@@ -109,7 +106,7 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   let unclaimed = 0;
   const teamOf = (id: string | null | undefined) => (id ? byId[id]?.team : null);
   const mkMembers = (ids: (string | null)[]): FourballMember[] =>
-    ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
+    ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: liveCh(q?.ch ?? null, meta.length, q?.course_handicap_source), noShow: !!q?.no_show }; });
 
   // Match, Four-Ball and Alternate Shot standings all come from the SAME legs the matchups block
   // draws, via lib/live-scoring — not a second set of engine calls here. Alternate Shot had no branch
@@ -118,7 +115,7 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   if (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") {
     const legs = liveLegs(
       { game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par },
-      Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+      Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, course_handicap_source: v.course_handicap_source, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
       pairings, foursomes, meta, allowance, altShotScores,
     );
     legs.forEach((leg) => {
@@ -192,7 +189,7 @@ function statusFor(p: LivePlayer, game: LiveGame, pairings: LiveData["pairings"]
   if (game.game_type === "fourball" || game.game_type === "trifecta") {
     const f = foursomes.find((x) => (x.a || []).includes(p.id) || (x.b || []).includes(p.id)); if (!f) return "";
     const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
-    const members = [...aIds, ...bIds].map((id) => { const q = byId[id]; return { id, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
+    const members = [...aIds, ...bIds].map((id) => { const q = byId[id]; return { id, gross: q?.scores || [], ch: liveCh(q?.ch ?? null, meta.length, q?.course_handicap_source), noShow: !!q?.no_show }; });
     const st = fourballStatus(meta, members, aIds, bIds, allowance);
     if (st.thru === 0) return "not started";
     const lead = aIds.includes(p.id) ? st.lead : -st.lead;
@@ -297,7 +294,7 @@ function Scorecard({ data }: { data: LiveData }) {
     const holes = meta.length;
     const allocHoles = meta.map((m) => ({ hole_number: m.n, stroke_index: m.si }));
     const shapeGame = { game_type: "alt_shot", course_par: game.course_par, allowance_pct: game.allowance_pct, holes_meta: meta, foursomes } as never;
-    const shapePlayers = players.map((q) => ({ id: q.id, user_id: q.id, course_handicap: q.ch, team: q.team, no_show: q.no_show })) as never;
+    const shapePlayers = players.map((q) => ({ id: q.id, user_id: q.id, course_handicap: q.ch, course_handicap_source: q.course_handicap_source, team: q.team, no_show: q.no_show })) as never;
     const out: { key: string; title: string; color: string | null; stat: PStat; ch: number | null }[] = [];
     for (const f of foursomes) {
       for (const side of ["a", "b"] as const) {
@@ -426,7 +423,7 @@ function Scorecard({ data }: { data: LiveData }) {
             </div>
           )}
           {g.players.map((p, idx) => (
-            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} setsFor={(si) => liveStrokeSets({ game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par }, Object.fromEntries(Object.entries(byId).map(([k2, v]) => [k2, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [], display_name: v.display_name }])), pairings, foursomes, meta, p.id, si)} />
+            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} setsFor={(si) => liveStrokeSets({ game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par }, Object.fromEntries(Object.entries(byId).map(([k2, v]) => [k2, { id: v.id, ch: v.ch, course_handicap_source: v.course_handicap_source, team: v.team, no_show: v.no_show, scores: v.scores || [], display_name: v.display_name }])), pairings, foursomes, meta, p.id, si)} />
           ))}
         </div>
       ))}
@@ -623,7 +620,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance, altSh
   teams.forEach((t, i) => { tColor[t.key] = teamColor(t.name, i); tName[t.key] = t.name; });
   const colorOf = (id?: string | null) => { const k = id ? byId[id]?.team : null; return k ? tColor[k] : null; };
   const teamNameOf = (id?: string | null) => { const k = id ? byId[id]?.team : null; return k ? (tName[k] || k) : ""; };
-  const mem = (ids: (string | null)[]): FourballMember[] => ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
+  const mem = (ids: (string | null)[]): FourballMember[] => ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: liveCh(q?.ch ?? null, meta.length, q?.course_handicap_source), noShow: !!q?.no_show }; });
   const nm = (id?: string | null) => (id ? (byId[id]?.display_name || "\u2014") : "\u2014");
   const sq = (color: string | null) => color ? <span style={{ width: 9, height: 9, borderRadius: 6, background: color, display: "inline-block", flex: "none" }} /> : null;
   const nameStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
@@ -650,7 +647,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance, altSh
   // own answers (lib/live-parity.diff.test.ts). Display stays local to this route; arithmetic does not.
   const legs: LiveLeg[] = liveLegs(
     { game_type: gt, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode },
-    Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+    Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, course_handicap_source: v.course_handicap_source, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
     pairings,
     foursomes,
     meta,
@@ -745,7 +742,7 @@ function SkinsCarry({ game, players, meta, allowance }: { game: LiveGame; player
   // 212.36: carry-overs across the whole field exist only in INDIVIDUAL skins with ties carried. A halved game carries
   // nothing; team skins (1:1, 2 v 2) are scored match by match (lib/live-skins), so a field-wide pot is not their game.
   if (game.skins_mode === "split" || (game.teams || []).length === 2) return null;
-  const sp: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
+  const sp: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: liveCh(p.ch, meta.length, p.course_handicap_source) }));
   const res = computeSkins(meta, sp, allowance);
   const carried = res.holes.filter((h) => h.decided && h.winnerId === null).map((h) => h.hole);
   const bigWins = res.holes.filter((h) => h.decided && h.winnerId && h.value > 1).map((h) => ({ hole: h.hole, value: h.value, who: players.find((p) => p.id === h.winnerId)?.display_name || "" }));
