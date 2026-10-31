@@ -1,0 +1,1617 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 ci
+> node scripts/check-deps.mjs || true; npm run test:scoring-device && npm run test:round-editor && npm run test:game-recovery && npm run lint:hooks && npx tsc --noEmit && npm test && node ci/test-ticking-clock.cjs && npm run test:setup-nav && npm run guards:lifecycle && npm run guards && npm run build
+
+(node:19) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+=== dependency currency ===
+  next                       installed ^16.3.8      latest 16.4.3       ok
+  react                      installed ^19.2.8      latest 19.3.1       ok
+  react-dom                  installed ^19.2.8      latest 19.3.1       ok
+  @supabase/supabase-js      installed ^2.45.4      latest 2.118.0      ok
+  @supabase/ssr              installed ^0.5.2       latest 0.12.7       ok
+  typescript                 installed ^5           latest 7.0.2        held (held at 5.x — Next.js rejects TS >= 7.0)
+
+dependency currency: all watched majors current.
+(node:31) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 test:scoring-device
+> node ci/test-scoring-device.cjs && node ci/test-device-view-cards.cjs && node ci/test-multitab-storage.cjs
+
+(node:44) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: actual controller phone-first, silent same-installation relaunch, passive desktop, offline primary, explicit transfer, tab fencing, isolated outboxes, retained/archived work, normal and offline reload, failed-read retention
+(node:52) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: actual own/group scorecards, DOM click-to-picker, viewer denial, primary admission, open-picker revocation and A-B-A re-entry
+(node:60) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: multi-tab storage — 10 hand-overs keep 1 backup; live tabs fence new ones; 50 tabs = 45.2 KB
+(node:68) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 test:round-editor
+> node ci/test-personal-round-editor.cjs
+
+(node:81) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Couldn't save this round] BNN-UNK { message: 'Injected rollback' }
+[Couldn't discard this round; your draft is still available] BNN-UNK { message: 'Injected discard failure' }
+PASS: actual editor Cancel/reopen, delayed timer, lifecycle flush, recovery identity/date, atomic-save error/retry, manual clear/new finish, deliberate deletion, discard failure/retry, backup/Finish ordering, gross-only correction
+(node:89) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 test:game-recovery
+> node ci/test-game-score-recovery.cjs && node ci/test-game-reset.cjs
+
+(node:102) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: actual load + sync helpers: reset not undone by the memory copy (212.29), corrections/deletions/all stats, remote edits, legacy, cold launch, denied/thrown/late reads, reset, rejected writes, marker permissions, concurrent writes and queue freshness
+(node:110) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: actual reset callback, clears the memory copy (212.29), viewer denial, cancel, idle-before-reset, failed reset retains UI/player/side drafts, confirmed reset clears after success and reloads
+(node:118) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 lint:hooks
+> eslint app components lib --max-warnings=0
+
+(node:131) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:143) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(node:164) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 test
+> { rm -rf .testout && tsc lib/setup-summary.test.ts lib/setup-summary.ts lib/alt-shot-scores.test.ts lib/alt-shot-scores.ts lib/alt-shot-side-scores.test.ts lib/alt-shot-side-scores.ts lib/alt-shot-simulation.test.ts lib/create-game-format.altshot.test.ts lib/setup-draft-lifecycle.test.ts lib/format-rules.test.ts lib/hole-result-consistency.test.ts lib/scoring-matrix.test.ts lib/trifecta-card-scoring.test.ts lib/live-trifecta-labels.test.ts lib/live-parity.diff.test.ts lib/live-competition.diff.test.ts lib/manual-handicap.test.ts lib/manual-handicap-simulation.test.ts lib/half-stroke-simulation.test.ts lib/closeout-freeze.test.ts lib/stroke-sets.test.ts lib/alt-shot-scoring.test.ts lib/alt-shot.test.ts lib/alt-shot.ts lib/match-length.test.ts lib/match-length.ts lib/nine-hole-payload.test.ts lib/nine-hole-handicap.test.ts lib/stroke-rounding.test.ts lib/stroke-agreement.test.ts lib/all-allocators.test.ts lib/nine-hole-posting.test.ts lib/game-type-coverage.test.ts lib/game-shape.test.ts lib/game-shape.ts lib/game-setup-policy.test.ts lib/game-setup-policy.ts lib/game-structure.test.ts lib/game-structure.ts lib/game-tee-assignment.test.ts lib/game-tee-assignment.ts lib/golf.ts lib/golf.test.ts lib/money.test.ts lib/money-scenarios.test.ts lib/bucket-model.test.ts lib/money.ts lib/legs.test.ts lib/legs.ts lib/grouping.ts lib/grouping.test.ts lib/sync-cols.ts lib/sync.test.ts lib/badges.ts lib/badges.test.ts lib/card.ts lib/card.test.ts lib/contests.ts lib/contests.test.ts lib/game-types.ts lib/competition.ts lib/competition.test.ts lib/player-scoring.ts lib/player-scoring.baseline.ts lib/player-scoring.test.ts lib/player-scoring.diff.test.ts lib/finish-gaps.ts lib/finish-gaps.baseline.ts lib/finish-gaps.test.ts lib/finish-gaps.diff.test.ts lib/segments.ts lib/segments.baseline.ts lib/segments.test.ts lib/segments.diff.test.ts lib/game-utils.ts lib/game-utils.baseline.ts lib/game-utils.test.ts lib/game-utils.diff.test.ts lib/flights.ts lib/game-create.ts lib/game-create.baseline.ts lib/game-create.test.ts lib/game-create.diff.test.ts lib/create-game-format.ts lib/create-game-format.test.ts lib/handicap-allowance.ts lib/handicap-allowance.test.ts lib/game-setup-draft.ts lib/game-setup-draft.test.ts lib/chart-helpers.ts lib/chart-helpers.test.ts lib/ai-sanitize.ts lib/ai-sanitize.test.ts lib/ai-contract.ts lib/ai-contract.test.ts lib/ttl-cache.ts lib/ttl-cache.test.ts lib/course-provider-id.ts lib/course-provider-id.test.ts lib/course-api-status.ts lib/course-api-status.test.ts lib/viewport-editable.test.ts lib/viewport-editable.ts lib/viewport-height.test.ts lib/viewport-height.ts lib/lineup.ts lib/lineup.test.ts lib/lineup-meta.ts lib/lineup-meta.test.ts lib/short-names.ts lib/short-names.test.ts lib/team-tint.ts lib/team-tint.test.ts lib/balance-teams.ts lib/balance-teams.test.ts lib/points-outlook.ts lib/points-outlook.test.ts lib/auto-score.ts lib/auto-score.test.ts lib/season-summary.ts lib/season-summary.test.ts lib/round-prep.ts lib/badges.ts lib/season-matches.ts lib/season-matches.test.ts lib/courses.ts lib/courses-order.test.ts lib/errors.ts lib/errors.test.ts lib/course-source-review.ts lib/course-source-review.test.ts lib/flights.ts lib/flights-tagcolor.baseline.ts lib/flights-tagcolor.diff.test.ts lib/round-stats.ts lib/round-stats.baseline.ts lib/round-stats.diff.test.ts lib/round-stat-completeness.test.ts --module commonjs --target es2020 --esModuleInterop --skipLibCheck --outDir .testout --rootDir lib && node .testout/setup-summary.test.js && node .testout/setup-draft-lifecycle.test.js && node .testout/format-rules.test.js && node .testout/hole-result-consistency.test.js && node .testout/scoring-matrix.test.js && node .testout/trifecta-card-scoring.test.js && node .testout/live-trifecta-labels.test.js && node .testout/live-parity.diff.test.js && node .testout/live-competition.diff.test.js && node .testout/manual-handicap.test.js && node .testout/manual-handicap-simulation.test.js && node .testout/half-stroke-simulation.test.js && node .testout/closeout-freeze.test.js && node .testout/stroke-sets.test.js && node .testout/alt-shot-scoring.test.js && node .testout/alt-shot.test.js && node .testout/alt-shot-scores.test.js && node .testout/alt-shot-side-scores.test.js && node .testout/alt-shot-simulation.test.js && node .testout/create-game-format.altshot.test.js && node .testout/match-length.test.js && node .testout/nine-hole-payload.test.js && node .testout/nine-hole-handicap.test.js && node .testout/stroke-rounding.test.js && node .testout/stroke-agreement.test.js && node .testout/all-allocators.test.js && node .testout/nine-hole-posting.test.js && node .testout/competition.test.js && node .testout/game-type-coverage.test.js && node .testout/game-shape.test.js && node .testout/game-setup-policy.test.js && node .testout/game-structure.test.js && node .testout/game-tee-assignment.test.js && node .testout/golf.test.js && node .testout/money.test.js && node .testout/money-scenarios.test.js && node .testout/bucket-model.test.js && node .testout/legs.test.js && node .testout/grouping.test.js && node .testout/sync.test.js && node .testout/badges.test.js && node .testout/card.test.js && node .testout/contests.test.js && node .testout/player-scoring.test.js && node .testout/player-scoring.diff.test.js && node .testout/finish-gaps.test.js && node .testout/finish-gaps.diff.test.js && node .testout/segments.test.js && node .testout/segments.diff.test.js && node .testout/game-utils.test.js && node .testout/game-utils.diff.test.js && node .testout/game-create.test.js && node .testout/game-create.diff.test.js && node .testout/create-game-format.test.js && node .testout/handicap-allowance.test.js && node .testout/game-setup-draft.test.js && node .testout/chart-helpers.test.js && node .testout/ai-sanitize.test.js && node .testout/ai-contract.test.js && node .testout/ttl-cache.test.js && node .testout/course-provider-id.test.js && node .testout/course-api-status.test.js && node .testout/viewport-editable.test.js && node .testout/viewport-height.test.js && node .testout/lineup.test.js && node .testout/lineup-meta.test.js && node .testout/short-names.test.js && node .testout/team-tint.test.js && node .testout/balance-teams.test.js && node .testout/points-outlook.test.js && node .testout/auto-score.test.js && node .testout/season-summary.test.js && node .testout/season-matches.test.js && node .testout/courses-order.test.js && node .testout/errors.test.js && node .testout/course-source-review.test.js && node .testout/flights-tagcolor.diff.test.js && node .testout/round-stats.diff.test.js && node .testout/round-stat-completeness.test.js && npx tsc lib/component-render.test.tsx lib/test-render.ts lib/test-dom.ts lib/golf.ts --outDir .testout-ui --module commonjs --target ES2020 --jsx react-jsx --esModuleInterop --skipLibCheck --moduleResolution node && node .testout-ui/component-render.test.js && rm -rf .testout-screens && tsc -p tsconfig.screens.json && node ci/patch_test_aliases.mjs .testout-screens && node .testout-screens/lib/screens.test.js && node .testout-screens/lib/trifecta-card-render.test.js && node .testout-screens/lib/lineup-card-render.test.js && node .testout-screens/lib/results-outlook-render.test.js && node .testout-screens/lib/season-render.test.js && node .testout-screens/lib/season-entry-render.test.js && node .testout-screens/lib/season-seen-request.test.js && node .testout-screens/lib/course-diff-freshness.test.js && node .testout-screens/lib/money-refresh-render.test.js && node .testout-screens/lib/push-send.test.js && node .testout-screens/lib/course-history-render.test.js && node .testout-screens/lib/course-status.test.js && node .testout-screens/lib/game-recap.test.js && node .testout-screens/lib/game-highlights.test.js && node .testout-screens/lib/game-recap-sections.test.js && node .testout-screens/lib/account-gate-render.test.js && node .testout-screens/lib/game-name.test.js && node .testout-screens/lib/course-merge.test.js && node .testout-screens/lib/team-colour.test.js && node .testout-screens/lib/team-colour-render.test.js && node .testout-screens/lib/cup-standing.test.js && node .testout-screens/lib/cup-recap-render.test.js && node .testout-screens/lib/match-outcomes.test.js && node .testout-screens/lib/club-report.test.js && node .testout-screens/lib/club-report-render.test.js && node .testout-screens/lib/fetch-all.test.js && node .testout-screens/lib/head-to-head-render.test.js && node .testout-screens/lib/messy-data.test.js && node .testout-screens/lib/app-links.test.js && node .testout-screens/lib/resume-game.test.js && node .testout-screens/lib/scramble.test.js && node .testout-screens/lib/scramble-teams.test.js && node .testout-screens/lib/scramble-render.test.js && node .testout-screens/lib/scramble-noshow.test.js && node .testout-screens/lib/scramble-groups.test.js && node .testout-screens/lib/skins-tie.test.js && node .testout-screens/lib/live-skins.test.js && node .testout-screens/lib/skins-format.test.js && node .testout-screens/lib/create-behaviour.test.js && node .testout-screens/lib/structure-behaviour.test.js && node .testout-screens/lib/create-complete-behaviour.test.js && node .testout-screens/lib/one-step-walkthrough.test.js && node .testout-screens/lib/draft-games.test.js && node .testout-screens/lib/compact-team-editor.test.js && node .testout-screens/lib/odd-field.test.js && node .testout-screens/lib/groups-start-over.test.js && node .testout-screens/lib/names.test.js && node .testout-screens/lib/late-scores.test.js && node .testout-screens/lib/add-player-blocked.test.js && node .testout-screens/lib/groups-unit-move.test.js && node .testout-screens/lib/match-card-layout.test.js && node .testout-screens/lib/test-clubs.test.js && node .testout-screens/lib/recap-additions.test.js && node .testout-screens/lib/share-links-form.test.js && node .testout-screens/lib/personal-bests.test.js && node .testout-screens/lib/cup-roster-row.test.js && node .testout-screens/lib/manual-handicap-clear.test.js && node .testout-screens/lib/course-handicap-one-source.test.js && node .testout-screens/lib/recap-additions.test.js && node .testout-screens/lib/one-step-v1-parity.test.js && node .testout-screens/lib/member-stats-server.test.js && node .testout-screens/lib/cup-scramble.test.js && node .testout-screens/lib/scramble-simulation.test.js && node .testout-screens/lib/team-rounds.test.js && node .testout-screens/lib/insights.test.js && node .testout-screens/lib/insights-render.test.js && node .testout-screens/lib/tee-yardage.test.js && node .testout-screens/lib/segments-scheme.test.js && node .testout-screens/lib/storage-tidy.test.js && node .testout-screens/lib/save-trace-toggle.test.js && node .testout-screens/lib/standout-watch.test.js && node .testout-screens/lib/round-email.test.js && node .testout-screens/lib/round-email-server.test.js && node .testout-screens/lib/latest-saver.test.js && node .testout-screens/lib/trifecta-results-row.test.js && node .testout-screens/lib/format-picker.test.js && node .testout-screens/lib/match-length-picker.test.js && node .testout-screens/lib/agreed-audit-fixes.test.js && node ci/test-live-manual-page.cjs && node .testout-screens/lib/manual-handicap-notice.test.js; } > .test-report.txt 2>&1; rc=$?; cat .test-report.txt; exit $rc
+
+setup summary: 31 passed, 0 failed
+(node:186) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+setup draft lifecycle: 10 passed, 0 failed
+(node:194) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+format rules: 34 passed, 0 failed
+(node:202) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+hole result consistency: 981 passed, 0 failed
+(node:210) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+scoring matrix: 3698 passed, 0 failed
+(node:218) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+trifecta-card-scoring (Architects Jul 5 + FB 6/21 fixtures): 15 passed, 0 failed
+(node:226) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+live trifecta labels (641032 fixture): 14 passed, 0 failed
+(node:234) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  fence: pre-184.0 live behaviour detected on 7 of 8 non-Trifecta fixture(s)
+live/app parity: 116 field comparisons across 11 fixture(s), 0 mismatch(es)
+(node:242) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+live cup parity: 49 passed, 0 failed
+(node:250) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+manual course handicap: 17 passed, 0 failed
+(node:258) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+manual handicap simulation: 76807 passed, 0 failed (4000 deterministic games, seed 0x5A17C)
+(node:266) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+half-stroke simulation: 168914 passed, 0 failed (5000 deterministic matches, seed 0x9F17E)
+(node:274) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+close-out freeze (571157 + 268834 + 248110 fixtures): 21 passed, 0 failed
+(node:282) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stroke sets (Architects Jul 5 fixture): 103 passed, 0 failed
+(node:290) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+alt shot scoring: 30 passed, 0 failed
+(node:298) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+alt shot: 73 passed, 0 failed
+(node:306) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+alt shot scores: 49 passed, 0 failed
+(node:314) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+alt shot side score model: 5006 passed, 0 failed
+(node:322) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+alt shot simulation: 181751 passed, 0 failed (5000 deterministic matches, seed 0x17812)
+(node:330) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+create-game format: 12 passed, 0 failed
+(node:338) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+match length: 49 passed, 0 failed
+(node:346) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+nine-hole payload: 12 passed, 0 failed
+(node:354) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+nine-hole handicap: 15 passed, 0 failed
+(node:362) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stroke rounding: 24 passed, 0 failed
+(node:370) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stroke agreement: 38 passed, 0 failed
+(node:378) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+all allocators: 253 passed, 0 failed
+(node:386) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+nine-hole posting: 20 passed, 0 failed
+(node:394) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ok 1 - formats common golf point fractions
+ok 2 - labels supported cup formats
+ok 3 - singles match awards one point to winning competition team
+ok 4 - reversed stored pairing still renders Cup Team A on the left
+ok 5 - all-square completed Singles splits the Cup point
+ok 6 - competition totals combine sessions
+ok 7 - locked schedule denominator comes from planned sessions, not created games
+ok 8 - Cup outlook distinguishes an outright path from a share-only path
+ok 9 - Four-Ball awards the existing game result into the Cup score
+ok 10 - Four-Ball normalizes Cup Team A to the left when the stored foursome is reversed
+ok 11 - a running Four-Ball match is projected but is not counted complete
+ok 12 - post-clinch Four-Ball holes cannot rewrite a 5 & 3 result as 2 UP
+ok 13 - Alternate Shot aggregates canonical side-owned scores without copying player scores
+ok 14 - Ryder Cup Trifecta expands each foursome into two Singles and one Four-Ball match
+ok 15 - Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair
+ok 16 - game 645502 freezes all nine Trifecta contests at mathematical close-out
+competition: 16 passed, 0 failed
+(node:402) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game type coverage: 102 passed, 0 failed
+(node:410) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+=== game-shape.test ===
+PASS 97  FAIL 0
+All assertions passed.
+(node:418) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+=== game-setup-policy.test ===
+PASS 54  FAIL 0
+All assertions passed.
+(node:426) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-structure differential: 40000 randomized assertions + fixed transition matrix PASS
+(node:434) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-tee-assignment: 5011/5011 assertions passed
+(node:442) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+golf/computeBetting tests: PASS 53  FAIL 0
+(node:450) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+=== money.test ===
+PASS 97  FAIL 0
+All assertions passed.
+
+=== money.test ===
+PASS 141  FAIL 0
+(node:458) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+=== money-scenarios ===
+Scenarios exercised:
+  1. W1: add expenses to an event, each ower settles → event fully settled
+  2. W2: settle an event, then unmark → returns EXACTLY to pre-payment state
+  3. W3: settle event E, move a settled expense to event F → coverage follows the expense; both correct
+  4. W4: owe in two events, settle only one → settled/open are independent (dispute preserved)
+  5. W5: net-creditor member (owed overall) owes a share in another event → must NOT show phantom 'covered'
+  6. W6: everyone globally square (net 0) via untagged payments → every event shows settled
+  7. W7: settle → unmark → settle again → coverage restored, event settled
+  8. W8: guest expense — settling resolves to the guest's sponsor
+  9. W9: multi-payer expense — ower settles; allocations/coverage consistent
+  10. W10: settle event, then increase an expense → event shows the new shortfall (not settled)
+  11. W11: settle event, move a settled expense to Ungrouped → coverage leaves; source stays consistent
+  12. WF: 1500 random action sequences (add/settle/unmark/move/close/reopen) — invariants hold after EVERY step
+  13. RT: 1500 random states — the settle OFFER equals true remaining, and paying it squares the member exactly (never over)
+  14. XC: a member in two clubs — each club's balances/simplify are fully independent (no cross-club netting)
+
+PASS 125  FAIL 0
+(node:466) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+bucket-model: 34 passed, 0 failed
+(node:474) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+legs: PASS 30  FAIL 0
+(node:482) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+grouping tests: PASS 301  FAIL 0
+(node:490) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+sync/column tests: PASS 6  FAIL 0
+(node:498) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+badges: 75 passed, 0 failed
+(node:506) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+card: 11 passed, 0 failed
+(node:514) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+contests: 26 passed, 0 failed
+(node:522) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+player-scoring: 71 passed, 0 failed
+(node:530) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+player-scoring DIFF (old vs new): 57460 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:538) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+finish-gaps: 18 passed, 0 failed
+(node:546) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+finish-gaps DIFF (old vs new): 7490 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:554) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+segments: 20 passed, 0 failed
+(node:562) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+segments DIFF (old vs new): 13867 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:570) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-utils: 21 passed, 0 failed
+(node:578) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-utils DIFF (old vs new): 12003 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:586) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-create: 64 passed, 0 failed
+(node:594) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-create DIFF (old vs new): 9000 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:602) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+create-game-format: 47/47 assertions passed
+(node:610) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+HANDICAP_ALLOWANCE_PASS 8/8 assertions
+(node:618) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-setup-draft: 2011/2011 assertions passed
+(node:626) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+chart-helpers: 10 passed, 0 failed
+(node:634) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ai-sanitize: 11 passed, 0 failed
+(node:642) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ai-contract tests passed
+(node:650) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ttl-cache tests passed
+(node:658) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: current provider id accepted: vqbyfsjx
+PASS: current provider id accepted: 1wewazqg
+PASS: current provider id accepted: p69gkgne
+PASS: current provider id accepted: vvg9vsa7
+PASS: current provider id accepted: fjk8jxy3
+PASS: current provider id accepted: 5wng1nrq
+PASS: current provider id accepted: 6ep6g28a
+PASS: current provider id accepted: vm2kn2bz
+PASS: current provider id accepted: zr1d76hs
+PASS: current provider id accepted: x8xdjb3z
+PASS: current provider id accepted: svcsvbhv
+PASS: current provider id accepted: tdcw9a0j
+PASS: current provider id accepted: dm2xnm4k
+PASS: current provider id accepted: npjk17jn
+PASS: current provider id accepted: sh98rvpq
+PASS: current provider id accepted: j8wp0c0t
+PASS: current provider id accepted: sq8txgf0
+PASS: current provider id accepted: chepnead
+PASS: legacy numeric provider id accepted
+PASS: trimmed provider id normalized
+PASS: unsafe provider id rejected: ""
+PASS: unsafe provider id rejected: " "
+PASS: unsafe provider id rejected: "../../etc"
+PASS: unsafe provider id rejected: "abc/def"
+PASS: unsafe provider id rejected: "abc?x=1"
+PASS: unsafe provider id rejected: "abc#frag"
+PASS: unsafe provider id rejected: "abc def"
+PASS: unsafe provider id rejected: "abc%2Fdef"
+PASS: unsafe provider id rejected: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+PASS: safe helper matches normalized fixtures
+(node:666) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:674) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+course-api-status tests passed
+viewport-editable tests passed
+(node:682) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+viewport-height tests passed
+(node:690) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+lineup tests passed
+(node:698) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+lineup-meta tests passed
+(node:706) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+short-names tests passed
+(node:714) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+team-tint tests passed
+(node:722) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+balance-teams tests passed
+(node:730) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+points-outlook tests passed
+(node:738) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+auto-score tests passed
+(node:746) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+season-summary tests passed
+(node:754) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+season-matches tests passed
+(node:762) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:770) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+course ordering: 4 passed, 0 failed
+[Couldn't save the pairing] 42501 { code: '42501' }
+[Couldn't save] 42501 {
+  code: '42501',
+  message: 'new row violates row-level security policy for table "games"'
+}
+failure messages: 24 passed, 0 failed
+(node:778) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+course source review transition: PASS
+(node:786) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+flightTagColor DIFF (old vs new): 5012 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:794) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+roundStats DIFF (old vs new): 6000 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+(node:802) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+round stat completeness: 8 passed, 0 failed
+(node:810) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:818) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+component render: 17 passed, 0 failed
+(node:856) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+patched 121 file(s) in .testout-screens
+  accepted contrast exceptions in use: #C9A227 on #1B5A46 (3.34:1), #C9A227 on #16503D (3.86:1)
+screen render: 67 passed, 0 failed
+trifecta card render — Architects Jul 5, Foursome 1
+trifecta card render: 8 passed, 0 failed
+lineup renders: 37 passed, 0 failed
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `GroupScorecard`. See https://react.dev/link/warning-keys for more information.
+results outlook + embedded group card + all formats: 34 passed, 0 failed
+season wrapped: 12 passed, 0 failed
+season entry: 6 passed, 0 failed
+(node:912) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+season seen request tests passed (discarded builder: 0 requests; markSeasonSeen: 1)
+course freshness diff tests passed
+(node:920) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:928) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+money refresh: 9 passed, 0 failed
+(node:936) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+push-send tests passed
+(node:944) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+course history: 6 passed, 0 failed
+course-status tests passed
+(node:952) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-recap tests passed
+(node:960) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-highlights tests passed
+(node:968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+game-recap-sections tests passed
+(node:976) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:984) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account gate + admin players: 13 passed, 0 failed
+game-name tests passed
+(node:992) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+course-merge tests passed
+(node:1000) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+team-colour tests passed
+(node:1008) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1016) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+team colour dot: 10 passed, 0 failed
+cup-standing tests passed
+(node:1024) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+cup on the recap: 8 passed, 0 failed
+match-outcomes tests passed
+(node:1040) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+club-report tests passed
+(node:1048) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+club report view: 11 passed, 0 failed
+(node:1064) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+fetch-all tests passed
+(node:1072) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+head-to-head errors: 3 passed, 0 failed
+messy-data tests passed
+(node:1080) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+app-links tests passed
+(node:1088) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+resume-game tests passed
+(node:1096) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+scramble tests passed
+(node:1104) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+scramble-teams tests passed
+(node:1112) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+An update to ScrambleTeamsBuilder inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleTeamsBuilder inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleSettings inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleSettings inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleTeamsBuilder inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleTeamsBuilder inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ScrambleTeamsBuilder inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+scramble screens: 51 passed, 0 failed
+scramble no-shows: 16 passed, 0 failed
+scramble groups: 25 passed, 0 failed
+skins ties: 13 passed, 0 failed
+live skins: 19 passed, 0 failed
+skins format: 13 passed, 0 failed
+create behaviour: 74 passed, 0 failed
+structure behaviour: 34 passed, 0 failed
+create game complete: 3 passed, 0 failed
+(node:1192) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+one-step walkthrough: 154 passed, 0 failed
+(node:1200) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+draft games: 11 passed, 0 failed
+(node:1208) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+compact team editor: 12 passed, 0 failed
+odd field: 26 passed, 0 failed
+(node:1224) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+groups start over: 6 passed, 0 failed
+names: 3 passed, 0 failed
+late scores: 10 passed, 0 failed
+add player blocked: 4 passed, 0 failed
+(node:1256) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+groups unit move: 4 passed, 0 failed
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `GroupScorecard`. See https://react.dev/link/warning-keys for more information.
+match card layout: 5 passed, 0 failed
+test clubs: 2 passed, 0 failed
+recap additions: 23 passed, 0 failed
+share links form: 2 passed, 0 failed
+personal bests: 16 passed, 0 failed
+cup roster row: 5 passed, 0 failed
+manual handicap: 3 passed, 0 failed
+course handicap one source: 6 passed, 0 failed
+recap additions: 23 passed, 0 failed
+(node:1336) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+v1.0 parity: 32 passed, 0 failed
+(node:1344) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+member-stats-server tests passed
+cup scramble: 13 passed, 0 failed
+scramble simulation: 240 games, 24622 checks
+scramble simulation: 1 passed, 0 failed
+team rounds: 11 passed, 0 failed
+insights: 28 passed, 0 failed
+insights screens: 7 passed, 0 failed
+tee yardage: 7 passed, 0 failed
+segment schemes: 8 passed, 0 failed
+(node:1408) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+storage tidy: 18 passed, 0 failed
+save trace toggle: 3 passed, 0 failed
+standout-watch tests passed
+(node:1424) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+round-email tests passed
+(node:1432) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+round-email-server tests passed
+(node:1440) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1448) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+latest-saver tests passed
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `GroupScorecard`. See https://react.dev/link/warning-keys for more information.
+trifecta results row: 20 passed, 0 failed
+format picker: 25 passed, 0 failed
+match length picker: 18 passed, 0 failed
+(node:1480) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS agreed fixes: report identity and actual loaders; failure handling; handicap parity across 9/18 holes, manual/derived, allowances and formats
+PASS actual public computePlayer: 18 manual/derived/legacy, length and allowance cases
+(node:1488) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+manual handicap notice: 12 passed, 0 failed
+ticking clock: PASS (158 suites pass with a clock that moves on every read)
+(node:1505) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2777) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 test:setup-nav
+> NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder node .testout-screens/lib/game-setup-workspace.test.js
+
+game setup workspace navigation: 34 passed, 0 failed
+(node:2798) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 guards:lifecycle
+> python3 ci/check_course_handicap_source_181_13.py && python3 ci/check_match_length_management_182_0.py && python3 ci/check_game_lifecycle_contract.py
+
+181.13 Course Handicap source contract: PASS (5/5)
+Match-length management contract: PASS (11/11)
+PASS: organizer deletion rejects ended or posted Games
+PASS: system-admin Game deletion is authenticated and anon-denied
+PASS: system-admin deletion removes only Alternate Shot history
+PASS: system-admin Game deletion is transactionally audited
+PASS: completed Ryder Cup deletion is system-admin-only
+PASS: system-admin oversight RPC is bounded and read-only
+PASS: system admins get SELECT-only game-player inspection
+PASS: live RLS contract includes system-admin inspection policy
+PASS: fresh database behavior proves admin visibility and deletion preservation
+PASS: fresh database creates auth principals before FK-protected Ryder Cup fixtures
+PASS: fresh database keeps ordinary and system-admin identities separate
+PASS: Admin home exposes searchable Games oversight
+PASS: Admin inspection opens existing Game without joining and returns to oversight
+PASS: Game room labels system-admin actions explicitly
+PASS: organizer UI hides completed Game deletion
+PASS: Ryder Cup UI distinguishes system admin from other managers
+game lifecycle contract: PASS (16/16)
+(node:2814) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@212.77.261030 guards
+> python3 ci/test_security_posture_check.py && python3 ci/check_public_routes_scroll.py && python3 ci/check_recurrence_guards.py && python3 ci/check_server_only_stats.py && python3 ci/check_field_style.py && python3 ci/check_server_routes.py && python3 ci/check_storage_writes.py && python3 ci/check_scoring_input_contract.py && python3 ci/check_trifecta_single_rule.py && python3 ci/check_trifecta_one_singles_source.py && python3 ci/check_live_parity_coverage.py && python3 ci/check_live_route_contract.py && python3 ci/check_stroke_dot_bases.py && python3 ci/check_handicap_single_source.py && python3 ci/check_live_manual_handicap.py && python3 ci/check_build_needs_no_secrets.py && python3 ci/check_sql_assertion_messages.py && python3 ci/check_single_altshot_source.py && python3 ci/check_altshot_view_contract.py && python3 ci/check_altshot_team_card_contract.py && python3 ci/check_team_play_altshot_contract.py && python3 ci/check_team_setup_results_regression.py && python3 ci/check_team_match_ryder_results.py && python3 ci/check_competition_contract.py && python3 ci/check_competitive_assignment_contract.py && python3 ci/check_react_hook_order_source.py && python3 ci/check_draft_not_resurrected.py && python3 ci/check_setup_reachable.py && python3 ci/check_nine_hole_basis.py && python3 ci/check_single_stroke_allocator.py && python3 ci/check_no_build_artifacts.py && python3 ci/check_legacy_migration_prereqs.py && python3 ci/check_db_extension_prereqs.py && python3 ci/check_migration_ledger_contract.py && python3 ci/check_migration_manifest.py && python3 ci/check_migration_parity_contract.py && python3 ci/check_migration_immutability.py && python3 ci/check_core_rls_helpers.py && python3 ci/check_core_rls_baseline.py && python3 ci/check_core_rls_source_closure.py && python3 ci/check_ci_runtime_contract.py && python3 ci/check_fresh_db_ci_contract.py && python3 ci/check_vapid_contract.py && python3 ci/check_reactive_time_contract.py && python3 ci/check_round_analysis_state_contract.py && python3 ci/check_env_hygiene.py && python3 ci/check-jsx-escapes.py && python3 ci/check-min-fontsize.py && python3 ci/check-global-rules.py && python3 ci/check-chart-overflow.py && python3 ci/check-date-inputs.py && python3 ci/check-bottom-sheets.py && python3 ci/check-safe-area-frames.py && python3 ci/check-contrast.py && python3 ci/check-popup-close.py && python3 ci/check_migration_authorization.py && python3 ci/check_course_schema_contract.py && python3 ci/workflow_fault_simulation.py && python3 ci/check_integration_contract.py && python3 ci/check_effect_suppressions.py && python3 ci/check_bet_atomicity_contract.py && python3 ci/check_player_tee_setup_contract.py && python3 ci/check_course_provider_id_contract.py && python3 ci/check_extraction_reachability.py && python3 ci/check_extracted_state_hygiene.py && python3 ci/check_extracted_import_debt.py && python3 ci/check_pwa_update_contract.py && python3 ci/check_staging_environment_marker.py && python3 ci/check_course_source_transparency.py && python3 ci/check_dashboard_putts_round_contract.py && python3 ci/check_round_rating_slope_correction.py && python3 ci/check_game_setup_workspace_contract.py && python3 ci/check_game_setup_policy_contract.py && python3 ci/check_game_course_change_contract.py && python3 ci/check_game_control_center_polish.py && python3 ci/check_create_game_draft_contract.py && python3 ci/check_create_game_state_inventory.py && python3 ci/check_game_structure_contract.py && python3 ci/check_create_game_workspace_contract.py && python3 ci/check_create_game_tee_inheritance.py && python3 ci/check_create_game_resume_and_betting_scope.py && python3 ci/check_create_game_format_selection.py && python3 ci/check-design-scale.py && python3 ci/check-palette-closure.py && python3 ci/check-overlay-contract.py && python3 ci/check_resolved_contrast.py && python3 ci/check_version_ledger.py && python3 ci/computed_colour_matrix.py . && python3 ci/check_tap_targets.py && python3 ci/check_shell_geometry.py && python3 ci/check_test_assertions.py && python3 ci/verify_release.py . && python3 ci/check_reset_setup_contract.py && python3 ci/check_paged_reads.py && python3 ci/check_round_rules.py && python3 ci/check_app_tabs_sync.py && python3 ci/check_stroke_pace_ranking.py && python3 ci/check_scramble_tee_groups.py && python3 ci/check_skins_tie.py && python3 ci/check_live_skins.py && python3 ci/check_skins_format.py && python3 ci/check_create_behaviour.py && python3 ci/check_structure_behaviour.py && python3 ci/check_shared_ball_scorecards.py && python3 ci/check_alphabetical_pickers.py && python3 ci/check_setup_rules_server_parity.py && python3 ci/check_setup_saves_report.py && node ci/check_gallery_overflow.mjs && python3 ci/check_course_handicap_reads.py
+
+security posture check: PASS (4 fixture cases; 60 tables listed)
+public routes scroll: PASS (3 public page(s) own their scroll container; service worker bypasses /live/ and /lineup/)
+recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks)
+server-only stats: PASS (badges and player cards are written only by lib/member-stats-server)
+field style: PASS (every field uses inputStyle; 2 documented exception(s))
+server routes: PASS (9 routes use the server key; each is gated; every acting-on-behalf call passes the signed-in user)
+storage writes: PASS (2 score-backup writes tidy, retry and report a failure)
+scoring input contract: PASS (match engines use exact basis; alt-shot uses canonical side handicaps)
+computeTrifecta production call sites checked: 11
+PASS one Trifecta rule: no per-hole variant, no scoring argument, column only written as "match"
+PASS Trifecta singles have one source (computeTrifecta) and one label rule (trifectaRowState)
+live parity coverage: rendered=['alt_shot', 'fourball', 'match', 'trifecta'] covered=['alt_shot', 'fourball', 'match', 'trifecta']
+PASS live page renders from lib/live-scoring and every rendered format has a parity fixture
+PASS live route owns its scroll container and labels from the winning side
+stroke-dot bases: 6 tokens, 4 dot surfaces discovered
+PASS every stroke dot comes from strokeSets with one basis, one colour and a label
+handicap single source: 53 file(s) touch a handicap, 44 checked, 10 exempt with a stated reason
+Debt was paid down — remove from ci/handicap_source_baseline.json: components/game/leader-row.tsx
+known debt: 4 file(s) still reading a raw handicap
+live manual handicap: 2 handicap-deriving function(s) checked
+PASS the Supabase client is constructed lazily; `next build` needs no credentials
+SQL assertion messages: 3 matched string(s) checked
+single alt-shot source: PASS (side handicaps computed only in lib/game-shape.ts)
+PASS FourballView identifies alternate shot explicitly
+PASS Alternate shot match summary uses altShotStatus
+PASS Alternate shot hole detail uses altShotHoleDetail
+PASS Alternate shot reads duplicated partner rows safely
+PASS Alternate shot surfaces partner-row conflicts
+PASS Alternate shot has its own results heading
+PASS Scorecard running line reads both partner rows
+PASS Play header identifies alternate shot
+PASS Play subtitle identifies one-ball match play
+PASS Alternate shot conflicts block group finish
+PASS Alternate shot conflicts block game end
+PASS alternate shot collapses duplicated partner rows into side columns
+PASS alternate shot card names the team not the clicked player
+PASS alternate shot card shows side playing handicap
+PASS alternate shot score cells show side net rather than Stableford points
+PASS alternate shot modal hides individual stat entry
+PASS alternate shot modal writes only the side score
+PASS alternate shot group segment component hard-stops if called
+PASS alternate shot does not render individual group segment side game
+PASS alternate shot does not render an individual personal scorecard
+PASS alternate shot six-hole individual board remains gated off
+PASS Match and Trifecta retain explicit matchup contract
+PASS Four-Ball/Alternate Shot use matchups only for legacy no-team games
+PASS new Four-Ball/Alternate Shot/Trifecta games create two teams
+PASS team Four-Ball/Alternate Shot expose Groups setup
+PASS Alternate Shot first-driver selection is persisted and consumed
+PASS live Alternate Shot write path no longer fans a score into player rows
+PASS live Alternate Shot scoring retains canonical side RPC through reset-version wrapper
+PASS scorecard and results read canonical side-owned scores
+PASS 0140 creates and records canonical side-score store
+PASS score reset clears side scores and scoring-start marker
+PASS Alternate Shot, Scramble (211.1) and Ryder Cup session side games default off
+PASS team Four-Ball/Alternate Shot derive contests from Teams + Groups
+PASS 0141 persists explicit clear tombstones for legacy-score masking
+PASS canonical side-score model represents clear as a persisted null override
+team-play/Alternate Shot contract: 14/14 PASS
+Team/setup/results regression contract: PASS (8/8)
+Team Match Ryder results contract: PASS (10 source + 7 model cases)
+PASS: 0142 records itself
+PASS: competition parent/roster/session tables exist
+PASS: session base supports original team match engines
+PASS: 0146 adds contract-bound Ryder Cup Trifecta sessions
+PASS: 0147 permits draft Trifecta groups but caps both sides at two
+PASS: child session links to ordinary game
+PASS: RLS enabled on all competition tables
+PASS: competition policies call canonical two-argument group helpers
+PASS: system admin retains Cup read/update visibility outside membership
+PASS: removed organizers cannot mutate Cup structure unless system admin
+PASS: Cup creation is atomic through one database RPC
+PASS: Cup creation RPC validates active club roster and both teams
+PASS: Cup teams require distinct names and canonical A/B child keys
+PASS: cup entry lives inside Games surface
+PASS: cup child game reuses CreateGame seed
+PASS: Cup organizer opt-out contract exists in shared player-row builder
+PASS: team assignment is inherited into child game rows
+PASS: aggregation uses canonical existing scoring engines
+PASS: UI exposes Four-Ball Alternate Shot Singles and Trifecta sessions
+PASS: Ryder Cup Trifecta uses one scorecard with fixed match and best-ball contracts
+PASS: Ryder Cup Trifecta exposes team groups and synchronizes their foursomes
+PASS: Trifecta session planning converts foursomes into three matches
+PASS: one match row keeps teams left/right with centered result
+PASS: linked Cup games keep persistent team contract
+PASS: roster trigger handles DELETE without touching NEW
+PASS: competition score normalizes Team A to left
+PASS: Cup score refreshes live while open
+PASS: 0143 records locked schedule contract
+PASS: locked schedule changes require explicit audited reopen
+PASS: Cup denominator and clinch copy use planned schedule
+PASS: Cup game handoff links an existing planned session
+PASS: weighted Cup points use golf quarter fractions
+PASS: Cup outcome separates outright and share-only paths
+PASS: Singles outlook uses match points and long names wrap
+PASS: 0145 records the Ryder Cup lifecycle contract
+PASS: Ryder Cup lifecycle RPCs are authenticated and permission checked
+PASS: Ryder Cup deletion is atomic across linked games and parent
+PASS: Ryder Cup deletion preserves own-ball rounds and removes shared-ball rounds
+PASS: Ryder Cup UI exposes rename and explicit format-aware deletion
+PASS: successful Ryder Cup deletion exits detail and reloads the parent list
+PASS: deleted Ryder Cup links use zero-row-safe loading and friendly copy
+PASS: Ryder Cup navigation title is singular while list grammar remains plural
+PASS: 0148 preserves the planned session while deleting its linked game
+PASS: 0148 permits only authenticated Cup managers
+PASS: 0148 preserves own-ball history and removes Alternate Shot shared-ball rounds
+PASS: linked-game delete UI uses the dedicated RPC and surfaces failure
+PASS: Ryder Cup roster shows live team count and index balance
+competition contract: PASS (47/47)
+competitive assignment contract: PASS (32/32)
+React hook-order source guard: PASS (99 hook-using function components checked)
+draft not resurrected: PASS (saves stop at creation, guard set before the clear)
+setup reachability: PASS (4 foursome format(s), all have an editor)
+nine-hole basis: PASS (halved once at write time; slope untouched; read side does not halve)
+single stroke allocator: PASS (one implementation; callers pass their hole list)
+build artifacts: PASS (no compiled output beside the sources)
+Historical migration dependency closure: PASS
+ - scanned all 231 globally ordered migrations, not a sampled subset
+ - relation dependencies checked: 1904 across 61 repo-created relations
+ - function dependencies checked: 1378 across 283 repo-created functions
+ - policy dependency operations checked: 189
+ - explicit column-state operations checked: 164
+ - executable column dependencies checked: 227
+ - custom type dependencies checked: 0 across 0 repo-created types
+ - historical pre-0034 auth helpers, pre-0017 notification policy, and out-of-band baseline columns are reconstructed in 0001
+ - extension ordering is independently enforced by check_db_extension_prereqs.py
+ - disposable fresh-database execution remains the authoritative final proof
+DB extension prerequisite contract: PASS
+ bootstrap extensions: citext
+Migration ledger contract: PASS (120 migrations checked)
+Migration manifest check: PASS (MIGRATIONS.md matches committed migration files)
+Migration parity contract: PASS (10/10)
+Migration immutability: SKIP (only enforced on pull requests targeting main)
+Core RLS helper baseline contract: PASS
+ - exact Production helper definitions: 6
+Core RLS baseline contract: PASS
+ - exact Production policies: 60
+ - RLS tables: 12
+ - table grants: exact exported privilege set for anon/authenticated
+Core RLS source-closure contract: PASS
+ - core tables: 12
+ - policy helper functions: is_admin, is_game_member, is_group_admin, is_group_member, is_tee_group_marker, shares_active_club
+CI runtime contract: PASS (Node 22 pinned in .nvmrc + package engines; duplicate app build removed)
+Fresh DB CI contract: PASS
+VAPID source contract: PASS
+Reactive-time contract: PASS
+Round analysis state contract: PASS
+Environment hygiene: PASS (38 referenced variables documented)
+PASS — no escapes in JSX text
+font-size check passed: no shipped font under 11px
+global-rules: pass
+Mobile fit contract: PASS (full-width padded boxes are border-box; match tables use HScroll)
+chart-overflow check: clean
+date-input check passed: all date fields are iOS-safe
+bottom-sheet check passed: all bottom popups clear the safe area
+safe-area frame check passed: fixed bordered frames respect the top notch
+contrast check passed: no element mixes same-family background and text
+popup-close check passed: every BottomSheet has an onClose (× close control)
+migration authorization guard: ok
+Authorization hardening contract: PASS (migration, client, CI secret boundary, negative tests)
+COURSE SCHEMA CONTRACT: PASS
+WORKFLOW FAULT SIMULATION: PASS (50087 checks; 50,000 randomized RSVP operations)
+STAGING INTEGRATION CONTRACT: PASS
+EFFECT SUPPRESSION GUARD: PASS (0 react-hooks/exhaustive-deps suppressions)
+BET ATOMICITY CONTRACT: PASS (0134 runtime ambiguity regression covered)
+PASS: player tee selector always rendered
+PASS: tee options merge player snapshots
+PASS: yardage is not a tee-selection prerequisite
+PASS: handicap override uses the player tee only
+PASS: handicap override does not borrow another player tee
+PASS: course lookup has global fallback
+PASS: async course lookup captures narrowed identifiers
+PASS: tee change still recalculates course handicap
+PASS: tee change still persists player tee snapshot
+PASS: detail endpoint validates opaque provider id
+PASS: search endpoint normalizes returned provider id
+PASS: detail endpoint URL-encodes provider id
+PASS: shared provider fetch validates the id
+PASS: numeric-only course id validation removed
+PASS: manage course search ids are strings
+PASS: round setup search ids are strings
+PASS: yardage lookup ids are strings
+PASS: facility refresh validates provider id through shared helper
+PASS: new course writes canonical external_id
+PASS: Francis Byrne golden id is permanent regression fixture
+Extraction reachability: PASS (16 critical contract links)
+Extracted-state hygiene: PASS
+Unused-symbol debt ratchet: WARNING (advisory; does not block release)
+ - app/api/courses/route.ts: unused-symbol debt increased 0 -> 1
+ - app/join/[code]/page.tsx: unused-symbol debt increased 0 -> 1
+ - app/lineup/[token]/page.tsx: unused-symbol debt increased 0 -> 1
+ - app/live/[token]/page.tsx: unused-symbol debt increased 0 -> 3
+ - app/page.tsx: unused-symbol debt increased 0 -> 1
+ - components/admin-club-report.tsx: unused-symbol debt increased 0 -> 2
+ - components/admin-club-requests.tsx: unused-symbol debt increased 0 -> 1
+ - components/admin-players.tsx: unused-symbol debt increased 0 -> 1
+ - components/admin-standout-watch.tsx: unused-symbol debt increased 0 -> 1
+ - components/auth.tsx: unused-symbol debt increased 1 -> 2
+ - components/club-latest-report.tsx: unused-symbol debt increased 0 -> 1
+ - components/club-pending-signups.tsx: unused-symbol debt increased 0 -> 1
+ - components/competitions.tsx: unused-symbol debt increased 0 -> 1
+ - components/course-change-picker.tsx: unused-symbol debt increased 0 -> 1
+ - components/course-history.tsx: unused-symbol debt increased 0 -> 1
+ - components/feedback.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/format-picker.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/game-list.tsx: unused-symbol debt increased 57 -> 58
+ - components/game/game-recap-card.tsx: unused-symbol debt increased 0 -> 2
+ - components/game/leader-row.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/match-length-picker.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/organizer-panel.tsx: unused-symbol debt increased 54 -> 57
+ - components/game/recap-body.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/scorecard-views.tsx: unused-symbol debt increased 73 -> 74
+ - components/game/scoring-views.tsx: unused-symbol debt increased 45 -> 50
+ - components/game/scramble-allowance-editor.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/setup/game-setup-workspace.tsx: unused-symbol debt increased 0 -> 2
+ - components/groups.tsx: unused-symbol debt increased 0 -> 1
+ - components/help-search.tsx: unused-symbol debt increased 0 -> 1
+ - components/home.tsx: unused-symbol debt increased 0 -> 2
+ - components/insights.tsx: unused-symbol debt increased 0 -> 1
+ - components/manage.tsx: unused-symbol debt increased 10 -> 16
+ - components/manage/courses.tsx: unused-symbol debt increased 32 -> 33
+ - components/round-editor.tsx: debt improved 24 -> 20; lower ci/unused_symbol_baseline.json so the improvement cannot regress
+ - components/round-setup.tsx: unused-symbol debt increased 30 -> 31
+ - components/rounds-list.tsx: unused-symbol debt increased 20 -> 24
+ - components/save-trace-view.tsx: unused-symbol debt increased 0 -> 1
+ - components/season-wrapped.tsx: unused-symbol debt increased 0 -> 1
+ - components/storage-meter.tsx: unused-symbol debt increased 0 -> 1
+ - components/toast.tsx: unused-symbol debt increased 0 -> 1
+ - components/tournaments.tsx: unused-symbol debt increased 40 -> 44
+ - components/ui.tsx: unused-symbol debt increased 11 -> 13
+ - components/yardage-backfill.tsx: unused-symbol debt increased 0 -> 1
+ - components/your-courses.tsx: unused-symbol debt increased 0 -> 1
+ - lib/account-gate-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/add-player-blocked.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/alt-shot-scoring.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/club-report-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/compact-team-editor.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/course-handicap-one-source.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/course-history-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/cup-recap-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/cup-roster-row.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/draft-games.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/format-picker.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/game-shape.ts: unused-symbol debt increased 0 -> 1
+ - lib/golf.ts: unused-symbol debt increased 1 -> 2
+ - lib/grouping.ts: unused-symbol debt increased 0 -> 1
+ - lib/groups-start-over.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/groups-unit-move.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/head-to-head-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/insights-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/insights.ts: unused-symbol debt increased 0 -> 1
+ - lib/legs.test.ts: debt improved 1 -> 0; lower ci/unused_symbol_baseline.json so the improvement cannot regress
+ - lib/lineup-card-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/live-parity.diff.test.ts: unused-symbol debt increased 0 -> 3
+ - lib/manual-handicap-notice.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/manual-handicap-simulation.test.ts: unused-symbol debt increased 0 -> 2
+ - lib/match-card-layout.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/one-step-v1-parity.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/one-step-walkthrough.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/personal-bests.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/recap-additions.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/recap-email.ts: unused-symbol debt increased 0 -> 2
+ - lib/recap-mockups.tsx: unused-symbol debt increased 0 -> 2
+ - lib/release-check.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/results-outlook-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/save-trace-toggle.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/scoring-matrix.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/scramble-groups.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/scramble-noshow.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/scramble-render.test.tsx: unused-symbol debt increased 0 -> 2
+ - lib/screens.test.tsx: unused-symbol debt increased 0 -> 2
+ - lib/season-entry-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/season-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/season-summary.ts: unused-symbol debt increased 0 -> 1
+ - lib/segments-scheme.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/share-links-form.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/skins-format.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/skins-tie.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/stroke-agreement.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/tee-yardage.test.tsx: unused-symbol debt increased 0 -> 2
+ - lib/trifecta-card-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/trifecta-results-row.test.tsx: unused-symbol debt increased 0 -> 2
+PASS: service worker version is app-version based, not build-id based
+PASS: service worker uses cache-first shell behavior
+PASS: register-sw prompt is version-driven
+PASS: register-sw does not treat waiting worker alone as an update
+PASS: help checker compares deployed version, not waiting worker
+PASS: service-worker activation remains explicit
+staging environment marker contract: PASS
+course source transparency contract: PASS
+PASS: dashboard label is Putts / round
+PASS: dashboard whole-round eligibility uses shared helper
+PASS: dashboard aggregate averages total putts across eligible rounds
+PASS: old Putts / hole card removed
+PASS: shared helper requires 18 played + 18 putt holes
+PASS: near-complete putt nudge threshold is 15-17
+PASS: round list names exact missing putt holes
+PASS: round list explains dashboard eligibility
+PASS: existing round-detail reminder reuses shared completeness helper
+PASS: fairway completeness remains par-3 aware
+dashboard putts/round contract: PASS
+Historical rating/slope correction contract: PASS (13 checks)
+Game setup workspace contract: PASS (35 boundary links + no DB ownership)
+Game setup transition-policy contract: PASS (31 source links + pure policy)
+Game course-change contract: PASS (18 source links)
+GAME_CONTROL_CENTER_POLISH_PASS: destructive-action wording and format-aware overview summary are locked
+CREATE_GAME_DRAFT_CONTRACT_PASS 9 checks
+CREATE_GAME_STATE_INVENTORY_PASS 47 state cells + 6 refs classified
+game structure contract: PASS (11 runtime links, 11 pure helpers)
+Create Game workspace contract PASS (13/13)
+CREATE_GAME_TEE_INHERITANCE_PASS 12/12 checks
+CREATE_GAME_RESUME_BETTING_SCOPE_PASS 11/11 checks
+CREATE_GAME_FORMAT_SELECTION_PASS 17/17 checks
+design scale: PASS (623 known off-scale use(s), none new)
+palette closure: PASS (72 known off-palette use(s) across 37 value(s), none new; 33 tokens, 12 allowlisted)
+overlay contract: PASS (0 undefined-overrides; 9 known hand-rolled overlay(s), none new)
+resolved contrast: PASS (13 known sub-threshold site(s), none new)
+version ledger: PASS (package.json 212.77.261030 matches DEPLOY_NOTES 212.77.261030 — agreed audit fixes (c)
+
+ptsColor()  Stableford points   (13px, needs 4.5:1)
+   ok    no score     #676253  on scorecard cell               #FBFAF4    5.82:1
+   ok    more than 2  #1A7A3C  on scorecard cell               #FBFAF4    5.16:1
+   ok    exactly 2    #2E5AB8  on scorecard cell               #FBFAF4    6.14:1
+   ok    under 2      #B83A2E  on scorecard cell               #FBFAF4    5.45:1
+
+flightTagColor()  flight tag fill   (11px, needs 4.5:1)
+   ok    A            #5AA9E6  on dark ink on the tag          #06251A    6.41:1
+   ok    B            #C9A227  on dark ink on the tag          #06251A    6.74:1
+   ok    C            #8FE0B0  on dark ink on the tag          #06251A   10.45:1
+   ok    D            #E0915B  on dark ink on the tag          #06251A    6.50:1
+   ok    other        #B2CBBD  on dark ink on the tag          #06251A    9.45:1
+
+colorFor()  player accent   (11px, needs 4.5:1)
+   ok    even index   #A3C6F5  on scorecard header strip       #1B5A46    4.60:1
+   ok    odd index    #E0C25E  on scorecard header strip       #1B5A46    4.64:1
+
+dashboard d.c  stat bars   (12px, needs 4.5:1)
+   ok    blue         #38BDF8  on C.green text on the bar itself #0E3B2E    5.82:1
+   ok    green        #4ADE80  on C.green text on the bar itself #0E3B2E    7.16:1
+   ok    purple       #C77DFF  on C.green text on the bar itself #0E3B2E    4.64:1
+   ok    red          #FB7185  on C.green text on the bar itself #0E3B2E    4.63:1
+
+KIND_COLOR  bug chip   (12px, needs 4.5:1)
+   ok    white on red #FFFFFF  on bug chip                     #B83A2E    5.70:1
+
+KIND_COLOR  wish chip   (12px, needs 4.5:1)
+   ok    white on blue #FFFFFF  on wish chip                    #2E5AB8    6.42:1
+
+KIND_COLOR  question chip   (12px, needs 4.5:1)
+   ok    dark on gold #0E3B2E  on question chip                #C9A227    5.16:1
+
+leader-row relCol / col  net vs par   (15px, needs 4.5:1)
+   ok    no thru      #B2CBBD  on leader row                   #1B5A46    4.69:1
+   ok    no thru      #B2CBBD  on own row                      #16503D    5.41:1
+   ok    under        #7FD6A3  on leader row                   #1B5A46    4.64:1
+   ok    under        #7FD6A3  on own row                      #16503D    5.36:1
+   ok    over         #F8BBB2  on leader row                   #1B5A46    4.91:1
+   ok    over         #F8BBB2  on own row                      #16503D    5.67:1
+   ok    level        #B2CBBD  on leader row                   #1B5A46    4.69:1
+   ok    level        #B2CBBD  on own row                      #16503D    5.41:1
+
+achievements col  hole vs par   (12px, needs 4.5:1)
+   ok    no score     #B2CBBD  on achievements panel           #1B5A46    4.69:1
+   ok    under        #7FD6A3  on achievements panel           #1B5A46    4.64:1
+   ok    over         #A3C6F5  on achievements panel           #1B5A46    4.60:1
+   ok    level        #F7F3E8  on achievements panel           #1B5A46    7.29:1
+
+catVerdict vcol  vs peers   (11px, needs 4.5:1)
+   ok    strength     #8FE0B0  on compare panel                #1B5A46    5.18:1
+   ok    on par       #F0C97B  on compare panel                #1B5A46    5.14:1
+   ok    focus here   #FFB3BC  on compare panel                #1B5A46    4.78:1
+
+==========================================================================
+33 combinations checked · 0 below threshold
+tap targets: PASS (0 known under 24px, none new)
+shell geometry: PASS (6 device profiles, nav fits and labels visible on all)
+shell geometry: installed app sizes to the layout viewport (199.4 guard) OK
+test assertions: PASS (440220 across 94 suite(s), none lost)
+=== 177.69 · agreed fixes ===
+  PASS  no C.birdie text on a green surface
+  PASS  C.overRedDark readable on green (4.91:1)
+  PASS  C.overRedDark in use at 82 sites
+  PASS  no success button using C.underDark
+  PASS  6 success buttons restored to mint (found 6)
+  PASS  mint carries dark text (9.36:1)
+
+=== earlier releases · still holding ===
+  PASS  177.67 body weight 500
+  PASS  177.65 color-scheme declared
+  PASS  177.65 focus ring
+  PASS  177.67 weights are 500/700/800 (found [500, 700, 800])
+  PASS  177.67 radii are 6 values (found [6, 8, 10, 12, 14, 999])
+  PASS  177.61 C.field
+  PASS  177.61 C.faint / C.sage
+  PASS  177.59 end-game undefined-override fix
+  PASS  177.59 copy-summary fix
+  PASS  177.59 pill radius 999
+  PASS  177.67 btn() roles
+
+=== regression checks ===
+  PASS  no mangled token names from scripted edits
+  PASS  version parses (212.77.261030)
+  PASS  DEPLOY_NOTES newest entry is 212.77.261030
+
+20 passed, 0 failed
+PASS: differential latest course/length setup validation, manual-handicap clearing, inputs/outputs and database writes preserved; only documented scoring locks/context added
+Paged reads: PASS (every list read is paged or marked bounded)
+Round rules: PASS (statistics code uses lib/round-rules)
+App tabs in sync: PASS (12 tabs)
+stroke pace ranking: PASS (app and live leaderboards rank stroke play on par pace, one shared rule)
+scramble tee groups: PASS (team saving and the Teams screen use one grouping rule)
+skins tie: PASS (every team skins call reads the tie setting through skinsTieOf)
+live skins: PASS (the live page scores skins with the app's rules; carry-overs only for individual carry-over skins)
+skins format: PASS (every skins count prints through lib/skins-format)
+create behaviour: PASS (the Create screen uses the shared rules the phase-1 snapshot pins)
+structure behaviour: PASS (Manage Game's save handlers use the shared rules the phase-1 record pins)
+shared-ball scorecards: PASS (no personal scorecard in scramble or alternate shot — one rule)
+alphabetical pickers: PASS (11 setup lists alphabetical by first name, one rule)
+setup rules ↔ server: PASS (14 blocking app rules, each with a server test)
+setup saves report: PASS (11 setup saves report the server's answer)
+(node:2978) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+GALLERY OVERFLOW: FAIL — Chromium is not available to Playwright (run `npx playwright install chromium`): browserType.launch: Executable doesn't exist at /root/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell

@@ -327,3 +327,8 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 ## Lessons become guards (standing rule, 201.4)
 
 - An incident that could recur becomes an executable guard — in `npm run guards` or the full-chain assertions — negative-tested with a deliberate violation, in the release that fixes it. A comment or release note explains the why; it never carries the enforcement. Current set: `ci/check_recurrence_guards.py` (server time formatting, NULL-safe SQL assertions, `is_admin()` arity, OS-assigned CI ports), `ci/check_public_routes_scroll.py`, `ci/assert-no-rpc-overloads.sql`, `ci/check_shell_geometry.py` (layout-viewport rule).
+
+
+## 212.77 candidate — agreed audit follow-up
+
+Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.

@@ -4,6 +4,7 @@
 // definition, so the summary can never disagree with the Dashboard. Entry points: a Dashboard card
 // (Dec 31 – Jan 31, until the account opens it), a row per finished season in Rounds, the Dec 31 notification (/?wrapped=YYYY),
 // and on staging a permanent preview.
+import { loadReportNames, reportPlayerNames } from "@/lib/report-names";
 import { loadTeamRounds } from "@/lib/team-rounds";
 import { fetchAllIn } from "@/lib/fetch-all";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +40,8 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
     const testClubs = await fetchTestClubIds(supabase);   // 212.70: test clubs' games don't exist for stats
     games = withoutTestClubs(gs.filter((g: any) => g.status === "ended"), testClubs).map((g: any) => ({ ...g, players: gp.filter((p: any) => p.game_id === g.id) }));
   }
+  const names = await loadReportNames(supabase, [userId, ...games.flatMap((g) => g.players.flatMap((p) => p.user_id ? [p.user_id] : []))]);
+  games = games.map((g) => ({ ...g, players: reportPlayerNames(g.players, names) }));
   const { matches, playedWith } = seasonMatches(games, userId);
   let clubs: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[] = [];
   try {
@@ -53,7 +56,7 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
   // 212.7: scramble / alternate-shot rounds count as played (lib/team-rounds)
   let teamRounds: { date: string; course: string; holes: number }[] = [];
   try { teamRounds = await loadTeamRounds(supabase, userId); } catch { /* optional — the season still builds */ }
-  return buildSeasonSummary({ year, name, rounds, matches, clubs, playedWithMost, teamRounds });
+  return buildSeasonSummary({ year, name: names[userId] ?? name, rounds, matches, clubs, playedWithMost, teamRounds });
 }
 
 export function SeasonWrappedModal({ year, rounds, userId, name, onClose }: { year: number; rounds: Round[]; userId: string; name: string; onClose: () => void }) {

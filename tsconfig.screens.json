@@ -120,6 +120,8 @@
     "components/game/format-picker.tsx",
     "lib/match-length-picker.test.tsx",
     "lib/game-setup-workspace.test.tsx",
-    "components/game/match-length-picker.tsx"
+    "components/game/match-length-picker.tsx",
+    "lib/agreed-audit-fixes.test.ts",
+    "lib/manual-handicap-notice.test.tsx"
   ]
 }

@@ -1,0 +1,16 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS SQL assert-agreed-audit-fixes
+PASS SQL assert-name-change
+PASS SQL assert-setup-locks
+PASS SQL assert-game-permissions
+PASS SQL assert-organizer-group-scoring
+PASS SQL assert-score-owner
+PASS SQL assert-game-reset-fencing
+PASS SQL assert-game-round-manual-handicap
+PASS SQL assert-match-length-roundtrip
+PASS SQL assert-live-skins
+PASS SQL assert-club-reports
+PASS SQL assert-core-rls-live
+PASS SQL assert-core-rls-behavior
+PASS: executed 231 migration files through 0233 in PostgreSQL/PGlite. Supabase auth/storage compatibility shim; cron scheduling stubbed, no jobs run.

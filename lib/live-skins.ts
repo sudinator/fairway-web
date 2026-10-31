@@ -18,7 +18,7 @@ export type LiveSkinsGame = {
   holes_meta: { n: number; par: number; si: number | null }[]; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null; course_par: number | null;
 };
-export type LiveSkinsPlayer = { id: string; display_name: string; ch: number; team: string | null; no_show: boolean; scores: (number | null)[] };
+export type LiveSkinsPlayer = { id: string; display_name: string; ch: number; course_handicap_source?: string | null; team: string | null; no_show: boolean; scores: (number | null)[] };
 export type LiveSkins = {
   style: "individual" | "team_11" | "team_2v2";
   byPlayer: Record<string, number>;          // keyed by live player id
@@ -37,7 +37,7 @@ export function liveSkins(game: LiveSkinsGame, players: LiveSkinsPlayer[], pairi
   } as unknown as Game;
   // live ids ARE the player keys (no user_id), and the feed's ch is the course handicap the app's chBasis would use
   const ps = players.map((p) => ({ id: p.id, user_id: null, display_name: p.display_name, team: p.team, no_show: p.no_show,
-    scores: p.scores || [], course_handicap: p.ch, course_handicap_source: null, handicap_index: null })) as unknown as Player[];
+    scores: p.scores || [], course_handicap: p.ch, course_handicap_source: p.course_handicap_source ?? null, handicap_index: null })) as unknown as Player[];
   const style = (shapeOf(g as never).skinsStyle ?? "individual") as LiveSkins["style"];
   const t = skinsTotals(g, ps);
   const holes = g.holes_meta?.length || 18;

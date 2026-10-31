@@ -14,7 +14,7 @@ export type SeasonInput = {
   name: string;
   rounds: Round[];                       // the golfer's finished rounds, any year (filtered here)
   /** Match results this year, from games the golfer played: opponent name and whether they won / lost / halved. */
-  matches?: { opponent: string; result: "won" | "lost" | "halved"; played_at: string }[];
+  matches?: { opponentId?: string; opponent: string; result: "won" | "lost" | "halved"; played_at: string }[];
   /** Club-wide context (optional). */
   /** Every club the golfer belongs to, with the club's rounds that year and the golfer's own (205.2). */
   clubs?: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[];
@@ -165,9 +165,9 @@ export function buildSeasonSummary(input: SeasonInput): SeasonSummary {
   const ms = (input.matches || []).filter((m) => inYear(m.played_at, year));
   if (ms.length) {
     const tally = (xs: typeof ms) => ({ won: xs.filter((m) => m.result === "won").length, lost: xs.filter((m) => m.result === "lost").length, halved: xs.filter((m) => m.result === "halved").length });
-    const byOpp = new Map<string, typeof ms>(); for (const m of ms) byOpp.set(m.opponent, [...(byOpp.get(m.opponent) || []), m]);
+    const byOpp = new Map<string, typeof ms>(); for (const m of ms) byOpp.set(m.opponentId ?? m.opponent, [...(byOpp.get(m.opponentId ?? m.opponent) || []), m]);
     const rivalEntry = Array.from(byOpp.entries()).sort((a, b) => b[1].length - a[1].length)[0];
-    const rival = rivalEntry && rivalEntry[1].length >= 2 ? { name: rivalEntry[0], ...tally(rivalEntry[1]) } : null;
+    const rival = rivalEntry && rivalEntry[1].length >= 2 ? { name: rivalEntry[1][rivalEntry[1].length - 1].opponent, ...tally(rivalEntry[1]) } : null;
     cards.push({ kind: "headToHead", ...tally(ms), rival });
   }
 
