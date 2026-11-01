@@ -67,6 +67,9 @@ const page = (inner: string, light = false) => `<!doctype html><html><head><meta
 const shots: Record<string, string> = {};
 const add = (name: string, node: React.ReactElement, light = false) => { shots[name] = page(renderToStaticMarkup(node), light); };
 
+// 212.81: actual reported incident, with saved UUIDs sanitized in the fixture.
+const incident947286 = JSON.parse(fs.readFileSync(path.resolve("lib/test-fixtures/recap-947286.json"), "utf8"));
+add("recap-947286-corrected-stats", <RecapBody game={incident947286.game} recap={buildRecap(incident947286.game, incident947286.players)} mode="app" />);
 // setup
 const updateActions = { onApply: noop, onDismiss: noop, onDetails: noop };
 const updateSample = { phase: "idle" as const, latest: "212.80.261101", message: "", blockers: [], dismissed: false };

@@ -18,7 +18,7 @@ ok(!noScheme.sections.segments, "segments off: no segments section");
 const stroke = buildRecap(formatGames["stroke"].game, formatGames["stroke"].players, []);
 ok(stroke.sections.segments?.length === 2 && stroke.sections.segments[0].unit === "net", "stroke play with nines: two segments, in net strokes");
 // ── stats and streaks ──
-ok(sx.statTiles.some((t) => t.label === "Fewest putts") && sx.statTiles.some((t) => t.label === "Longest par streak") && sx.statTiles.some((t) => t.label === "Most fairways"), `stat tiles for every stat entered (got ${sx.statTiles.map((t) => t.label).join(", ")})`);
+ok(sx.statTiles.some((t) => t.label === "Fewest putts") && sx.statTiles.some((t) => t.label === "Longest par-or-better streak") && sx.statTiles.some((t) => t.label === "Most fairways"), `stat tiles for every stat entered (got ${sx.statTiles.map((t) => t.label).join(", ")})`);
 const bare = players.map((p) => ({ ...p, putts: [], fairways: [] }) as unknown as Player);
 const rb = buildRecap(game, bare, []);
 ok(!rb.sections.statTiles.some((t) => t.label === "Fewest putts" || t.label === "Most fairways"), "no stats entered: no putts or fairways tiles");
@@ -32,7 +32,7 @@ ok(/Toughest hole \d+ \(par \d, avg [0-9.]+, [+−]?[0-9.]+; (nobody made par|\d
 ok(!!t.el.querySelector("[data-recap-segments]") && !t.el.querySelector("[data-recap-segments-box]"), "share: segments as a line; no box");
 ok(share.includes("Closest to the pin #12") && share.includes("Long drive #16"), "share: the side contests line");
 // stat tiles on the share: notable only, two at most
-const statLabels = ["Fewest putts", "Longest par streak", "Most fairways", "Bounce-back birdie"];
+const statLabels = ["Fewest putts", "Longest par-or-better streak", "Most fairways", "Bounce-back birdie"];
 const shownStats = [...t.el.querySelectorAll("[data-recap-tiles] > div")].filter((d) => statLabels.some((l) => (d.textContent || "").toUpperCase().startsWith(l.toUpperCase()))).length;
 ok(shownStats <= 2 && shownStats === Math.min(2, sx.statTiles.filter((x) => x.notable).length), `share: the notable stat tiles, two at most (shown ${shownStats}, notable ${sx.statTiles.filter((x) => x.notable).length})`);
 // standouts take net birdies' place on the share

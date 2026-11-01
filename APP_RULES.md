@@ -1,3 +1,4 @@
+<!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
 <!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 <!-- 192.20: fresh-database failure cleanup captures server/container diagnostics before teardown and preserves the failing exit status; privilege assertions verify the actual test role. -->
@@ -352,3 +353,9 @@ Manual course handicap is authoritative for differential comparisons via a game-
 - Success requires the installed version to match the requested target after reload. Worker acceptance alone is not success.
 - All update entry points use lib/app-update and lib/update-safety. Diagnostics name known games/rounds and preserve every score/draft.
 - Dismiss is a per-release display preference only. It must not clear blockers, drafts or recovery data; Settings stays accessible.
+
+## Saved recap stats (212.81)
+- Game fairways are hit/miss/left/right strings, never Boolean flags. Missing/invalid stats are unavailable; recorded zero putts or all misses remain valid.
+- A full stat card must cover every scheduled eligible hole; trailing array entries cannot compensate for missing holes.
+- Stat tests assert exact winners and values through app/share/email, using typed production-shaped fixtures. Tile presence alone is insufficient.
+- Bounce-back names and hole/score descriptions stay paired. Streaks count pars or better; clock spans are scoring windows, not measured tee-to-putt durations.

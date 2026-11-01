@@ -1,0 +1,36 @@
+{
+  "scope": "EXECUTED exact committed 0106 sweep on isolated MODELLED schema; posting stubbed; not full security-chain or live staging proof",
+  "completed": 1,
+  "rows": [
+    {
+      "name": "eligible",
+      "status": "ended",
+      "completion_observed": true
+    },
+    {
+      "name": "first_observed_now",
+      "status": "active",
+      "completion_observed": true
+    },
+    {
+      "name": "no_scores",
+      "status": "active",
+      "completion_observed": false
+    },
+    {
+      "name": "older_30_days",
+      "status": "active",
+      "completion_observed": true
+    },
+    {
+      "name": "partial",
+      "status": "active",
+      "completion_observed": false
+    },
+    {
+      "name": "test_club",
+      "status": "active",
+      "completion_observed": true
+    }
+  ]
+}

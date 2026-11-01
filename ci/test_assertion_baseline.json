@@ -1,5 +1,5 @@
 {
-  "total": 440386,
+  "total": 440445,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -97,6 +97,7 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "update safety": 38,
-    "app update feedback": 38
+    "app update feedback": 38,
+    "recap stat contract": 59
   }
 }

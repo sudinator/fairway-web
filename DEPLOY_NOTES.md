@@ -1,3 +1,14 @@
+## 212.81.261101 — validate recap stats from saved scorecards (candidate)
+
+- Fairways use canonical hit/miss/left/right values, require a valid entry on each scheduled par-4/5 and preserve explicit all-miss zero. Fixes false 0-of-14 tie in game 947286.
+- Putts require nonnegative integer values on scheduled holes only. Extra slots cannot qualify a missing hole or inflate the total; recorded zeros remain valid.
+- Bounce-back tiles retain each player's actual birdie/eagle and preceding double/triple/higher score and hole numbers.
+- Labels describe par-or-better streaks, birdies-or-better counts, exact best-net-hole results and the score-entry time window honestly.
+- App net-birdie/eagle positions preserve golf-style ties; email includes every player tied at the fifth-place cutoff.
+- Canonical string-valued fixtures replace Boolean fairway mock data. New real production-data fixture (identity UUIDs sanitized) verifies recap/app/share/email values.
+- No score/data mutation, migration, update-policy change or stale-game auto-ending change in this stats release. Stale-game investigation is separate and read-only.
+- Full source delivery; evidence and staging checklist in RELEASE_VERIFICATION_212.81.md.
+
 ## 212.80.261101 — actionable update results and dismissal (candidate)
 
 - Fix the silent Updating -> banner loop: the worker returns accepted/refused results with blockers. Missing acknowledgement, installation/download errors and restart timeout have explicit feedback; no navigation bypass of a waiting worker.

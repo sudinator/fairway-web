@@ -1,3 +1,4 @@
+<!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
 <!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 # Birdie Num Num (BNN) — Developer Handoff
@@ -8,7 +9,7 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 212.80.261101 — staging/GitHub verification pending
+## Current candidate: 212.81.261101 — staging/GitHub verification pending
 
 212.77 is deployed per user confirmation. The new 212.78 candidate fixes missing/manual-handicap differential comparisons; no database migration. See RELEASE_VERIFICATION_212.78.md for executed local checks and outstanding game-specific/GitHub/staging verification. No production deployment of 212.78 has been performed.
 

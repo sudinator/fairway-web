@@ -1,3 +1,4 @@
+import { completeFairways, completePutts } from "./recorded-stats";
 // Game highlights — the shared sections of the game recap and its share image (207.2). Pure; tested.
 // "Net" here is gross − FULL course handicap with strokes allocated by stroke index (the app's
 // allocateStrokes) — a golfer's own net score, independent of the game's match allowance.
@@ -34,7 +35,7 @@ export type Highlights = {
     fewestPutts: { names: string[]; putts: number; notable: boolean } | null;
     mostFairways: { names: string[]; hit: number; of: number; notable: boolean } | null;
     parStreak: { names: string[]; holes: number; notable: boolean } | null;
-    bounceBack: { names: string[]; hole: number } | null;               // a birdie straight after a double or worse
+    bounceBack: { names: string[]; hole: number; events?: { name: string; hole: number; previousOverPar: number; currentVsPar: number }[] } | null;               // a birdie straight after a double or worse
   };
   toughest: HoleStat | null; easiest: HoleStat | null;
   netEagleHole: { n: number; par: number; si: number | null; count: number; total: number } | null;
@@ -192,20 +193,20 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
     return { name: p.display_name, userId: (p as any).user_id ?? null, index: hi, differential, gap: differential - hi };
   }).filter((x): x is { name: string; userId: string | null; index: number; differential: number; gap: number } => !!x);
   // 212.71: stats and streaks over FINISHERS (a full card), only where entered
-  const puttsOf = (p: Player) => { const ps = (p.putts || []) as (number | null)[]; const n = ps.filter((x) => x != null).length; return n >= nh ? ps.reduce((t, x) => (t as number) + (x || 0), 0) as number : null; };
-  const fwOf = (p: Player) => { const fw = (p.fairways || []) as (boolean | null)[]; const asked = holes.filter((h) => h.par >= 4).length; const answered = fw.filter((x, i) => x != null && holes[i] && holes[i].par >= 4).length; return answered >= asked && asked > 0 ? { hit: fw.filter((x, i) => x === true && holes[i]?.par >= 4).length, of: asked } : null; };
+  const puttsOf = (p: Player) => completePutts(p.putts, nh);
+  const fwOf = (p: Player) => completeFairways(p.fairways, holes);
   const best = <T,>(rows: { p: Player; v: T | null }[], key: (v: T) => number, pick: "low" | "high") => { const ok = rows.filter((r): r is { p: Player; v: T } => r.v != null); if (!ok.length) return null; const target = pick === "low" ? Math.min(...ok.map((r) => key(r.v))) : Math.max(...ok.map((r) => key(r.v))); const w = ok.filter((r) => key(r.v) === target); return { names: w.map((r) => r.p.display_name), v: w[0].v }; };
   const fewestPutts = best(finishers.map((p) => ({ p, v: puttsOf(p) })), (v) => v, "low");
   const mostFairways = best(finishers.map((p) => ({ p, v: fwOf(p) })), (v) => v.hit, "high");
   const streakOf = (p: Player) => { let b = 0, run = 0; holes.forEach((h, i) => { const sc = played(p, i); run = sc != null && sc <= h.par ? run + 1 : 0; b = Math.max(b, run); }); return b; };
   const parStreak = best(finishers.map((p) => ({ p, v: streakOf(p) })), (v) => v, "high");
-  const bounce = finishers.map((p) => { for (let i = 1; i < holes.length; i++) { const prev = played(p, i - 1), cur = played(p, i); if (prev != null && cur != null && prev >= holes[i - 1].par + 2 && cur <= holes[i].par - 1) return { p, hole: holes[i].n }; } return null; }).filter((x): x is { p: Player; hole: number } => !!x);
+  const bounce = finishers.map((p) => { for (let i = 1; i < holes.length; i++) { const prev = played(p, i - 1), cur = played(p, i); if (prev != null && cur != null && prev >= holes[i - 1].par + 2 && cur <= holes[i].par - 1) return { p, hole: holes[i].n, previousOverPar: prev - holes[i - 1].par, currentVsPar: cur - holes[i].par }; } return null; }).filter((x): x is { p: Player; hole: number; previousOverPar: number; currentVsPar: number } => !!x);
   const stats: Highlights["stats"] = {
     entered: finishers.filter((p) => puttsOf(p) != null || fwOf(p) != null).length,
     fewestPutts: fewestPutts ? { names: fewestPutts.names, putts: fewestPutts.v, notable: fewestPutts.v <= 30 } : null,
     mostFairways: mostFairways ? { names: mostFairways.names, hit: mostFairways.v.hit, of: mostFairways.v.of, notable: mostFairways.v.hit >= 10 } : null,
     parStreak: parStreak && parStreak.v >= 3 ? { names: parStreak.names, holes: parStreak.v, notable: parStreak.v >= 5 } : null,
-    bounceBack: bounce.length ? { names: bounce.map((b) => b.p.display_name), hole: bounce[0].hole } : null,
+    bounceBack: bounce.length ? { names: bounce.map((b) => b.p.display_name), hole: bounce[0].hole, events: bounce.map(b => ({ name: b.p.display_name, hole: b.hole, previousOverPar: b.previousOverPar, currentVsPar: b.currentVsPar })) } : null,
   };
   const standouts = standoutsFrom(scored);
   const fieldRows = fieldComparison(scored);
