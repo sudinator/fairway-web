@@ -9,7 +9,7 @@ BANNED = [
     # the ELEMENT itself checked for null (scores) — not a recorded statistic like h.putts
     (re.compile(r"\.every\(\(?([a-z_]+)\)?\s*=>\s*\1\s*!=\s*null"), "a private 'every hole has a score' check — use isFullCard / isValidRound"),
     (re.compile(r"\.filter\(\(?[a-z_]*\)?\s*=>\s*[a-z_]+\s*!=\s*null\s*&&\s*Number\([a-z_]+\)\s*>\s*0\)"), "a private 'count scored holes' check — use scoredHoles / isValidRound"),
-    (re.compile(r"Number\([^)]*handicap_index"), "converting a handicap index directly (a missing index becomes 0) — use handicapReading"),
+    (re.compile(r"Number\(\s*(?:\([^)]*\)|[^()])*handicap_index"), "converting a handicap index directly (a missing index becomes 0) — use handicapReading"),
 ]
 bad = []
 for path in sorted((ROOT / "lib").rglob("*.ts")):

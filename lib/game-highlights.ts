@@ -4,7 +4,7 @@
 // Rules agreed with the owner (Oct 2026): golf-style ties everywhere ("T3"); field average only for
 // 8+ players; front v back only on 18 holes; winners named, losers never singled out.
 import { allocateStrokes } from "@/lib/golf";
-import { pkey, chBasis } from "@/lib/game-shape";
+import { pkey, chBasis, gameComparisonIndex, comparisonNumber } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import { holeScore, isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
@@ -45,7 +45,7 @@ export type Highlights = {
   roundMinutes: number | null;
   /** 209.0: rounds that were rare FOR THAT PLAYER (owner, Oct 2026). Score differential (USGA: 113/slope ×
    *  (adjusted gross − rating), each hole capped at net double bogey on the full course handicap) against the
-   *  player's Handicap Index. With 8+ scored players, measured against the FIELD's average gap (the course and
+   *  player's recorded index (or the equivalent index from their manual course handicap). With 8+ scored players, measured against the FIELD's average gap (the course and
    *  conditions — the idea behind the WHS playing-conditions calculation); smaller groups use the player's own
    *  index. Standout = 2.0+ better; "exceptional" = 7.0+ below the player's own index (the WHS term). */
   /** 209.1: EVERY scored player's comparison with the field (8+ players only; else empty) — for the admin
@@ -183,8 +183,9 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
 
   // ---- standout rounds (209.0) ----
   const scored = finishers.map((p) => {
-    const hi = Number((p as any).handicap_index), rating = Number((p as any).rating), slope = Number((p as any).slope);
-    if (!isFinite(hi) || !isFinite(rating) || !isFinite(slope) || slope <= 0 || nh !== 18) return null;
+    const hi = gameComparisonIndex(p, game.course_par, nh);
+    const rating = comparisonNumber(p.rating), slope = comparisonNumber(p.slope);
+    if (hi == null || rating == null || rating <= 0 || slope == null || slope <= 0) return null;
     const a = (alloc.get(pkey(p)) || {}) as Record<number, number>;
     const ags = holes.reduce((sum, h, i) => sum + Math.min(played(p, i) || 0, h.par + 2 + (a[h.n] || 0)), 0);   // net double bogey cap
     const differential = Math.round(((113 / slope) * (ags - rating)) * 10) / 10;

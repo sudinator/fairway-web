@@ -635,4 +635,9 @@ The baseline intentionally reproduces current Production behavior. Any later pri
 
 ## 212.77 candidate — agreed audit follow-up
 
-Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.
+212.77 is deployed per user confirmation on November 1, 2026: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. The user confirmed CI and staging tests, skipped manual name testing and deferred public-link testing. The original RELEASE_VERIFICATION_212.77.md records its earlier candidate evidence.
+
+
+## 212.78 candidate — missing-handicap comparison
+
+Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.

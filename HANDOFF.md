@@ -6,9 +6,9 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 212.77.261030 — NOT READY FOR DEPLOYMENT
+## Current candidate: 212.78.261101 — NOT READY FOR DEPLOYMENT
 
-Four agreed audit fixes are implemented. See RELEASE_VERIFICATION_212.77.md for executed checks and outstanding gates; no live migration or deployment has been performed.
+212.77 is deployed per user confirmation. The new 212.78 candidate fixes missing/manual-handicap differential comparisons; no database migration. See RELEASE_VERIFICATION_212.78.md for executed local checks and outstanding game-specific/GitHub/staging verification. No production deployment of 212.78 has been performed.
 
 - RULE: every new column that refers to an account goes into account_reference_columns (ci/assert-account-merge.sql fails otherwise).
 - RULE: guards are judged by the account/data affected, never by current_user (definer functions run as owner) and never by a session flag.
@@ -1049,3 +1049,8 @@ For changed interactions, do not equate handler reachability with working behavi
 
 ## Current staging convergence checkpoint — 177.52 Lean Create
 Create Game is intentionally **lean**: Game → Players → Format → Review. Default/flight/player tee inheritance and Resume Setup remain in Create; persisted structural work (teams, matchups, foursomes, tee groups) is completed in Manage Game, which remains the single source of truth for transition policy and structural edits. Stableford/Stroke create into Play; structural formats create into the relevant Manage Game setup section. No migration. Production should not receive the convergence train until cumulative validation is complete.
+
+
+## 212.78 candidate — missing-handicap comparison
+
+Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.

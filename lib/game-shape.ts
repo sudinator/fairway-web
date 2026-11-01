@@ -1,3 +1,4 @@
+import { handicapReading } from "./round-rules";
 import { shortNamer } from "./short-names";
 // Pure game-shape + stroke logic. No React. Single source of truth for "what mode
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
@@ -159,6 +160,36 @@ export const chBasisOrNull = (p: Parameters<typeof chBasis>[0], coursePar: numbe
     || p.course_handicap != null;
   return has ? chBasis(p, coursePar, holeCount) : null;
 };
+
+// 212.78: comparison-only equivalent index; never changes scoring or stored profiles.
+type ComparisonPlayer = {
+  handicap_index?: unknown; course_handicap?: unknown; course_handicap_source?: string | null;
+  rating?: unknown; slope?: unknown;
+};
+
+/** Read numeric database values without turning null, blanks or booleans into scratch. */
+export function comparisonNumber(value: unknown): number | null {
+  return typeof value === "number" || typeof value === "string" ? handicapReading(value) : null;
+}
+
+/**
+ * Keep the recap's existing 18-hole-only differential contract. Manual CH is authoritative:
+ * invert the shared courseHandicapExact relationship using THIS game's saved tee data.
+ * If that cannot be inverted, the comparison is unavailable; never substitute a stale index
+ * for a manual override or assume zero. Without a numeric manual override use the recorded index.
+ * Do not round the inferred index: the recap rounds the final comparison for display.
+ */
+export function gameComparisonIndex(player: ComparisonPlayer, coursePar: unknown, holeCount: number): number | null {
+  if (holeCount !== 18) return null;
+  const manual = comparisonNumber(player.course_handicap);
+  if (player.course_handicap_source === "manual" && manual != null) {
+    const rating = comparisonNumber(player.rating), slope = comparisonNumber(player.slope), par = comparisonNumber(coursePar);
+    if (rating == null || rating <= 0 || slope == null || slope <= 0 || par == null || par <= 0) return null;
+    const index = (manual - (rating - par)) * 113 / slope;
+    return Number.isFinite(index) ? index : null;
+  }
+  return comparisonNumber(player.handicap_index);
+}
 
 // Orange stroke dots a player RECEIVES on a hole. This MUST match the basis the
 // game's net scoring uses, so the dots can never disagree with the result:
