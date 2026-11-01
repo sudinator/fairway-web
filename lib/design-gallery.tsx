@@ -1,3 +1,4 @@
+import { UpdateBannerView, UpdateBlockerList } from "@/components/app-update-status";
 import { UpdateChecker } from "@/components/app-update-checker";
 /**
  * 212.16 — DESIGN GALLERY (owner, Oct 22: "these are basic design choices that you should be proactively looking to
@@ -67,6 +68,12 @@ const shots: Record<string, string> = {};
 const add = (name: string, node: React.ReactElement, light = false) => { shots[name] = page(renderToStaticMarkup(node), light); };
 
 // setup
+const updateActions = { onApply: noop, onDismiss: noop, onDetails: noop };
+const updateSample = { phase: "idle" as const, latest: "212.80.261101", message: "", blockers: [], dismissed: false };
+add("update-available", <UpdateBannerView state={updateSample} {...updateActions} />);
+add("update-refused", <UpdateBannerView state={{ ...updateSample, phase: "blocked", message: "Update paused. Another BNN tab needs attention.", blockers: [{ key: "tab:sample", title: "Another BNN tab did not respond", action: "Finish and sync its rounds, close that tab and try again." }] }} {...updateActions} />);
+add("update-installed", <UpdateBannerView state={{ ...updateSample, phase: "success", message: "Updated successfully to 212.80.261101." }} {...updateActions} />);
+add("update-blocker-checklist", <UpdateBlockerList blockers={[{ key: "game:sample", title: "Game not confirmed finished: Francis Byrne · #947286", action: "Continue playing. After play, the organizer finishes the game. Reconnect and choose Check again." }, { key: "round:sample", title: "Unfinished round: Berkshire Valley · 2026-10-31", action: "Open Rounds and resume this round. Finish and save, or discard only if unwanted." }]} />);
 add("update-paused-during-round", <UpdateChecker />);
 add("01-teams-usga", <ScrambleTeamsBuilder game={field({ foursomes: [{ id: "t1", name: "Team 1", a: ["u0", "u1", "u2", "u3"], b: [] }, { id: "t2", name: "Team 2", a: ["u4", "u5", "u6"], b: [] }] })} players={players()} readOnly={false} onSave={noop} />);
 add("02-teams-captains-agreed", <ScrambleTeamsBuilder game={field({ scramble_team_size: 1, scramble_handicap: "agreed", foursomes: [0, 1, 2, 3].map((t) => ({ id: `c${t}`, name: `Team ${t + 1}`, a: [`u${t}`], b: [], ...(t < 2 ? { a_hcp: 6 + t * 3 } : {}) })) })} players={players().slice(0, 5)} readOnly={false} onSave={noop} />);

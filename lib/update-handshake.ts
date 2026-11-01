@@ -1,4 +1,4 @@
-import { updatesBlocked, holdUpdateInput, releaseUpdateInput } from "./update-safety";
+import { updatesBlocked, holdUpdateInput, releaseUpdateInput, updateBlockers } from "./update-safety";
 
 /** The same responder is used by the live app and the two-release browser test. */
 export function updateHandshake() {
@@ -13,7 +13,7 @@ export function updateHandshake() {
         clearTimeout(timer);
         timer = setTimeout(() => { request = ""; releaseUpdateInput(); }, 15000);
       }
-      e.ports[0].postMessage({ ready });
+      e.ports[0].postMessage({ ready, blockers: ready ? [] : updateBlockers() });
     } else if (e.data?.kind === "bnn-update-release" && e.data.requestId === request) {
       request = ""; clearTimeout(timer); releaseUpdateInput();
     }

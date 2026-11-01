@@ -29,7 +29,7 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
   const [sessionId] = useState(() => round.id || round.draft_session_id || crypto.randomUUID());
   const editKey = `round:${sessionId}`;
   const [updateSessionClosed, setUpdateSessionClosed] = useState(false);
-  useScoringUpdateProtection("round", sessionId, !updateSessionClosed);
+  useScoringUpdateProtection("round", sessionId, !updateSessionClosed, `${round.course || "Personal round"}${round.played_at ? ` · ${round.played_at.slice(0, 10)}` : ""}`);
   const recovered = React.useMemo(() => {
     if (isRecordedFinal) {
       const d = loadEditorDraft<{ round: Round; playDate: string; ratingText: string; slopeText: string; chEdit: string | null }>(editKey);

@@ -1,3 +1,4 @@
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 # Birdie Num Num (BNN) — Developer Handoff
 
@@ -7,7 +8,7 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 212.79.261101 — staging/GitHub verification pending
+## Current candidate: 212.80.261101 — staging/GitHub verification pending
 
 212.77 is deployed per user confirmation. The new 212.78 candidate fixes missing/manual-handicap differential comparisons; no database migration. See RELEASE_VERIFICATION_212.78.md for executed local checks and outstanding game-specific/GitHub/staging verification. No production deployment of 212.78 has been performed.
 
@@ -1062,3 +1063,6 @@ The currently reviewed baseline is the locally available 212.77 source with the 
 Existing older clients cannot answer the new worker handshake. During the first rollout the waiting worker refuses activation until those tabs/windows are closed. Close all BNN windows after completing/syncing, then reopen. Never close during entry merely to force an update.
 An unresolved draft, storage failure, offline/missing game read, or an unresponsive tab may keep updates deferred. No age-based deletion or forced activation is provided. Resume/finish/discard through the app; retain backups.
 See RELEASE_VERIFICATION_212.79.md for executed vs pending verification. User will wait for green GitHub CI before the production merge PR. Full source ZIP delivery is now required; no bloat cleanup in this release.
+
+## 212.80 update feedback handoff
+Fixes missing feedback/dismissal in 212.79. Source: lib/app-update.ts, components/app-update-status.tsx; shared Settings/banner actions, worker outcome messages and detailed safety blockers. No migration. Existing loaded OLD builds cannot retroactively gain this UI; for the one-time transition, finish/sync scores, close all BNN windows and reopen. Never clear browser storage to force installation. Do not bypass first-rollout safety just to get the new feedback.

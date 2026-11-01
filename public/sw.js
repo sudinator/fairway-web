@@ -4,7 +4,7 @@
 // bypass the worker. App-shell requests are cache-first for the lifetime of the active
 // worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "212.79.261101";
+const SW_VERSION = "212.80.261101";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -28,23 +28,26 @@ let updateAttempt = null;
 async function safeActivation() {
   const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
   const requestId = crypto.randomUUID();
-  const ready = await Promise.all(windows.map(client => new Promise(resolve => {
+  const results = await Promise.all(windows.map(client => new Promise(resolve => {
     const channel = new MessageChannel();
-    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 4000);
-    channel.port1.onmessage = event => { clearTimeout(timer); channel.port1.close(); resolve(event.data?.ready === true); };
+    const timer = setTimeout(() => { channel.port1.close(); resolve({ ready: false, blockers: [{ key: `tab:${client.id}`, title: "Another BNN tab did not respond", action: "Finish and sync rounds in your other BNN tabs/windows, then close them and try again. An older or sleeping tab cannot confirm that updating is safe. Do not clear browser data." }] }); }, 4000);
+    channel.port1.onmessage = event => { clearTimeout(timer); channel.port1.close(); resolve({ ready: event.data?.ready === true, blockers: Array.isArray(event.data?.blockers) ? event.data.blockers.map(item => ({ ...item, key: `tab:${client.id}:${item.key}` })) : [] }); };
     try { client.postMessage({ kind: "bnn-update-check", requestId }, [channel.port2]); }
-    catch { clearTimeout(timer); channel.port1.close(); resolve(false); }
+    catch { clearTimeout(timer); channel.port1.close(); resolve({ ready: false, blockers: [{ key: `tab:${client.id}`, title: "Another BNN tab could not be checked", action: "Finish and sync any rounds in that tab, close it, then try again." }] }); }
   })));
-  // Recheck membership: a new tab may have opened while acknowledgements arrived.
   const now = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
   const sameWindows = now.length === windows.length && now.every(c => windows.some(w => w.id === c.id));
-  if (ready.every(Boolean) && sameWindows) await self.skipWaiting();
-  else windows.forEach(client => { try { client.postMessage({ kind: "bnn-update-release", requestId }); } catch {} });
+  const blockers = results.flatMap(result => result.ready ? [] : result.blockers.length ? result.blockers : [{ key: "other-tab", title: "Another BNN tab is not ready", action: "Return to that tab and finish saving its scores, then try again." }]);
+  if (!sameWindows) blockers.push({ key: "tabs-changed", title: "The open BNN tabs changed during the update check", action: "Wait until the other tabs finish opening or closing, then try again." });
+  const ready = results.map(result => result.ready);
+  if (ready.every(Boolean) && sameWindows) { await self.skipWaiting(); return { kind: "bnn-update-result", accepted: true, blockers: [] }; }
+  windows.forEach(client => { try { client.postMessage({ kind: "bnn-update-release", requestId }); } catch {} });
+  return { kind: "bnn-update-result", accepted: false, blockers, message: "Update paused. Another open BNN tab needs attention; your scores have not been changed." };
 }
 self.addEventListener("message", event => {
   if (event.data !== "SKIP_WAITING") return;
   if (!updateAttempt) updateAttempt = safeActivation().finally(() => { updateAttempt = null; });
-  event.waitUntil(updateAttempt);
+  event.waitUntil(updateAttempt.then(result => { if (event.ports[0]) event.ports[0].postMessage(result); }).catch(() => { if (event.ports[0]) event.ports[0].postMessage({ kind: "bnn-update-result", accepted: false, message: "The update check failed. Keep your saved scores and try again when connected." }); }));
 });
 
 self.addEventListener("activate", (event) => {

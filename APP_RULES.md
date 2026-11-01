@@ -1,3 +1,4 @@
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 <!-- 192.20: fresh-database failure cleanup captures server/container diagnostics before teardown and preserves the failing exit status; privilege assertions verify the actual test role. -->
 
@@ -345,3 +346,9 @@ Manual course handicap is authoritative for differential comparisons via a game-
 - All open windows must acknowledge readiness before worker activation; unknown/old/frozen windows veto. Do not add a forced timeout escape.
 - Every update path uses lib/update-safety; do not add an independent SKIP_WAITING/reload bypass.
 - Releases are delivered as FULL source ZIPs. Exclude dependencies, local environments, build caches and generated test output. File cleanup remains a separate approved change.
+
+## Update feedback (212.80)
+- Activation must return a result; never silently reset Updating on a fixed timer.
+- Success requires the installed version to match the requested target after reload. Worker acceptance alone is not success.
+- All update entry points use lib/app-update and lib/update-safety. Diagnostics name known games/rounds and preserve every score/draft.
+- Dismiss is a per-release display preference only. It must not clear blockers, drafts or recovery data; Settings stays accessible.

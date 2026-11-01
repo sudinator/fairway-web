@@ -1,3 +1,4 @@
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 ## 212.76.261030 — One source for a live player's course handicap; the handicap audit (index, tees); audits 3–7 (names reach games, Cup points on the recap)
 

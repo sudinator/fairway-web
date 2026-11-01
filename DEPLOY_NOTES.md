@@ -1,3 +1,12 @@
+## 212.80.261101 — actionable update results and dismissal (candidate)
+
+- Fix the silent Updating -> banner loop: the worker returns accepted/refused results with blockers. Missing acknowledgement, installation/download errors and restart timeout have explicit feedback; no navigation bypass of a waiting worker.
+- One shared update controller for banner and Settings. Success is reported only after the installed version matches the requested target after reload.
+- Dismiss hides the notice for that release, including later passive checks/reopens. Settings remains available; a different release can announce itself.
+- Live local checklist identifies games by name/code, personal rounds by course/date, pending rows by player/count, failed local checks and other-tab refusals. Instructions preserve drafts and say to continue playing rather than end a live game for an update.
+- Existing update protection, handicap fix and scoring calculations retained. No migration or obsolete-file cleanup.
+- Full source ZIP; local/staging/GitHub evidence in RELEASE_VERIFICATION_212.80.md.
+
 ## 212.79.261101 — defer app updates during scoring (candidate)
 
 - Active game/personal-round sessions hide update controls and defer update-driven reloads, including after navigation away.

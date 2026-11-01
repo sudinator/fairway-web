@@ -47,12 +47,16 @@ async function main() {
     const askUpdate = () => b.evaluate(async () => {
       for (let n = 0; n < 200; n++) {
         const r = await navigator.serviceWorker.getRegistration();
-        if (r?.waiting?.state === 'installed') { r.waiting.postMessage('SKIP_WAITING'); return; }
+        if (r?.waiting?.state === 'installed') {
+          return await new Promise(resolve => { const ch = new MessageChannel(); const timer = setTimeout(() => resolve({ accepted: false, timedOut: true }), 6500); ch.port1.onmessage = e => { clearTimeout(timer); ch.port1.close(); resolve(e.data); }; r.waiting.postMessage('SKIP_WAITING', [ch.port2]); });
+        }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       throw new Error('No installed waiting worker');
     });
-    await askUpdate();
+    const veto = await askUpdate();
+    assert.equal(veto.accepted, false, "active scoring refusal is returned to requester");
+    assert.ok(veto.blockers.length > 0, "active refusal carries actionable blocker details");
     await b.waitForFunction(() => !window.safety.updateInProgress());
     await new Promise(resolve => setTimeout(resolve, 300));
     assert.ok(await b.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting), 'active round veto leaves new release waiting');
@@ -61,12 +65,15 @@ async function main() {
     await a.evaluate(() => window.safety.protectUpdateSession('game', 'live', false));
     // A nonresponding/legacy tab must veto by timeout, never be assumed safe.
     const legacy = await context.newPage(); await legacy.goto(url + '/legacy');
-    await askUpdate();
+    const legacyResult = await askUpdate();
+    assert.equal(legacyResult.accepted, false, "legacy tab returns explicit refusal");
+    assert.ok(legacyResult.blockers.some(item => item.title.includes("did not respond")), "legacy refusal names nonresponding tab");
     await new Promise(resolve => setTimeout(resolve, 4400));
     assert.ok(await b.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting), 'unresponsive tab prevents activation');
     assert.equal(await b.evaluate(() => window.safety.updateInProgress()), false, 'timeout releases other tabs input');
     await legacy.close();
-    await askUpdate();
+    const accepted = await askUpdate();
+    assert.equal(accepted.accepted, true, "safe activation returns explicit acceptance");
     await a.waitForFunction(async () => (await caches.keys()).includes('bnn-shell-212.80.261101') && !(await navigator.serviceWorker.getRegistration()).waiting);
     await a.waitForFunction(n => window.changes > n, changes);
     assert.equal(await a.evaluate(() => localStorage.getItem('score-proof')), '5,4,3', 'successful activation preserves scores');

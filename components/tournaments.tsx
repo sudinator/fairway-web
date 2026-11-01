@@ -2434,7 +2434,7 @@ function GameRoom({
   // Pending = holes saved on this phone but not yet confirmed on the server.
   const [pendingHoles, setPendingHoles] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  useScoringUpdateProtection("game", gameId, !game || game.status !== "ended" || pendingHoles > 0 || syncState === "saving" || syncState === "retry" || syncState === "error" || savingHole != null || syncing);
+  useScoringUpdateProtection("game", gameId, !game || game.status !== "ended" || pendingHoles > 0 || syncState === "saving" || syncState === "retry" || syncState === "error" || savingHole != null || syncing, game?.name || game?.course || undefined, game?.code);
   const countPending = React.useCallback(() => {
     let total = 0;
     for (const pl of playersRef.current) {

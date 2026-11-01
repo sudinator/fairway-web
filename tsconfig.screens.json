@@ -124,6 +124,7 @@
     "lib/agreed-audit-fixes.test.ts",
     "lib/manual-handicap-notice.test.tsx",
     "lib/game-comparison-handicap.test.ts",
-    "lib/update-safety.test.tsx"
+    "lib/update-safety.test.tsx",
+    "lib/app-update.test.tsx"
   ]
 }
