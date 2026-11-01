@@ -122,6 +122,7 @@
     "lib/game-setup-workspace.test.tsx",
     "components/game/match-length-picker.tsx",
     "lib/agreed-audit-fixes.test.ts",
-    "lib/manual-handicap-notice.test.tsx"
+    "lib/manual-handicap-notice.test.tsx",
+    "lib/game-comparison-handicap.test.ts"
   ]
 }

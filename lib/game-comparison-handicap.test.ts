@@ -1,0 +1,76 @@
+/** 212.78 — manual game handicaps govern comparison; missing is never scratch. */
+import { renderScreen, ok, report } from "./screen-harness";
+import { comparisonNumber, gameComparisonIndex, chBasis } from "./game-shape";
+import { buildHighlights, fieldComparison } from "./game-highlights";
+import * as React from "react";
+import { RecapBody } from "../components/game/recap-body";
+import { buildRecap } from "./game-recap";
+import { recapEmailHtml } from "./recap-email";
+import { playingHandicapOf } from "./balance-teams";
+
+const near = (a: number | null, b: number, label: string) => ok(a != null && Math.abs(a-b)<1e-9, `${label}: ${a} == ${b}`);
+for (const value of [null,undefined,"","  ",NaN,Infinity,-Infinity,true,false,[],{}]) ok(comparisonNumber(value)===null, `invalid/missing ${String(value)} is not scratch`);
+near(comparisonNumber(0),0,"explicit numeric zero"); near(comparisonNumber("0"),0,"explicit database numeric zero"); near(comparisonNumber(-2),-2,"plus handicap remains valid");
+const rajat = { handicap_index:null,course_handicap:10,course_handicap_source:"manual" as const,rating:72.3,slope:133 };
+const pj = { handicap_index:null,course_handicap:22,course_handicap_source:"manual" as const,rating:70.7,slope:132 };
+near(gameComparisonIndex(rajat,70,18),(10-2.3)*113/133,"Rajat manual equivalent");
+near(gameComparisonIndex(pj,70,18),(22-.7)*113/132,"PJ manual equivalent");
+ok(gameComparisonIndex(rajat,70,18)!.toFixed(2)==="6.54", "Rajat 6.54 on par70 (not an official/profile index)");
+ok(gameComparisonIndex(pj,70,18)!.toFixed(2)==="18.23", "PJ 18.23 on par70");
+near(gameComparisonIndex({...rajat,handicap_index:99},70,18),gameComparisonIndex(rajat,70,18)!,"manual wins over recorded index");
+near(gameComparisonIndex({handicap_index:0},70,18),0,"recorded scratch is valid");
+near(gameComparisonIndex({handicap_index:14,course_handicap_source:"derived"},70,18),14,"recorded derived index unchanged");
+ok(gameComparisonIndex({handicap_index:null},70,18)===null,"no index/override means unavailable");
+ok(gameComparisonIndex({...rajat,slope:0},70,18)===null,"zero slope cannot be inverted");
+ok(gameComparisonIndex({...rajat,rating:null,handicap_index:14},70,18)===null,"manual without tee data does not borrow a different recorded index");
+ok(gameComparisonIndex(rajat,null,18)===null,"manual inverse needs saved par");
+ok(gameComparisonIndex({...rajat,course_handicap:Infinity},70,18)===null,"invalid override and no index is unavailable");
+near(gameComparisonIndex({...rajat,course_handicap:null,handicap_index:14},70,18),14,"cleared/missing manual value uses recorded index");
+for (const holes of [0,8,9,17]) ok(gameComparisonIndex(rajat,70,holes)===null, `${holes} holes does not invent an 18-hole comparison`);
+for (const manual of [-4,0,10,22,36]) for (const slope of [100,113,132,155]) {
+ const p={...rajat,course_handicap:manual,slope};const index=gameComparisonIndex(p,70,18)!;
+ near(index*slope/113+(72.3-70),manual,"inverse round-trip");
+ near(chBasis(p,70,18),manual,"comparison does not change scoring authority");
+}
+const pars=Array.from({length:18},(_,i)=>i<2?3:4);
+const holes=pars.map((par,i)=>({n:i+1,par,si:i+1}));
+const game={id:"synthetic-comparison",game_type:"stroke",course_par:70,holes_meta:holes,allowance_pct:100,stroke_basis:"net"} as never;
+const player=(id:string,name:string,extra:Record<string,unknown>)=>({id,user_id:id,display_name:name,no_show:false,scores:pars.map(p=>p+1),course_handicap:10,course_handicap_source:"derived",handicap_index:10,rating:70,slope:113,...extra});
+const players=[player("rajat","Rajat",rajat),player("pj","PJ",pj),...Array.from({length:6},(_,i)=>player(`p${i}`,i===0?"Amit":i===1?"Ankur":`P${i}`,{}))];
+const snapshot=JSON.stringify(players);
+const h=buildHighlights(game,players as never);
+const expected=fieldComparison(players.map((p,i)=>({name:p.display_name,userId:p.user_id,index:i===0?gameComparisonIndex(rajat,70,18)!:i===1?gameComparisonIndex(pj,70,18)!:10,differential:i===0?13.3:i===1?14.8:18})));
+ok(JSON.stringify(h.fieldRows)===JSON.stringify(expected),"entire field comparison uses manual equivalent indices");
+ok(h.standouts?.fieldGap===6.4,"synthetic field gap is 6.4, not the old null-as-zero 9.5");
+ok(h.fieldRows.find(r=>r.name==="Amit")?.better===-1.6,"Amit's comparison is recalculated with corrected field");
+ok(h.fieldRows.find(r=>r.name==="PJ")?.better===9.8,"PJ is compared using his manual handicap");
+ok(JSON.stringify(players)===snapshot,"player snapshots and profile index fields are not mutated");
+const unknown=player("missing","Missing",{handicap_index:null,course_handicap:null});
+const missing=buildHighlights(game,[...players.slice(0,7),unknown] as never);
+ok(missing.fieldRows.length===0,"7 usable indices plus missing data cannot manufacture an 8-player field");
+ok(missing.standouts?.basis==="own","existing under8 eligible-comparison rule remains");
+const absent=buildHighlights(game,[unknown] as never);
+ok(absent.standouts===null,"missing index has no invented own-handicap comparison");
+const zero=buildHighlights(game,[player("zero","Scratch",{handicap_index:0,course_handicap:0})] as never);
+ok(zero.standouts!==null,"real scratch remains comparison-eligible");
+const noRating=buildHighlights(game,[player("nullrating","No rating",{rating:null})] as never);
+ok(noRating.standouts===null,"missing rating is not treated as course rating0");
+const manual0=gameComparisonIndex({...rajat,course_handicap:0},70,18);
+near(manual0,-2.3*113/133,"manual zero inverse may be a plus equivalent index");
+const before=buildHighlights(game,players as never);
+const after=buildHighlights(game,players.map(p=>({...p,handicap_index:p.handicap_index??0})) as never);
+ok(JSON.stringify(before.topNet)===JSON.stringify(after.topNet)&&before.fieldNet===after.fieldNet,"manual override still controls net scores regardless of stored index0/null");
+const nine={...game as any,holes_meta:holes.slice(0,9)};
+ok(buildHighlights(nine,players as never).standouts===null,"nine-hole standout contract unchanged");
+const recap=buildRecap(game,players as never,[]);
+for (const mode of ["app","share"] as const) {
+ const t=renderScreen(React.createElement(RecapBody,{game,recap,mode}));
+ const text=t.el.textContent || "";
+ ok(text.includes("PJ")&&text.includes("9.8 better"), `${mode}: corrected comparison reaches rendered recap`);
+ if(mode==="app") ok(text.includes("6.4 over its handicaps"), "app: corrected field gap reaches explanatory line");
+ t.unmount();
+}
+ok(recapEmailHtml(recap).includes("9.8"), "new recap email contains corrected comparison");
+near(playingHandicapOf({course_par:70,allowance_pct:100,holes_meta:holes}, {...rajat,id:"r",display_name:"Rajat"}),10,"team playing handicap stays manual10");
+near(playingHandicapOf({course_par:70,allowance_pct:100,holes_meta:holes}, {...pj,id:"pj",display_name:"PJ"}),22,"team playing handicap stays manual22");
+report("game comparison handicap");

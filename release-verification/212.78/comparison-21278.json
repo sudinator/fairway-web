@@ -1,0 +1,94 @@
+{
+  "evidence": "EXECUTED on SYNTHETIC scores with reported manual inputs and assumed par70; NOT latest production game",
+  "before21277": {
+    "fieldGap": 9.5,
+    "fieldRows": [
+      {
+        "name": "Rajat",
+        "userId": "u0",
+        "better": -3.8
+      },
+      {
+        "name": "PJ",
+        "userId": "u1",
+        "better": -5.3
+      },
+      {
+        "name": "Amit",
+        "userId": "u2",
+        "better": 1.5
+      },
+      {
+        "name": "Ankur",
+        "userId": "u3",
+        "better": 1.5
+      },
+      {
+        "name": "P4",
+        "userId": "u4",
+        "better": 1.5
+      },
+      {
+        "name": "P5",
+        "userId": "u5",
+        "better": 1.5
+      },
+      {
+        "name": "P6",
+        "userId": "u6",
+        "better": 1.5
+      },
+      {
+        "name": "P7",
+        "userId": "u7",
+        "better": 1.5
+      }
+    ]
+  },
+  "after21278": {
+    "fieldGap": 6.4,
+    "fieldRows": [
+      {
+        "name": "Rajat",
+        "userId": "u0",
+        "better": -0.3
+      },
+      {
+        "name": "PJ",
+        "userId": "u1",
+        "better": 9.8
+      },
+      {
+        "name": "Amit",
+        "userId": "u2",
+        "better": -1.6
+      },
+      {
+        "name": "Ankur",
+        "userId": "u3",
+        "better": -1.6
+      },
+      {
+        "name": "P4",
+        "userId": "u4",
+        "better": -1.6
+      },
+      {
+        "name": "P5",
+        "userId": "u5",
+        "better": -1.6
+      },
+      {
+        "name": "P6",
+        "userId": "u6",
+        "better": -1.6
+      },
+      {
+        "name": "P7",
+        "userId": "u7",
+        "better": -1.6
+      }
+    ]
+  },
+  "netScoresUnchanged": true
+}

@@ -1,3 +1,14 @@
+## 212.78.261101 — manual-handicap comparison correction (candidate)
+
+- Fix recap/field comparisons reading missing Handicap Index as zero. An explicit zero remains valid.
+- A manual course handicap uses a game-specific equivalent index: `(manual CH - (saved rating - saved par)) * 113 / saved slope`. It takes precedence over a recorded index for this comparison only. This estimate is not written to profiles or used to replace the manual scoring handicap.
+- Without a numeric manual override, use the recorded game-row index. Without a usable comparison basis or saved rating/slope, omit that player's differential comparison. A manual override without enough tee/course data is unavailable rather than compared against a conflicting recorded index.
+- Keep existing 18-hole/full-card eligibility, field thresholds, adjusted-gross calculation, format scoring, net scores, team handicap totals and points rules. The 9-hole scoring/override rules remain unchanged; no new 9-hole standout conversion is introduced.
+- Shared highlight builder feeds app recap, share image, emails, club reports and admin Standout watch.
+- No database migration or stored-data rewrite. All 212.77 fixes remain present.
+- Regression examples use Rajat/PJ's reported CH/rating/slope with **assumed saved par70**; the scored cards in the regression are synthetic, not the latest production game. Latest game-specific totals still require saved game data.
+- See RELEASE_VERIFICATION_212.78.md. Candidate is not declared deployable until required checks pass.
+
 ## 212.77.261030 — agreed audit fixes (candidate; not deployment-ready)
 
 - Settlements require the caller to be an active member of the payment's club, preserving party/admin authorization and historical counterparties.

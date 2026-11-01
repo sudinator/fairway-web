@@ -1,15 +1,15 @@
 ## 206.2 — backlog
 
-## Agreed audit fixes — 212.77 candidate
+## Agreed audit fixes — 212.77 deployed (user confirmed November 1, 2026)
 
-Implemented in this candidate; deployment and remaining release gates are pending:
+User confirmed production 212.77. In-app manual handicap, organizer correction and settlements passed staging; manual name test was skipped and public-link testing deferred. The records below describe the shipped scope:
 
 - [ ] Target-club active membership required for settlement submissions; preserve legitimate historical counterparties and separate club/bucket balances.
 - [ ] Reject participant edits and complete clearing on ended games; preserve organizer corrections/resets and reset fencing.
 - [ ] Retain manual course-handicap authority in public game/Cup feeds and scoring adapters; clarify hole count and separate allowance.
 - [ ] Consolidate registered reporting identities by user ID and display current readable profile names; retain historical game names and existing published reports. Guests are never merged by name. Unavailable profiles retain the saved name; query failures stop generation.
 
-See RELEASE_VERIFICATION_212.77.md for executed evidence and blockers. Other review findings remain deferred.
+See RELEASE_VERIFICATION_212.77.md for the original candidate evidence; the user subsequently confirmed CI and production. Other review findings remain deferred.
 
 
 - **Choose which API changes to apply.** An approval takes only the changes the admin ticks (e.g. the new slope, not the provider's stroke indexes) and keeps every hand correction it does not touch; still bound to the reviewed revision of an unedited course.
@@ -1531,4 +1531,9 @@ Still open (lower priority, honestly assessed):
 
 ## 212.77 candidate — agreed audit follow-up
 
-Implemented in candidate only, not deployed: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. See RELEASE_VERIFICATION_212.77.md for gate status.
+212.77 is deployed per user confirmation on November 1, 2026: target-club settlement membership; ended-card clearing restriction; public manual-handicap source/notice; report identity/current readable profile names. Historical names and published reports are preserved. The user confirmed CI and staging tests, skipped manual name testing and deferred public-link testing. The original RELEASE_VERIFICATION_212.77.md records its earlier candidate evidence.
+
+
+## 212.78 candidate — missing-handicap comparison
+
+Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
