@@ -1,3 +1,4 @@
+<!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 <!-- 192.20: fresh-database failure cleanup captures server/container diagnostics before teardown and preserves the failing exit status; privilege assertions verify the actual test role. -->
 
 ## Primary scoring device (193.0)
@@ -337,3 +338,10 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+## Update safety (212.79)
+- A scoring session survives screen navigation for update protection. It ends only on confirmed completion/discard/delete; a timeout, offline response or missing row never proves completion.
+- Hide the update prompt and Settings activation during active scoring or pending edits. Guard controller-change reloads too.
+- All open windows must acknowledge readiness before worker activation; unknown/old/frozen windows veto. Do not add a forced timeout escape.
+- Every update path uses lib/update-safety; do not add an independent SKIP_WAITING/reload bypass.
+- Releases are delivered as FULL source ZIPs. Exclude dependencies, local environments, build caches and generated test output. File cleanup remains a separate approved change.

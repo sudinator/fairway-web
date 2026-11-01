@@ -1,3 +1,4 @@
+<!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 # Birdie Num Num (BNN) — Developer Handoff
 
 **Read this first.** It's the onboarding brief for continuing BNN development in a fresh chat with no
@@ -6,7 +7,7 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 212.78.261101 — NOT READY FOR DEPLOYMENT
+## Current candidate: 212.79.261101 — staging/GitHub verification pending
 
 212.77 is deployed per user confirmation. The new 212.78 candidate fixes missing/manual-handicap differential comparisons; no database migration. See RELEASE_VERIFICATION_212.78.md for executed local checks and outstanding game-specific/GitHub/staging verification. No production deployment of 212.78 has been performed.
 
@@ -1054,3 +1055,10 @@ Create Game is intentionally **lean**: Game → Players → Format → Review. D
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+## 212.79 update deferral handoff
+Source files: lib/update-safety.ts, lib/update-handshake.ts, components/update-safety.tsx, components/register-sw.tsx, components/app-update-checker.tsx, game room and personal editor lifecycle integrations, public/sw.js. No migration.
+The currently reviewed baseline is the locally available 212.77 source with the exact saved 212.78 candidate overlaid. Reconcile against the latest synchronized GitHub branches before committing; do not overwrite newer remote work.
+Existing older clients cannot answer the new worker handshake. During the first rollout the waiting worker refuses activation until those tabs/windows are closed. Close all BNN windows after completing/syncing, then reopen. Never close during entry merely to force an update.
+An unresolved draft, storage failure, offline/missing game read, or an unresponsive tab may keep updates deferred. No age-based deletion or forced activation is provided. Resume/finish/discard through the app; retain backups.
+See RELEASE_VERIFICATION_212.79.md for executed vs pending verification. User will wait for green GitHub CI before the production merge PR. Full source ZIP delivery is now required; no bloat cleanup in this release.

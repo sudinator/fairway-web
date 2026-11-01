@@ -1,4 +1,6 @@
 "use client";
+import { protectUpdateSession } from "@/lib/update-safety";
+import { useScoringUpdateProtection } from "@/components/update-safety";
 import { trace } from "@/lib/save-trace";
 import { SaveTraceView, useSaveTraceOn } from "@/components/save-trace-view";
 import { scrambleFinishGaps } from "@/lib/scramble-game";
@@ -2432,6 +2434,7 @@ function GameRoom({
   // Pending = holes saved on this phone but not yet confirmed on the server.
   const [pendingHoles, setPendingHoles] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  useScoringUpdateProtection("game", gameId, !game || game.status !== "ended" || pendingHoles > 0 || syncState === "saving" || syncState === "retry" || syncState === "error" || savingHole != null || syncing);
   const countPending = React.useCallback(() => {
     let total = 0;
     for (const pl of playersRef.current) {
@@ -3735,6 +3738,7 @@ function GameRoom({
     // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
     // or active-game pointer that could resurface or boot straight back into it.
     clearAllGameScores(game.id); clearMemBackups();
+    protectUpdateSession("game", game.id, false);
     clearActiveGame();
     onBack();
   };

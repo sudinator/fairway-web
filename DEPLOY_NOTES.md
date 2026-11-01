@@ -1,3 +1,13 @@
+## 212.79.261101 — defer app updates during scoring (candidate)
+
+- Active game/personal-round sessions hide update controls and defer update-driven reloads, including after navigation away.
+- Pending score/stat/deletion outboxes and failed local storage prevent updates after the game ends. No database or scoring-rule change.
+- Worker activation requires acknowledgements from every open window. Unknown/legacy/frozen tabs veto; no timeout may be interpreted as completion.
+- Settings uses the same policy. Deferred controller-change reload runs only after protection clears.
+- First rollout: already-open older clients lack the responder, so close all BNN tabs/windows after finishing and syncing, then reopen to install. No forced update during play.
+- Full source ZIPs from this release; obsolete-file cleanup is deferred.
+- Verification and outstanding staging/GitHub checks: RELEASE_VERIFICATION_212.79.md.
+
 ## 212.78.261101 — manual-handicap comparison correction (candidate)
 
 - Fix recap/field comparisons reading missing Handicap Index as zero. An explicit zero remains valid.

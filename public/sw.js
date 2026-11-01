@@ -4,7 +4,7 @@
 // bypass the worker. App-shell requests are cache-first for the lifetime of the active
 // worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "212.78.261101";
+const SW_VERSION = "212.79.261101";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -22,9 +22,29 @@ self.addEventListener("install", (event) => {
   })());
 });
 
-// The page tells a waiting worker to activate now — fired only after the user taps Update.
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
+// Every open window must explicitly acknowledge that scoring is safe. A frozen,
+// old or unreachable window is NOT consent. No heartbeat expiry can end a round.
+let updateAttempt = null;
+async function safeActivation() {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const requestId = crypto.randomUUID();
+  const ready = await Promise.all(windows.map(client => new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 4000);
+    channel.port1.onmessage = event => { clearTimeout(timer); channel.port1.close(); resolve(event.data?.ready === true); };
+    try { client.postMessage({ kind: "bnn-update-check", requestId }, [channel.port2]); }
+    catch { clearTimeout(timer); channel.port1.close(); resolve(false); }
+  })));
+  // Recheck membership: a new tab may have opened while acknowledgements arrived.
+  const now = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const sameWindows = now.length === windows.length && now.every(c => windows.some(w => w.id === c.id));
+  if (ready.every(Boolean) && sameWindows) await self.skipWaiting();
+  else windows.forEach(client => { try { client.postMessage({ kind: "bnn-update-release", requestId }); } catch {} });
+}
+self.addEventListener("message", event => {
+  if (event.data !== "SKIP_WAITING") return;
+  if (!updateAttempt) updateAttempt = safeActivation().finally(() => { updateAttempt = null; });
+  event.waitUntil(updateAttempt);
 });
 
 self.addEventListener("activate", (event) => {

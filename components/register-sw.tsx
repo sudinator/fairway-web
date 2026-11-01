@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APP_VERSION } from "@/lib/app-version";
 import { C } from "@/lib/golf";
+import { useUpdatesBlocked, useUpdateInputLock } from "@/components/update-safety";
+import { updatesBlocked, holdUpdateInput, releaseUpdateInput, reconcileUpdateGames } from "@/lib/update-safety";
+import { updateHandshake } from "@/lib/update-handshake";
+import { createClient } from "@/lib/supabase";
 
 // Registers the service worker AND handles updates.
 //
@@ -12,6 +16,9 @@ import { C } from "@/lib/golf";
 //   1. a waiting service worker
 //   2. /app-version.json, which is generated fresh during every build
 export function RegisterSW() {
+  const blocked = useUpdatesBlocked();
+  useUpdateInputLock();
+  const pendingReload = useRef(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [versionUpdate, setVersionUpdate] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -19,7 +26,7 @@ export function RegisterSW() {
 
   // Version numbers are the release contract. A waiting worker by itself is not
   // user-visible because Vercel/rebuilds can produce a worker with the same app version.
-  const hasUpdate = versionUpdate;
+  const hasUpdate = versionUpdate && !blocked;
 
   const checkAppVersion = useCallback(async () => {
     if (typeof window === "undefined") return false;
@@ -46,7 +53,18 @@ export function RegisterSW() {
     let interval: ReturnType<typeof setInterval> | null = null;
     let started = false;
 
+    let reconciling = false;
+    const reconcile = async () => {
+      if (reconciling) return;
+      reconciling = true;
+      try { await reconcileUpdateGames(async id => {
+        // bounded: one tracked game by primary key; a failed read retains protection.
+        const { data, error } = await createClient().from("games").select("status").eq("id", id).maybeSingle();
+        return error ? null : data ? { status: data.status } : { missing: true };
+      }); } finally { reconciling = false; }
+    };
     const runChecks = () => {
+      void reconcile();
       reg?.update().catch(() => {});
       checkAppVersion();
     };
@@ -90,9 +108,11 @@ export function RegisterSW() {
     const onControllerChange = () => {
       if (reloaded) return;
       reloaded = true;
+      if (updatesBlocked()) { pendingReload.current = true; return; }
       window.location.reload();
     };
 
+    const safetyTimer = window.setInterval(() => { void reconcile(); }, 15000);
     window.addEventListener("load", start);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onPageShow);
@@ -102,7 +122,9 @@ export function RegisterSW() {
     }
     // When a push notification is clicked and an existing tab is focused, the SW asks
     // the page to route to the notification's deep link.
+    const handshake = updateHandshake();
     const onSwMessage = (e: MessageEvent) => {
+      handshake.receive(e);
       if (e.data && e.data.kind === "notif-nav" && typeof e.data.link === "string") {
         try {
           const url = new URL(e.data.link, window.location.origin);
@@ -126,11 +148,17 @@ export function RegisterSW() {
         navigator.serviceWorker.removeEventListener("message", onSwMessage);
       }
       if (interval) clearInterval(interval);
+      clearInterval(safetyTimer);
+      handshake.dispose();
     };
   }, [checkAppVersion]);
 
+  useEffect(() => {
+    if (!blocked && pendingReload.current && !updatesBlocked()) { pendingReload.current = false; window.location.reload(); }
+  }, [blocked]);
+
   const applyUpdate = async () => {
-    if (!versionUpdate || applying) return;
+    if (!versionUpdate || applying || updatesBlocked()) return;
     setApplying(true);
     try {
       let reg = regRef.current;
@@ -148,6 +176,7 @@ export function RegisterSW() {
           worker = reg.waiting;
         }
         if (worker) {
+          if (updatesBlocked()) return;
           worker.postMessage("SKIP_WAITING");
           setWaiting(null);
           return;
@@ -156,11 +185,13 @@ export function RegisterSW() {
 
       // Explicit user action fallback: a cache-busting navigation is allowed only
       // after Update is tapped, so an old controlling worker can fetch the new shell.
+      if (updatesBlocked()) return;
+      holdUpdateInput();
       const url = new URL(window.location.href);
       url.searchParams.set("refresh", Date.now().toString());
       window.location.replace(url.toString());
     } finally {
-      setTimeout(() => setApplying(false), 6000);
+      setTimeout(() => { setApplying(false); releaseUpdateInput(); }, 6000);
     }
   };
 

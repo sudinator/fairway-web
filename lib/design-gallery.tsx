@@ -1,3 +1,4 @@
+import { UpdateChecker } from "@/components/app-update-checker";
 /**
  * 212.16 — DESIGN GALLERY (owner, Oct 22: "these are basic design choices that you should be proactively looking to
  * implement"). Renders the screens built recently with realistic sample data to HTML, one file per screen, for
@@ -66,6 +67,7 @@ const shots: Record<string, string> = {};
 const add = (name: string, node: React.ReactElement, light = false) => { shots[name] = page(renderToStaticMarkup(node), light); };
 
 // setup
+add("update-paused-during-round", <UpdateChecker />);
 add("01-teams-usga", <ScrambleTeamsBuilder game={field({ foursomes: [{ id: "t1", name: "Team 1", a: ["u0", "u1", "u2", "u3"], b: [] }, { id: "t2", name: "Team 2", a: ["u4", "u5", "u6"], b: [] }] })} players={players()} readOnly={false} onSave={noop} />);
 add("02-teams-captains-agreed", <ScrambleTeamsBuilder game={field({ scramble_team_size: 1, scramble_handicap: "agreed", foursomes: [0, 1, 2, 3].map((t) => ({ id: `c${t}`, name: `Team ${t + 1}`, a: [`u${t}`], b: [], ...(t < 2 ? { a_hcp: 6 + t * 3 } : {}) })) })} players={players().slice(0, 5)} readOnly={false} onSave={noop} />);
 add("03-format-settings", <ScrambleSettings game={field({ scramble_allowance: { "4": [30, 20, 15, 10] } })} locked={false} onSave={noop} />);
