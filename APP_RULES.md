@@ -1,3 +1,4 @@
+<!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
 <!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
 <!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
 <!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->

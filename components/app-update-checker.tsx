@@ -7,6 +7,8 @@ import { useUpdateBlockers } from "@/components/update-safety";
 import { useAppUpdate, UpdateBlockerList, visibleUpdateBlockers } from "@/components/app-update-status";
 import { applyAppUpdate, checkForUpdate } from "@/lib/app-update";
 
+import { SavedScoreReview } from "@/components/saved-score-review";
+
 export function UpdateChecker() {
   const local = useUpdateBlockers(), update = useAppUpdate();
   const blockers = visibleUpdateBlockers(update.blockers, local);
@@ -17,8 +19,10 @@ export function UpdateChecker() {
     <div style={{ color: C.cream, fontSize: 13, marginTop: 12 }}>Current version: <b>{APP_VERSION}</b></div>
     <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>Latest version: {update.latest || "Not checked yet"}</div>
     {update.message && <div role="status" aria-live="polite" style={{ color: C.cream, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>{update.message}</div>}
-    {blockers.length > 0 && <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, marginTop: 12 }}>Updates are paused — what needs attention</div>}
-    <div style={{ marginTop: 12 }}><UpdateBlockerList blockers={blockers} /></div>
+    {update.latest === APP_VERSION && <div role="status" style={{ color: C.cream, marginTop: 12 }}>You’re up to date.</div>}
+    {blockers.length > 0 && <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, marginTop: 12 }}>{isNewer ? "Updates are paused — what needs attention" : "Saved scoring needs attention"}</div>}
+    <SavedScoreReview />
+    {blockers.length > 0 && <details style={{ marginTop: 16, color: C.cream, fontSize: 13 }}><summary>All scoring protections ({blockers.length})</summary><div style={{ marginTop: 12 }}><UpdateBlockerList blockers={blockers} /></div></details>}
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
       <button style={btn(false)} disabled={busy} onClick={() => { window.dispatchEvent(new Event("bnn-check-update-status")); void checkForUpdate(true); }}>{busy ? "Checking…" : "Check again"}</button>
       {isNewer && local.length === 0 && <button style={btn(true)} disabled={busy} onClick={() => { void applyAppUpdate(); }}>{update.phase === "preparing" || update.phase === "reloading" ? "Updating…" : `Update to ${update.latest}`}</button>}

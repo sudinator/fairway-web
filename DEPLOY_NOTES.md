@@ -1,3 +1,11 @@
+## 212.82.261101 — verify saved scores and resolve update warnings (candidate)
+
+- Home/start/focus/update checks verify pending player-score backups against authenticated, RLS-protected Supabase reads; up to four checks concurrently, bounded reads, no automatic uploads.
+- Matching current-version scorecards refresh their local sync confirmation; real differences, missing/hidden rows, offline failures, malformed data and reset versions remain protected.
+- Settings shows current-version success independently of pending scoring. Verify saved scores shows per-field scheduled-position differences and identifies player/game.
+- Explicit completed-game Use database version re-reads both sides, requires the same review, no mounted editor and only one service-worker window; archives the old scores before replacing the local backup. No database writes. Recovery copies can be downloaded; export before sign-out/site-data clearing. Active games cannot use this path.
+- No database migration. Full codebase ZIP. Run staging integration and GitHub CI, then check the actual iPhone flow; local evidence in RELEASE_VERIFICATION_212.82.md.
+
 ## 212.81.261101 — validate recap stats from saved scorecards (candidate)
 
 - Fairways use canonical hit/miss/left/right values, require a valid entry on each scheduled par-4/5 and preserve explicit all-miss zero. Fixes false 0-of-14 tie in game 947286.

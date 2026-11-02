@@ -9,6 +9,7 @@ import { applyAppUpdate, checkForUpdate, dismissUpdate, restoreUpdateResult, rep
 import { useUpdatesBlocked, useUpdateInputLock, useUpdateBlockers } from "@/components/update-safety";
 import { updatesBlocked, reconcileUpdateGames, rememberUpdateGame } from "@/lib/update-safety";
 import { updateHandshake } from "@/lib/update-handshake";
+import { verifySavedScoresFromServer } from "@/lib/verify-saved-scores-server";
 import { createClient } from "@/lib/supabase";
 
 // Registers the service worker AND handles updates.
@@ -58,6 +59,7 @@ export function RegisterSW() {
     };
     const runChecks = () => {
       void reconcile();
+      void verifySavedScoresFromServer();
       reg?.update().catch(() => {});
       checkAppVersion();
     };

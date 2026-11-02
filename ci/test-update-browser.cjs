@@ -14,6 +14,7 @@ function bundle(name) {
   }
 }
 bundle('lib/update-handshake');
+bundle('lib/saved-score-verification');
 let version = '212.79.261101';
 const worker = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
 const definitions = Object.entries(modules).map(([id, body]) => `${JSON.stringify(id)}:function(require,module,exports){${body}\n}`).join(',');
@@ -77,7 +78,19 @@ async function main() {
     await a.waitForFunction(async () => (await caches.keys()).includes('bnn-shell-212.80.261101') && !(await navigator.serviceWorker.getRegistration()).waiting);
     await a.waitForFunction(n => window.changes > n, changes);
     assert.equal(await a.evaluate(() => localStorage.getItem('score-proof')), '5,4,3', 'successful activation preserves scores');
-    console.log('safe update browser: PASS (two releases, two tabs, active-round veto, legacy timeout, safe activation, scores preserved)');
+    // Actual recovery policy + actual worker: another window must veto a local replacement.
+    await a.evaluate(async () => {
+      window.verification = load('lib/saved-score-verification');
+      window.testRemote = { row: { scores: [4, 5], putts: [], fairways: [], penalties: [], sand: [] }, game: { status: 'ended', scoring_version: 0, code: 'TST05' } };
+      localStorage.setItem('bnn_device_scores:u:old:bnn_game_scores_g_p', JSON.stringify({ ...window.testRemote.row, scores: [4, 6] }));
+      await window.verification.verifySavedScores(async () => window.testRemote);
+    });
+    assert.equal(await a.evaluate(async () => window.verification.keepDatabaseScores(window.verification.savedScoreState().reviews[0], async () => window.testRemote)), false, 'another real browser window vetoes saved-score replacement');
+    await b.close();
+    assert.equal(await a.evaluate(async () => window.verification.keepDatabaseScores(window.verification.savedScoreState().reviews[0], async () => window.testRemote)), true, 'single real window can explicitly keep verified database scores');
+    assert.equal(await a.evaluate(() => JSON.parse(window.verification.recoveryCopies()[0].data).backup.scores[1]), 6, 'real browser recovery retains original differing score');
+    assert.equal(await a.evaluate(() => window.safety.pendingUpdateScores(localStorage)), false, 'resolved score copy no longer blocks in actual browser');
+    console.log('safe update browser: PASS (two releases, two tabs, active-round veto, legacy timeout, safe activation, scores preserved, guarded recovery)');
     await context.close();
   } finally { await browser.close(); }
 }

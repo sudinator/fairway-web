@@ -13,6 +13,8 @@ let bootChecked = false;
 let applying = false;
 const mounted = new Set<string>();
 const listeners = new Set<() => void>();
+export function scoringEditorOpen() { return mounted.size > 0; }
+export function emitSavedScoreVerification() { emit(); }
 export function subscribeUpdateSafety(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 function emit() { listeners.forEach(fn => fn()); if (typeof window !== "undefined") window.dispatchEvent(new Event(UPDATE_EVENT)); }
 export function updateSessions(): Record<string, Session> {

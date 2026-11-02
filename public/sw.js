@@ -4,7 +4,7 @@
 // bypass the worker. App-shell requests are cache-first for the lifetime of the active
 // worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "212.81.261101";
+const SW_VERSION = "212.82.261101";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -45,6 +45,12 @@ async function safeActivation() {
   return { kind: "bnn-update-result", accepted: false, blockers, message: "Update paused. Another open BNN tab needs attention; your scores have not been changed." };
 }
 self.addEventListener("message", event => {
+  if (event.data?.kind === "bnn-score-review-alone") {
+    event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(windows => {
+      event.ports[0]?.postMessage({ alone: windows.length === 1 && windows[0].id === event.source?.id });
+    }));
+    return;
+  }
   if (event.data !== "SKIP_WAITING") return;
   if (!updateAttempt) updateAttempt = safeActivation().finally(() => { updateAttempt = null; });
   event.waitUntil(updateAttempt.then(result => { if (event.ports[0]) event.ports[0].postMessage(result); }).catch(() => { if (event.ports[0]) event.ports[0].postMessage({ kind: "bnn-update-result", accepted: false, message: "The update check failed. Keep your saved scores and try again when connected." }); }));

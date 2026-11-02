@@ -126,6 +126,7 @@
     "lib/game-comparison-handicap.test.ts",
     "lib/update-safety.test.tsx",
     "lib/app-update.test.tsx",
-    "lib/recap-stat-contract.test.tsx"
+    "lib/recap-stat-contract.test.tsx",
+    "lib/saved-score-verification.test.tsx"
   ]
 }

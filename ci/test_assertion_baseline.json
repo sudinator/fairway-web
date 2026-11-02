@@ -1,5 +1,5 @@
 {
-  "total": 440445,
+  "total": 440480,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -10,6 +10,7 @@
     "alt shot scoring": 30,
     "alt shot side score model": 5006,
     "alt shot simulation": 181751,
+    "app update feedback": 38,
     "badges": 75,
     "bucket-model": 34,
     "card": 11,
@@ -68,8 +69,10 @@
     "personal bests": 16,
     "player-scoring": 71,
     "recap additions": 46,
+    "recap stat contract": 59,
     "round stat completeness": 8,
     "save trace toggle": 3,
+    "saved score verification": 35,
     "scoring matrix": 3698,
     "scramble groups": 25,
     "scramble no-shows": 16,
@@ -96,8 +99,6 @@
     "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20,
-    "update safety": 38,
-    "app update feedback": 38,
-    "recap stat contract": 59
+    "update safety": 38
   }
 }
