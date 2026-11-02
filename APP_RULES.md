@@ -1,3 +1,4 @@
+<!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
 <!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
 <!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
@@ -326,7 +327,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 ## Public routes (share links) and scrolling (standing rule, 201.3)
 
-- Public share routes are **bypassed by the service worker** (`shouldBypass()` in `public/sw.js`): the worker is cache-first and only the installed app can tap Update, so a cached public page is pinned in Safari for every visitor. They also carry **server-side metadata** (`layout.tsx` + `generateMetadata`) so chat previews name the game, and show `APP_VERSION` in the footer.
+- Public share routes are **bypassed by the service worker** (`shouldBypass()` in `public/sw.js`): public reports must use current server responses rather than a cached app shell. They also carry **server-side metadata** (`layout.tsx` + `generateMetadata`) so chat previews name the game, and show `APP_VERSION` in the footer.
 - `html`/`body` are locked (`overflow: hidden`, `body { position: fixed }`) for iOS bounce prevention. Any page rendered outside `.app-shell` — `/live`, `/lineup`, any future share link — must own its scroll container: `className="live-scroll"` (position fixed, inset 0, overflow-y auto). Without it the page does not scroll and taps below the fold hit nothing. `ci/check_public_routes_scroll.py` enforces it.
 
 ## Lessons become guards (standing rule, 201.4)
@@ -343,18 +344,14 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
 
-## Update safety (212.79)
-- A scoring session survives screen navigation for update protection. It ends only on confirmed completion/discard/delete; a timeout, offline response or missing row never proves completion.
-- Hide the update prompt and Settings activation during active scoring or pending edits. Guard controller-change reloads too.
-- All open windows must acknowledge readiness before worker activation; unknown/old/frozen windows veto. Do not add a forced timeout escape.
-- Every update path uses lib/update-safety; do not add an independent SKIP_WAITING/reload bypass.
-- Releases are delivered as FULL source ZIPs. Exclude dependencies, local environments, build caches and generated test output. File cleanup remains a separate approved change.
-
-## Update feedback (212.80)
-- Activation must return a result; never silently reset Updating on a fixed timer.
-- Success requires the installed version to match the requested target after reload. Worker acceptance alone is not success.
-- All update entry points use lib/app-update and lib/update-safety. Diagnostics name known games/rounds and preserve every score/draft.
-- Dismiss is a per-release display preference only. It must not clear blockers, drafts or recovery data; Settings stays accessible.
+## Automatic app updates (212.84 — supersedes212.79–212.83 update deferral)
+- Install workers automatically. A successful fresh navigation uses current network HTML; a complete cached shell is the offline fallback.
+- No manual Update action, unfinished-round gate, pending-score checklist or readiness veto from another window.
+- Do not force-reload an open scoring document on deployment, controller changes, focus or a visibility change. The new code loads on a fresh open/refresh. Returning to a suspended document keeps it running.
+- Preserve local drafts, score outboxes, watermarks and recovery archives. Updating never clears or uploads scores. Keep single-primary-device and database write guards unchanged.
+- Warm initial scripts/styles before committing an offline HTML shell. Cache-write errors must not block successful online navigation. Retain older assets while another/older document may need them; prune only from a sole current-version document with a complete cached shell.
+- Public share/API/auth/version requests bypass the offline cache.
+- Deliver FULL source ZIPs. Require local lifecycle/real-browser upgrade/offline checks, GitHub CI and staging integration before production.
 
 ## Saved recap stats (212.81)
 - Game fairways are hit/miss/left/right strings, never Boolean flags. Missing/invalid stats are unavailable; recorded zero putts or all misses remain valid.

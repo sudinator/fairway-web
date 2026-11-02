@@ -1,5 +1,5 @@
 {
-  "total": 440505,
+  "total": 440483,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -10,7 +10,7 @@
     "alt shot scoring": 30,
     "alt shot side score model": 5006,
     "alt shot simulation": 181751,
-    "app update feedback": 38,
+    "automatic update status": 16,
     "badges": 75,
     "bucket-model": 34,
     "card": 11,

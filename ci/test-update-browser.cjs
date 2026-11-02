@@ -1,97 +1,27 @@
-// Real Chromium, actual worker + actual page policy/responder, two release versions.
-const fs = require('fs'), path = require('path'), http = require('http'), ts = require('typescript');
-const { chromium } = require('playwright');
-const assert = require('node:assert/strict');
-const root = path.resolve(__dirname, '..');
-const modules = {};
-function bundle(name) {
-  if (modules[name]) return;
-  const source = ts.transpileModule(fs.readFileSync(path.join(root, name + '.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  modules[name] = source;
-  for (const m of source.matchAll(/require\("([^"]+)"\)/g)) {
-    assert.ok(m[1].startsWith('.'), 'policy bundle has no substituted dependencies');
-    bundle(path.posix.normalize(path.posix.join(path.posix.dirname(name), m[1])));
-  }
-}
-bundle('lib/update-handshake');
-bundle('lib/saved-score-verification');
-let version = '212.79.261101';
-const worker = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
-const definitions = Object.entries(modules).map(([id, body]) => `${JSON.stringify(id)}:function(require,module,exports){${body}\n}`).join(',');
-const client = `const modules={${definitions}},cache={};function load(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](p=>load(id.slice(0,id.lastIndexOf('/')+1)+p.replace('./','')),m,m.exports);return m.exports;}
-window.safety=load('lib/update-safety');load('lib/scoring-device').markScoringDeviceRevoked();
-const responder=load('lib/update-handshake').updateHandshake();navigator.serviceWorker.addEventListener('message',responder.receive);
-window.changes=0;navigator.serviceWorker.addEventListener('controllerchange',()=>window.changes++);window.safety.reconcileUpdateGames(async()=>null).then(()=>window.ready=true);`;
-const server = http.createServer((req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  if (req.url.startsWith('/sw.js')) { res.setHeader('Content-Type', 'application/javascript'); res.end(worker.replace(/const SW_VERSION = "[^"]+";/, `const SW_VERSION = "${version}";`)); }
-  else if (req.url.startsWith('/client.js')) { res.setHeader('Content-Type', 'application/javascript'); res.end(client); }
-  else if (req.url.startsWith('/legacy')) { res.setHeader('Content-Type', 'text/html'); res.end('<title>Legacy tab</title>'); }
-  else { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Actual update policy integration</title><script src="/client.js"></script>'); }
-});
-async function main() {
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${server.address().port}`;
-  const provisioned = fs.existsSync('/opt/pw-browsers') ? fs.readdirSync('/opt/pw-browsers').filter(x => x.startsWith('chromium_headless_shell')).map(x => path.join('/opt/pw-browsers', x, 'chrome-linux/headless_shell'))[0] : undefined;
-  const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM || provisioned, args: ['--no-sandbox'] });
-  try {
-    const context = await browser.newContext();
-    const a = await context.newPage(), b = await context.newPage();
-    await a.goto(url); await a.waitForFunction(() => window.ready);
-    await a.evaluate(async () => { await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready; });
-    await a.waitForFunction(() => !!navigator.serviceWorker.controller);
-    await b.goto(url); await b.waitForFunction(() => window.ready);
-    await a.evaluate(() => { localStorage.setItem('score-proof', '5,4,3'); window.safety.protectUpdateSession('game', 'live', true); });
-    const changes = await a.evaluate(() => window.changes);
-    version = '212.80.261101';
-    await b.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
-    const askUpdate = () => b.evaluate(async () => {
-      for (let n = 0; n < 200; n++) {
-        const r = await navigator.serviceWorker.getRegistration();
-        if (r?.waiting?.state === 'installed') {
-          return await new Promise(resolve => { const ch = new MessageChannel(); const timer = setTimeout(() => resolve({ accepted: false, timedOut: true }), 6500); ch.port1.onmessage = e => { clearTimeout(timer); ch.port1.close(); resolve(e.data); }; r.waiting.postMessage('SKIP_WAITING', [ch.port2]); });
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-      throw new Error('No installed waiting worker');
-    });
-    const veto = await askUpdate();
-    assert.equal(veto.accepted, false, "active scoring refusal is returned to requester");
-    assert.ok(veto.blockers.length > 0, "active refusal carries actionable blocker details");
-    await b.waitForFunction(() => !window.safety.updateInProgress());
-    await new Promise(resolve => setTimeout(resolve, 300));
-    assert.ok(await b.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting), 'active round veto leaves new release waiting');
-    assert.equal(await a.evaluate(() => window.changes), changes, 'scoring tab controller unchanged');
-    assert.equal(await a.evaluate(() => localStorage.getItem('score-proof')), '5,4,3', 'score backup untouched');
-    await a.evaluate(() => window.safety.protectUpdateSession('game', 'live', false));
-    // A nonresponding/legacy tab must veto by timeout, never be assumed safe.
-    const legacy = await context.newPage(); await legacy.goto(url + '/legacy');
-    const legacyResult = await askUpdate();
-    assert.equal(legacyResult.accepted, false, "legacy tab returns explicit refusal");
-    assert.ok(legacyResult.blockers.some(item => item.title.includes("did not respond")), "legacy refusal names nonresponding tab");
-    await new Promise(resolve => setTimeout(resolve, 4400));
-    assert.ok(await b.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting), 'unresponsive tab prevents activation');
-    assert.equal(await b.evaluate(() => window.safety.updateInProgress()), false, 'timeout releases other tabs input');
-    await legacy.close();
-    const accepted = await askUpdate();
-    assert.equal(accepted.accepted, true, "safe activation returns explicit acceptance");
-    await a.waitForFunction(async () => (await caches.keys()).includes('bnn-shell-212.80.261101') && !(await navigator.serviceWorker.getRegistration()).waiting);
-    await a.waitForFunction(n => window.changes > n, changes);
-    assert.equal(await a.evaluate(() => localStorage.getItem('score-proof')), '5,4,3', 'successful activation preserves scores');
-    // Actual recovery policy + actual worker: another window must veto a local replacement.
-    await a.evaluate(async () => {
-      window.verification = load('lib/saved-score-verification');
-      window.testRemote = { row: { scores: [4, 5], putts: [], fairways: [], penalties: [], sand: [] }, game: { status: 'ended', scoring_version: 0, code: 'TST05' } };
-      localStorage.setItem('bnn_device_scores:u:old:bnn_game_scores_g_p', JSON.stringify({ ...window.testRemote.row, scores: [4, 6] }));
-      await window.verification.verifySavedScores(async () => window.testRemote);
-    });
-    assert.equal(await a.evaluate(async () => window.verification.keepDatabaseScores(window.verification.savedScoreState().reviews[0], async () => window.testRemote)), false, 'another real browser window vetoes saved-score replacement');
-    await b.close();
-    assert.equal(await a.evaluate(async () => window.verification.keepDatabaseScores(window.verification.savedScoreState().reviews[0], async () => window.testRemote)), true, 'single real window can explicitly keep verified database scores');
-    assert.equal(await a.evaluate(() => JSON.parse(window.verification.recoveryCopies()[0].data).backup.scores[1]), 6, 'real browser recovery retains original differing score');
-    assert.equal(await a.evaluate(() => window.safety.pendingUpdateScores(localStorage)), false, 'resolved score copy no longer blocks in actual browser');
-    console.log('safe update browser: PASS (two releases, two tabs, active-round veto, legacy timeout, safe activation, scores preserved, guarded recovery)');
-    await context.close();
-  } finally { await browser.close(); }
-}
-main().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => server.close());
+// Actual old/new workers and new registration policy in Chromium. Fixture HTML,
+// local score drafts and simulated server responses; no live staging database.
+const fs=require('fs'),path=require('path'),http=require('http'),ts=require('typescript'),assert=require('node:assert/strict');
+const {chromium}=require('playwright'),root=path.resolve(__dirname,'..'),modules={};
+function bundle(name){if(modules[name])return;const body=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;modules[name]=body;for(const m of body.matchAll(/require\("([^"]+)"\)/g)){assert.ok(m[1].startsWith('.'));bundle(path.posix.normalize(path.posix.join(path.posix.dirname(name),m[1])));}}
+bundle('lib/automatic-updates');
+bundle('lib/update-safety');
+const defs=Object.entries(modules).map(([n,s])=>`${JSON.stringify(n)}:function(require,module,exports){${s}\n}`).join(',');
+const newWorker=fs.readFileSync(path.join(root,'public/sw.js'),'utf8'),oldWorker=fs.readFileSync(path.join(root,'ci/fixtures/sw-manual-21283.js'),'utf8');
+let version='212.83.261101',calls=0;
+function client(v){return `const modules={${defs.replaceAll('212.84.261101',v)}},cache={};function load(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](p=>load(id.slice(0,id.lastIndexOf('/')+1)+p.replace('./','')),m,m.exports);return m.exports;}window.legacySafety=load('lib/update-safety');window.ready=true;window.loadedVersion=${JSON.stringify(v)};${v==='212.83.261101'?'':"window.stopUpdates=load('lib/automatic-updates').registerAutomaticUpdates();"}`;}
+const server=http.createServer((req,res)=>{res.setHeader('Cache-Control','no-store');if(req.url.startsWith('/sw.js')){res.setHeader('Content-Type','application/javascript');res.end(version==='212.83.261101'?oldWorker:newWorker.replace(/const SW_VERSION = "[^"]+";/,`const SW_VERSION = "${version}";`));}else if(req.url.startsWith('/client-')){res.setHeader('Content-Type','application/javascript');res.end(client(req.url.slice('/client-'.length).split('.js')[0]));}else if(req.url.startsWith('/api/')){res.end(String(++calls));}else if(req.url.startsWith('/app-version.json')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version}));}else if(req.url.startsWith('/legacy'))res.end('<title>Legacy sleeping window</title>');else{res.setHeader('Content-Type','text/html');res.end(`<title>BNN ${version}</title><input id="score"><script src="/client-${version}.js"></script>`);}});
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const url=`http://127.0.0.1:${server.address().port}`;const provisioned=fs.readdirSync('/opt/pw-browsers').filter(x=>x.startsWith('chromium_headless_shell')).map(x=>path.join('/opt/pw-browsers',x,'chrome-linux/headless_shell')).find(x=>fs.existsSync(x));const b=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM||provisioned,args:['--no-sandbox']});try{
+ const ctx=await b.newContext(),a=await ctx.newPage();await a.goto(url);await a.waitForFunction(()=>window.ready);await a.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready;});await a.waitForFunction(()=>!!navigator.serviceWorker.controller);await a.waitForTimeout(100);
+ const other=await ctx.newPage();await other.goto(url);await other.waitForFunction(()=>window.ready);const legacy=await ctx.newPage();await legacy.goto(url+'/legacy');
+ const scores={'bnn_update_sessions_v1:round:missing':'{"kind":"round","id":"missing"}','bnn_round_draft_v1':'{"round":{"id":"r","status":"in_progress","holes":[{"strokes":5}]}}','bnn_device_scores:u:old:bnn_game_scores_g_p':'{"scores":[5,6],"putts":[2,3]}','bnn:altshot-side-drafts:g':'[{"strokes":4}]','bnn_verified_score_recovery:test':'{"backup":{"scores":[7]}}'};
+ await a.evaluate(async data=>{for(const[k,v]of Object.entries(data))localStorage.setItem(k,v);await window.legacySafety.reconcileUpdateGames(async()=>({status:'active'}));document.querySelector('#score').value='unsaved typing';window.oldController=navigator.serviceWorker.controller;window.controllerEvents=0;navigator.serviceWorker.addEventListener('controllerchange',()=>{window.controllerEvents++;if(window.legacySafety.updatesBlocked()){window.deferred=true;return;}location.reload();});},scores);
+ version='212.84.261101';await a.evaluate(async()=>{await(await navigator.serviceWorker.getRegistration()).update();});
+ await a.waitForFunction(async()=>(await navigator.serviceWorker.getRegistration()).active!==window.oldController && (await navigator.serviceWorker.getRegistration()).active?.state==='activated');
+ await a.waitForFunction(()=>window.deferred===true);assert.equal(await a.evaluate(()=>window.loadedVersion),'212.83.261101','old open window is not restarted');assert.equal(await a.evaluate(()=>window.deferred),true,'old scoring gate defers the one-time legacy controller transition');assert.equal(await a.inputValue('#score'),'unsaved typing','active input is uninterrupted');assert.equal(await a.evaluate(()=>navigator.serviceWorker.controller!==window.oldController),true,'worker activates without a manual update even with legacy pending data');
+ await ctx.setOffline(true);await a.reload();await a.waitForFunction(()=>window.loadedVersion==='212.84.261101');await ctx.setOffline(false);assert.deepEqual(await a.evaluate(keys=>Object.fromEntries(keys.map(k=>[k,localStorage.getItem(k)])),Object.keys(scores)),scores,'refresh preserves all pending scores and legacy blocker keys');assert.equal(await other.evaluate(()=>window.loadedVersion),'212.83.261101','another running game stays on its document');assert.ok(await a.evaluate(async()=>(await caches.keys()).includes('bnn-shell-212.83.261101')),'old window assets retained');
+ const api=await a.evaluate(async()=>[await(await fetch('/api/ping')).text(),await(await fetch('/api/ping')).text()]);assert.notEqual(api[0],api[1],'API reads never served from cache');
+ await a.evaluate(()=>{window.before=navigator.serviceWorker.controller;document.querySelector('#score').value='8';});version='212.85.261101';await a.evaluate(async()=>{await(await navigator.serviceWorker.getRegistration()).update();});await a.waitForFunction(async()=>(await navigator.serviceWorker.getRegistration()).active!==window.before&&(await navigator.serviceWorker.getRegistration()).active?.state==='activated');assert.equal(await a.inputValue('#score'),'8','next deployment also never restarts current entry');
+ await a.reload();await a.waitForFunction(()=>window.loadedVersion==='212.85.261101');assert.ok(await a.evaluate(async()=>(await caches.keys()).includes('bnn-shell-212.84.261101')),'multiple windows prevent cache pruning');await other.close();await legacy.close();await a.evaluate(()=>window.dispatchEvent(new Event('focus')));await a.waitForFunction(async()=>(await caches.keys()).every(k=>!k.startsWith('bnn-shell-')||k==='bnn-shell-212.85.261101'));
+ await ctx.setOffline(true);await a.reload();await a.waitForFunction(()=>window.loadedVersion==='212.85.261101');assert.deepEqual(await a.evaluate(keys=>Object.fromEntries(keys.map(k=>[k,localStorage.getItem(k)])),Object.keys(scores)),scores,'offline reload preserves draft/outbox/recovery data');await ctx.setOffline(false);
+ console.log('automatic update browser: PASS (actual212.83 worker upgrade, 3 versions, legacy/sleeping and active windows, no forced reload, next refresh, offline resume, no score deletion, guarded cache pruning)');
+ }finally{await b.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1;});

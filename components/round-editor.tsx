@@ -1,6 +1,4 @@
 "use client";
-import { useScoringUpdateProtection } from "@/components/update-safety";
-import { protectUpdateSession } from "@/lib/update-safety";
 
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
@@ -28,8 +26,6 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
   const isRecordedFinal = !!round.id && (round.status ?? "final") !== "in_progress";
   const [sessionId] = useState(() => round.id || round.draft_session_id || crypto.randomUUID());
   const editKey = `round:${sessionId}`;
-  const [updateSessionClosed, setUpdateSessionClosed] = useState(false);
-  useScoringUpdateProtection("round", sessionId, !updateSessionClosed, `${round.course || "Personal round"}${round.played_at ? ` · ${round.played_at.slice(0, 10)}` : ""}`);
   const recovered = React.useMemo(() => {
     if (isRecordedFinal) {
       const d = loadEditorDraft<{ round: Round; playDate: string; ratingText: string; slopeText: string; chEdit: string | null }>(editKey);
@@ -393,8 +389,6 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
       discardedRef.current = true;
       clearEditorDraft(editKey);
       clearDraft(sessionId);
-      protectUpdateSession("round", sessionId, false);
-      setUpdateSessionClosed(true);
       onSaved();
     } catch (e: any) {
       setErr(failureMessage("Couldn't save this round", e));
@@ -411,8 +405,6 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
       discardedRef.current = true;
       clearEditorDraft(editKey);
       clearDraft(sessionId);
-      protectUpdateSession("round", sessionId, false);
-      setUpdateSessionClosed(true);
       onCancel(); return;
     }
     savingRef.current = true;
@@ -424,8 +416,6 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
       if (error) throw error;
       discardedRef.current = true;
       clearDraft(sessionId);
-      protectUpdateSession("round", sessionId, false);
-      setUpdateSessionClosed(true);
       onCancel();
     } catch (e: any) {
       savingRef.current = false; setSaving(false);

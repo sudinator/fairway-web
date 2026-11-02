@@ -4,7 +4,6 @@ import { verifySavedScores, savedScoreState, savedScoreDifferences, keepDatabase
 import { reconcileUpdateGames, updateBlockers, mountUpdateProtection } from "./update-safety";
 import { SavedScoreReview } from "../components/saved-score-review";
 import { UpdateChecker } from "../components/app-update-checker";
-import { setUpdateAvailable } from "./app-update";
 import { APP_VERSION } from "./app-version";
 
 const key = "bnn_device_scores:u:old:bnn_game_scores_game_player";
@@ -80,12 +79,14 @@ async function main() {
   seed(); window.localStorage.setItem(key.replace(":old:", ":other:"), JSON.stringify(row)); await verifySavedScores(async () => remote());
   ok(savedScoreState().matched === 2, "all token-scoped copies are checked without taking over scoring");
   seed(); await verifySavedScores(async () => remote());
-  act(() => setUpdateAvailable(APP_VERSION));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   view = renderScreen(<UpdateChecker />);
-  ok(view.text.includes("You’re up to date.") && !view.text.includes("Updates are paused"), "matching installed version has independent success status"); view.unmount();
+  ok(view.text.includes("Updates install automatically") && !view.text.includes("Updates are paused"), "version screen no longer consumes recovery blockers"); view.unmount();
   seed({ ...row, scores: [4, 6] }); await verifySavedScores(async () => remote());
   view = renderScreen(<UpdateChecker />);
-  ok(view.text.includes("You’re up to date.") && view.text.includes("Saved scoring needs attention") && !view.text.includes("Updates are paused"), "same-version score warnings do not imply failed update"); view.unmount();
+  ok(view.text.includes("Updates install automatically") && !view.text.includes("Saved scoring needs attention") && !view.text.includes("Updates are paused"), "recovery differences do not appear in update status"); view.unmount();
+  globalThis.fetch = originalFetch;
   report("saved score verification");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

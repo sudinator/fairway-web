@@ -1,3 +1,4 @@
+<!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
 <!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
 <!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
@@ -1060,12 +1061,15 @@ Create Game is intentionally **lean**: Game → Players → Format → Review. D
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
 
-## 212.79 update deferral handoff
+## Historical212.79 update deferral — superseded by212.84
 Source files: lib/update-safety.ts, lib/update-handshake.ts, components/update-safety.tsx, components/register-sw.tsx, components/app-update-checker.tsx, game room and personal editor lifecycle integrations, public/sw.js. No migration.
 The currently reviewed baseline is the locally available 212.77 source with the exact saved 212.78 candidate overlaid. Reconcile against the latest synchronized GitHub branches before committing; do not overwrite newer remote work.
 Existing older clients cannot answer the new worker handshake. During the first rollout the waiting worker refuses activation until those tabs/windows are closed. Close all BNN windows after completing/syncing, then reopen. Never close during entry merely to force an update.
 An unresolved draft, storage failure, offline/missing game read, or an unresponsive tab may keep updates deferred. No age-based deletion or forced activation is provided. Resume/finish/discard through the app; retain backups.
 See RELEASE_VERIFICATION_212.79.md for executed vs pending verification. User will wait for green GitHub CI before the production merge PR. Full source ZIP delivery is now required; no bloat cleanup in this release.
 
-## 212.80 update feedback handoff
+## Historical212.80 update feedback — superseded by212.84
 Fixes missing feedback/dismissal in 212.79. Source: lib/app-update.ts, components/app-update-status.tsx; shared Settings/banner actions, worker outcome messages and detailed safety blockers. No migration. Existing loaded OLD builds cannot retroactively gain this UI; for the one-time transition, finish/sync scores, close all BNN windows and reopen. Never clear browser storage to force installation. Do not bypass first-rollout safety just to get the new feedback.
+
+## Current212.84 automatic update handoff
+User explicitly replaced unfinished-round update deferral with automatic installation and fresh-open/refresh loading. No running-document reload on deployment/focus/controllerchange. No score/draft/round cleanup required. Pending data, ordinary scoring sync and primary-device security remain intact. Legacy verification/correction helpers are retained for source-copy compatibility, existing recovery archives and previously copied links; the live update flow does not call or render them. Legacy manual-worker behavior is kept only as an explicit browser-test fixture. Follow RELEASE_VERIFICATION_212.84.md and its staging/iPhone gates.

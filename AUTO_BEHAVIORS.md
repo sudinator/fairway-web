@@ -1,3 +1,6 @@
+## Current update policy —212.84
+Workers install automatically. A fresh online open/refresh uses current network code; an already-open document keeps running without a forced reload, even after focus/controller changes. Unfinished games, drafts and old backup confirmations do not gate updates. Offline scoring restores the last complete cached shell and saved score data. Updates never remove scores or automatically upload them. This supersedes older update-deferral notes; normal game/round auto-completion rules below are unchanged.
+
 # BNN — things the app does automatically (no explicit tap)
 
 Built by reading the current code at v176.3 (components/, lib/, app/, migrations/). This is a

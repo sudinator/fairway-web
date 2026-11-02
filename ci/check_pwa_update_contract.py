@@ -1,31 +1,21 @@
 from pathlib import Path
-
 root = Path(__file__).resolve().parents[1]
-sw = (root / "public/sw.js").read_text(encoding="utf-8")
-reg = (root / "components/register-sw.tsx").read_text(encoding="utf-8")
-flow = (root / "lib/app-update.ts").read_text(encoding="utf-8")
-manage = (root / "components/app-update-checker.tsx").read_text(encoding="utf-8")
-writer = (root / "scripts/write-version.mjs").read_text(encoding="utf-8")
-
+sw = (root / 'public/sw.js').read_text()
+reg = (root / 'components/register-sw.tsx').read_text()
+flow = (root / 'lib/automatic-updates.ts').read_text()
+manage = (root / 'components/app-update-checker.tsx').read_text()
 checks = {
-    "service worker version is app-version based, not build-id based": "const swVersion = appVersion;" in writer,
-    "service worker uses cache-first shell behavior": "const cached = await caches.match(req);" in sw and "if (cached) return cached;" in sw,
-    "register-sw prompt is version-driven": "const hasUpdate = versionUpdate && !blocked;" in reg,
-    "register-sw does not treat waiting worker alone as an update": "const hasUpdate = !!waiting || versionUpdate;" not in reg,
-    "help checker compares deployed version, not waiting worker": "const isNewer = !!update.latest && update.latest !== APP_VERSION;" in manage,
-    "worker requires all windows ready": "ready.every(Boolean) && sameWindows" in sw,
-    "reload checks scoring safety": "if (updatesBlocked()) { pendingReload.current = true; reportDeferredReload(); return; }" in reg,
-    "shared activation rechecks safety after download": "if (updatesBlocked())" in flow and "applyAppUpdate" in manage,
-    "worker returns refused and accepted outcomes": 'kind: "bnn-update-result"' in sw and "accepted: false" in sw and "accepted: true" in sw,
-    "dismissal is wired": "onDismiss={dismissUpdate}" in reg,
-    "success checks installed version": 'target === APP_VERSION ? "success"' in flow,
-    "game registers protection": "useScoringUpdateProtection(\"game\"" in (root / "components/tournaments.tsx").read_text(),
-    "personal round registers protection": "useScoringUpdateProtection(\"round\"" in (root / "components/round-editor.tsx").read_text(),
-    "service-worker activation remains explicit": 'postMessage("SKIP_WAITING", [channel.port2])' in flow and 'event.data !== "SKIP_WAITING"' in sw,
+    'worker installs automatically': 'await self.skipWaiting()' in sw,
+    'open documents are not claimed or reloaded': 'await self.clients.claim()' not in sw and 'location.reload(' not in flow and 'controllerchange' not in reg,
+    'navigation checks network before offline cache': 'req.mode === "navigate"' in sw and 'fetch(req, { cache: "no-store" })' in sw,
+    'fresh page survives a cache quota failure': 'cache quota cannot block a fresh page' in sw,
+    'API/auth/live/version traffic bypasses cache': all(x in sw for x in ['/api/', '/auth/', '/live/', '/lineup/', '/app-version.json']),
+    'activation does not inspect scores or require other tabs': 'safeActivation' not in sw and 'bnn-update-check' not in sw,
+    'update registration never reads score blockers': all(x not in flow + reg + manage for x in ['updatesBlocked(', 'updateBlockers(', 'reconcileUpdateGames(', 'applyAppUpdate(', '<SavedScoreReview']),
+    'no scoring interlocks mounted by scorecards': all('useScoringUpdateProtection(' not in (root / f).read_text() for f in ['components/round-editor.tsx', 'components/tournaments.tsx']),
+    'worker cache cleanup is restricted to its current sole document': 'windows.length !== 1' in sw and 'event.data.version === SW_VERSION' in sw and 'windows[0].id !== event.source?.id' in sw,
+    'push support retained': 'self.addEventListener("push"' in sw and 'self.addEventListener("notificationclick"' in sw,
+    'legacy archives remain exportable': 'Download recovery copies' in manage,
 }
-
-bad = [name for name, ok in checks.items() if not ok]
-for name, ok in checks.items():
-    print(("PASS" if ok else "FAIL") + ": " + name)
-if bad:
-    raise SystemExit("PWA update contract failed: " + "; ".join(bad))
+for label, result in checks.items(): print(('PASS: ' if result else 'FAIL: ') + label)
+if not all(checks.values()): raise SystemExit('Automatic update contract failed')

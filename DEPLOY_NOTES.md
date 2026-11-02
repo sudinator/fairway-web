@@ -1,3 +1,15 @@
+## 212.84.261101 — automatic updates (candidate)
+
+### Behaviour changes
+- Supersedes212.79–212.83 update deferral: background installation is automatic, and a fresh open/refresh loads current server code. No manual Update button, update banner, round-completion gate or correction checklist.
+- An already-open document keeps running; no focus/controllerchange/deployment reload is added. Returning to a suspended window does not restart the game. The new worker may activate/change controller, but the new page does not reload itself on that event.
+- No game/round data is deleted, discarded or automatically uploaded. Normal score saving, pending uploads and single-primary-device controls remain unchanged.
+- Complete offline shell dependencies are cached before root HTML is committed. Old assets are retained while other documents may need them; cache errors do not prevent successful online navigation.
+
+### Delivery and checks
+- Full codebase ZIP; no database migration. Recap-stat fixes retained. Settings shows current/deployed versions and explains next-open behavior; earlier recovery copies remain exportable.
+- Actual212.83-worker upgrade, new-version transitions, legacy/sleeping and active windows, unsaved entry, offline-before-first-refresh, draft/outbox survival, cache pruning and API bypass are exercised in Chromium. Fault-injected worker checks cover missing assets/cache quota failures. See RELEASE_VERIFICATION_212.84.md for final results and live staging gates.
+
 ## 212.83.261101 — open the item that needs correction (candidate)
 
 - Warning titles and saved-score reviews link to their exact game or personal-round ID and show the source club. Covers player-score backups, team drafts, tracked games and personal rounds/edits.
