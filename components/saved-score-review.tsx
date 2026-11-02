@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useSyncExternalStore } from "react";
+import { ScoreCorrectionLink } from "@/components/score-correction-link";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import { savedScoreState, serverSavedScoreState, subscribeSavedScores, keepDatabaseScores, recoveryCopies, type ScoreReader } from "@/lib/saved-score-verification";
@@ -21,7 +22,8 @@ export function SavedScoreReview({ verify = verifySavedScoresFromServer, reader 
     <button style={{ ...btn(false), marginTop: 12 }} disabled={state.busy} onClick={() => { setConfirm(null); setKept(null); void verify(); }}>{state.busy ? "Verifying…" : "Verify saved scores"}</button>
     {state.message && <div role="status" style={{ marginTop: 12, fontSize: 13 }}>{state.message}</div>}
     {state.reviews.map(review => <div key={review.key} style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 12, paddingTop: 12 }}>
-      <div style={{ fontWeight: 700, fontSize: 13 }}>{review.title}</div>
+      <div style={{ fontWeight: 700, fontSize: 13 }}><ScoreCorrectionLink target={{ kind: "game", id: review.gameId }}>{review.title}</ScoreCorrectionLink></div>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{review.club || "Club: not yet available — reconnect to check"}</div>
       <div style={{ fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>{review.message}</div>
       {review.differences.length > 0 && <details style={{ marginTop: 8, fontSize: 13 }}><summary>Review {review.differences.length} differing values</summary>
         <table style={{ width: "100%", tableLayout: "fixed", fontSize: 12, marginTop: 8 }}><thead><tr><th>Hole*</th><th>Field</th><th>Saved</th><th>Database</th></tr></thead><tbody>{review.differences.map(d => <tr key={`${d.hole}:${d.field}`}><td>{d.hole}</td><td>{d.field}</td><td>{String(d.local ?? "—")}</td><td>{String(d.database ?? "—")}</td></tr>)}</tbody></table>

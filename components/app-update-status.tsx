@@ -3,6 +3,7 @@ import React, { useSyncExternalStore } from "react";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import { updateState, subscribeAppUpdate, serverUpdateState, type UpdateState } from "@/lib/app-update";
+import { ScoreCorrectionLink } from "@/components/score-correction-link";
 import type { UpdateBlocker } from "@/lib/update-safety";
 
 export function useAppUpdate() { return useSyncExternalStore(subscribeAppUpdate, updateState, serverUpdateState); }
@@ -14,7 +15,8 @@ export function UpdateBlockerList({ blockers }: { blockers: UpdateBlocker[] }) {
   if (!blockers.length) return <div style={{ color: C.sage, fontSize: 13 }}>No pending scoring was found in this browser’s saved data. Other open tabs are checked when you choose Update.</div>;
   return <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
     {blockers.map(item => <div key={item.key} style={{ borderTop: `1px solid ${C.borderGreen}`, paddingTop: 12 }}>
-      <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, overflowWrap: "anywhere" }}>{item.title}</div>
+      <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, overflowWrap: "anywhere" }}>{item.target ? <ScoreCorrectionLink target={item.target}>{item.title}</ScoreCorrectionLink> : item.title}</div>
+      {item.club && <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{item.club}</div>}
       {item.key.startsWith("tab:") && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Reported by another tab at the last update attempt. Choose Update again after resolving it.</div>}
       <div style={{ color: C.sage, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>{item.action}</div>
     </div>)}
@@ -26,7 +28,7 @@ export function UpdateBannerView({ state, onApply, onDismiss, onDetails }: { sta
   return <div data-update-notice role="status" aria-live="polite" style={{ position: "fixed", left: 12, right: 12, bottom: "calc(12px + env(safe-area-inset-bottom))", background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "13px 16px", zIndex: 100 }}>
     <div style={{ color: C.cream, fontSize: 15, fontWeight: 700 }}>{title}</div>
     <div style={{ color: C.sage, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>{state.message || `Version ${state.latest} is ready. Your current app stays in use until you update.`}</div>
-    {state.blockers.length > 0 && <div style={{ color: C.cream, fontSize: 13, marginTop: 4, overflowWrap: "anywhere" }}>{state.blockers[0].title}{state.blockers.length > 1 ? ` · ${state.blockers.length - 1} more` : ""}</div>}
+    {state.blockers.length > 0 && <div style={{ color: C.cream, fontSize: 13, marginTop: 4, overflowWrap: "anywhere" }}>{state.blockers[0].target ? <ScoreCorrectionLink target={state.blockers[0].target}>{state.blockers[0].title}</ScoreCorrectionLink> : state.blockers[0].title}{state.blockers[0].club && <span style={{ display: "block", color: C.sage, marginTop: 4 }}>{state.blockers[0].club}</span>}{state.blockers.length > 1 ? ` · ${state.blockers.length - 1} more` : ""}</div>}
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
       {state.phase !== "success" && state.phase !== "blocked" && <button style={btn(true)} onClick={onApply} disabled={busy}>{busy ? "Updating…" : state.phase === "failed" ? "Try again" : "Update"}</button>}
       {state.phase !== "success" && <button style={btn(false)} onClick={onDetails} disabled={busy}>Details</button>}

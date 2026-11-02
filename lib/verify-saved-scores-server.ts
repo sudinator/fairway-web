@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "./supabase";
+import { rememberUpdateGame } from "./update-safety";
 import { verifySavedScores, type ScoreReader, type VerifiedRow } from "./saved-score-verification";
 
 export function savedScoreReader(): ScoreReader {
@@ -7,8 +8,11 @@ export function savedScoreReader(): ScoreReader {
   const games = new Map<string, Promise<VerifiedRow["game"] | null>>();
   return async (gameId, playerId) => {
     if (!games.has(gameId)) games.set(gameId, (async () => {
-      const { data, error } = await db.from("games").select("status,scoring_version,name,code").eq("id", gameId).maybeSingle();
-      return error || !data ? null : data as VerifiedRow["game"];
+      const { data, error } = await db.from("games").select("status,scoring_version,name,code,group_id,groups(name)").eq("id", gameId).maybeSingle();
+      if (error || !data) return null;
+      const game = { ...data, group_name: (data.groups as any)?.name || null } as VerifiedRow["game"];
+      rememberUpdateGame(gameId, game);
+      return game;
     })());
     const game = await games.get(gameId);
     if (!game) return null;

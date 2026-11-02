@@ -1,3 +1,4 @@
+<!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
 <!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
 <!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->

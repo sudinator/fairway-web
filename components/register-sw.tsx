@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SCORE_CORRECTION_EVENT } from "@/lib/score-correction-links";
 import { APP_VERSION } from "@/lib/app-version";
 import { C } from "@/lib/golf";
 import { btn, BottomSheet } from "@/components/ui";
@@ -48,13 +49,13 @@ export function RegisterSW() {
       reconciling = true;
       try { await reconcileUpdateGames(async id => {
         // bounded: one tracked game by primary key; a failed read retains protection.
-        const { data, error } = await createClient().from("games").select("status,name,code").eq("id", id).maybeSingle();
-        if (!error && data) rememberUpdateGame(id, data);
+        const { data, error } = await createClient().from("games").select("status,name,code,group_id,groups(name)").eq("id", id).maybeSingle();
+        if (!error && data) rememberUpdateGame(id, { ...data, group_name: (data.groups as any)?.name || null });
         return error ? null : data ? { status: data.status } : { missing: true };
       }, async id => {
         // bounded: display metadata for one already-tracked personal round.
-        const { data, error } = await createClient().from("rounds").select("course,played_at").eq("id", id).maybeSingle();
-        return error || !data ? null : data;
+        const { data, error } = await createClient().from("rounds").select("course,played_at,group_id,groups(name)").eq("id", id).maybeSingle();
+        return error || !data ? null : { ...data, group_name: (data.groups as any)?.name || null };
       }); } finally { reconciling = false; }
     };
     const runChecks = () => {
@@ -93,6 +94,8 @@ export function RegisterSW() {
       window.location.reload();
     };
 
+    const closeDetails = () => setDetails(false);
+    window.addEventListener(SCORE_CORRECTION_EVENT, closeDetails);
     const safetyTimer = window.setInterval(() => { void reconcile(); }, 15000);
     window.addEventListener("load", start);
     document.addEventListener("visibilitychange", onVisible);
@@ -121,6 +124,7 @@ export function RegisterSW() {
     if (document.readyState === "complete") start();
 
     return () => {
+      window.removeEventListener(SCORE_CORRECTION_EVENT, closeDetails);
       window.removeEventListener("load", start);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", onPageShow);

@@ -1,5 +1,5 @@
 {
-  "total": 440480,
+  "total": 440505,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -72,7 +72,8 @@
     "recap stat contract": 59,
     "round stat completeness": 8,
     "save trace toggle": 3,
-    "saved score verification": 35,
+    "saved score verification": 36,
+    "score correction links": 24,
     "scoring matrix": 3698,
     "scramble groups": 25,
     "scramble no-shows": 16,

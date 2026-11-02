@@ -1,5 +1,6 @@
 "use client";
 
+import { scoreClubName } from "./score-correction-links";
 import { rowPendingHoles } from "./draft";
 import { emitSavedScoreVerification, scoringEditorOpen } from "./update-safety";
 
@@ -7,10 +8,10 @@ export const RECOVERY_PREFIX = "bnn_verified_score_recovery:";
 const FIELDS = ["scores", "putts", "fairways", "penalties", "sand"] as const;
 type Field = typeof FIELDS[number];
 export type ScoreRow = Partial<Record<Field, unknown[] | null>> & { scoringVersion?: number };
-export type VerifiedRow = { row: ScoreRow; game: { status: string; scoring_version: number; name?: string; code?: string }; player?: string };
+export type VerifiedRow = { row: ScoreRow; game: { status: string; scoring_version: number; name?: string; code?: string; group_id?: string | null; group_name?: string | null }; player?: string };
 export type ScoreReader = (gameId: string, playerId: string) => Promise<VerifiedRow | null>;
 export type ScoreDifference = { hole: number; field: Field; local: unknown; database: unknown };
-export type ScoreReview = { key: string; gameId: string; playerId: string; title: string; state: "different" | "unverified"; message: string; differences: ScoreDifference[]; canKeepDatabase: boolean; raw: string; watermark: string | null };
+export type ScoreReview = { key: string; gameId: string; playerId: string; title: string; club?: string; state: "different" | "unverified"; message: string; differences: ScoreDifference[]; canKeepDatabase: boolean; raw: string; watermark: string | null };
 type Verification = { busy: boolean; message: string; reviews: ScoreReview[]; matched: number };
 const INITIAL: Verification = { busy: false, message: "", reviews: [], matched: 0 };
 let state = INITIAL;
@@ -81,6 +82,7 @@ async function run(read: ScoreReader) {
           if (!unchanged(e.key, raw, watermark)) { review.message = "This scorecard changed during verification. Verify again after saving."; reviews.push(review); continue; }
           if (!remote || !valid(remote.row)) { reviews.push(review); continue; }
           review.title = `${remote.game.name || "Game"}${remote.game.code ? ` · #${remote.game.code}` : ""}${remote.player ? ` · ${remote.player}` : ""}`;
+          review.club = scoreClubName(remote.game);
           const differences = savedScoreDifferences(local, remote.row);
           // A changed reset/version is a separate recovery decision, never silently acknowledged.
           if ((local.scoringVersion ?? 0) !== remote.game.scoring_version) {

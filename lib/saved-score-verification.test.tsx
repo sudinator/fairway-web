@@ -10,7 +10,7 @@ import { APP_VERSION } from "./app-version";
 const key = "bnn_device_scores:u:old:bnn_game_scores_game_player";
 const wm = key.replace("bnn_game_scores_", "bnn_game_wm_");
 const row = { scores: [4, 5], putts: [2, 2], fairways: ["hit", "miss"], penalties: [0, 0], sand: [false, false] };
-const remote = (change: Partial<VerifiedRow> = {}): VerifiedRow => ({ row, game: { status: "ended", scoring_version: 0, name: "Test Fourball", code: "TST05" }, player: "Dev", ...change });
+const remote = (change: Partial<VerifiedRow> = {}): VerifiedRow => ({ row, game: { status: "ended", scoring_version: 0, name: "Test Fourball", code: "TST05", group_id: "club-b", group_name: "Test Club" }, player: "Dev", ...change });
 function seed(value: any = row) { window.localStorage.clear(); window.localStorage.setItem(key, JSON.stringify(value)); }
 async function main() {
   await reconcileUpdateGames(async () => null);
@@ -26,6 +26,7 @@ async function main() {
   ok(review.title.includes("TST05") && review.title.includes("Dev"), "review identifies game and player");
   ok(updateBlockers().some(b => b.key.startsWith("pending:")), "real difference remains protected");
   let view = renderScreen(<SavedScoreReview verify={() => verifySavedScores(async () => remote())} reader={() => async () => remote()} />);
+  ok(view.text.includes("Club: Test Club") && view.el.querySelector("a")?.getAttribute("href") === "/?scoreGame=game", "actual difference review includes club and game link");
   ok(view.text.includes("Review 1 differing values") && view.text.includes("Use database version"), "actual component renders review and explicit resolution");
   view.click("Use database version");
   ok(view.text.includes("Confirm database version") && recoveryCopies().length === 0, "first click only opens confirmation, no data mutation");

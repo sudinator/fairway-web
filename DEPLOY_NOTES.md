@@ -1,3 +1,11 @@
+## 212.83.261101 — open the item that needs correction (candidate)
+
+- Warning titles and saved-score reviews link to their exact game or personal-round ID and show the source club. Covers player-score backups, team drafts, tracked games and personal rounds/edits.
+- Club names come from authenticated record joins, persisted item metadata or matching boot-cache club IDs; unknown club is labelled unknown, never substituted from the current picker.
+- In-app taps resolve access and select the source club before opening the game/round. UUID links support TST test-game codes. Copy/open links also resolve on startup, before automatic resume. No changes to existing six-digit game links.
+- Repeat navigation remounts the game/editor so stale component state cannot keep the prior item open. Update-details sheet closes on a correction link. Missing/offline/inaccessible records show an explanation without modifying saved scores.
+- No migration. Full source ZIP; staging/GitHub and affected-iPhone checks remain external gates. See RELEASE_VERIFICATION_212.83.md.
+
 ## 212.82.261101 — verify saved scores and resolve update warnings (candidate)
 
 - Home/start/focus/update checks verify pending player-score backups against authenticated, RLS-protected Supabase reads; up to four checks concurrently, bounded reads, no automatic uploads.
