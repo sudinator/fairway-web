@@ -1541,3 +1541,9 @@ Still open (lower priority, honestly assessed):
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+
+## Match presentation follow-up — 212.89 review (2026-11-02)
+- Expanded hole-by-hole MATCH values currently use side A basis; make attribution explicit without changing score math.
+- Personal running MATCH columns need a separate closeout audit so continued score entry after clinch cannot obscure the official match result.
+- Assess consistent player-name emphasis on separate Ryder Cup/public/recap surfaces while preserving overall team totals and existing public presentation. No redesign of these surfaces is included in 212.89.

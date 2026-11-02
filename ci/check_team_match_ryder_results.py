@@ -28,6 +28,7 @@ checks = [
     ('thru centered', '>THRU</span>' in block and 'textAlign: "center"' in block and '{st.thru}' in block),
     ('all square centered only after play begins', 'const allSquare = st.thru > 0 && st.lead === 0' in block and '>AS<' in block),
     ('leader-only UP status', 'leftLeading ? `${Math.abs(st.lead)} UP`' in block and 'rightLeading ? `${Math.abs(st.lead)} UP`' in block),
+    ('final halve labels both sides', 'const finalHalved = st.thru > 0 && st.thru === game.holes_meta.length && st.lead === 0' in block and block.count('finalHalved ? "Halved"') == 2 and '>Final<' in block),
     ('no redundant down status', ' DN' not in block and '`DN`' not in block),
     ('details stays clickable', block.count('Details ›') == 2 and block.count('onClick={toggleProgress}') >= 3),
     ('progression remains canonical', 'matchProgress(' in src and 'MATCH PROGRESSION' in src and 'Net scores drive the running match position' in src),
@@ -36,20 +37,24 @@ for label, ok in checks:
     need(ok, label)
 
 # Model the approved status placement across normal/edge states.
-def display(lead, thru, result=None):
+def display(lead, thru, result=None, length=18):
+    if thru > 0 and thru == length and lead == 0:
+        return "Halved", "Final", "Halved"
     left = result if result and lead > 0 else (f"{abs(lead)} UP" if lead > 0 else "")
     right = result if result and lead < 0 else (f"{abs(lead)} UP" if lead < 0 else "")
-    center = "AS" if thru > 0 and lead == 0 else ""
+    center = "Final" if result else ("AS" if thru > 0 and lead == 0 else "")
     return left, center, right
 
 cases = [
+    ((0, 0, None, 0), ("", "", "")),
     ((0, 0, None), ("", "", "")),
     ((1, 3, None), ("1 UP", "", "")),
     ((-2, 7, None), ("", "", "2 UP")),
     ((0, 5, None), ("", "AS", "")),
-    ((3, 16, "3 & 2"), ("3 & 2", "", "")),
-    ((-1, 18, "1 UP"), ("", "", "1 UP")),
-    ((0, 18, "AS"), ("", "AS", "")),
+    ((3, 16, "3 & 2"), ("3 & 2", "Final", "")),
+    ((-1, 18, "1 UP"), ("", "Final", "1 UP")),
+    ((0, 18, "AS"), ("Halved", "Final", "Halved")),
+    ((0, 9, "AS", 9), ("Halved", "Final", "Halved")),
 ]
 for args, expected in cases:
     need(display(*args) == expected, f"status placement case {args}")

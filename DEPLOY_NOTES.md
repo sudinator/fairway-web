@@ -1,3 +1,11 @@
+## 212.89.261102 — consistent match result cards (candidate)
+
+- Keep team names and players in Four-ball/Alternate Shot; reuse the Trifecta row to emphasize the leading side and show the official closeout. Existing detail toggles remain.
+- Keep Trifecta thru counts on one line and allow long names to wrap. Singles final ties show Halved on both sides with Final beneath the hole count; live neutral display is unchanged.
+- Label Team Skins best-ball pairs with their team names; skins totals/carries remain unchanged.
+- Preserve the original Scramble layout: white match title, gold result at roster size, leading roster gold, each player and team handicap listed once. Field leaderboard unchanged.
+- No scoring-engine, persistence, updater, database or member-description changes. Full-source candidate; external gates remain required. See RELEASE_VERIFICATION_212.89.md.
+
 ## 212.88.261102 — portable CI browser discovery (candidate)
 
 - Fix update browser tests throwing ENOENT when /opt/pw-browsers does not exist on GitHub Actions. Use the Playwright-installed browser by default when no local provisioned binary exists; preserve PLAYWRIGHT_CHROMIUM override precedence.

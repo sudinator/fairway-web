@@ -1,0 +1,6 @@
+{
+  "executed": "real React mount and in-place rerenders with modelled score props",
+  "checks": 15,
+  "sequence": "Violet lead -> Burgundy lead -> AS -> Violet lead -> final -> unstarted",
+  "errors": []
+}

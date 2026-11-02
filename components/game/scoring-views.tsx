@@ -226,11 +226,11 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>PAIR 1</div>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{teamName(playerOf(f.a[0])?.team) === "—" ? "PAIR 1" : teamName(playerOf(f.a[0])?.team).toUpperCase()}</div>
                   <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
                 </div>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>PAIR 2</div>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{teamName(playerOf(f.b[0])?.team) === "—" ? "PAIR 2" : teamName(playerOf(f.b[0])?.team).toUpperCase()}</div>
                   <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
                 </div>
               </div>
@@ -779,8 +779,9 @@ export function MatchView({
           const leftLeading = st.lead > 0;
           const rightLeading = st.lead < 0;
           const allSquare = st.thru > 0 && st.lead === 0;
-          const leftStatus = st.result && st.lead > 0 ? st.result : leftLeading ? `${Math.abs(st.lead)} UP` : "";
-          const rightStatus = st.result && st.lead < 0 ? st.result : rightLeading ? `${Math.abs(st.lead)} UP` : "";
+          const finalHalved = st.thru > 0 && st.thru === game.holes_meta.length && st.lead === 0;
+          const leftStatus = finalHalved ? "Halved" : st.result && st.lead > 0 ? st.result : leftLeading ? `${Math.abs(st.lead)} UP` : "";
+          const rightStatus = finalHalved ? "Halved" : st.result && st.lead < 0 ? st.result : rightLeading ? `${Math.abs(st.lead)} UP` : "";
           return (
             <div key={idx} data-pairing-card={idx}>
               {idx === 0 && (
@@ -813,7 +814,7 @@ export function MatchView({
 
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minHeight: 64, background: C.green, border: "none", borderLeft: `1px solid ${C.borderGreen}`, borderRight: `1px solid ${C.borderGreen}`, padding: "8px 12px", textAlign: "center", cursor: "pointer", color: C.cream }}>
                   <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{st.thru}</div>
-                  {allSquare ? <div style={{ marginTop: 6, color: C.sage, fontSize: 11, fontWeight: 800 }}>AS</div> : null}
+                  {finalHalved || st.result ? <div style={{ marginTop: 6, color: C.sage, fontSize: 11, fontWeight: 800 }}>Final</div> : allSquare ? <div style={{ marginTop: 6, color: C.sage, fontSize: 11, fontWeight: 800 }}>AS</div> : null}
                 </button>
 
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "right", cursor: "pointer", color: C.cream }}>
@@ -1026,13 +1027,13 @@ export function TrifectaContestRow({ c, aNames, bNames, prefix, open, onToggle }
   return (
     <div onClick={onToggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
       <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{open ? "▾" : "▸"}</span>
-      <span style={{ flex: 1, fontSize: 13, color: C.cream, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span style={{ flex: 1, fontSize: 13, color: C.cream, minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.5 }}>
         {prefix ? <span style={{ color: C.sage }}>{prefix}</span> : null}
         <span style={TRIFECTA_NAME_STYLE[st.aSide]}>{aNames}</span>
         <span style={{ color: C.sage, margin: "0 5px" }}>v</span>
         <span style={TRIFECTA_NAME_STYLE[st.bSide]}>{bNames}</span>
       </span>
-      <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+      <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
       <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{label}</span>
     </div>
   );
@@ -1360,10 +1361,6 @@ export function FourballView({
           : null;
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
-        const lead = st?.lead ?? 0;
-        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isTeam
-          ? `${teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team)} ${Math.abs(lead)} UP`
-          : `${isAltShot ? (lead > 0 ? "Pair 1" : "Pair 2") : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair`} ${Math.abs(lead)} UP`;
         const matchDecided = !!st && st.thru > 0 && (st.thru === game.holes_meta.length || Math.abs(st.lead) > game.holes_meta.length - st.thru);
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap) : null;
         // Show the LIVE provisional match tally (who currently leads each contest) rather than
@@ -1376,7 +1373,7 @@ export function FourballView({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{embedded ? "Match status" : `${f.name}${mine ? " · your match" : ""}`}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : !st || st.thru === 0 ? "Not started" : matchDecided ? st.result : "Live"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : !st || st.thru === 0 ? "Not started" : matchDecided ? "Final" : "Live"}</div>
             </div>
             {!embedded && <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -1427,16 +1424,13 @@ export function FourballView({
                 : fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
               return (
                 <div style={{ marginTop: 6 }}>
-                  <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
-                    <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
-                    <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{leadText}</span>
-                    {/* Once decided, say so and name the hole it ended on. The header already shows
-                        the close-out ("4 & 2") while this row shows the running margin ("Red 4 UP"),
-                        so without this the same card carries two numbers and no explanation. */}
-                    <span style={{ color: C.sage, fontSize: 11 }}>
-                      {matchDecided ? `match complete on hole ${game.holes_meta[st.thru - 1]?.n ?? st.thru}` : `thru ${st.thru}`}
-                    </span>
-                  </div>
+                  <TrifectaContestRow
+                    c={{ kind: "team", thru: st.thru, lead: st.lead, settled: matchDecided, result: st.result }}
+                    aNames={f.a.map(firstName).join(" & ")}
+                    bNames={f.b.map(firstName).join(" & ")}
+                    open={isOpen}
+                    onToggle={() => setOpenKey(isOpen ? null : key)}
+                  />
                   {isOpen && <HoleDetail rows={detail} aLabel={isAltShot ? (isTeam ? teamName(playerOf(f.a[0])?.team) : "Pair 1") : firstName(f.a[0]) + "'s"} bLabel={isAltShot ? (isTeam ? teamName(playerOf(f.b[0])?.team) : "Pair 2") : firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
                 </div>
               );
