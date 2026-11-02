@@ -1,3 +1,9 @@
+## 212.88.261102 — portable CI browser discovery (candidate)
+
+- Fix update browser tests throwing ENOENT when /opt/pw-browsers does not exist on GitHub Actions. Use the Playwright-installed browser by default when no local provisioned binary exists; preserve PLAYWRIGHT_CHROMIUM override precedence.
+- Add launch-policy regressions for CI/local/override/stale installations and genuine failures. Browser tests still run and still fail if Chromium cannot launch.
+- No app update-policy, scoring, draft, membership copy or database changes. Version metadata bumped consistently. Full-source ZIP; see RELEASE_VERIFICATION_212.88.md.
+
 ## 212.87.261102 — keep the update prompt until applied (candidate)
 
 - Remove Later/Dismiss from pending updates. Update now is the only banner action; old session dismissal flags are ignored.

@@ -1,6 +1,7 @@
 // Actual old/new workers and new registration policy in Chromium. Fixture HTML,
 // local score drafts and simulated server responses; no live staging database.
 const fs=require('fs'),path=require('path'),http=require('http'),ts=require('typescript'),assert=require('node:assert/strict');
+const {launchUpdateChromium}=require('./playwright-browser.cjs');
 const {chromium}=require('playwright'),root=path.resolve(__dirname,'..'),modules={};
 function bundle(name){if(modules[name])return;const body=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;modules[name]=body;for(const m of body.matchAll(/require\("([^"]+)"\)/g)){assert.ok(m[1].startsWith('.'));bundle(path.posix.normalize(path.posix.join(path.posix.dirname(name),m[1])));}}
 bundle('lib/automatic-updates');
@@ -20,7 +21,7 @@ async function reopenOffline(page) {
  await page.locator('#reopen').evaluate(node=>{node.href='/?reopen='+Date.now();});
  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.click('#reopen')]);
 }
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const url=`http://127.0.0.1:${server.address().port}`;const provisioned=fs.readdirSync('/opt/pw-browsers').filter(x=>x.startsWith('chromium_headless_shell')).map(x=>path.join('/opt/pw-browsers',x,'chrome-linux/headless_shell')).find(x=>fs.existsSync(x));const b=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM||provisioned,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader']});try{
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const url=`http://127.0.0.1:${server.address().port}`;const b=await launchUpdateChromium(chromium);try{
  const ctx=await b.newContext();ctx.setDefaultTimeout(45000);const a=await ctx.newPage();await a.goto(url);console.log('browser: fixture loaded');if(process.env.BNN_DEBUG){a.on('request',r=>console.log('request',r.url()));a.on('requestfailed',r=>console.log('failed',r.url(),r.failure()));}a.on('pageerror',e=>console.error('fixture page error:',e.message));await a.waitForFunction(()=>window.ready);console.log('browser: client ready');await a.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready;});console.log('browser: first worker ready');await a.waitForFunction(()=>!!navigator.serviceWorker.controller);await a.waitForTimeout(100);
  const other=await ctx.newPage();await other.goto(url);await other.waitForFunction(()=>window.ready);const legacy=await ctx.newPage();await legacy.goto(url+'/legacy');
  const scores={'bnn_update_sessions_v1:round:missing':'{"kind":"round","id":"missing"}','bnn_round_draft_v1':'{"round":{"id":"r","status":"in_progress","holes":[{"strokes":5}]}}','bnn_device_scores:u:old:bnn_game_scores_g_p':'{"scores":[5,6],"putts":[2,3]}','bnn:altshot-side-drafts:g':'[{"strokes":4}]','bnn_verified_score_recovery:test':'{"backup":{"scores":[7]}}'};
