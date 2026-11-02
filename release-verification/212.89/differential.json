@@ -1,0 +1,5 @@
+{
+  "assertions": 383,
+  "unchangedNamedHelpers": 52,
+  "notes": "Executed before/after real component renders; existing top-level lib files and named setup/detail helpers unchanged."
+}

@@ -1,3 +1,6 @@
+## Current update policy —212.84
+Workers install automatically. A fresh online open/refresh uses current network code; an already-open document keeps running without a forced reload, even after focus/controller changes. Unfinished games, drafts and old backup confirmations do not gate updates. Offline scoring restores the last complete cached shell and saved score data. Updates never remove scores or automatically upload them. This supersedes older update-deferral notes; normal game/round auto-completion rules below are unchanged.
+
 # BNN — things the app does automatically (no explicit tap)
 
 Built by reading the current code at v176.3 (components/, lib/, app/, migrations/). This is a
@@ -19,11 +22,14 @@ round that is 24h+ old **and has all 18 holes scored** is flipped to `final`, st
 (fewer than 18 holes) are left alone. Rationale: rescue rounds you finished but never tapped "Finish".
 Not gated — it just happens when you open the app.
 
-**A2 · Auto-complete stale fully-scored games** — `sweep_stale_games()` (migration 0083), also called on
+**A2 · Auto-complete stale fully-scored games** — `sweep_stale_games()` (0103, revised by 0106), also called on
 home load (once/hour). For any non-ended game created in the last 30 days where **every player who has
 entered anything has entered all holes**, once it's past the end of its Eastern-time day the game is
 auto-ended — which **posts each player's round into their history** (and thus handicap). So a round can
 appear in your Rounds tab without you ending the game yourself. Not gated.
+
+Current exclusions (0106): test clubs are skipped entirely; games outside the last 30 creation-days are skipped; any partially scored member card prevents completion. The timing is the next Eastern midnight after `scored_at` was first stamped by the sweep, not 24–48 hours since last play. The legacy eligibility reads member `game_players.scores` arrays; it does not evaluate Alternate Shot/Scramble shared-ball rows. This is not a blanket age-based close/archive rule for partial, empty or abandoned games. Use diagnostics/staging-stale-games.sql to inspect actual rows, deployed definitions and job state without calling the sweep.
+
 
 **A3 · Auto-record your round when an ended game opens** — `recordMyGameRound()` (components/tournaments.tsx),
 run from a `useEffect` when you open a game that's already ended. Writes *your* game scorecard into your

@@ -1,22 +1,23 @@
 from pathlib import Path
-
 root = Path(__file__).resolve().parents[1]
-sw = (root / "public/sw.js").read_text(encoding="utf-8")
-reg = (root / "components/register-sw.tsx").read_text(encoding="utf-8")
-manage = (root / "components/manage.tsx").read_text(encoding="utf-8")
-writer = (root / "scripts/write-version.mjs").read_text(encoding="utf-8")
-
+sw = (root / 'public/sw.js').read_text()
+reg = (root / 'components/register-sw.tsx').read_text()
+flow = (root / 'lib/automatic-updates.ts').read_text()
+manage = (root / 'components/app-update-checker.tsx').read_text()
 checks = {
-    "service worker version is app-version based, not build-id based": "const swVersion = appVersion;" in writer,
-    "service worker uses cache-first shell behavior": "const cached = await caches.match(req);" in sw and "if (cached) return cached;" in sw,
-    "register-sw prompt is version-driven": "const hasUpdate = versionUpdate;" in reg,
-    "register-sw does not treat waiting worker alone as an update": "const hasUpdate = !!waiting || versionUpdate;" not in reg,
-    "help checker compares deployed version, not waiting worker": "const isNewer = !!serverVersion && serverVersion !== APP_VERSION;" in manage,
-    "service-worker activation remains explicit": 'postMessage("SKIP_WAITING")' in reg and 'event.data === "SKIP_WAITING"' in sw,
+    'worker activation requires explicit action': 'event.waitUntil(self.skipWaiting())' in sw and 'await self.skipWaiting()' not in sw,
+    'open documents are not claimed or reloaded': 'await self.clients.claim()' not in sw and 'location.reload(' not in flow and 'controllerchange' not in reg,
+    'navigation checks network before offline cache': 'req.mode === "navigate"' in sw and 'fetch(req, { cache: "no-store" })' in sw,
+    'fresh page survives a cache quota failure': 'cache quota cannot block a fresh page' in sw,
+    'API/auth/live/version traffic bypasses cache': all(x in sw for x in ['/api/', '/auth/', '/live/', '/lineup/', '/app-version.json']),
+    'activation does not inspect scores or require other tabs': 'safeActivation' not in sw and 'bnn-update-check' not in sw,
+    'update registration never reads score blockers': all(x not in flow + reg + manage for x in ['updatesBlocked(', 'updateBlockers(', 'reconcileUpdateGames(', 'applyAppUpdate(', '<SavedScoreReview']),
+    'no scoring interlocks mounted by scorecards': all('useScoringUpdateProtection(' not in (root / f).read_text() for f in ['components/round-editor.tsx', 'components/tournaments.tsx']),
+    'worker cache cleanup is restricted to its current sole document': 'windows.length !== 1' in sw and 'event.data.version === SW_VERSION' in sw and 'windows[0].id !== event.source?.id' in sw,
+    'push support retained': 'self.addEventListener("push"' in sw and 'self.addEventListener("notificationclick"' in sw,
+    'explicit action and verified feedback': all(x in reg + flow + manage for x in ['requestAppUpdate', 'clearConfirmedUpdateNotice', 'bnnUpdate', 'Updated successfully', 'Update did not complete', 'did not restart']),
+    'pending banner has no dismissal path': 'bnn-update-dismissed' not in flow and 'dismissed' not in flow and 'dismissUpdateNotice' not in reg and '>Later<' not in reg and '>Dismiss<' not in reg,
+    'legacy archives remain exportable': 'Download recovery copies' in manage,
 }
-
-bad = [name for name, ok in checks.items() if not ok]
-for name, ok in checks.items():
-    print(("PASS" if ok else "FAIL") + ": " + name)
-if bad:
-    raise SystemExit("PWA update contract failed: " + "; ".join(bad))
+for label, result in checks.items(): print(('PASS: ' if result else 'FAIL: ') + label)
+if not all(checks.values()): raise SystemExit('Automatic update contract failed')

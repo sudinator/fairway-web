@@ -1,5 +1,5 @@
 {
-  "total": 440310,
+  "total": 441078,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -10,6 +10,7 @@
     "alt shot scoring": 30,
     "alt shot side score model": 5006,
     "alt shot simulation": 181751,
+    "approved match results presentation": 574,
     "badges": 75,
     "bucket-model": 34,
     "card": 11,
@@ -29,6 +30,7 @@
     "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
+    "explicit update banner and status": 37,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
@@ -68,8 +70,11 @@
     "personal bests": 16,
     "player-scoring": 71,
     "recap additions": 46,
+    "recap stat contract": 59,
     "round stat completeness": 8,
     "save trace toggle": 3,
+    "saved score verification": 36,
+    "score correction links": 24,
     "scoring matrix": 3698,
     "scramble groups": 25,
     "scramble no-shows": 16,
@@ -95,6 +100,7 @@
     "tee yardage": 7,
     "test clubs": 2,
     "trifecta card render": 8,
-    "trifecta results row": 20
+    "trifecta results row": 20,
+    "update safety": 38
   }
 }

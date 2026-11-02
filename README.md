@@ -1,3 +1,13 @@
+<!-- 212.88: fix CI browser discovery on runners without /opt/pw-browsers; app behavior unchanged. -->
+<!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
+<!-- 212.86.261102: dismissible Update now banner, verified restart result, no unfinished-round gate. See RELEASE_VERIFICATION_212.86.md. -->
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
+<!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
+<!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
+<!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
+<!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
+<!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 ## 212.76.261030 — One source for a live player's course handicap; the handicap audit (index, tees); audits 3–7 (names reach games, Cup points on the recap)
 
 Owner (Oct 30, after 947286): "shouldn't the handicap be derived from one place for all calculations and displays? … is it worth doing an audit?" Yes; and the index and tee rules confirmed as designed.

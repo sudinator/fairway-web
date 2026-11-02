@@ -72,7 +72,7 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null, contests: EmailCo
   if (s.leaderboard?.rows.length) parts.push(H(`LEADERBOARD · ${s.leaderboard.basis.toUpperCase()}`) + TABLE(s.leaderboard.rows.slice(0, 10).map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, String(x.item.score))).join("")));
   // 2. how the field played
   if (s.individualStats) {
-    const strip = ([["birdies", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const)
+    const strip = ([["birdies+", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const)
       .map(([l, v]) => `<td style="text-align:center;width:25%"><div style="font-family:Georgia,serif;font-size:20px;font-weight:800">${v}</div><div style="font-size:11px;color:#5d6f66">${l}</div></td>`).join("");
     parts.push(H("HOW THE FIELD PLAYED") + `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${strip}</tr></table>`
       + fieldLines(r).map((l) => `<div style="font-size:13px;color:#33433b;margin-top:5px;line-height:1.45">${esc(l)}</div>`).join(""));
@@ -111,6 +111,6 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null, contests: EmailCo
   // 6. net birdies & eagles
   if (s.individualStats && h.netBirdies.players) parts.push(H("NET BIRDIES & EAGLES", `top ${Math.min(5, h.netBirdies.top.length)}`)
     + TABLE(`<tr><td style="font-size:11px;color:#5d6f66"></td><td style="font-size:11px;color:#5d6f66;text-align:right">Net birdies · Net eagles</td></tr>`
-      + h.netBirdies.top.slice(0, 5).map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, `${x.item.birdies} · ${x.item.eagles}`)).join("")));
+      + h.netBirdies.top.map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, `${x.item.birdies} · ${x.item.eagles}`)).join("")));
   return parts.join("");
 }

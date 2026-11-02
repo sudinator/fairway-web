@@ -1,4 +1,6 @@
 "use client";
+import { useScoreCorrectionNavigation } from "@/components/score-correction-navigation";
+import { parseScoreCorrection } from "@/lib/score-correction-links";
 import { parseAppLink } from "@/lib/app-links";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { prepareRound } from "@/lib/round-prep";
@@ -13,7 +15,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { write } from "@/lib/db-write";
 import { Toaster, notifyInfo } from "@/components/toast";
-import { loadDraft, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
+import { loadDraft, personalDraftIsPending, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
@@ -359,7 +361,7 @@ export function Home({ session }: { session: any }) {
   useEffect(() => {
     if (resumeChecked || scoringDevice === "checking" || !activeGameChecked) return;
     // A tee-time deep link takes priority over resuming a round/game.
-    if (deepTeeId) { setResumeChecked(true); return; }
+    if (deepTeeId || parseScoreCorrection(window.location.search)) { setResumeChecked(true); return; }
     // If the user was in a game room, reopen the Games tab so it can restore the room.
     if (loadActiveGame()) {
       setResumeChecked(true);
@@ -691,6 +693,41 @@ export function Home({ session }: { session: any }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
 
+  const [scoreCorrectionVisit, setScoreCorrectionVisit] = useState(0);
+  useScoreCorrectionNavigation({
+    ready: !groupsLoading && !loading,
+    userId: user.id,
+    groups,
+    readGame: async id => {
+      // Bounded by the primary key; the linked game determines its club, never the current picker.
+      const { data, error } = await supabase.from("games").select("id,group_id").eq("id", id).maybeSingle();
+      if (error) throw new Error("Could not check this game's club. Reconnect and try the link again; saved scores are unchanged.");
+      return data;
+    },
+    readRound: async id => {
+      const draft = loadDraft()?.round;
+      if (draft && (id === "draft" || (draft.id || draft.draft_session_id) === id)) return draft;
+      if (draft && personalDraftIsPending(draft)) throw new Error("Finish or save your current personal round before opening a different round. Its saved scores are unchanged.");
+      const edit = loadEditorDraft<{ round?: Round }>(`round:${id}`, Infinity);
+      if (edit?.round) return edit.round;
+      // Personal rounds are always constrained to the signed-in owner.
+      const { data, error } = await supabase.from("rounds").select("*,groups(name)").eq("id", id).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
+      if (error) throw new Error("Could not open this round. Reconnect and try again; saved scores are unchanged.");
+      if (!data) return null;
+      const holes = await fetchAll<any>((from, to) => supabase.from("holes").select("*").eq("round_id", id).order("hole_number").range(from, to));
+      return prepareRound({ ...data, group_name: (data.groups as any)?.name || null, holes: dedupeHoles(holes) }) as Round;
+    },
+    selectClub: id => {
+      setActiveGroupId(id);
+      saveAppBootCache({ groups, activeGroupId: id });
+      setProfile((p: any) => p ? { ...p, active_group_id: id } : p);
+      void supabase.from("profiles").update({ active_group_id: id }).eq("id", user.id).then(() => {});
+    },
+    openGame: id => { setScoreCorrectionVisit(v => v + 1); setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null); setGameSeed(null); setOpenGameReturnTab(null); setOpenGameId(id); setTab("games"); },
+    openRound: round => { setScoreCorrectionVisit(v => v + 1); setViewing(null); setMoreOpen(false); setReturnTab(null); setStage({ round }); setTab("rounds"); },
+    reportError: message => notifyInfo(message),
+  });
+
   // Profile-completion nudge funnel: log one impression per session when the banner is
   // visible, and a click when the CTA is tapped (see the button below).
   const showProfNudge = !!(activeGroup && !profNudgeHidden && profile && (!profile.avatar_url || profile.handicap_index == null));
@@ -928,7 +965,7 @@ export function Home({ session }: { session: any }) {
           <RoundSetup index={index} saveIndex={saveIndex} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} onCancel={() => setStage(null)}
             onReady={(round) => setStage({ round })} />
         ) : stage && typeof stage === "object" && "round" in stage ? (
-          <RoundEditor round={stage.round} onCancel={() => setStage(null)}
+          <RoundEditor key={`${scoreCorrectionVisit}:${stage.round.id || stage.round.draft_session_id || "draft"}`} round={stage.round} onCancel={() => setStage(null)}
             onSaved={async () => { await loadRounds(); setStage(null); setTab("rounds"); }} />
         ) : viewing ? (
           <RoundDetail round={viewing} ghinNumber={profile?.ghin_number || null} playerName={displayName}
@@ -974,7 +1011,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (
-          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} isGroupAdmin={activeGroup.role === "admin"} seed={gameSeed} openGameId={openGameId}
+          <Tournaments key={scoreCorrectionVisit} session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} isGroupAdmin={activeGroup.role === "admin"} seed={gameSeed} openGameId={openGameId}
             onExitOpenGame={openGameReturnTab === "admin" ? () => { setOpenGameId(null); setOpenGameReturnTab(null); setTab("admin"); } : undefined} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>

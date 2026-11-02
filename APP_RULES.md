@@ -1,3 +1,14 @@
+<!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
+# Current update policy — 212.87
+The pending-update banner offers Update now only, with no Later/Dismiss control. Downloaded workers wait for that action to activate while app pages remain open. Failed attempts keep retry feedback visible. Confirmed success expires after8seconds only when no newer release is pending. Explicit action reloads; deployment/focus/controller changes never force an open page to restart. Unfinished rounds never gate updating. Confirm success from the version actually loaded; report failures/timeouts and keep all drafts/outboxes. This supersedes earlier no-banner guidance below.
+
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
+<!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
+<!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
+<!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
+<!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
+<!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 <!-- 192.20: fresh-database failure cleanup captures server/container diagnostics before teardown and preserves the failing exit status; privilege assertions verify the actual test role. -->
 
 ## Primary scoring device (193.0)
@@ -321,7 +332,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 ## Public routes (share links) and scrolling (standing rule, 201.3)
 
-- Public share routes are **bypassed by the service worker** (`shouldBypass()` in `public/sw.js`): the worker is cache-first and only the installed app can tap Update, so a cached public page is pinned in Safari for every visitor. They also carry **server-side metadata** (`layout.tsx` + `generateMetadata`) so chat previews name the game, and show `APP_VERSION` in the footer.
+- Public share routes are **bypassed by the service worker** (`shouldBypass()` in `public/sw.js`): public reports must use current server responses rather than a cached app shell. They also carry **server-side metadata** (`layout.tsx` + `generateMetadata`) so chat previews name the game, and show `APP_VERSION` in the footer.
 - `html`/`body` are locked (`overflow: hidden`, `body { position: fixed }`) for iOS bounce prevention. Any page rendered outside `.app-shell` — `/live`, `/lineup`, any future share link — must own its scroll container: `className="live-scroll"` (position fixed, inset 0, overflow-y auto). Without it the page does not scroll and taps below the fold hit nothing. `ci/check_public_routes_scroll.py` enforces it.
 
 ## Lessons become guards (standing rule, 201.4)
@@ -337,3 +348,21 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+## Automatic app updates (212.84 — supersedes212.79–212.83 update deferral)
+- Install workers automatically. A successful fresh navigation uses current network HTML; a complete cached shell is the offline fallback.
+- No manual Update action, unfinished-round gate, pending-score checklist or readiness veto from another window.
+- Do not force-reload an open scoring document on deployment, controller changes, focus or a visibility change. The new code loads on a fresh open/refresh. Returning to a suspended document keeps it running.
+- Preserve local drafts, score outboxes, watermarks and recovery archives. Updating never clears or uploads scores. Keep single-primary-device and database write guards unchanged.
+- Warm initial scripts/styles before committing an offline HTML shell. Cache-write errors must not block successful online navigation. Retain older assets while another/older document may need them; prune only from a sole current-version document with a complete cached shell.
+- Public share/API/auth/version requests bypass the offline cache.
+- Deliver FULL source ZIPs. Require local lifecycle/real-browser upgrade/offline checks, GitHub CI and staging integration before production.
+
+## Saved recap stats (212.81)
+- Game fairways are hit/miss/left/right strings, never Boolean flags. Missing/invalid stats are unavailable; recorded zero putts or all misses remain valid.
+- A full stat card must cover every scheduled eligible hole; trailing array entries cannot compensate for missing holes.
+- Stat tests assert exact winners and values through app/share/email, using typed production-shaped fixtures. Tile presence alone is insufficient.
+- Bounce-back names and hole/score descriptions stay paired. Streaks count pars or better; clock spans are scoring windows, not measured tee-to-putt durations.
+
+## Member feature guide (212.85)
+When shipping a member-facing feature, review lib/capabilities.json and the relevant HelpSearch answers. Regenerate both public one-pager PDFs and marketing/onepager-content.txt from the shared source. The supported-format guard must cover every GAME_TYPES entry in the guide and the Formats answer. Describe implemented behavior and preserve edition restrictions. Automatic updates remain quiet: no release/update banner. Member education can use a separately reviewed monthly feature email; this rule does not authorize automatic email sends.

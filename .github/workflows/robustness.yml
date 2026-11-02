@@ -18,6 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "reportlab==4.4.10"
+      - run: python3 ci/check_capabilities_formats.py
       - run: python3 marketing/make_onepagers.py
       - name: Fail if the capability list changed without regenerating the sheets
         run: |

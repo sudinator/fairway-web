@@ -1,0 +1,3 @@
+(node:7) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+safe update browser: PASS (two releases, two tabs, active-round veto, legacy timeout, safe activation, scores preserved, guarded recovery)

@@ -1,3 +1,4 @@
+import { scoreDescription } from "./recorded-stats";
 // Format-specific sections of the game recap (207.2): the second line under the headline, the results
 // table each format needs, and that format's highlight tiles. Built ONLY on the engines and the shared
 // results library. Ordering rules agreed with the owner: team formats group results by winning team
@@ -76,7 +77,7 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
   const ch = (p: Player) => chBasis(p, game.course_par, holes);
   const tiles: Tile[] = [];
   const common = () => {
-    if (h.bestNetHole) tiles.push({ label: "Best net hole", who: h.bestNetHole.name, what: `${h.bestNetHole.grossVsPar <= -2 ? "eagle" : h.bestNetHole.grossVsPar === -1 ? "birdie" : h.bestNetHole.grossVsPar === 0 ? "par" : "bogey"} on ${h.bestNetHole.n} · net ${h.bestNetHole.netVsPar <= -2 ? "eagle" : "birdie"}` });
+    if (h.bestNetHole) tiles.push({ label: "Best net hole", who: h.bestNetHole.name, what: `${scoreDescription(h.bestNetHole.grossVsPar)} on ${h.bestNetHole.n} · net ${scoreDescription(h.bestNetHole.netVsPar)}` });
     if (h.mostParsOrBetter) tiles.push({ label: "Most pars or better", who: h.mostParsOrBetter.names.join(" · "), what: String(h.mostParsOrBetter.count) });
   };
   const out: RecapSections = { sub: null, individualStats: true, tiles, statTiles: [] };
@@ -251,9 +252,13 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
     const names = (xs: string[]) => xs.join(" · ");
     const st = h.stats;
     if (st.fewestPutts) out.statTiles.push({ label: "Fewest putts", who: names(st.fewestPutts.names), what: `${st.fewestPutts.putts} putts`, notable: st.fewestPutts.notable });
-    if (st.parStreak) out.statTiles.push({ label: "Longest par streak", who: names(st.parStreak.names), what: `${st.parStreak.holes} holes`, notable: st.parStreak.notable });
+    if (st.parStreak) out.statTiles.push({ label: "Longest par-or-better streak", who: names(st.parStreak.names), what: `${st.parStreak.holes} holes`, notable: st.parStreak.notable });
     if (st.mostFairways) out.statTiles.push({ label: "Most fairways", who: names(st.mostFairways.names), what: `${st.mostFairways.hit} of ${st.mostFairways.of}`, notable: st.mostFairways.notable });
-    if (st.bounceBack) out.statTiles.push({ label: "Bounce-back birdie", who: names(st.bounceBack.names), what: `after a double on ${st.bounceBack.hole - 1}`, notable: true });
+    if (st.bounceBack) {
+      const events = st.bounceBack.events;
+      out.statTiles.push({ label: events?.some(e => e.currentVsPar !== -1) ? "Bounce-back" : "Bounce-back birdie", who: names(st.bounceBack.names),
+        what: events?.length ? events.map(e => `${events.length > 1 ? `${e.name}: ` : ""}${scoreDescription(e.currentVsPar)} on ${e.hole} after ${scoreDescription(e.previousOverPar)} on ${e.hole - 1}`).join("; ") : `after double bogey or worse on ${st.bounceBack.hole - 1}`, notable: true });
+    }
     // segments: Stableford and stroke play with a scheme (a money game is always three sixes — never money here, points only)
     if (game.game_type === "stableford" || game.game_type === "stroke") {
       const scheme = indivSegScheme(game, false);

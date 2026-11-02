@@ -22,13 +22,17 @@ export function ScrambleView({ game, players, altShotScores }: { game: Game; pla
           <Eyebrow>SCRAMBLE · TEAM V TEAM{r.gross ? " · GROSS" : ""}</Eyebrow>
           {r.matches.map((m) => (
             <div key={m.groupId} data-scramble-match style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
-              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{m.name.toUpperCase()}</div>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15, marginTop: 2 }}>{m.line}</div>
-              {[m.a, m.b].map((t) => (
-                <div key={t.key} style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-                  <b style={{ color: C.cream }}>{t.name}</b> · {t.memberNames.join(" · ")}{r.gross ? "" : ` · team hcp ${t.handicap}`}
-                </div>
-              ))}
+              <div data-scramble-match-name style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{m.name.toUpperCase()}</div>
+              <div data-scramble-status style={{ color: C.gold, fontWeight: 800, fontSize: 12, marginTop: 2 }}>{m.line}</div>
+              {[m.a, m.b].map((t) => {
+                const leading = m.status.thru > 0 && (m.status.lead > 0 ? t.key === m.a.key : m.status.lead < 0 && t.key === m.b.key);
+                const nameColor = leading ? C.gold : C.cream;
+                return (
+                  <div key={t.key} data-scramble-roster={t.side} style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
+                    <b style={{ color: nameColor }}>{t.name}</b> · <span data-scramble-members style={{ color: leading ? C.gold : C.sage, fontWeight: leading ? (m.status.decided ? 800 : 700) : 500 }}>{t.memberNames.join(" · ")}</span>{r.gross ? "" : ` · team hcp ${t.handicap}`}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </>

@@ -3,6 +3,7 @@
 // can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
+import { rankTies } from "@/lib/game-highlights";
 import { shortenedNote } from "@/lib/round-rules";
 import { fmtSkins } from "@/lib/skins-format";
 import type { CupLine } from "@/lib/cup-standing";
@@ -52,7 +53,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
   const live = (game as any).players_count as number | undefined; // set by the caller
   const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? (cup.sessionCount ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : `Session ${cup.sessionNo}`) : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
   const head = recap.headline.match(/^(.*?)([\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+–[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+|net \d+|[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞.]+ skins?|\d+ points)$/);   // 212.37: skins counts can be fractions (lib/skins-format)
-  const nbRows = share ? (netBirdiesTop != null ? h.netBirdies.top.filter((r) => Number(String(r.pos).replace("T", "")) <= netBirdiesTop) : h.netBirdies.top) : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
+  const nbRows = share ? (netBirdiesTop != null ? h.netBirdies.top.filter((r) => Number(String(r.pos).replace("T", "")) <= netBirdiesTop) : h.netBirdies.top) : rankTies(h.netBirdies.all, r => `${r.birdies + r.eagles}|${r.eagles}`, Infinity);
   return (
     <div data-recap-body={mode} style={{ display: "flex", flexDirection: "column", gap: 10, color: C.cream }}>
       <div>
@@ -193,7 +194,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
       {/* 209.0 order (owner, Oct 2026): how the field played → highlights → standout rounds → top 3 → net birdies */}
       {s.individualStats ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, textAlign: "center" }} data-recap-scoring>
-          {([["birdies", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const).map(([l, v]) => (
+          {([["birdies+", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const).map(([l, v]) => (
             <div key={l} style={{ color: C.sage, fontSize: 11 }}><div style={{ ...S.num, fontSize: 20, color: C.cream }}>{v}</div>{l}</div>
           ))}
         </div>
@@ -276,7 +277,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
       ) : null}
       {!share ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-app-extra>
-        {!share && h.roundMinutes ? <div style={S.line}>Round length: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first tee to last putt</div> : null}
+        {!share && h.roundMinutes ? <div style={S.line}>Scoring window: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first score entry to last recorded finish</div> : null}
         </div>
       ) : null}
       <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? <>Net uses each player&apos;s full Course Handicap — you against the course. Match results use the game&apos;s allowance.<br /></> : null}⛳ Birdie Num Num</div>

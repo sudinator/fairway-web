@@ -1,3 +1,14 @@
+<!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
+# Current update policy — 212.87
+The pending-update banner offers Update now only, with no Later/Dismiss control. Downloaded workers wait for that action to activate while app pages remain open. Failed attempts keep retry feedback visible. Confirmed success expires after8seconds only when no newer release is pending. Explicit action reloads; deployment/focus/controller changes never force an open page to restart. Unfinished rounds never gate updating. Confirm success from the version actually loaded; report failures/timeouts and keep all drafts/outboxes. This supersedes earlier no-banner guidance below.
+
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
+<!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
+<!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
+<!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
+<!-- 212.81.261101: recap stat corrections; see RELEASE_VERIFICATION_212.81.md. -->
+<!-- 212.80.261101: update feedback/dismissal candidate; see RELEASE_VERIFICATION_212.80.md. -->
+<!-- 212.79.261101 candidate: updates are deferred during scoring. See RELEASE_VERIFICATION_212.79.md; full source ZIP delivery. -->
 # Birdie Num Num (BNN) — Developer Handoff
 
 **Read this first.** It's the onboarding brief for continuing BNN development in a fresh chat with no
@@ -6,7 +17,7 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 212.78.261101 — NOT READY FOR DEPLOYMENT
+## Current candidate: 212.81.261101 — staging/GitHub verification pending
 
 212.77 is deployed per user confirmation. The new 212.78 candidate fixes missing/manual-handicap differential comparisons; no database migration. See RELEASE_VERIFICATION_212.78.md for executed local checks and outstanding game-specific/GitHub/staging verification. No production deployment of 212.78 has been performed.
 
@@ -1054,3 +1065,19 @@ Create Game is intentionally **lean**: Game → Players → Format → Review. D
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+## Historical212.79 update deferral — superseded by212.84
+Source files: lib/update-safety.ts, lib/update-handshake.ts, components/update-safety.tsx, components/register-sw.tsx, components/app-update-checker.tsx, game room and personal editor lifecycle integrations, public/sw.js. No migration.
+The currently reviewed baseline is the locally available 212.77 source with the exact saved 212.78 candidate overlaid. Reconcile against the latest synchronized GitHub branches before committing; do not overwrite newer remote work.
+Existing older clients cannot answer the new worker handshake. During the first rollout the waiting worker refuses activation until those tabs/windows are closed. Close all BNN windows after completing/syncing, then reopen. Never close during entry merely to force an update.
+An unresolved draft, storage failure, offline/missing game read, or an unresponsive tab may keep updates deferred. No age-based deletion or forced activation is provided. Resume/finish/discard through the app; retain backups.
+See RELEASE_VERIFICATION_212.79.md for executed vs pending verification. User will wait for green GitHub CI before the production merge PR. Full source ZIP delivery is now required; no bloat cleanup in this release.
+
+## Historical212.80 update feedback — superseded by212.84
+Fixes missing feedback/dismissal in 212.79. Source: lib/app-update.ts, components/app-update-status.tsx; shared Settings/banner actions, worker outcome messages and detailed safety blockers. No migration. Existing loaded OLD builds cannot retroactively gain this UI; for the one-time transition, finish/sync scores, close all BNN windows and reopen. Never clear browser storage to force installation. Do not bypass first-rollout safety just to get the new feedback.
+
+## Current212.84 automatic update handoff
+User explicitly replaced unfinished-round update deferral with automatic installation and fresh-open/refresh loading. No running-document reload on deployment/focus/controllerchange. No score/draft/round cleanup required. Pending data, ordinary scoring sync and primary-device security remain intact. Legacy verification/correction helpers are retained for source-copy compatibility, existing recovery archives and previously copied links; the live update flow does not call or render them. Legacy manual-worker behavior is kept only as an explicit browser-test fixture. Follow RELEASE_VERIFICATION_212.84.md and its staging/iPhone gates.
+
+## 212.85 member-guide upkeep
+User declined an updated-version banner and prefers monthly feature education by email. No banner or email sending/scheduling is added. Shared capabilities now cover all8 game formats, Ryder Cup events and round recaps. Scramble/Alternate Shot are in Help's Formats answer; Scramble and Ryder Cup have guidance. Both PDF editions regenerated from the same JSON. Every future member feature must review the guide/FAQ/PDFs; ci/check_capabilities_formats.py prevents format-list drift.

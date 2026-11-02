@@ -27,7 +27,7 @@ const PUTTS = [[2,2,1,2,2,2,2,2,1,2,2,2,2,2,1,2,2,2],[2,2,2,2,1,2,2,3,2,2,2,2,2,
 const FW = [[1,1,0,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1],[1,0,0,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1],[1,1,0,0,1,0,1,1,0,1,1,0,1,1,0,0,1,0],[0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0],
   [1,1,0,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1],[1,1,0,1,0,0,1,1,1,1,1,0,1,1,1,0,1,1],[1,0,0,1,1,0,1,1,1,0,1,0,1,1,1,0,0,1],[0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,1,0]];
 export const players: Player[] = NAMES.map((n, i) => ({ id: `u${i}`, user_id: `u${i}`, display_name: n, course_handicap: CH[i], course_handicap_source: "manual", handicap_index: CH[i] * 0.9,
-  scores: REL[i].map((r, h) => PAR[h] + r), putts: PUTTS[i], fairways: FW[i].map((f, h) => (PAR[h] === 3 ? null : !!f)), sand: REL[i].map((_, h) => (h % 7 === 3 ? 1 : 0)), penalties: REL[i].map(() => 0),
+  scores: REL[i].map((r, h) => PAR[h] + r), putts: PUTTS[i], fairways: FW[i].map((f, h) => (PAR[h] === 3 ? null : f ? "hit" : "miss")), sand: REL[i].map((_, h) => (h % 7 === 3 ? 1 : 0)), penalties: REL[i].map(() => 0),
   rating: 72.3, slope: 133, tee_name: "Blue", no_show: false, tee_group: Math.floor(i / 4) + 1, team: null, is_guest: false }) as unknown as Player);
 export const game = { id: "g", code: "494730", name: "Sunday Stableford", course: "Oak Hollow", holes_meta: holes, course_par: 72, played_at: "2026-10-25", created_by: "u4", status: "ended",
   game_type: "stableford", stroke_basis: "net", allowance_pct: 95, teams: null, pairings: [], foursomes: null, leg_config: { scheme: "sixes", metric: "pts", points: {} }, flight_mode: "off", group_id: "club" } as unknown as Game;
@@ -38,7 +38,7 @@ const ranges = segRanges("sixes", 18);
 const segs = segLeadersFor(players.map((p) => ({ p, seg: segValues(p, game, ranges) })), game, ranges);
 const stat = (f: (p: Player) => number, best: "low" | "high") => { const rows = players.map((p) => ({ p, v: f(p) })); const v = best === "low" ? Math.min(...rows.map((r) => r.v)) : Math.max(...rows.map((r) => r.v)); return { v, who: rows.filter((r) => r.v === v).map((r) => r.p.display_name) }; };
 const putts = stat((p) => (p.putts as number[]).reduce((a, b) => a + b, 0), "low");
-const fairways = stat((p) => (p.fairways as (boolean | null)[]).filter((x) => x === true).length, "high");
+const fairways = stat((p) => p.fairways.filter((x) => x === "hit").length, "high");
 const streakOf = (p: Player) => { let best = 0, run = 0; (p.scores as number[]).forEach((s, h) => { run = s <= PAR[h] ? run + 1 : 0; best = Math.max(best, run); }); return best; };
 const streak = stat(streakOf, "high");
 const bounce = players.filter((p) => (p.scores as number[]).some((s, h) => h > 0 && s === PAR[h] - 1 && (p.scores as number[])[h - 1] >= PAR[h - 1] + 2)).map((p) => p.display_name);

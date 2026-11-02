@@ -1,3 +1,100 @@
+## 212.89.261102 — consistent match result cards (candidate)
+
+- Keep team names and players in Four-ball/Alternate Shot; reuse the Trifecta row to emphasize the leading side and show the official closeout. Existing detail toggles remain.
+- Keep Trifecta thru counts on one line and allow long names to wrap. Singles final ties show Halved on both sides with Final beneath the hole count; live neutral display is unchanged.
+- Label Team Skins best-ball pairs with their team names; skins totals/carries remain unchanged.
+- Preserve the original Scramble layout: white match title, gold result at roster size, leading roster gold, each player and team handicap listed once. Field leaderboard unchanged.
+- No scoring-engine, persistence, updater, database or member-description changes. Full-source candidate; external gates remain required. See RELEASE_VERIFICATION_212.89.md.
+
+## 212.88.261102 — portable CI browser discovery (candidate)
+
+- Fix update browser tests throwing ENOENT when /opt/pw-browsers does not exist on GitHub Actions. Use the Playwright-installed browser by default when no local provisioned binary exists; preserve PLAYWRIGHT_CHROMIUM override precedence.
+- Add launch-policy regressions for CI/local/override/stale installations and genuine failures. Browser tests still run and still fail if Chromium cannot launch.
+- No app update-policy, scoring, draft, membership copy or database changes. Version metadata bumped consistently. Full-source ZIP; see RELEASE_VERIFICATION_212.88.md.
+
+## 212.87.261102 — keep the update prompt until applied (candidate)
+
+- Remove Later/Dismiss from pending updates. Update now is the only banner action; old session dismissal flags are ignored.
+- A fresh server check confirming a withdrawn release clears obsolete failure feedback; a later new release restores the prompt.
+- Keep failure and retry feedback visible. Confirmed success remains visible briefly, then clears automatically after8seconds; expiry can never hide a pending release.
+- Explicit activation, no unfinished-round gates, fresh online navigation, stored scores/drafts and worker compatibility are unchanged from212.86.
+- No migration or capability-description changes. Full local verification and external gates: RELEASE_VERIFICATION_212.87.md.
+
+## 212.86.261102 — explicit update banner (candidate)
+
+- Workers download in the background and wait for explicit activation, preserving older production pages that reload on controllerchange. Existing production SKIP_WAITING messages remain supported, without score-state checks.
+- Restore a dismissible new-version banner and Settings Update now action, with one shared status. No unfinished-round gate.
+- Version checks run on startup/reconnect/focus; numeric version ordering prevents requesting an older release.
+- Explicit update rechecks the server, requests the worker update, and navigates with a fresh URL. A restart target survives reload; success requires the running version to meet that target. Errors/timeouts identify the installed version and allow retry.
+- No forced reload on deployment/focus/controller change, no score/draft deletion or automatic uploads. Member capability descriptions remain as212.85, pending owner review.
+- No migrations. Actual iPhone/staging verification remains required. See RELEASE_VERIFICATION_212.86.md.
+
+## 212.85.261102 — refresh what members can do (candidate)
+
+- The shared in-app capabilities list and both downloadable one-pagers now include Scramble, Alternate Shot, Ryder Cup events and round recaps.
+- Help's Formats answer covers all8 supported game types, with new Scramble and Ryder Cup guidance; Games with friends no longer implies only Stableford/match play.
+- Course-correction wording reflects per-club changes before global approval. Offline wording describes saved scores and reconnection rather than guaranteeing that scores can never be lost.
+- Add a supported-format coverage guard to local CI and the one-pager workflow, plus a release checklist requirement to refresh member guidance with future features.
+- Quiet automatic updates unchanged. No banner, migration, email send or email schedule. Full codebase delivery; see RELEASE_VERIFICATION_212.85.md.
+
+## 212.84.261101 — automatic updates (candidate)
+
+### Behaviour changes
+- Supersedes212.79–212.83 update deferral: background installation is automatic, and a fresh open/refresh loads current server code. No manual Update button, update banner, round-completion gate or correction checklist.
+- An already-open document keeps running; no focus/controllerchange/deployment reload is added. Returning to a suspended window does not restart the game. The new worker may activate/change controller, but the new page does not reload itself on that event.
+- No game/round data is deleted, discarded or automatically uploaded. Normal score saving, pending uploads and single-primary-device controls remain unchanged.
+- Complete offline shell dependencies are cached before root HTML is committed. Old assets are retained while other documents may need them; cache errors do not prevent successful online navigation.
+
+### Delivery and checks
+- Full codebase ZIP; no database migration. Recap-stat fixes retained. Settings shows current/deployed versions and explains next-open behavior; earlier recovery copies remain exportable.
+- Actual212.83-worker upgrade, new-version transitions, legacy/sleeping and active windows, unsaved entry, offline-before-first-refresh, draft/outbox survival, cache pruning and API bypass are exercised in Chromium. Fault-injected worker checks cover missing assets/cache quota failures. See RELEASE_VERIFICATION_212.84.md for final results and live staging gates.
+
+## 212.83.261101 — open the item that needs correction (candidate)
+
+- Warning titles and saved-score reviews link to their exact game or personal-round ID and show the source club. Covers player-score backups, team drafts, tracked games and personal rounds/edits.
+- Club names come from authenticated record joins, persisted item metadata or matching boot-cache club IDs; unknown club is labelled unknown, never substituted from the current picker.
+- In-app taps resolve access and select the source club before opening the game/round. UUID links support TST test-game codes. Copy/open links also resolve on startup, before automatic resume. No changes to existing six-digit game links.
+- Repeat navigation remounts the game/editor so stale component state cannot keep the prior item open. Update-details sheet closes on a correction link. Missing/offline/inaccessible records show an explanation without modifying saved scores.
+- No migration. Full source ZIP; staging/GitHub and affected-iPhone checks remain external gates. See RELEASE_VERIFICATION_212.83.md.
+
+## 212.82.261101 — verify saved scores and resolve update warnings (candidate)
+
+- Home/start/focus/update checks verify pending player-score backups against authenticated, RLS-protected Supabase reads; up to four checks concurrently, bounded reads, no automatic uploads.
+- Matching current-version scorecards refresh their local sync confirmation; real differences, missing/hidden rows, offline failures, malformed data and reset versions remain protected.
+- Settings shows current-version success independently of pending scoring. Verify saved scores shows per-field scheduled-position differences and identifies player/game.
+- Explicit completed-game Use database version re-reads both sides, requires the same review, no mounted editor and only one service-worker window; archives the old scores before replacing the local backup. No database writes. Recovery copies can be downloaded; export before sign-out/site-data clearing. Active games cannot use this path.
+- No database migration. Full codebase ZIP. Run staging integration and GitHub CI, then check the actual iPhone flow; local evidence in RELEASE_VERIFICATION_212.82.md.
+
+## 212.81.261101 — validate recap stats from saved scorecards (candidate)
+
+- Fairways use canonical hit/miss/left/right values, require a valid entry on each scheduled par-4/5 and preserve explicit all-miss zero. Fixes false 0-of-14 tie in game 947286.
+- Putts require nonnegative integer values on scheduled holes only. Extra slots cannot qualify a missing hole or inflate the total; recorded zeros remain valid.
+- Bounce-back tiles retain each player's actual birdie/eagle and preceding double/triple/higher score and hole numbers.
+- Labels describe par-or-better streaks, birdies-or-better counts, exact best-net-hole results and the score-entry time window honestly.
+- App net-birdie/eagle positions preserve golf-style ties; email includes every player tied at the fifth-place cutoff.
+- Canonical string-valued fixtures replace Boolean fairway mock data. New real production-data fixture (identity UUIDs sanitized) verifies recap/app/share/email values.
+- No score/data mutation, migration, update-policy change or stale-game auto-ending change in this stats release. Stale-game investigation is separate and read-only.
+- Full source delivery; evidence and staging checklist in RELEASE_VERIFICATION_212.81.md.
+
+## 212.80.261101 — actionable update results and dismissal (candidate)
+
+- Fix the silent Updating -> banner loop: the worker returns accepted/refused results with blockers. Missing acknowledgement, installation/download errors and restart timeout have explicit feedback; no navigation bypass of a waiting worker.
+- One shared update controller for banner and Settings. Success is reported only after the installed version matches the requested target after reload.
+- Dismiss hides the notice for that release, including later passive checks/reopens. Settings remains available; a different release can announce itself.
+- Live local checklist identifies games by name/code, personal rounds by course/date, pending rows by player/count, failed local checks and other-tab refusals. Instructions preserve drafts and say to continue playing rather than end a live game for an update.
+- Existing update protection, handicap fix and scoring calculations retained. No migration or obsolete-file cleanup.
+- Full source ZIP; local/staging/GitHub evidence in RELEASE_VERIFICATION_212.80.md.
+
+## 212.79.261101 — defer app updates during scoring (candidate)
+
+- Active game/personal-round sessions hide update controls and defer update-driven reloads, including after navigation away.
+- Pending score/stat/deletion outboxes and failed local storage prevent updates after the game ends. No database or scoring-rule change.
+- Worker activation requires acknowledgements from every open window. Unknown/legacy/frozen tabs veto; no timeout may be interpreted as completion.
+- Settings uses the same policy. Deferred controller-change reload runs only after protection clears.
+- First rollout: already-open older clients lack the responder, so close all BNN tabs/windows after finishing and syncing, then reopen to install. No forced update during play.
+- Full source ZIPs from this release; obsolete-file cleanup is deferred.
+- Verification and outstanding staging/GitHub checks: RELEASE_VERIFICATION_212.79.md.
+
 ## 212.78.261101 — manual-handicap comparison correction (candidate)
 
 - Fix recap/field comparisons reading missing Handicap Index as zero. An explicit zero remains valid.

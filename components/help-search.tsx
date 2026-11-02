@@ -103,7 +103,7 @@ const FAQ: Faq[] = [
   },
   {
     q: "What are the different formats?",
-    keywords: "formats stableford stroke play skins match four ball trifecta difference explain types which",
+    keywords: "formats stableford stroke play skins match four ball trifecta alternate shot foursomes scramble difference explain types which",
     steps: [
       "Stableford - points per hole vs par (kindest for mixed groups).",
       "Stroke play - lowest total wins, gross or net.",
@@ -111,6 +111,27 @@ const FAQ: Faq[] = [
       "Singles match - you vs one opponent, hole by hole.",
       "Four-ball - two teams, best ball or shootout (aggregate).",
       "Trifecta - four-ball plus the two 1-v-1 singles (three contests).",
+      "Alternate Shot - partners alternate strokes with one ball per side and a shared team scorecard.",
+      "Scramble - teammates choose the best shot each time and record one score per team per hole.",
+    ],
+  },
+  {
+    q: "How do we play a Scramble?",
+    keywords: "scramble team best shot shared scorecard team handicap usga custom",
+    steps: [
+      "Open Games, start a game, and choose Scramble.",
+      "Set the team size, assign players, and choose the team-handicap method.",
+      "The team chooses its best shot each time and plays from there. Record one score per team per hole.",
+      "Completed shared-ball rounds appear in Rounds as team rounds, separately from individual handicap and stats.",
+    ],
+  },
+  {
+    q: "Can we organise a Ryder Cup?",
+    keywords: "ryder cup competition event sessions schedule teams standings points",
+    steps: [
+      "Open Games and select Ryder Cup to create a team event.",
+      "Create the teams and schedule sessions, choosing their formats and match points.",
+      "Create the linked session games and follow their match results and the overall team standings.",
     ],
   },
   {

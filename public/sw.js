@@ -1,92 +1,75 @@
-// Birdie Num Num service worker.
-// Goal: keep the installed app on its CURRENT code version until the user explicitly
-// taps Update, while never serving stale live data. Supabase/API/auth requests always
-// bypass the worker. App-shell requests are cache-first for the lifetime of the active
-// worker; activating a new version creates a new cache and reloads into the new shell.
-
-const SW_VERSION = "212.78.261101";
+// Birdie Num Num: background download, explicit activation, fresh online navigation.
+// No clients.claim(): do not take over uncontrolled documents. Activation can
+// change a controlled page’s controller; the new app never reloads on that event.
+const SW_VERSION = "212.89.261102";
 const CACHE = `bnn-shell-${SW_VERSION}`;
-
-self.addEventListener("install", (event) => {
-  // Do NOT skipWaiting here. On UPDATE the worker stays waiting until the user taps
-  // Update. Pre-cache the root shell for this worker so activation has a coherent
-  // starting document even if connectivity is poor.
+// Commit an offline shell only after its initial scripts/styles are cached.
+// Otherwise a background update could leave an offline restart with new HTML
+// whose code was never downloaded while the old game was still running.
+async function cacheShell(response, request = "/") {
+  const cache = await caches.open(CACHE), html = await response.clone().text();
+  const paths = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)].map(m => m[1]);
+  paths.push(...[...html.matchAll(/\/_next\/static\/[^"'<>\\\s]+/g)].map(m => m[0]));
+  const assets = [...new Set(paths.map(p => new URL(p.replaceAll("&amp;", "&"), self.location.origin)).filter(u => u.origin === self.location.origin && /\.(?:js|css)(?:\?|$)/.test(u.pathname + u.search)).map(u => u.href))];
+  await Promise.all(assets.map(async url => {
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
+    try { const asset = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!asset.ok) throw new Error("Shell asset unavailable"); await cache.put(url, asset); }
+    finally { clearTimeout(timer); }
+  }));
+  await cache.put(request, response.clone());
+}
+self.addEventListener("install", event => {
   event.waitUntil((async () => {
-    try {
-      const fresh = await fetch("/", { cache: "no-store" });
-      if (fresh && fresh.status === 200) {
-        const cache = await caches.open(CACHE);
-        await cache.put("/", fresh.clone());
-      }
-    } catch { /* first navigation will populate the cache */ }
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
+    try { const fresh = await fetch("/", { cache: "no-store", signal: controller.signal }); if (fresh.ok) await cacheShell(fresh); } catch { /* keep existing complete offline shell */ }
+    finally { clearTimeout(timer); }
+    // Wait for the explicit Update now action. Older open app versions reload
+    // on controllerchange; automatic activation would restart their scorecards.
   })());
 });
-
-// The page tells a waiting worker to activate now — fired only after the user taps Update.
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
+self.addEventListener("activate", event => {
+  // Old windows may still need their assets. Prune only after a current-version
+  // document confirms it is the sole window in this browser's registration.
+  event.waitUntil(Promise.resolve());
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    (async () => {
+self.addEventListener("message", event => {
+  // Compatible with the existing production Update button; no score-state gate.
+  if (event.data === "SKIP_WAITING") { event.waitUntil(self.skipWaiting()); return; }
+  if (event.data?.kind === "bnn-cleanup-shells" && event.data.version === SW_VERSION) {
+    event.waitUntil((async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      if (windows.length !== 1 || windows[0].id !== event.source?.id || !await (await caches.open(CACHE)).match("/")) return;
       const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
-      await self.clients.claim();
-    })()
-  );
+      await Promise.all(keys.filter(k => k.startsWith("bnn-shell-") && k !== CACHE).map(k => caches.delete(k)));
+    })());
+  }
 });
-
 function shouldBypass(url) {
-  return (
-    // Public share pages (/live/<token>, /lineup/<token>) are opened from chats, usually in Safari,
-    // where nobody can tap Update. Cache-first pinned a broken /lineup page in Safari across two
-    // fixes (201.2 -> 201.4, 2026-10-08). They are not the installed app shell: always network.
-    url.pathname.startsWith("/live/") ||
-    url.pathname.startsWith("/lineup/") ||
-    url.hostname.endsWith("supabase.co") ||
-    url.hostname.includes("supabase") ||
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/auth/") ||
-    url.pathname === "/app-version.json" ||
-    url.hostname.includes("googleapis.com") ||
-    url.hostname.includes("google.com") ||
-    url.hostname.includes("generativelanguage")
-  );
+  return url.pathname.startsWith("/live/") || url.pathname.startsWith("/lineup/") || url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/") || url.pathname === "/app-version.json";
 }
-
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-  const url = new URL(req.url);
-
-  if (url.origin !== self.location.origin) return;
-  if (shouldBypass(url)) return;
-
-  // Cache-first is deliberate: the ACTIVE worker pins the installed app shell to
-  // its current release. A new deployment can download a waiting worker, but the
-  // old code stays in use until the user explicitly activates that worker.
-  event.respondWith(
-    (async () => {
-      const cached = await caches.match(req);
-      if (cached) return cached;
+self.addEventListener("fetch", event => {
+  const req = event.request, url = new URL(req.url);
+  if (req.method !== "GET" || url.origin !== self.location.origin || shouldBypass(url)) return;
+  event.respondWith((async () => {
+    if (req.mode === "navigate") {
+      // Navigation is always fresh online; a failure retains offline scoring.
       try {
-        const fresh = await fetch(req);
-        if (fresh && fresh.status === 200 && fresh.type === "basic") {
-          const cache = await caches.open(CACHE);
-          await cache.put(req, fresh.clone());
-        }
-        return fresh;
+        const fresh = await fetch(req, { cache: "no-store" });
+        if (fresh.ok) { event.waitUntil(cacheShell(fresh.clone(), req).catch(() => { /* cache quota cannot block a fresh page */ })); return fresh; }
+        const saved = await (await caches.open(CACHE)).match(req) || await (await caches.open(CACHE)).match("/") || await caches.match(req) || await caches.match("/");
+        return saved || fresh;
       } catch {
-        // For an uncached navigation with no network, fall back to the cached root.
-        if (req.mode === "navigate") {
-          const root = await caches.match("/");
-          if (root) return root;
-        }
-        throw new Error("offline and not cached");
+        const saved = await (await caches.open(CACHE)).match(req) || await (await caches.open(CACHE)).match("/") || await caches.match(req) || await caches.match("/");
+        if (saved) return saved;
+        return new Response("BNN is offline. Reconnect once to load the app; saved scores have not been removed.", { status: 503, headers: { "Content-Type": "text/plain" } });
       }
-    })()
-  );
+    }
+    const saved = await caches.match(req);
+    if (saved) return saved;
+    const fresh = await fetch(req);
+    if (fresh.ok && fresh.type === "basic") await (await caches.open(CACHE)).put(req, fresh.clone());
+    return fresh;
+  })());
 });
 
 // ---- Web Push (phase 1: display + click routing; server sender arrives in phase 2) ----
