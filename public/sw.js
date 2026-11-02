@@ -1,7 +1,7 @@
-// Birdie Num Num: automatic installation, fresh online navigations, offline fallback.
+// Birdie Num Num: background download, explicit activation, fresh online navigation.
 // No clients.claim(): do not take over uncontrolled documents. Activation can
 // change a controlled page’s controller; the new app never reloads on that event.
-const SW_VERSION = "212.85.261102";
+const SW_VERSION = "212.87.261102";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 // Commit an offline shell only after its initial scripts/styles are cached.
 // Otherwise a background update could leave an offline restart with new HTML
@@ -23,7 +23,8 @@ self.addEventListener("install", event => {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
     try { const fresh = await fetch("/", { cache: "no-store", signal: controller.signal }); if (fresh.ok) await cacheShell(fresh); } catch { /* keep existing complete offline shell */ }
     finally { clearTimeout(timer); }
-    await self.skipWaiting();
+    // Wait for the explicit Update now action. Older open app versions reload
+    // on controllerchange; automatic activation would restart their scorecards.
   })());
 });
 self.addEventListener("activate", event => {
@@ -32,6 +33,8 @@ self.addEventListener("activate", event => {
   event.waitUntil(Promise.resolve());
 });
 self.addEventListener("message", event => {
+  // Compatible with the existing production Update button; no score-state gate.
+  if (event.data === "SKIP_WAITING") { event.waitUntil(self.skipWaiting()); return; }
   if (event.data?.kind === "bnn-cleanup-shells" && event.data.version === SW_VERSION) {
     event.waitUntil((async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

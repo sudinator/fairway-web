@@ -5,7 +5,7 @@ reg = (root / 'components/register-sw.tsx').read_text()
 flow = (root / 'lib/automatic-updates.ts').read_text()
 manage = (root / 'components/app-update-checker.tsx').read_text()
 checks = {
-    'worker installs automatically': 'await self.skipWaiting()' in sw,
+    'worker activation requires explicit action': 'event.waitUntil(self.skipWaiting())' in sw and 'await self.skipWaiting()' not in sw,
     'open documents are not claimed or reloaded': 'await self.clients.claim()' not in sw and 'location.reload(' not in flow and 'controllerchange' not in reg,
     'navigation checks network before offline cache': 'req.mode === "navigate"' in sw and 'fetch(req, { cache: "no-store" })' in sw,
     'fresh page survives a cache quota failure': 'cache quota cannot block a fresh page' in sw,
@@ -15,6 +15,8 @@ checks = {
     'no scoring interlocks mounted by scorecards': all('useScoringUpdateProtection(' not in (root / f).read_text() for f in ['components/round-editor.tsx', 'components/tournaments.tsx']),
     'worker cache cleanup is restricted to its current sole document': 'windows.length !== 1' in sw and 'event.data.version === SW_VERSION' in sw and 'windows[0].id !== event.source?.id' in sw,
     'push support retained': 'self.addEventListener("push"' in sw and 'self.addEventListener("notificationclick"' in sw,
+    'explicit action and verified feedback': all(x in reg + flow + manage for x in ['requestAppUpdate', 'clearConfirmedUpdateNotice', 'bnnUpdate', 'Updated successfully', 'Update did not complete', 'did not restart']),
+    'pending banner has no dismissal path': 'bnn-update-dismissed' not in flow and 'dismissed' not in flow and 'dismissUpdateNotice' not in reg and '>Later<' not in reg and '>Dismiss<' not in reg,
     'legacy archives remain exportable': 'Download recovery copies' in manage,
 }
 for label, result in checks.items(): print(('PASS: ' if result else 'FAIL: ') + label)

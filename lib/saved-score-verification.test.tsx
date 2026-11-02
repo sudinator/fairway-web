@@ -82,10 +82,10 @@ async function main() {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   view = renderScreen(<UpdateChecker />);
-  ok(view.text.includes("Updates install automatically") && !view.text.includes("Updates are paused"), "version screen no longer consumes recovery blockers"); view.unmount();
+  ok(view.text.includes("Unfinished rounds and saved scores do not block updates.") && !view.text.includes("Updates are paused"), "version screen no longer consumes recovery blockers"); view.unmount();
   seed({ ...row, scores: [4, 6] }); await verifySavedScores(async () => remote());
   view = renderScreen(<UpdateChecker />);
-  ok(view.text.includes("Updates install automatically") && !view.text.includes("Saved scoring needs attention") && !view.text.includes("Updates are paused"), "recovery differences do not appear in update status"); view.unmount();
+  ok(view.text.includes("Unfinished rounds and saved scores do not block updates.") && !view.text.includes("Saved scoring needs attention") && !view.text.includes("Updates are paused"), "recovery differences do not appear in update status"); view.unmount();
   globalThis.fetch = originalFetch;
   report("saved score verification");
 }

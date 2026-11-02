@@ -1,3 +1,7 @@
+## 212.87 — update rollout validation (open)
+
+- [ ] Investigate the reported staging phone remaining on212.84 after refresh. Collect the exact app origin/URL, Current/Latest versions and deployed build/version metadata; confirm the actual phone upgrade. Cause remains unverified. The saved212.84 build has no restart-result verifier, so it cannot display the new failure messages if that old code is returned.
+
 ## 206.2 — backlog
 
 ## Agreed audit fixes — 212.77 deployed (user confirmed November 1, 2026)

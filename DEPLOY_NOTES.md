@@ -1,3 +1,20 @@
+## 212.87.261102 — keep the update prompt until applied (candidate)
+
+- Remove Later/Dismiss from pending updates. Update now is the only banner action; old session dismissal flags are ignored.
+- A fresh server check confirming a withdrawn release clears obsolete failure feedback; a later new release restores the prompt.
+- Keep failure and retry feedback visible. Confirmed success remains visible briefly, then clears automatically after8seconds; expiry can never hide a pending release.
+- Explicit activation, no unfinished-round gates, fresh online navigation, stored scores/drafts and worker compatibility are unchanged from212.86.
+- No migration or capability-description changes. Full local verification and external gates: RELEASE_VERIFICATION_212.87.md.
+
+## 212.86.261102 — explicit update banner (candidate)
+
+- Workers download in the background and wait for explicit activation, preserving older production pages that reload on controllerchange. Existing production SKIP_WAITING messages remain supported, without score-state checks.
+- Restore a dismissible new-version banner and Settings Update now action, with one shared status. No unfinished-round gate.
+- Version checks run on startup/reconnect/focus; numeric version ordering prevents requesting an older release.
+- Explicit update rechecks the server, requests the worker update, and navigates with a fresh URL. A restart target survives reload; success requires the running version to meet that target. Errors/timeouts identify the installed version and allow retry.
+- No forced reload on deployment/focus/controller change, no score/draft deletion or automatic uploads. Member capability descriptions remain as212.85, pending owner review.
+- No migrations. Actual iPhone/staging verification remains required. See RELEASE_VERIFICATION_212.86.md.
+
 ## 212.85.261102 — refresh what members can do (candidate)
 
 - The shared in-app capabilities list and both downloadable one-pagers now include Scramble, Alternate Shot, Ryder Cup events and round recaps.

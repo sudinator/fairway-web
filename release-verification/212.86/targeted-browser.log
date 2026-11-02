@@ -1,0 +1,9 @@
+(node:5) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+browser: fixture loaded
+browser: client ready
+browser: first worker ready
+browser: exercising old-worker transition
+browser: exercising explicit stale-page retry
+explicit update browser: PASS (actual212.78 reload handler stays idle during download, stale HTML detected, retry loads target, verified actual running version, one-shot URL, draft preservation)
+automatic update browser: PASS (actual212.83 worker upgrade, 3 versions, legacy/sleeping and active windows, no forced reload, next refresh, offline resume, no score deletion, guarded cache pruning)

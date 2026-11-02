@@ -94,21 +94,21 @@ async function main() {
   ok(clicked === 2, "cancelled activation restores score input");
   entry.unmount();
 
-  // Actual update components: version available -> hidden during game -> visible
-  // after conclusion -> hidden again on re-entry (A -> B -> A).
+  // Current update UI remains available through game start/end/re-entry.
+  // Legacy safety helpers above are retained compatibility tests, not live gates.
   const oldFetch = globalThis.fetch;
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: "999.0.261101" }) })) as any;
   let banner: ReturnType<typeof renderScreen>;
   await act(async () => { banner = renderScreen(<RegisterSW />); await new Promise(resolve => setTimeout(resolve, 20)); });
-  ok(banner!.text === "", "automatic updater has no manual banner");
+  ok(banner!.text.includes("Update now"), "new version offers an explicit update banner");
   act(() => protectUpdateSession("game", "render", true));
-  ok(banner!.text === "", "active game does not add update UI");
+  ok(banner!.text.includes("Update now"), "active game does not hide update action");
   const settings = renderScreen(<UpdateChecker />);
-  ok(!settings.text.includes("Update to") && settings.text.includes("Updates install automatically"), "Settings ignores historical session blockers");
+  ok(settings.text.includes("Update now") && !settings.text.includes("Updates are paused"), "Settings ignores historical session blockers");
   act(() => protectUpdateSession("game", "render", false));
-  ok(banner!.text === "", "ending a game does not require an update action");
+  ok(banner!.text.includes("Update now"), "ending a game retains the same update action");
   act(() => protectUpdateSession("game", "render", true));
-  ok(banner!.text === "", "reopening a game does not change automatic update policy");
+  ok(banner!.text.includes("Update now"), "reopening a game never reinstates an update gate");
   act(() => protectUpdateSession("game", "render", false));
   settings.unmount(); banner!.unmount(); globalThis.fetch = oldFetch;
   releaseUpdateInput(); releaseScoringDeviceRuntime();
