@@ -15,7 +15,13 @@
     },
     "strict": false,
     "strictNullChecks": true,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "resolveJsonModule": true,
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2021"
+    ]
   },
   "files": [
     "lib/screens.test.tsx",

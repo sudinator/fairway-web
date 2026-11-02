@@ -3143,7 +3143,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
   return (
     <div>
       <Eyebrow>HELP · HOW BIRDIE NUM NUM WORKS</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Tap the SCREEN selector at the top to move around.</div>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Use the bottom tabs and More menu to move around.</div>
 
       {(() => {
         const isTGC = effectiveGroupId(groupId) === TGC_GROUP_ID;
@@ -3155,7 +3155,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
         return (
           <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700, flex: 1 }}>What Birdie Num Num can do</div>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700, flex: "1 1 240px" }}>What Birdie Num Num can do</div>
               <a href={pdf} target="_blank" rel="noopener noreferrer" style={{ background: C.gold, color: C.green, fontWeight: 800, fontSize: 12, borderRadius: 8, padding: "7px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>Download one-pager (PDF)</a>
             </div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{capabilities.tagline}</div>
@@ -3197,7 +3197,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
       </Section>
 
       <Section title="Games with friends">
-        In <b>Games</b>, an organizer creates a Stableford or match-play game and shares a 6-digit code. Players enter the code to join, or the organizer adds them. Tap the code to copy it for a text. The organizer can set everyone's handicap and manage the roster.
+        In <b>Games</b>, an organizer chooses a format - including Scramble, Alternate Shot, Stableford, stroke play or match play - and shares a 6-digit code. Players enter the code to join, or the organizer adds them. Tap the code to copy it for a text. The organizer can set everyone's handicap and manage the roster.
       </Section>
 
       <Section title="Courses">

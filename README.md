@@ -1,3 +1,4 @@
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
 <!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
 <!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->

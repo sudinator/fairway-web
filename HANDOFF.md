@@ -1,3 +1,4 @@
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
 <!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
 <!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
@@ -1073,3 +1074,6 @@ Fixes missing feedback/dismissal in 212.79. Source: lib/app-update.ts, component
 
 ## Current212.84 automatic update handoff
 User explicitly replaced unfinished-round update deferral with automatic installation and fresh-open/refresh loading. No running-document reload on deployment/focus/controllerchange. No score/draft/round cleanup required. Pending data, ordinary scoring sync and primary-device security remain intact. Legacy verification/correction helpers are retained for source-copy compatibility, existing recovery archives and previously copied links; the live update flow does not call or render them. Legacy manual-worker behavior is kept only as an explicit browser-test fixture. Follow RELEASE_VERIFICATION_212.84.md and its staging/iPhone gates.
+
+## 212.85 member-guide upkeep
+User declined an updated-version banner and prefers monthly feature education by email. No banner or email sending/scheduling is added. Shared capabilities now cover all8 game formats, Ryder Cup events and round recaps. Scramble/Alternate Shot are in Help's Formats answer; Scramble and Ryder Cup have guidance. Both PDF editions regenerated from the same JSON. Every future member feature must review the guide/FAQ/PDFs; ci/check_capabilities_formats.py prevents format-list drift.

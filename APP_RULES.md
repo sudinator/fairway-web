@@ -1,3 +1,4 @@
+<!-- 212.85.261102: refreshed member capabilities/Help and one-pagers; automatic updates remain quiet. See RELEASE_VERIFICATION_212.85.md. -->
 <!-- 212.84.261101: automatic updates on fresh open/refresh; manual update deferral is superseded. See RELEASE_VERIFICATION_212.84.md. -->
 <!-- 212.83.261101: correction warnings link to the exact game/round and show its club; see RELEASE_VERIFICATION_212.83.md. -->
 <!-- 212.82.261101: saved-score verification and guarded recovery; see RELEASE_VERIFICATION_212.82.md. -->
@@ -358,3 +359,6 @@ Manual course handicap is authoritative for differential comparisons via a game-
 - A full stat card must cover every scheduled eligible hole; trailing array entries cannot compensate for missing holes.
 - Stat tests assert exact winners and values through app/share/email, using typed production-shaped fixtures. Tile presence alone is insufficient.
 - Bounce-back names and hole/score descriptions stay paired. Streaks count pars or better; clock spans are scoring windows, not measured tee-to-putt durations.
+
+## Member feature guide (212.85)
+When shipping a member-facing feature, review lib/capabilities.json and the relevant HelpSearch answers. Regenerate both public one-pager PDFs and marketing/onepager-content.txt from the shared source. The supported-format guard must cover every GAME_TYPES entry in the guide and the Formats answer. Describe implemented behavior and preserve edition restrictions. Automatic updates remain quiet: no release/update banner. Member education can use a separately reviewed monthly feature email; this rule does not authorize automatic email sends.

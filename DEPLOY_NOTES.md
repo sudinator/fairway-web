@@ -1,3 +1,11 @@
+## 212.85.261102 — refresh what members can do (candidate)
+
+- The shared in-app capabilities list and both downloadable one-pagers now include Scramble, Alternate Shot, Ryder Cup events and round recaps.
+- Help's Formats answer covers all8 supported game types, with new Scramble and Ryder Cup guidance; Games with friends no longer implies only Stableford/match play.
+- Course-correction wording reflects per-club changes before global approval. Offline wording describes saved scores and reconnection rather than guaranteeing that scores can never be lost.
+- Add a supported-format coverage guard to local CI and the one-pager workflow, plus a release checklist requirement to refresh member guidance with future features.
+- Quiet automatic updates unchanged. No banner, migration, email send or email schedule. Full codebase delivery; see RELEASE_VERIFICATION_212.85.md.
+
 ## 212.84.261101 — automatic updates (candidate)
 
 ### Behaviour changes
