@@ -1,3 +1,11 @@
+## 212.91.261106 — simplify Clubs and expose the published report (candidate)
+
+- Remove the Activity tab. Members and Club settings remain; member search/filter state survives the round trip.
+- Expand/collapse course rankings inline in the existing engagement summary, without changing the selected section. Reset expansion on club change.
+- Show the latest published club report directly in Members, with its actual period label, existing expand action, distinct loading/absent/error states and Retry. Do not duplicate it in Settings.
+- Existing reports are scheduled July 1 (January–June) and October 1 (July–September); no monthly schedule is added or implied. Production schedule/publication status has not been checked here.
+- No SQL, report-generation, scoring, engagement-counting, authorization or updater behavior changes. Full-source candidate; see RELEASE_VERIFICATION_212.91.md.
+
 ## 212.90.261106 — one club member directory (candidate)
 
 - Combine Players and Clubs into a Clubs hub with Members, Activity and Club settings. Keep legacy Players links and Admin shortcuts working.

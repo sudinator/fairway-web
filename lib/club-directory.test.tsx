@@ -1,6 +1,7 @@
 /** EXECUTED UI/loader scenarios with MODELLED database responses. No live database. */
 import { renderScreen, ok, eq, report } from './screen-harness';
 import React, { act } from 'react';
+import { buildClubReport } from './club-report';
 import { ClubHub } from '@/components/club-hub';
 import { clubDirectorySummary, filterClubDirectory, loadClubDirectory, type ClubDirectoryRow } from '@/lib/club-directory';
 const now=Date.now(),iso=(days:number)=>new Date(now-days*86400000).toISOString();
@@ -21,7 +22,7 @@ let failRead=false,failWrite=false,reportState:'none'|'error'|'yes'='none',write
  if(table==='group_members'&&failRead)return new Response(JSON.stringify({message:'Read unavailable'}),{status:400});
  if(table==='club_reports'&&reportState==='error')return new Response(JSON.stringify({message:'Report unavailable'}),{status:400});
  const gid=(url.searchParams.get('group_id')||'').replace('eq.','');
- const body=table==='club-engagement'?{period:{key:'club-30:2026-11-06',from:'2026-10-08',to:'2026-11-06',label:'Last 30 days'},rounds:0,standaloneRounds:0,members:0,totalMembers:2,courses:0,games:0,missingCourseRounds:0,participationPct:0,topCourses:[]}:table==='group_members'?memberships.filter(m=>m.group_id===gid&&m.status!=='removed'):table==='profiles'?profiles:table==='club_reports'&&reportState==='yes'?[{snapshot:{period:{label:'October'},games:2,rounds:4,members:2}}]:[];
+ const body=table==='club-engagement'?{period:{key:'club-30:2026-11-06',from:'2026-10-08',to:'2026-11-06',label:'Last 30 days'},rounds:0,standaloneRounds:0,members:0,totalMembers:2,courses:0,games:0,missingCourseRounds:0,participationPct:0,topCourses:[]}:table==='group_members'?memberships.filter(m=>m.group_id===gid&&m.status!=='removed'):table==='profiles'?profiles:table==='club_reports'&&reportState==='yes'?[{snapshot:buildClubReport('Main',{key:'2026-Q3',label:'July–September 2026',from:'2026-07-01',to:'2026-09-30'},[])}]:[];
  return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
 };
 const settle=()=>act(async()=>{await new Promise(r=>setTimeout(r,35));});
@@ -36,14 +37,20 @@ function tab(t:ReturnType<typeof renderScreen>,name:string){const b=[...t.el.que
  function searchFor(value:string){act(()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!.call(search,value);search.dispatchEvent(new Event('input',{bubbles:true}));});}
  searchFor('Bo');ok(!t.el.textContent?.includes('Alice Admin')&&t.el.textContent?.includes('Bo Member'),'search changes rendered cards');searchFor('');ok(t.el.textContent?.includes('Alice Admin'),'clearing search restores directory');
  t.click('Missing handicap');ok(t.el.textContent?.includes('Bo Member')&&!t.el.textContent?.includes('Alice Admin'),'missing handicap filter rendered');t.click('All');
- tab(t,'Activity');await settle();ok(t.el.textContent?.includes('No published club report'),'no invented report');
- reportState='error';tab(t,'Members');tab(t,'Activity');await settle();ok(t.el.textContent?.includes("Couldn't load the club report"),'report errors differ from no report');
- reportState='yes';t.click('Retry');await settle();ok(t.el.textContent?.includes('CLUB REPORT · OCTOBER'),'report retry loads actual fixture snapshot');
- tab(t,'Club settings');await settle();ok(!t.el.querySelector('[data-club-latest-report]'),'report not duplicated in settings');ok(t.el.textContent?.includes('Generate invite link'),'invitation controls retained');
+ ok(![...t.el.querySelectorAll('[role="tab"]')].some(e=>e.textContent==='Activity'),'Activity tab removed');
+ ok(t.el.textContent?.includes('No published club report'),'no invented report directly in Members');
+ t.click('See courses & participation');await settle();ok(t.el.textContent?.includes('Hide course details'),'inline details expand');
+ ok(t.el.querySelector('[role="tab"][aria-selected="true"]')?.textContent==='Members','expansion keeps directory selected');
+ t.click('Hide course details');await settle();ok(t.el.textContent?.includes('See courses & participation'),'inline details collapse');
+ searchFor('Bo');tab(t,'Club settings');tab(t,'Members');ok(search.value==='Bo'&&t.el.textContent?.includes('Bo Member'),'member search survives Settings round trip');searchFor('');
+ reportState='error';t.click('Switch test club');await settle();t.click('Switch test club');await settle();ok(t.el.textContent?.includes("Couldn't load the club report"),'report errors differ from no report');
+ reportState='yes';t.click('Retry');await settle();ok(t.el.textContent?.includes('CLUB REPORT · JULY–SEPTEMBER 2026'),'report retry loads actual fixture period, not a monthly label');
+ t.click('See the report');await settle();ok(!!t.el.querySelector('[data-club-latest-report]')&& !t.el.textContent?.includes('See the report →'),'actual published report expands');
+ tab(t,'Club settings');await settle();ok(t.el.querySelectorAll('[data-club-latest-report]').length===1&&t.el.querySelector('[data-club-latest-report]')?.parentElement?.hidden,'single report stays in hidden Members pane, not Settings');ok(t.el.textContent?.includes('Generate invite link'),'invitation controls retained');
  tab(t,'Members');ok(t.el.textContent?.includes('Alice Admin'),'directory remains across subtab round trip');
  failWrite=true;const before=writes;t.click('Make club admin');await settle();eq(writes,before+1,'one attempted role write');ok(t.el.textContent?.includes("Couldn't change this role"),'failed write visible');ok(t.el.textContent?.includes('Bo Member'),'failed write retains roster');
  failWrite=false;t.click('Make club admin');await settle();ok(t.el.textContent?.includes('Remove club admin'),'role retry refreshes visible role');
- t.click('Switch test club');await settle();ok(!t.el.textContent?.includes('Alice Admin')&&!t.el.textContent?.includes('Bo Member'),'old club data cleared');ok(t.el.textContent?.includes('Club B Member'),'new club loaded');ok(!t.el.textContent?.includes('Invite members')&&!t.el.textContent?.includes('Make club admin'),'member role has no management actions');
+ t.click('See courses & participation');await settle();t.click('Switch test club');await settle();ok(t.el.textContent?.includes('See courses & participation')&&!t.el.textContent?.includes('Hide course details'),'new club resets inline details');ok(!t.el.textContent?.includes('Alice Admin')&&!t.el.textContent?.includes('Bo Member'),'old club data cleared');ok(t.el.textContent?.includes('Club B Member'),'new club loaded');ok(!t.el.textContent?.includes('Invite members')&&!t.el.textContent?.includes('Make club admin'),'member role has no management actions');
  t.click('Switch test club');await settle();ok(t.el.textContent?.includes('Alice Admin'),'A-B-A round trip reloads correct club');t.unmount();
  failRead=true;const bad=renderScreen(<View/>);await settle();ok(bad.el.querySelector('[role="alert"]'),'read failure visible');ok(bad.el.querySelector('[data-club-summary]')!.textContent!.includes('—'),'read failure is not zero members');tab(bad,'Club settings');await settle();ok(!bad.el.textContent?.includes('Delete club'),'unknown membership count never offers delete');failRead=false;tab(bad,'Members');const retry=bad.el.querySelector('[role="alert"] button') as HTMLButtonElement;act(()=>retry.click());await settle();ok(bad.el.textContent?.includes('Alice Admin'),'read retry recovers');bad.unmount();
  const empty=renderScreen(<ClubHub user={{id:'a'}} groups={[]} activeGroupId={null} onGroupsChanged={()=>{}} onActiveGroupChange={()=>{}}/>);await settle();ok(empty.el.textContent?.includes('Submit request'),'no-club member can still request a club');empty.unmount();

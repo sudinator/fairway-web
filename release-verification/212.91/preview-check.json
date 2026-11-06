@@ -1,0 +1,5 @@
+{
+  "checks": 6,
+  "errors": [],
+  "evidence": "EXECUTED Chromium role/section and expand-collapse controls on actual component snapshots; MODELLED data"
+}

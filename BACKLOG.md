@@ -1553,3 +1553,5 @@ Manual course handicap is authoritative for differential comparisons via a game-
 - Add member-since date only after confirming actual club-join semantics; membership creation can predate joining when invited.
 - Add per-member last club round to the directory. The live aggregate 30-day participation summary is implemented in 212.90, separately from app-open activity.
 - Add per-member activity sorting after the consolidated directory is validated. Activity now includes live engagement and top courses, plus a saved published report when available.
+
+- Club report cadence: owner asked whether a monthly report exists (Nov 6). Existing schedule is July 1 / October 1; monthly generation is not implemented by 212.91. Confirm any desired cadence change before changing database jobs.

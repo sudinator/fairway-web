@@ -21,7 +21,8 @@ export function ClubHub({ user, groups, activeGroupId, onGroupsChanged, onActive
 function ClubHubContent({ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted, initialPane = "members" }: Props) {
   const active = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
   const admin = active?.role === "admin";
-  const [pane, setPane] = useState<"members" | "activity" | "settings">(initialPane);
+  const [pane, setPane] = useState<"members" | "settings">(initialPane);
+  const [showCourses, setShowCourses] = useState(false);
   const now = useNowTick(60_000);
   const [summary, setSummary] = useState<ClubDirectorySummary | null>(null);
   const receiveSummary = useCallback((value: ClubDirectorySummary | null) => setSummary(value), []);
@@ -36,15 +37,15 @@ function ClubHubContent({ user, groups, activeGroupId, onGroupsChanged, onActive
       {tiles.map(([n, label]) => <div key={label} style={{ flex: 1, minWidth: 0, padding: "13px 16px", background: C.greenLight, borderRadius: 12 }}><div style={{ color: C.cream, fontSize: 24, fontFamily: "Georgia, serif", fontWeight: 800 }}>{n == null ? "—" : n}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{label}</div></div>)}
     </div>
     <div style={{ color: C.sage, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>Opened BNN measures app use across all clubs, not rounds played in this club.{summary?.unknownActivity ? ` Activity is not recorded for ${summary.unknownActivity} member${summary.unknownActivity === 1 ? "" : "s"}.` : ""}</div>
-    <ClubEngagement key={`engagement:${active.id}`} groupId={active.id} now={now} refreshKey={groups} compact={pane !== "activity"} onDetails={() => setPane("activity")} />
+    <ClubEngagement key={`engagement:${active.id}`} groupId={active.id} now={now} refreshKey={groups} compact={!showCourses} onDetails={() => setShowCourses((value) => !value)} />
     {admin && <ClubPendingSignups key={`pending:${active.id}`} groupId={active.id} groupName={active.name} />}
     <div role="tablist" aria-label="Club sections" style={{ display: "flex", gap: 16, marginTop: 16, marginBottom: 12 }}>
-      {([["members", "Members"], ["activity", "Activity"], ["settings", "Club settings"]] as const).map(([id, text]) => <button key={id} type="button" role="tab" aria-selected={pane === id} onClick={() => setPane(id)} style={{ background: "none", border: "none", borderBottom: `2px solid ${pane === id ? C.gold : "transparent"}`, color: pane === id ? C.gold : C.sage, padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>{text}</button>)}
+      {([["members", "Members"], ["settings", "Club settings"]] as const).map(([id, text]) => <button key={id} type="button" role="tab" aria-selected={pane === id} onClick={() => setPane(id)} style={{ background: "none", border: "none", borderBottom: `2px solid ${pane === id ? C.gold : "transparent"}`, color: pane === id ? C.gold : C.sage, padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>{text}</button>)}
     </div>
     <div hidden={pane !== "members"} style={{ display: pane === "members" ? "block" : "none" }}>
+      <ClubLatestReport key={`report:${active.id}`} groupId={active.id} showEmpty />
       <PlayersTab user={user} activeGroupId={active.id} isGroupAdmin={admin} onChanged={onGroupsChanged} directoryTools onSummary={receiveSummary} summaryNow={now} />
     </div>
-    {pane === "activity" && <ClubLatestReport key={`report:${active.id}`} groupId={active.id} showEmpty />}
     {pane === "settings" && <GroupsPanel {...{ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted }} settingsOnly />}
   </div>;
 }
