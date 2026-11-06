@@ -1,0 +1,115 @@
+{
+  "checks": 57,
+  "errors": [],
+  "captionMeasurements": [
+    {
+      "width": 284,
+      "window": "Last 5",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 284,
+      "height": 13
+    },
+    {
+      "width": 284,
+      "window": "Last 20",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 284,
+      "height": 13
+    },
+    {
+      "width": 284,
+      "window": "Season",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 284,
+      "height": 13
+    },
+    {
+      "width": 284,
+      "window": "All",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 284,
+      "height": 13
+    },
+    {
+      "width": 354,
+      "window": "Last 5",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 354,
+      "height": 13
+    },
+    {
+      "width": 354,
+      "window": "Last 20",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 354,
+      "height": 13
+    },
+    {
+      "width": 354,
+      "window": "Season",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 354,
+      "height": 13
+    },
+    {
+      "width": 354,
+      "window": "All",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 354,
+      "height": 13
+    },
+    {
+      "width": 394,
+      "window": "Last 5",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 394,
+      "height": 13
+    },
+    {
+      "width": 394,
+      "window": "Last 20",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 394,
+      "height": 13
+    },
+    {
+      "width": 394,
+      "window": "Season",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 394,
+      "height": 13
+    },
+    {
+      "width": 394,
+      "window": "All",
+      "color": "rgb(178, 203, 189)",
+      "size": "11px",
+      "whiteSpace": "nowrap",
+      "scroll": 394,
+      "height": 13
+    }
+  ],
+  "evidence": "EXECUTED Chromium; actual client component snapshots with MODELLED reads; 320/390/430px; club 2 roles × 3 periods × collapsed/expanded and actual dashboard 4 picker states; extra zero/singular/9999 caption simulations. No live app/session."
+}

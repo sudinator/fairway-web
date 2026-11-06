@@ -354,13 +354,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               }}>{label}</button>
             )))}
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 5, textAlign: "center" }}>
-            {done.length === 0
-              ? (win === "season" ? "No rounds yet this season" : "No rounds in this range")
-              : win === "all" ? `Stats reflect all ${done.length} round${done.length === 1 ? "" : "s"}`
-              : win === "season" ? `Stats reflect this season · ${done.length} round${done.length === 1 ? "" : "s"}`
-              : `Stats reflect your last ${done.length} round${done.length === 1 ? "" : "s"}`}
-            <span style={{ color: C.faint }}> · index always uses WHS best-8-of-20</span>
+          <div data-dashboard-range-caption style={{ color: C.sage, fontSize: 11, marginTop: 5, textAlign: "center", whiteSpace: "nowrap" }}>
+            Stats: {done.length} round{done.length === 1 ? "" : "s"} · WHS index: best 8 of 20
           </div>
         </div>
       )}

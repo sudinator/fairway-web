@@ -1555,3 +1555,6 @@ Manual course handicap is authoritative for differential comparisons via a game-
 - Add per-member activity sorting after the consolidated directory is validated. Activity now includes live engagement and top courses, plus a saved published report when available.
 
 - Club report cadence: owner asked whether a monthly report exists (Nov 6). Existing schedule is July 1 / October 1; monthly generation is not implemented by 212.91. Confirm any desired cadence change before changing database jobs.
+
+- Completed in 212.92: aggregate club period selector (30/90/YTD), repeat-player count, recorded holes, gross score categories and format mix; no personal rankings. Header invitation shortcut removed; real invite controls stay in Settings.
+- Invitation result copy: after generating 24-hour/7-day links, GroupsPanel still says “Expires in 30 days and can only be used once.” Match that label to linkKind in a later focused change; actual generator already uses the selected expiry/use limit.

@@ -9,7 +9,7 @@ import { ClubEngagement } from "@/components/club-engagement";
 import { ClubLatestReport } from "@/components/club-latest-report";
 import { ClubPendingSignups } from "@/components/club-pending-signups";
 import { useNowTick } from "@/lib/use-now-tick";
-import { btn, Eyebrow } from "@/components/ui";
+import { Eyebrow } from "@/components/ui";
 
 type Props = { user: any; groups: AppGroup[]; activeGroupId: string | null; onGroupsChanged: () => Promise<void> | void;
   onActiveGroupChange: (id: string) => void; onGroupDeleted?: () => Promise<void> | void; initialPane?: "members" | "settings" };
@@ -27,11 +27,10 @@ function ClubHubContent({ user, groups, activeGroupId, onGroupsChanged, onActive
   const [summary, setSummary] = useState<ClubDirectorySummary | null>(null);
   const receiveSummary = useCallback((value: ClubDirectorySummary | null) => setSummary(value), []);
   if (!active) return <GroupsPanel {...{ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted }} settingsOnly />;
-  const tiles = [[summary?.members, "Members"], [summary?.opened30, "Opened BNN · 30 days"], [admin ? summary?.invited : summary?.admins, admin ? "Invited players" : "Club admins"]] as const;
+  const tiles = [[summary?.members, "Total club members"], [summary?.opened30, "Opened BNN · 30 days"], [admin ? summary?.invited : summary?.admins, admin ? "Invited players" : "Club admins"]] as const;
   return <div data-club-hub>
     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
       <div style={{ flex: 1, minWidth: 0 }}><Eyebrow>YOUR CLUB</Eyebrow><h2 style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, margin: "8px 0" }}>{active.name}</h2><div style={{ color: C.sage, fontSize: 12 }}>{admin ? "Club admin" : "Member"}</div></div>
-      {admin && <button type="button" style={{ ...btn(true), fontSize: 12 }} onClick={() => setPane("settings")}>Invite members</button>}
     </div>
     <div data-club-summary style={{ display: "flex", gap: 8, marginTop: 16 }}>
       {tiles.map(([n, label]) => <div key={label} style={{ flex: 1, minWidth: 0, padding: "13px 16px", background: C.greenLight, borderRadius: 12 }}><div style={{ color: C.cream, fontSize: 24, fontFamily: "Georgia, serif", fontWeight: 800 }}>{n == null ? "—" : n}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{label}</div></div>)}

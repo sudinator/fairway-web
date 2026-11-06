@@ -1,5 +1,5 @@
 {
-  "total": 441196,
+  "total": 441368,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -102,8 +102,9 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "update safety": 38,
-    "combined club directory": 51,
+    "combined club directory": 58,
     "club engagement": 43,
-    "club engagement route": 24
+    "club engagement route": 38,
+    "club activity periods and scores": 151
   }
 }
