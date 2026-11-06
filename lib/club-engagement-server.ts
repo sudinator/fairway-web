@@ -19,7 +19,7 @@ export async function getClubEngagement(db: SupabaseClient, callerId: string, gr
   const rounds: Omit<EngagementRound, "holes">[] = [];
   for (let i = 0; i < ids.length; i += 100) {
     rounds.push(...await fetchAll<Omit<EngagementRound, "holes">>((from, to) => db.from("rounds")
-      .select("id,user_id,group_id,course,played_at,game_id,status,deleted_at").eq("group_id", groupId).in("user_id", ids.slice(i, i + 100))
+      .select("id,user_id,group_id,course,played_at,game_id,status,deleted_at,course_handicap,course_handicap_source,handicap_index,rating,slope,course_par").eq("group_id", groupId).in("user_id", ids.slice(i, i + 100))
       .is("game_id", null).is("deleted_at", null).or("status.is.null,status.eq.final").gte("played_at", period.from).lte("played_at", `${period.to}T23:59:59.999999`).order("id").range(from, to)));
   }
   const holes = await fetchAllIn<import("./golf").Hole & { round_id: string }>(db, "holes", "round_id", rounds.map((r) => r.id));

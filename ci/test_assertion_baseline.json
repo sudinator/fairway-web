@@ -1,5 +1,5 @@
 {
-  "total": 441368,
+  "total": 441709,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -104,7 +104,8 @@
     "update safety": 38,
     "combined club directory": 58,
     "club engagement": 43,
-    "club engagement route": 38,
-    "club activity periods and scores": 151
+    "club engagement route": 45,
+    "club activity periods and scores": 151,
+    "club net scoring": 334
   }
 }
