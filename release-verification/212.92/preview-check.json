@@ -1,0 +1,5 @@
+{
+  "checks": 6,
+  "errors": [],
+  "evidence": "EXECUTED Chromium preview navigation; MODELLED actual component snapshots, 320px; 2 roles × 3 periods × details round trip; all four dashboard windows each time"
+}

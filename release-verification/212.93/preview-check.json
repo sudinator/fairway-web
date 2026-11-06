@@ -1,0 +1,5 @@
+{
+  "checks": 6,
+  "errors": [],
+  "evidence": "EXECUTED Chromium at 320px; MODELLED actual component states; 2 roles × 3 periods; readable dates, invariant total membership tile, expand/collapse and dashboard windows"
+}

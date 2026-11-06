@@ -2,9 +2,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll, fetchAllIn } from "./fetch-all";
 import { loadClubGames } from "./club-report-load";
-import { buildClubEngagement, clubEngagementPeriod, type EngagementRound } from "./club-engagement";
+import { buildClubEngagement, clubEngagementPeriod, type ClubEngagementRange, type EngagementRound } from "./club-engagement";
 export class ClubEngagementDenied extends Error {}
-export async function getClubEngagement(db: SupabaseClient, callerId: string, groupId: string, now: number) {
+export async function getClubEngagement(db: SupabaseClient, callerId: string, groupId: string, now: number, range: ClubEngagementRange = "30") {
   const { data: profile, error: profileError } = await db.from("profiles").select("account_status,banned").eq("id", callerId).maybeSingle();
   if (profileError) throw profileError;
   if (!profile || (profile.account_status ?? "active") !== "active" || profile.banned) throw new ClubEngagementDenied("Account unavailable");
@@ -14,7 +14,7 @@ export async function getClubEngagement(db: SupabaseClient, callerId: string, gr
   const members = await fetchAll<{ user_id: string | null; status: string; is_support: boolean }>((from, to) => db.from("group_members")
     .select("id,user_id,status,is_support").eq("group_id", groupId).eq("status", "active").eq("is_support", false).order("id").range(from, to));
   const ids = [...new Set(members.filter((r) => r.status === "active" && !r.is_support && r.user_id).map((r) => r.user_id!))];
-  const period = clubEngagementPeriod(now);
+  const period = clubEngagementPeriod(now, range);
   const input = ids.length ? await loadClubGames(db, groupId, period) : [];
   const rounds: Omit<EngagementRound, "holes">[] = [];
   for (let i = 0; i < ids.length; i += 100) {

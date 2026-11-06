@@ -1,3 +1,18 @@
+## 212.93.261106 — readable club dates and explicit member total (candidate)
+
+- Show club play periods as Oct 8 – Nov 6 rather than ISO dates. Include years on both ends when a range crosses a year boundary. Format civil dates consistently in every viewer time zone; date/query boundaries are unchanged.
+- Label the existing membership tile Total club members. Preserve the current active non-support member count, independent of the play window; keep invitations separate. Include the actual membership summary in the candidate preview instead of omitting it.
+- No aggregate/scoring, period selection, endpoint, membership permission, report-cadence, dashboard or updater changes. No migration or dependency change. Full-source candidate; see RELEASE_VERIFICATION_212.93.md.
+
+## 212.92.261106 — club play periods and aggregate engagement (candidate)
+
+- Add Last 30 days, Last 90 days and Year to date using US Eastern calendar dates. Update all club play totals together; keep app-open activity explicitly separate.
+- Add repeat-player count (2+ distinct qualifying rounds), completed-game format mix, recorded holes and gross eagles/birdies/pars/bogeys/doubles+ totals. Reuse the existing gross scoring buckets. Shared Scramble/Alternate Shot holes count once per side; personal game posts do not count twice. Missing par is disclosed and excluded from score classification.
+- Keep details expandable/collapsible inline, no Activity tab, no player names or performance rankings in the aggregate section. Keep the published report, member directory/phone/profile/Say hi, club permissions and actual Settings invitation controls.
+- Remove the redundant Invite members shortcut from the club header. Club name remains cream.
+- Owner selected shorter dashboard copy to fit one line: “Stats: 5 rounds · WHS index: best 8 of 20” (round count changes with selection). Sage text, 11px minimum; no scoring/index calculation change.
+- No migration, report-cadence, dependency, scoring persistence or updater-policy change. Full-source candidate; executed/modelled evidence and pending external gates: RELEASE_VERIFICATION_212.92.md.
+
 ## 212.91.261106 — simplify Clubs and expose the published report (candidate)
 
 - Remove the Activity tab. Members and Club settings remain; member search/filter state survives the round trip.

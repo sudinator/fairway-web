@@ -21,7 +21,8 @@
       "DOM",
       "DOM.Iterable",
       "ES2021"
-    ]
+    ],
+    "strictFunctionTypes": true
   },
   "files": [
     "lib/screens.test.tsx",
@@ -137,6 +138,7 @@
     "lib/score-correction-links.test.tsx",
     "lib/match-results-presentation.test.tsx",
     "lib/club-directory.test.tsx",
-    "lib/club-engagement.test.tsx"
+    "lib/club-engagement.test.tsx",
+    "lib/club-activity-expansion.test.tsx"
   ]
 }
