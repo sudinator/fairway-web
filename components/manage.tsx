@@ -3,6 +3,7 @@
 import { UpdateChecker } from "@/components/app-update-checker";
 import { SaveTraceToggle } from "@/components/save-trace-view";
 import { StorageMeter } from "@/components/storage-meter";
+import { loadClubDirectory, clubDirectorySummary, filterClubDirectory, type ClubDirectorySummary } from "@/lib/club-directory";
 import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
@@ -2209,37 +2210,40 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
 
 // ================= Players directory =================
 // Everyone can see who else has access: name, handicap (if set), and phone to reach them.
-export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { user: any; activeGroupId: string; isGroupAdmin: boolean; onChanged?: () => void }) {
+export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged, directoryTools = false, onSummary, summaryNow }: { user: any; activeGroupId: string; isGroupAdmin: boolean; onChanged?: () => void; directoryTools?: boolean; onSummary?: (value: ClubDirectorySummary | null) => void; summaryNow?: number }) {
   const [players, setPlayers] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [cardMember, setCardMember] = useState<any | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "admin" | "invited" | "handicap">("all");
+  const request = React.useRef(0);
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("group_members")
-      .select("id, user_id, email, role, status, avatar_url")
-      .eq("group_id", activeGroupId)
-      .neq("status", "removed")
-      .order("role")
-      .order("email");
-    const rows = data || [];
-    const ids = rows.map((r: any) => r.user_id).filter(Boolean);
-    let profilesById: Record<string, any> = {};
-    if (ids.length) {
-      // bounded: one club's members
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
-      profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
+    const version = ++request.current;
+    setLoadError(null);
+    try {
+      const rows = await loadClubDirectory(supabase, activeGroupId);
+      if (version === request.current) setPlayers(rows);
+    } catch (e: any) {
+      if (version === request.current) setLoadError(failureMessage("Couldn't load the club members", e));
     }
-    setPlayers(rows.map((r: any) => ({ ...r, profiles: r.user_id ? profilesById[r.user_id] || null : null })));
   }, [activeGroupId]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setPlayers(null); setQuery(""); setFilter("all"); setEdits({}); setCardMember(null);
+    void load();
+    return () => { request.current++; };
+  }, [load]);
+  const summary = React.useMemo(() => players ? clubDirectorySummary(players, summaryNow ?? 0) : null, [players, summaryNow]);
+  useEffect(() => { onSummary?.(summary); }, [onSummary, summary]);
+  const visible = directoryTools && players ? filterClubDirectory(players, query, filter) : players;
 
   // Group admin: set a member's handicap index (updates their profile; notifies them).
   const saveHandicap = async (row: any) => {
     const raw = edits[row.id];
-    if (raw === undefined || !row.user_id) return;
+    if (!isGroupAdmin || raw === undefined || !row.user_id) return;
     const idx = raw.trim() === "" ? null : parseFloat(raw);
     setBusyId(row.id); setMsg(null);
     const { error } = await supabase.from("profiles").update({ handicap_index: idx }).eq("id", row.user_id);
@@ -2254,8 +2258,10 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 
   // Group admin: promote/demote within the group.
   const toggleRole = async (row: any) => {
+    if (!isGroupAdmin || row.user_id === user.id) return;
     setBusyId(row.id); setMsg(null);
-    await supabase.from("group_members").update({ role: row.role === "admin" ? "member" : "admin" }).eq("id", row.id);
+    const { error } = await supabase.from("group_members").update({ role: row.role === "admin" ? "member" : "admin" }).eq("id", row.id);
+    if (error) { setMsg(failureMessage("Couldn't change this role", error)); setBusyId(null); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "role_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Changed ${row.profiles?.display_name || row.email} to ${row.role === "admin" ? "member" : "club admin"}` });
     setBusyId(null);
     await load(); onChanged?.();
@@ -2263,9 +2269,11 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 
   // Group admin: remove a member from THIS group (does not delete their account or other groups).
   const removeFromGroup = async (row: any) => {
+    if (!isGroupAdmin || row.user_id === user.id) return;
     if (!confirm(`Remove ${row.profiles?.display_name || row.email} from this club?\n\nThis only affects this club — their account and other clubs are untouched.`)) return;
     setBusyId(row.id); setMsg(null);
-    await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
+    const { error } = await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
+    if (error) { setMsg(failureMessage("Couldn't remove this member", error)); setBusyId(null); return; }
     if (row.user_id && row.user_id !== user.id) await notify(row.user_id, `You were removed from a group by an admin.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "member_removed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Removed ${row.profiles?.display_name || row.email} from a group` });
     setBusyId(null);
@@ -2274,15 +2282,24 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 
   return (
     <div>
-      <Eyebrow>PLAYERS · CURRENT CLUB</Eyebrow>
+      <Eyebrow>{directoryTools ? "MEMBERS" : "PLAYERS · CURRENT CLUB"}</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Members and invited players in the selected group. Tap a phone number to call or text.
         {isGroupAdmin ? " As a club admin you can set handicaps, change roles, and remove players from this club." : ""}
       </div>
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
-      {players === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+      {directoryTools && <div style={{ marginTop: 12 }}>
+        <input aria-label="Search club members" placeholder="Search by name, email, phone or GHIN" value={query} onChange={(e) => setQuery(e.target.value)} style={{ ...inputStyle, width: "100%", fontSize: 14 }} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          {([["all", "All"], ["admin", "Club admins"], ["invited", "Invited"], ...(isGroupAdmin ? [["handicap", "Missing handicap"]] : [])] as [typeof filter, string][]).map(([id, text]) => <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} style={{ ...btn(filter === id), fontSize: 11, padding: "8px 12px", minHeight: 30 }}>{text}</button>)}
+        </div>
+        {isGroupAdmin && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Invited players have not joined yet. Shared invitation links are not included in this count.</div>}
+      </div>}
+      {loadError && <div role="alert" style={{ color: C.cream, background: C.greenLight, borderRadius: 8, padding: 12, marginTop: 12 }}>{loadError} <button type="button" style={{ ...btn(false), fontSize: 12 }} onClick={() => void load()}>Retry</button></div>}
+      {players === null && !loadError && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {players?.length === 0 && <div style={{ color: C.sage, marginTop: 14 }}>No players yet.</div>}
-      {players?.map((row: any) => {
+      {players && players.length > 0 && visible?.length === 0 && <div style={{ color: C.sage, marginTop: 14 }}>No matching members.</div>}
+      {visible?.map((row: any) => {
         const p = row.profiles || {};
         const self = row.user_id === user.id;
         return (

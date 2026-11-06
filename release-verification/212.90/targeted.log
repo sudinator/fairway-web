@@ -1,0 +1,13 @@
+(node:22) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Couldn't load the club report] BNN-UNK { message: 'Report unavailable' }
+[Couldn't change this role] BNN-UNK { message: 'Write rejected' }
+[Couldn't load the club members] BNN-UNK Error: Read unavailable
+    at fetchAll (/workspace/scratch/02068af8b213/release-21290/.testout-screens/lib/fetch-all.js:19:19)
+    at async loadClubDirectory (/workspace/scratch/02068af8b213/release-21290/.testout-screens/lib/club-directory.js:9:18)
+    at async /workspace/scratch/02068af8b213/release-21290/.testout-screens/components/manage.js:1269:26
+[Couldn't load the club members] BNN-UNK Error: Read unavailable
+    at fetchAll (/workspace/scratch/02068af8b213/release-21290/.testout-screens/lib/fetch-all.js:19:19)
+    at async loadClubDirectory (/workspace/scratch/02068af8b213/release-21290/.testout-screens/lib/club-directory.js:9:18)
+    at async /workspace/scratch/02068af8b213/release-21290/.testout-screens/components/groups.js:105:26
+combined club directory: 44 passed, 0 failed
