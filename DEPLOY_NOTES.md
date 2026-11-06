@@ -1,3 +1,21 @@
+## 212.91.261106 — simplify Clubs and expose the published report (candidate)
+
+- Remove the Activity tab. Members and Club settings remain; member search/filter state survives the round trip.
+- Expand/collapse course rankings inline in the existing engagement summary, without changing the selected section. Reset expansion on club change.
+- Show the latest published club report directly in Members, with its actual period label, existing expand action, distinct loading/absent/error states and Retry. Do not duplicate it in Settings.
+- Existing reports are scheduled July 1 (January–June) and October 1 (July–September); no monthly schedule is added or implied. Production schedule/publication status has not been checked here.
+- No SQL, report-generation, scoring, engagement-counting, authorization or updater behavior changes. Full-source candidate; see RELEASE_VERIFICATION_212.91.md.
+
+## 212.90.261106 — one club member directory (candidate)
+
+- Combine Players and Clubs into a Clubs hub with Members, Activity and Club settings. Keep legacy Players links and Admin shortcuts working.
+- Retain player cards, contact links, handicap editing and club role/removal actions. Add search and member/admin/invited/missing-handicap filters.
+- Summary counts current members, members who opened BNN within 30 days, and invited players (club admins) or club admins (members). Exclude support memberships from directory counts; app opens are explicitly not club participation. Unknown activity is labelled.
+- Paginate memberships/profile reads, reset per-club state on switching, preserve rows on read failures and show Retry. Reject failed role/removal writes before success side effects; club deletion is unavailable when membership reads fail.
+- Activity shows only a saved report; absent reports and failed reads have distinct empty/error states. No sample report, report-generation job, SQL migration, scoring or updater changes.
+- Live 30-day engagement: qualifying member rounds, participating members, courses, participation percentage and the three most-played courses. Includes finalized club-linked personal rounds and shared-ball participation; game-posted rounds count once. Club-member-authenticated read-only endpoint returns aggregates only. No published report required.
+- Full-source candidate. Local/external evidence: RELEASE_VERIFICATION_212.90.md.
+
 ## 212.89.261102 — consistent match result cards (candidate)
 
 - Keep team names and players in Four-ball/Alternate Shot; reuse the Trifecta row to emphasize the leading side and show the official closeout. Existing detail toggles remain.

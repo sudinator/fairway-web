@@ -1,0 +1,42 @@
+{
+  "version": "212.90.261106",
+  "base": "212.89.261102",
+  "existingFilesChanged": [
+    "BACKLOG.md",
+    "DEPLOY_NOTES.md",
+    "README-UPLOAD.txt",
+    "ci/test_assertion_baseline.json",
+    "components/club-latest-report.tsx",
+    "components/groups.tsx",
+    "components/home.tsx",
+    "components/manage.tsx",
+    "lib/app-version.ts",
+    "package-lock.json",
+    "package.json",
+    "public/app-version.json",
+    "public/sw.js",
+    "tsconfig.screens.json"
+  ],
+  "newSourceAndVerificationFiles": [
+    "components/club-hub.tsx",
+    "components/club-engagement.tsx",
+    "lib/club-directory.ts",
+    "lib/club-directory.test.tsx",
+    "lib/club-engagement.ts",
+    "lib/club-engagement-server.ts",
+    "lib/club-engagement.test.tsx",
+    "app/api/club-engagement/route.ts",
+    "ci/test-club-engagement-route.cjs",
+    "RELEASE_VERIFICATION_212.90.md"
+  ],
+  "sqlFilesByteIdentical": 313,
+  "dependenciesUnchanged": true,
+  "workerBodyUnchangedExceptVersionStamp": true,
+  "privateArtifactsExcluded": true,
+  "highConfidenceCredentialScan": "PASS: authored/changed text",
+  "fullLocalCiExitCode": 0,
+  "differentialChecks": 329,
+  "phoneLayoutChecks": 18,
+  "previewNavigationChecks": 6,
+  "externalGates": "Pending: GitHub verify, Vercel staging, staging integration, actual phones"
+}

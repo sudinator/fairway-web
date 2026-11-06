@@ -1,0 +1,12 @@
+{
+  "checks": 329,
+  "unchangedWriteHelpers": [
+    "GroupsPanel/loadMyRequests",
+    "GroupsPanel/createGroup",
+    "GroupsPanel/renameGroup",
+    "GroupsPanel/generateInvite",
+    "GroupsPanel/copyInviteLink",
+    "GroupsPanel/updateMember"
+  ],
+  "notes": "All pre-existing lib files (except generated app-version.ts) and selected scoring/device/update components byte-identical. Original club request/rename/invite/update helpers preserved; directory reads and documented membership error guards intentionally changed."
+}

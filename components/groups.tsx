@@ -3,6 +3,7 @@
 import { ClubPendingSignups } from "@/components/club-pending-signups";
 import { ClubLatestReport } from "@/components/club-latest-report";
 import React, { useCallback, useEffect, useState } from "react";
+import { loadClubDirectory } from "@/lib/club-directory";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C, TGC_GROUP_ID, APP_TESTING_GROUP_ID, MIRROR_KEY, effectiveGroupId } from "@/lib/golf";
@@ -63,13 +64,14 @@ function FeatureMirrorControl({ groups, activeGroupId }: { groups: AppGroup[]; a
   );
 }
 
-export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted }: {
+export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted, settingsOnly = false }: {
   user: any;
   groups: AppGroup[];
   activeGroupId: string | null;
   onGroupsChanged: () => Promise<void> | void;
   onActiveGroupChange: (id: string) => void;
   onGroupDeleted?: () => Promise<void> | void;
+  settingsOnly?: boolean;
 }) {
   const active = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
   const isAdmin = active?.role === "admin";
@@ -92,30 +94,18 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const memberRequest = React.useRef(0);
   const loadMembers = useCallback(async () => {
+    const version = ++memberRequest.current;
     if (!active) { setMembers([]); return; }
-    const { data } = await supabase
-      .from("group_members")
-      .select("id, group_id, user_id, email, role, status")
-      .eq("group_id", active.id)
-      .neq("status", "removed")
-      .order("role")
-      .order("email");
-    const rows = (data || []) as Member[];
-    const ids = rows.map((m) => m.user_id).filter(Boolean) as string[];
-    let profilesById: Record<string, any> = {};
-    if (ids.length) {
-      // bounded: one club's members
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number, avatar_url").in("id", ids);
-      profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
-    }
-    const mapped = rows.map((m) => ({ ...m, profiles: m.user_id ? profilesById[m.user_id] || null : null }));
-    // Deliberate order: alphabetical by display name (falling back to email for pending invites).
-    mapped.sort((a, b) => (a.profiles?.display_name || a.email || "").toLowerCase().localeCompare((b.profiles?.display_name || b.email || "").toLowerCase()));
-    setMembers(mapped as any);
+    setMembersError(null);
+    try {
+      const rows = await loadClubDirectory(supabase, active.id);
+      if (version === memberRequest.current) setMembers(rows.map((row) => ({ ...row, group_id: active.id })) as Member[]);
+    } catch (e: any) { if (version === memberRequest.current) setMembersError(failureMessage("Couldn't load the club members", e)); }
   }, [active?.id]);
-
-  useEffect(() => { loadMembers(); }, [loadMembers]);
+  useEffect(() => { setMembers(null); void loadMembers(); return () => { memberRequest.current++; }; }, [loadMembers]);
   useEffect(() => {
     if (active) {
       setRenameText(active.name);
@@ -181,7 +171,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   };
 
   const deleteGroup = async () => {
-    if (!active || !isAdmin) return;
+    if (!active || !isAdmin || !members || membersError) return;
     const activeOthers = (members || []).filter((m) => m.status === "active" && m.user_id !== user.id);
     if (activeOthers.length > 0) {
       setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this club. Remove them first.`);
@@ -281,8 +271,8 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
   return (
     <div>
-      {isAdmin && active ? <ClubPendingSignups groupId={active.id} groupName={active.name} /> : null}
-      {active ? <ClubLatestReport groupId={active.id} /> : null}
+      {!settingsOnly && isAdmin && active ? <ClubPendingSignups groupId={active.id} groupName={active.name} /> : null}
+      {!settingsOnly && active ? <ClubLatestReport groupId={active.id} /> : null}
       <FeatureMirrorControl groups={groups} activeGroupId={activeGroupId} />
       <Eyebrow>CLUBS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
@@ -332,7 +322,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
                 {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
-                {isAdmin && (members || []).filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
+                {isAdmin && members !== null && !membersError && members.filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
                   <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: C.danger }} disabled={busy} onClick={deleteGroup}>Delete club</button>
                 )}
               </div>
@@ -367,9 +357,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
             </div>
           )}
 
+          {membersError && <div role="alert" style={{ color: C.cream, fontSize: 12, marginTop: 10 }}>{membersError} <button type="button" style={{ ...btn(false), fontSize: 12 }} onClick={() => void loadMembers()}>Retry</button></div>}
           {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
 
-          <div style={{ marginTop: 16 }}>
+          {!settingsOnly && <div style={{ marginTop: 16 }}>
             <Eyebrow>MEMBERS</Eyebrow>
             {members === null && <div style={{ color: C.sage, marginTop: 10 }}>Loading members…</div>}
             {members?.map((m) => {
@@ -396,7 +387,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 </div>
               );
             })}
-          </div>
+          </div>}
         </div>
       )}
     </div>

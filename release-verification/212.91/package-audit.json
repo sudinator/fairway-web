@@ -1,0 +1,27 @@
+{
+  "version": "212.91.261106",
+  "base": "212.90.261106",
+  "existingFilesChanged": [
+    "BACKLOG.md",
+    "DEPLOY_NOTES.md",
+    "README-UPLOAD.txt",
+    "ci/test_assertion_baseline.json",
+    "components/club-engagement.tsx",
+    "components/club-hub.tsx",
+    "lib/app-version.ts",
+    "lib/club-directory.test.tsx",
+    "package-lock.json",
+    "package.json",
+    "public/app-version.json",
+    "public/sw.js"
+  ],
+  "unchangedExistingFiles": 1223,
+  "sqlFilesByteIdentical": 313,
+  "dependenciesUnchanged": true,
+  "engagementCountingReportGenerationAndAuthenticationUnchanged": true,
+  "fullLocalCiExitCode": 0,
+  "combinedDirectoryChecks": 51,
+  "chromiumLayoutChecks": 24,
+  "previewRoundTrips": 6,
+  "externalGates": "PENDING: GitHub verify, Vercel staging Ready, staging integration, actual phones; live report jobs/webhook unverified"
+}

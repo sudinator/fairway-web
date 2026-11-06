@@ -21,7 +21,7 @@ import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary } from "@/components/manage/courses";
-import { ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
+import { ProfilePanel, NotificationBell, NotificationsScreen, AdminHome, HelpPage } from "@/components/manage";
 import { MoneyTab } from "@/components/money";
 import { TeeTimes } from "@/components/tee-times";
 import { RoundSetup } from "@/components/round-setup";
@@ -32,7 +32,7 @@ import { Dashboard } from "@/components/dashboard";
 import { RoundsList, TeamRoundsList } from "@/components/rounds-list";
 import { YourCourses } from "@/components/your-courses";
 import { loadTeamRounds, type TeamRound } from "@/lib/team-rounds";
-import { GroupsPanel } from "@/components/groups";
+import { ClubHub } from "@/components/club-hub";
 import { InstallHint } from "@/components/install-hint";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 
@@ -984,10 +984,8 @@ export function Home({ session }: { session: any }) {
             <YourCourses rounds={rounds} groupId={activeGroup.id} />
             <CoursesLibrary user={user} activeGroupId={activeGroup.id} />
           </>
-        ) : tab === "players" && activeGroup ? (
-          <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
-        ) : tab === "groups" ? (
-          <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} onGroupDeleted={onGroupDeleted} />
+        ) : tab === "players" || tab === "groups" ? (
+          <ClubHub user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} onGroupDeleted={onGroupDeleted} initialPane={returnTab === "admin" && tab === "groups" ? "settings" : "members"} />
         ) : tab === "admin" && (profile?.is_admin || activeGroup?.role === "admin") ? (
           <AdminHome
             user={user}
@@ -1116,7 +1114,6 @@ export function Home({ session }: { session: any }) {
               const more: { key: Tab; label: string; show: boolean }[] = [
                 { key: "money", label: "Money", show: !!activeGroup },
                 { key: "teetimes", label: "Tee Times", show: !!activeGroup && effectiveGroupId(activeGroupId) === TGC_GROUP_ID },
-                { key: "players", label: "Players", show: true },
                 { key: "groups", label: "Clubs", show: showGroupsTab },
                 { key: "admin", label: "Admin ★", show: !!profile?.is_admin || activeGroup?.role === "admin" },
                 { key: "help", label: "Help", show: true },

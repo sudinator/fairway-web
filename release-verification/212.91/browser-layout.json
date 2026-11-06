@@ -1,0 +1,5 @@
+{
+  "checks": 24,
+  "errors": [],
+  "evidence": "EXECUTED Chromium on actual client-rendered component snapshots with MODELLED reads; 320/390/430px; 2 roles × 2 sections × collapsed/expanded. No live session."
+}

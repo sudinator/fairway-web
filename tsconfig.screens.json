@@ -135,6 +135,8 @@
     "lib/recap-stat-contract.test.tsx",
     "lib/saved-score-verification.test.tsx",
     "lib/score-correction-links.test.tsx",
-    "lib/match-results-presentation.test.tsx"
+    "lib/match-results-presentation.test.tsx",
+    "lib/club-directory.test.tsx",
+    "lib/club-engagement.test.tsx"
   ]
 }
