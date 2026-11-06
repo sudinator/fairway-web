@@ -1558,3 +1558,6 @@ Manual course handicap is authoritative for differential comparisons via a game-
 
 - Completed in 212.92: aggregate club period selector (30/90/YTD), repeat-player count, recorded holes, gross score categories and format mix; no personal rankings. Header invitation shortcut removed; real invite controls stay in Settings.
 - Invitation result copy: after generating 24-hour/7-day links, GroupsPanel still says “Expires in 30 days and can only be used once.” Match that label to linkKind in a later focused change; actual generator already uses the selected expiry/use limit.
+
+- Completed in 212.94: aggregate club Gross/Net comparison, separate eligible-hole denominators, missing-handicap/allocation exclusions and Eagles+ label.
+- Separate statistics audit: older club-report/game-highlights code still uses non-null chBasis for some legacy comparisons; review its missing-handicap treatment separately. 212.94's new net aggregates use the null-aware statistical accessor without changing those other reports.

@@ -528,3 +528,19 @@ export function scrambleMethodOf(game: { scramble_handicap?: string | null; scra
   if (game.scramble_team_size === 1) return "agreed";
   return game.scramble_handicap === "agreed" ? "agreed" : game.scramble_handicap === "gross" ? "gross" : "usga";
 }
+
+/** Null-aware, finite statistics input gate; allocation and handicap arithmetic stay in the existing helpers. */
+export function statisticalCourseHandicap(p: Parameters<typeof chBasis>[0], par: number | null | undefined, holes?: number): number | null {
+  const stored = comparisonNumber(p.course_handicap), index = comparisonNumber(p.handicap_index), slope = comparisonNumber(p.slope), rating = comparisonNumber(p.rating), coursePar = comparisonNumber(par);
+  const derived = index != null && slope != null && slope > 0 && rating != null && rating > 0 && coursePar != null && coursePar > 0;
+  const value = chBasisOrNull({ ...p, course_handicap: stored, handicap_index: derived ? index : null, slope: derived ? slope : null, rating: derived ? rating : null }, coursePar, holes);
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Historical ROUND snapshots already carry their played-hole basis, including nine-hole rounds. */
+export function roundHandicapBasis(round: Partial<{ course_handicap: number | null; course_handicap_source: "manual" | "derived" | null; handicap_index: number | null; rating: number | null; slope: number | null; course_par: number | null }>): number | null {
+  const stored = comparisonNumber(round.course_handicap);
+  if (stored != null) return stored;
+  const value = statisticalCourseHandicap({ ...round, course_handicap: null }, round.course_par);
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}

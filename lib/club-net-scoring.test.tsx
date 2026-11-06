@@ -1,0 +1,49 @@
+/** EXECUTED gross/net and UI scenarios using MODELLED data. No live writes. */
+import { renderScreen, eq, ok, report } from './screen-harness';
+import React, { act } from 'react';
+import { buildClubEngagement, clubEngagementPeriod } from './club-engagement';
+import { buildClubEngagement as before } from './club-engagement.21293-baseline';
+import { holeBuckets, scoringCategory, type Round } from './golf';
+import { legacyHoleBuckets } from './club-net-scoring.baseline';
+import { ClubEngagement } from '@/components/club-engagement';
+const now=Date.parse('2026-11-06T16:00:00Z'),period=clubEngagementPeriod(now);
+const meta=(n=18)=>Array.from({length:n},(_,i)=>({n:i+1,par:4,si:i+1}));
+const p=(id:string,ch:any=18,patch:any={})=>({id:'row-'+id,user_id:id,display_name:'PRIVATE '+id,scores:Array(18).fill(5),course_handicap:ch,course_handicap_source:'manual',handicap_index:null,rating:null,slope:null,...patch});
+const g=(ps:any[]=[p('a')],patch:any={})=>({game:{id:'game',group_id:'g',status:'ended',played_at:'2026-11-01',course:'Course',course_par:72,game_type:'stroke',holes_meta:meta(),...patch},players:ps,altScores:[]} as any);
+const calc=(games:any[],rounds:any[]=[])=>buildClubEngagement('g',period,['a','b','c'],games,rounds);
+let r=calc([g()]);eq(r.netScoringHoles,18,'known manual basis');eq(r.netScoring.par,18,'manual override authoritative despite null index');eq(r.scoring.bogey,18,'gross unchanged');
+r=calc([g([p('a',null)])]);eq(r.netScoringHoles,0,'missing handicap never scratch');eq(r.netExcludedHandicapHoles,18,'missing handicap exclusion disclosed');eq(r.scoringHoles,18,'missing handicap retains gross');
+r=calc([g([p('a',0,{handicap_index:30,rating:72,slope:113})])]);eq(r.netScoring.bogey,18,'manual zero beats index-derived handicap');
+r=calc([g([p('a',null,{course_handicap_source:'derived',handicap_index:14,rating:72,slope:113})])]);eq(r.netScoring.par,14,'derived basis uses selected tee');eq(r.netScoring.bogey,4,'derived stroke allocation exact');
+r=calc([g([p('a',9,{scores:Array(9).fill(5)})],{holes_meta:meta(9)})]);eq(r.netScoring.par,9,'nine-hole manual override never halved');
+r=calc([g([p('a',null,{course_handicap_source:'derived',handicap_index:18,rating:72,slope:113,scores:Array(9).fill(5)})],{holes_meta:meta(9)})]);eq(r.netScoring.par,9,'derived game nine gets existing single halving');
+r=calc([g([p('a',9,{scores:[...Array(9).fill(null),...Array(9).fill(5)]})])]);eq(r.netScoring.bogey,9,'partial 18-hole card allocates across all 18, not only scored holes');
+r=calc([g([p('a',90,{scores:Array(18).fill(1)})])]);eq(r.netScoring.eagle,18,'zero/negative net scores classify as eagle-or-better');eq(r.netScoringHoles,18,'negative net scores not silently dropped');
+r=calc([g([p('a',-18,{scores:Array(18).fill(3)})])]);eq(r.netScoring.par,18,'plus handicap gives strokes back');
+r=calc([g([p('a',-.5,{scores:Array(18).fill(4)})])]);eq(r.netScoring.bogey,1,'negative fractional basis uses canonical signed rounding');
+r=calc([g([p('a')],{holes_meta:meta().map(h=>({...h,si:null}))})]);eq(r.netScoringHoles,0,'missing stroke index is not an invented allocation');eq(r.netExcludedAllocationHoles,18,'allocation exclusion disclosed');
+r=calc([g([p('a',0)],{holes_meta:meta().map(h=>({...h,si:null}))})]);eq(r.netScoringHoles,18,'known scratch needs no index allocation');
+r=calc([g([p('a')],{holes_meta:meta().map(h=>({...h,si:1}))})]);eq(r.netExcludedAllocationHoles,18,'duplicate stroke indexes excluded from net');
+r=calc([g([p('a',NaN)])]);eq(r.netExcludedHandicapHoles,18,'invalid handicap excluded');
+r=calc([g([p('a',null,{course_handicap_source:'derived',handicap_index:18,rating:72,slope:0})])]);eq(r.netExcludedHandicapHoles,18,'invalid slope never derived as scratch');
+r=calc([g([p('a',null,{course_handicap_source:'derived',handicap_index:18,rating:0,slope:113})])]);eq(r.netExcludedHandicapHoles,18,'invalid rating excluded');
+const personal=(patch:any={})=>({id:'solo',user_id:'a',group_id:'g',played_at:'2026-11-01',course:'Solo',status:'final',game_id:null,course_handicap:9,course_handicap_source:'derived',course_par:36,holes:meta(9).map(h=>({hole_number:h.n,par:h.par,stroke_index:h.si,strokes:5})),...patch});
+r=calc([],[personal()]);eq(r.netScoring.par,9,'stored personal nine already has nine-hole handicap basis');
+r=calc([],[personal({course_handicap:0})]);eq(r.netScoring.bogey,9,'personal scratch valid');
+r=calc([],[personal({course_handicap:null,handicap_index:9,rating:36,slope:113})]);eq(r.netScoring.par,9,'historical derived personal basis not halved again');
+r=calc([],[personal({course_par:72})]);eq(r.netExcludedAllocationHoles,9,'personal partial full-course metadata not overcredited');
+r=calc([],[personal({course_par:72,holes:meta().map(h=>({hole_number:h.n,par:4,stroke_index:h.si,strokes:h.n>9?5:null}))})]);eq(r.netScoring.bogey,9,'personal null rows retain complete allocation metadata');
+for(const type of ['scramble','alt_shot']){
+ const team=g([p('a',18),p('b',18)],{game_type:type,allowance_pct:50,scramble_handicap:'agreed',foursomes:[{id:'f',a:['a','b'],b:[],a_hcp:18}]});team.altScores=meta().map((h,i)=>({foursome_id:'f',side:'a',hole_index:i,strokes:5}));r=calc([team]);eq(r.netScoring.par,18,type+' team basis applied once');eq(r.netScoringHoles,18,type+' shared holes not multiplied by members');eq(r.rounds,2,type+' participation still per member');eq(calc([team,team]).netScoringHoles,18,type+' duplicates excluded');
+ if(type==='scramble'){team.game.foursomes[0].a_hcp=null;eq(calc([team]).netExcludedHandicapHoles,18,'missing agreed team handicap not silently scratch');team.game.foursomes[0].a_hcp=0;eq(calc([team]).netScoring.bogey,18,'explicit agreed scratch counts');team.game.scramble_handicap='gross';team.players.forEach((x:any)=>x.course_handicap=null);eq(calc([team]).netScoring.bogey,18,'explicit gross scramble has deliberate zero adjustment');team.game.scramble_handicap='usga';team.players[0].course_handicap=8;team.players[1].course_handicap=20;eq(calc([team]).netScoring.par,6,'USGA team basis reuses existing team helper');team.players[1].course_handicap=null;eq(calc([team]).netExcludedHandicapHoles,18,'unknown USGA partner not silently scratch');}
+ else{team.players[1].course_handicap=null;eq(calc([team]).netExcludedHandicapHoles,18,'unknown alternate-shot partner excluded');}
+ team.altScores.forEach((x:any)=>x.strokes=null);eq(calc([team]).netScoringHoles,0,type+' canonical clears remain authoritative');
+}
+r=calc([g([p('a')],{game_type:'match',allowance_pct:0})]);eq(r.netScoring.par,18,'individual club net uses full course basis, not match-relative/allowance');
+r=calc([g([p('a',0)],{holes_meta:meta().map((h,i)=>({...h,par:i===0?null:4}))})]);eq(r.scoringHoles,17,'missing par excluded from gross');eq(r.netScoringHoles,17,'missing par excluded from net');
+for(let par=2;par<=6;par++)for(let score=-2;score<=16;score++){const rows=[{holes:[{par,strokes:score}]}] as Round[];eq(JSON.stringify(holeBuckets(rows)),JSON.stringify(legacyHoleBuckets(rows)),'gross classifier differential '+par+'/'+score);}
+for(let seed=0;seed<60;seed++){const input=[g([p('a',seed%2?null:seed%30),p('b',-seed%10)],{id:'x'+seed,course:seed%2?'Course':'',game_type:seed%3?'stroke':'fourball'})];const old=before('g',period,['a','b','c'],input),next=calc(input);eq(JSON.stringify(Object.fromEntries(Object.keys(old).map(k=>[k,(next as any)[k]]))),JSON.stringify(old),'all prior aggregate fields differential '+seed);eq(Object.values(next.netScoring).reduce((a,b)=>a+b,0),next.netScoringHoles,'net category totals reconcile '+seed);eq(next.netScoringHoles+next.netExcludedHandicapHoles+next.netExcludedAllocationHoles,next.scoringHoles,'net eligibility reconciles '+seed);}
+eq(scoringCategory(0,4),'eagle','zero net remains valid');eq(scoringCategory(-1,4),'eagle','negative net remains valid');
+let response=calc([g(),g([p('b',null)],{id:'missing'})]),malformed=false,fail=false;
+(globalThis as any).fetch=async()=>new Response(JSON.stringify(fail?{error:'Unavailable'}:malformed?{...response,netScoringHoles:999}:response),{status:fail?503:200});const settle=()=>act(async()=>new Promise(r=>setTimeout(r,30)));
+(async()=>{const t=renderScreen(<ClubEngagement groupId="g" now={now}/>);await settle();const table=t.el.querySelector('table[aria-label="Club gross and net scoring"]');ok(!!table,'gross and net columns rendered together');eq((table?.querySelector('thead') as HTMLElement).style.background,'rgb(14, 59, 46)','dark header preserves readable gold contrast');ok(table?.querySelector('tbody th')?.textContent==='Eagles+','eagle-or-better label explicit');const headers=[...table!.querySelectorAll('thead th')].map(h=>h.textContent);ok(headers[1]?.includes('Gross')&&headers[1]?.includes('36 holes')&&headers[2]?.includes('Net')&&headers[2]?.includes('18 holes'),'each column shows its own denominator');ok(t.el.querySelector('[data-net-exclusions]')?.textContent?.includes('18 holes excluded'),'missing basis visible');ok(!t.el.textContent?.includes('PRIVATE'),'no individual performance exposed');fail=true;t.click('Refresh');await settle();ok(t.el.textContent?.includes('last loaded figures')&&!!t.el.querySelector('table'),'failed refresh preserves last good comparison');fail=false;malformed=true;t.click('Refresh');await settle();ok(t.el.querySelector('[role="alert"]')?.textContent?.includes('incomplete response'),'malformed net totals rejected');malformed=false;t.click('Refresh');await settle();ok(!t.el.querySelector('[role="alert"]'),'retry recovers');t.unmount();response=calc([g([p('a',null)])]);const empty=renderScreen(<ClubEngagement groupId="g" now={now}/>);await settle();ok([...empty.el.querySelectorAll('tbody tr')].every(row=>row.children[2].textContent==='——'),'no eligible net holes displays dashes, not invented zero performance');empty.unmount();report('club net scoring');})().catch(e=>{console.error(e);process.exit(1)});

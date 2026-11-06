@@ -332,16 +332,17 @@ export const pct = (s: { hit: number; total: number }) =>
 export const fracPct = (s: { hit: number; total: number }) =>
   s.total ? `${s.hit}/${s.total} (${Math.round((100 * s.hit) / s.total)}%)` : "—";
 
+/** Shared gross/net category; zero or negative NET scores remain real scoring outcomes. */
+export function scoringCategory(strokes: number, par: number): "eagle" | "birdie" | "par" | "bogey" | "double" {
+  const d = strokes - par;
+  return d <= -2 ? "eagle" : d === -1 ? "birdie" : d === 0 ? "par" : d === 1 ? "bogey" : "double";
+}
+
 export function holeBuckets(rounds: Round[]) {
   const b = { eagle: 0, birdie: 0, par: 0, bogey: 0, double: 0 };
   rounds.forEach((r) =>
     played(r).forEach((h) => {
-      const d = (h.strokes || 0) - h.par;
-      if (d <= -2) b.eagle++;
-      else if (d === -1) b.birdie++;
-      else if (d === 0) b.par++;
-      else if (d === 1) b.bogey++;
-      else b.double++;
+      b[scoringCategory(h.strokes || 0, h.par)]++;
     })
   );
   return b;

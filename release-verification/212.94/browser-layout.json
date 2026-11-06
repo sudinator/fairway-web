@@ -1,0 +1,115 @@
+{
+  "checks": 36,
+  "errors": [],
+  "measurements": [
+    {
+      "width": 320,
+      "role": "admin",
+      "period": "30",
+      "tableWidth": 252
+    },
+    {
+      "width": 320,
+      "role": "admin",
+      "period": "90",
+      "tableWidth": 252
+    },
+    {
+      "width": 320,
+      "role": "admin",
+      "period": "year",
+      "tableWidth": 252
+    },
+    {
+      "width": 320,
+      "role": "member",
+      "period": "30",
+      "tableWidth": 252
+    },
+    {
+      "width": 320,
+      "role": "member",
+      "period": "90",
+      "tableWidth": 252
+    },
+    {
+      "width": 320,
+      "role": "member",
+      "period": "year",
+      "tableWidth": 252
+    },
+    {
+      "width": 390,
+      "role": "admin",
+      "period": "30",
+      "tableWidth": 322
+    },
+    {
+      "width": 390,
+      "role": "admin",
+      "period": "90",
+      "tableWidth": 322
+    },
+    {
+      "width": 390,
+      "role": "admin",
+      "period": "year",
+      "tableWidth": 322
+    },
+    {
+      "width": 390,
+      "role": "member",
+      "period": "30",
+      "tableWidth": 322
+    },
+    {
+      "width": 390,
+      "role": "member",
+      "period": "90",
+      "tableWidth": 322
+    },
+    {
+      "width": 390,
+      "role": "member",
+      "period": "year",
+      "tableWidth": 322
+    },
+    {
+      "width": 430,
+      "role": "admin",
+      "period": "30",
+      "tableWidth": 362
+    },
+    {
+      "width": 430,
+      "role": "admin",
+      "period": "90",
+      "tableWidth": 362
+    },
+    {
+      "width": 430,
+      "role": "admin",
+      "period": "year",
+      "tableWidth": 362
+    },
+    {
+      "width": 430,
+      "role": "member",
+      "period": "30",
+      "tableWidth": 362
+    },
+    {
+      "width": 430,
+      "role": "member",
+      "period": "90",
+      "tableWidth": 362
+    },
+    {
+      "width": 430,
+      "role": "member",
+      "period": "year",
+      "tableWidth": 362
+    }
+  ],
+  "evidence": "EXECUTED Chromium on actual client component snapshots, MODELLED reads. 320/390/430px × two roles × three periods × collapsed/expanded. Table/cells checked for clipping; Gross/Net/Eagles+ and cream club heading verified. No live session."
+}

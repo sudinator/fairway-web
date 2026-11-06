@@ -1,3 +1,11 @@
+## 212.94.261106 — gross and net club scoring (candidate)
+
+- Show Gross and Net side by side, with separate eligible-hole counts and percentages. Labels are Eagles+, Birdies, Pars, Bogeys and Doubles+. No personal names or rankings.
+- Use existing full course-handicap statistics basis for individual cards and saved team-handicap rules for shared cards. Respect manual/scratch/plus/nine-hole snapshots. Unknown or invalid handicaps do not become scratch; incomplete allocation data is excluded and disclosed. No net-eligible holes displays dashes.
+- Shared team holes count once; existing gross/participation/course/format totals and 30/90/YTD behavior remain unchanged. Historical personal-round reads include existing saved handicap fields; no schema change.
+- Share the existing gross category classification with Net, including zero/negative net outcomes. Existing gross hole inclusion and classifications are preserved by differential tests. No game-result, handicap computation, score persistence, report cadence, permissions or updater-policy change.
+- Full-source candidate; see RELEASE_VERIFICATION_212.94.md for executed/modelled checks and pending external gates.
+
 ## 212.93.261106 — readable club dates and explicit member total (candidate)
 
 - Show club play periods as Oct 8 – Nov 6 rather than ISO dates. Include years on both ends when a range crosses a year boundary. Format civil dates consistently in every viewer time zone; date/query boundaries are unchanged.

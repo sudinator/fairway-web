@@ -1,0 +1,43 @@
+{
+  "version": "212.94.261106",
+  "base": "212.93.261106",
+  "existingFilesChanged": [
+    "BACKLOG.md",
+    "DEPLOY_NOTES.md",
+    "README-UPLOAD.txt",
+    "ci/test-club-engagement-route.cjs",
+    "ci/test_assertion_baseline.json",
+    "components/club-engagement.tsx",
+    "lib/app-version.ts",
+    "lib/club-engagement-server.ts",
+    "lib/club-engagement.ts",
+    "lib/game-shape.ts",
+    "lib/golf.ts",
+    "package-lock.json",
+    "package.json",
+    "public/app-version.json",
+    "public/sw.js",
+    "tsconfig.screens.json"
+  ],
+  "newFiles": [
+    "lib/club-net-scoring.ts",
+    "lib/club-net-scoring.test.tsx",
+    "lib/club-net-scoring.baseline.ts",
+    "lib/club-engagement.21293-baseline.ts",
+    "RELEASE_VERIFICATION_212.94.md"
+  ],
+  "sqlFilesByteIdentical": 313,
+  "dependenciesUnchanged": true,
+  "originalGameShapeFunctionsUnchanged": true,
+  "golfChangedOnlyPureCategoryExtraction": true,
+  "serverChangedOnlyExistingHistoricalSelectColumns": true,
+  "authRouteGameResultsDirectoryDashboardAndUpdaterUnchanged": true,
+  "fullLocalCiExitCode": 0,
+  "netChecks": 334,
+  "originalGrossClassifierDifferentialCases": 95,
+  "originalAggregateDifferentialCases": 60,
+  "endpointChecks": 45,
+  "browserLayoutChecks": 36,
+  "previewRoundTrips": 6,
+  "externalGates": "PENDING: GitHub verify, Vercel staging Ready, staging integration and actual phone. No live writes."
+}
