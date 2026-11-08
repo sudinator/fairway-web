@@ -43,6 +43,10 @@ import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit, clea
 import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
+import { ChartAxisTick } from "@/components/charts/axis-tick";
+import { chartXAxis, formatChartDate, showCountLabels } from "@/lib/chart-axis";
+import { ChartTip, ChartTooltip, DismissableChart } from "@/components/charts/chart-tip";
+
 const supabase = createClient();
 
 // Create an in-app notification for a user. `detail` is the optional second line (0165).
@@ -650,6 +654,7 @@ function StatDrawerHost() {
 function AdminEngagement() {
   const [e, setE] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
   useEffect(() => {
     supabase.rpc("get_admin_engagement").then(({ data, error }: any) => {
       if (error) setErr(failureMessage("Couldn't load the contest", error)); else setE(data);
@@ -685,33 +690,35 @@ function AdminEngagement() {
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 6 }}>Weekend reach — golfers logging Fri–Sun</div>
-      <div style={{ height: 160, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
+      <div style={{ height: 172, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
         {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> : (
-          <ResponsiveContainer>
-            <BarChart data={ws} margin={{ top: 14, right: 8, left: -20, bottom: 0 }}>
-              <XAxis dataKey="week" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={16} />
-              <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={22} />
+          <DismissableChart height="100%" holdDismissed><ResponsiveContainer onResize={(width) => setChartWidth(width)}>
+            <BarChart data={ws} margin={{ top: 14, right: 2, left: 2, bottom: 0 }}>
+              <XAxis dataKey="week" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(ws, "week", "week")} />
+              <ChartTooltip wrapperStyle={{ pointerEvents: "auto" }} content={<ChartTip nameMap={{ golfers: "Golfers", new: "New", returning: "Returning" }} fmt={(v: number) => String(v)} heading={(point: { week?: string }) => formatChartDate(point.week)} />} />
+              <YAxis allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} />
               <Bar dataKey="golfers" fill={C.gold} radius={[4, 4, 0, 0]} maxBarSize={34} isAnimationActive={false}>
-                <LabelList dataKey="golfers" position="top" fill={C.cream} fontSize={11} fontWeight={700} />
+                {showCountLabels(ws.map(w => w.golfers), chartWidth) && <LabelList dataKey="golfers" position="top" fill={C.cream} fontSize={11} fontWeight={700} />}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></DismissableChart>
         )}
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 6 }}>New vs returning golfers, per week</div>
-      <div style={{ height: 160, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
+      <div style={{ height: 172, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
         {nr.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> : (
-          <ResponsiveContainer>
-            <BarChart data={nrData} margin={{ top: 14, right: 8, left: -20, bottom: 0 }}>
-              <XAxis dataKey="week" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={16} />
-              <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={22} />
+          <DismissableChart height="100%" holdDismissed><ResponsiveContainer onResize={(width) => setChartWidth(width)}>
+            <BarChart data={nrData} margin={{ top: 14, right: 2, left: 2, bottom: 0 }}>
+              <XAxis dataKey="week" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(nrData, "week", "week")} />
+              <ChartTooltip wrapperStyle={{ pointerEvents: "auto" }} content={<ChartTip nameMap={{ golfers: "Golfers", new: "New", returning: "Returning" }} fmt={(v: number) => String(v)} heading={(point: { week?: string }) => formatChartDate(point.week)} />} />
+              <YAxis allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} />
               <Bar dataKey="new" stackId="a" fill={C.gold} maxBarSize={34} isAnimationActive={false} />
               <Bar dataKey="returning" stackId="a" fill={C.sage} radius={[4, 4, 0, 0]} maxBarSize={34} isAnimationActive={false}>
-                <LabelList dataKey="total" position="top" fill={C.cream} fontSize={11} fontWeight={700} />
+                {showCountLabels(nrData.map(w => w.total), chartWidth) && <LabelList dataKey="total" position="top" fill={C.cream} fontSize={11} fontWeight={700} />}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></DismissableChart>
         )}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sage }}>

@@ -11,6 +11,7 @@ ROOTS = ["components", "lib", "app"]
 FLOOR = 11.0
 num_re = re.compile(r'fontSize\s*:\s*(\d+(?:\.\d+)?)\b')
 px_re  = re.compile(r'''fontSize\s*:\s*['"`]\s*(\d+(?:\.\d+)?)px''')
+svg_re = re.compile(r'fontSize\s*=\s*(?:["\']|\{\s*)(\d+(?:\.\d+)?)')
 css_re = re.compile(r'font-size\s*:\s*(\d+(?:\.\d+)?)px')
 
 bad = []
@@ -23,7 +24,7 @@ for r in ROOTS:
                 continue
             fp = os.path.join(dp, f)
             for i, line in enumerate(open(fp, encoding="utf-8", errors="ignore"), 1):
-                for m in list(num_re.finditer(line)) + list(px_re.finditer(line)) + list(css_re.finditer(line)):
+                for m in list(num_re.finditer(line)) + list(px_re.finditer(line)) + list(css_re.finditer(line)) + list(svg_re.finditer(line)):
                     if float(m.group(1)) < FLOOR:
                         bad.append(f"{fp}:{i}  fontSize {m.group(1)} (< {FLOOR:g})  | {line.strip()[:100]}")
 

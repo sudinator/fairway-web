@@ -2,12 +2,15 @@
 
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { InsightsCard } from "@/components/insights";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, BarChart, Bar, Rectangle, ComposedChart, Legend,
 } from "recharts";
 import { barShapeValue } from "@/lib/chart-helpers";
+import { ChartTip, DismissableChart } from "@/components/charts/chart-tip";
+import { ChartAxisTick } from "@/components/charts/axis-tick";
+import { chartXAxis } from "@/lib/chart-axis";
 import { FormBars } from "@/components/charts/form-bars";
 import { roundStatCompleteness } from "@/lib/round-stats";
 import {
@@ -38,38 +41,6 @@ import { goalOptions } from "@/lib/benchmarks";
 // Shared chart tooltip — solid deep-green card, thin gold ring, gold label (course ·
 // player/date), cream values. `nameMap` maps each series' dataKey to a display label;
 // `fmt` formats each value. Replaces the old white contentStyle tooltip on every chart.
-function ChartTip({ active, payload, nameMap, fmt }: any) {
-  if (!active || !payload || !payload.length) return null;
-  const p0 = payload[0]?.payload || {};
-  const label = p0.course ? `${p0.course}${p0.name ? " · " + p0.name : ""}` : "";
-  const rows = payload.filter((e: any) => e.value != null);
-  return (
-    <div style={{ position: "relative", background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", paddingRight: 30, minWidth: 132 }}>
-      <button aria-label="Close" onClick={(e) => { e.stopPropagation(); if (typeof window !== "undefined") window.dispatchEvent(new Event("bnn-chart-dismiss")); }}
-        style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: 12, background: C.greenMid, border: "none", color: C.cream, fontSize: 14, fontWeight: 800, lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
-      {label && <div style={{ color: C.gold, fontWeight: 700, fontSize: 11.5, marginBottom: 6 }}>{label}</div>}
-      {rows.map((e: any, i: number) => (
-        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "baseline" }}>
-          <span style={{ color: C.sage, fontSize: 11 }}>{(nameMap && nameMap[e.dataKey]) || e.name || e.dataKey}</span>
-          <span style={{ color: C.cream, fontWeight: 800, fontSize: 12 }}>{fmt ? fmt(e.value, e.dataKey) : (typeof e.value === "number" ? e.value.toFixed(1) : e.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Wraps a chart so its (recharts) tooltip can be dismissed: tapping the tooltip's × fires a global
-// "bnn-chart-dismiss", which remounts the chart here (clearing recharts' internal active-tooltip state).
-// Also dismisses on a tap anywhere outside the plotted area via the transparent catcher.
-function DismissableChart({ height, marginTop, children }: { height: number; marginTop?: number; children: React.ReactNode }) {
-  const [nonce, setNonce] = useState(0);
-  useEffect(() => {
-    const h = () => setNonce((n) => n + 1);
-    window.addEventListener("bnn-chart-dismiss", h);
-    return () => window.removeEventListener("bnn-chart-dismiss", h);
-  }, []);
-  return <div key={nonce} style={{ height, marginTop }}>{children}</div>;
-}
 // Dense-view trend chart: faint raw dots + a single 5-round rolling line that runs green when
 // you're beating your average and red when you're not (gradient keyed to the rolling line's own
 // range vs `avg`), a dashed average reference, and a date x-axis. Used once a range has enough
@@ -99,14 +70,14 @@ function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctS
     : [0, 1];
   return (
     <ResponsiveContainer>
-      <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
+      <ComposedChart data={data} margin={{ top: 5, right: 2, left: 2, bottom: 0 }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             {stops.map(([o, c], i) => <stop key={i} offset={o} stopColor={c} />)}
           </linearGradient>
         </defs>
-        <XAxis dataKey="name" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
-        <YAxis domain={domain ?? autoDomain} allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={pctStat ? 34 : 30} />
+        <XAxis dataKey="i" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(data)} />
+        <YAxis domain={domain ?? autoDomain} allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} />
         <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<ChartTip nameMap={nameMap} fmt={fmt} />} />
         {avg != null && <ReferenceLine y={Math.round(avg * 10) / 10} stroke={C.gold} strokeDasharray="5 4" />}
         <Line type="monotone" dataKey={valueKey} stroke="transparent" isAnimationActive={false} dot={{ r: 2, fill: C.sage, fillOpacity: 0.28, stroke: "none" }} />
@@ -215,7 +186,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     const w = diffSeries.slice(Math.max(0, i - 4), i + 1);
     return {
       i: i + 1,
-      name: fmtDate(x.r.played_at),
+      playedAt: x.r.played_at, name: fmtDate(x.r.played_at),
       course: x.r.course,
       diff: Math.round(x.d * 10) / 10,
       roll: Math.round((w.reduce((s, y) => s + y.d, 0) / w.length) * 10) / 10,
@@ -377,7 +348,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               )}
             </div>
           )}
-          <DismissableChart height={200} marginTop={12}>
+          <DismissableChart height={212} marginTop={12}>
             {diffTrend.length > 30 ? (
               <AdaptiveTrend data={diffTrend} valueKey="diff" rollKey="roll" avg={diffFormAvg} lowerBetter domain={diffFormDomain}
                 nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />
@@ -462,7 +433,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             const series = sorted.map((r) => ({ r, v: perRoundNum(key, r) })).filter((x) => x.v != null && Number.isFinite(x.v)) as { r: Round; v: number }[];
             if (series.length === 0) return <div style={{ color: C.sage, fontSize: 13, padding: "12px 2px" }}>No rounds with this stat yet — log a few and the trend appears here.</div>;
             const roll = (i: number, w: number) => { if (i < w - 1) return null; let sum = 0; for (let j = i - w + 1; j <= i; j++) sum += series[j].v; return Math.round((sum / w) * 10) / 10; };
-            const data = series.map((x, i) => ({ i: i + 1, val: Math.round(x.v * 10) / 10, roll5: roll(i, 5), roll10: series.length >= 10 ? roll(i, 10) : null, course: x.r.course, name: fmtDate(x.r.played_at) }));
+            const data = series.map((x, i) => ({ i: i + 1, val: Math.round(x.v * 10) / 10, roll5: roll(i, 5), roll10: series.length >= 10 ? roll(i, 10) : null, course: x.r.course, playedAt: x.r.played_at, name: fmtDate(x.r.played_at) }));
             const pctStat = key === "gir" || key === "fir" || key === "scramble" || key === "sandsave";
             const seriesAvg = series.reduce((s, x) => s + x.v, 0) / series.length;
             const dense = data.length > 30;
@@ -474,16 +445,16 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             const barColor = (v: number) => (isBetter(v) ? "#4ADE80" : "#FB7185");
             return (
               <>
-                <DismissableChart height={210} marginTop={10}>
+                <DismissableChart height={222} marginTop={10}>
                   {dense ? (
                     <AdaptiveTrend data={data} valueKey="val" rollKey="roll5" avg={seriesAvg} lowerBetter={dirLower.has(key)} pctStat={pctStat} domain={valDomain}
                       nameMap={{ val: detailLabels[key], roll5: "5-rd avg" }}
                       fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />
                   ) : (
                   <ResponsiveContainer>
-                    <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
-                      <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                      <YAxis allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={pctStat ? 34 : 30} domain={valDomain} />
+                    <ComposedChart data={data} margin={{ top: 5, right: 2, left: 2, bottom: 0 }}>
+                      <XAxis dataKey="i" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(data)} />
+                      <YAxis allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} domain={valDomain} />
                       <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ val: detailLabels[key], roll5: "5-rd avg", roll10: "10-rd avg" }} fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />} />
                       <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26} shape={(props: any) => {
                         // Per-bar conditional color (replaces the deprecated <Cell>): barColor(val).

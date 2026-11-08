@@ -1,3 +1,4 @@
+<!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
 # Current update policy — 212.87
 The pending-update banner offers Update now only, with no Later/Dismiss control. Downloaded workers wait for that action to activate while app pages remain open. Failed attempts keep retry feedback visible. Confirmed success expires after8seconds only when no newer release is pending. Explicit action reloads; deployment/focus/controller changes never force an open page to restart. Unfinished rounds never gate updating. Confirm success from the version actually loaded; report failures/timeouts and keep all drafts/outboxes. This supersedes earlier no-banner guidance below.
@@ -366,3 +367,7 @@ Manual course handicap is authoritative for differential comparisons via a game-
 
 ## Member feature guide (212.85)
 When shipping a member-facing feature, review lib/capabilities.json and the relevant HelpSearch answers. Regenerate both public one-pager PDFs and marketing/onepager-content.txt from the shared source. The supported-format guard must cover every GAME_TYPES entry in the guide and the Formats answer. Describe implemented behavior and preserve edition restrictions. Automatic updates remain quiet: no release/update banner. Member education can use a separately reviewed monthly feature email; this rule does not authorize automatic email sends.
+
+## Chart label clearance — 212.95
+
+Use the shared chart-axis policy and Recharts automatic axis width. Keep text at least 11px. Labels must fit their chart and must not overlap labels from either axis; the browser regression requires at least 8px between opposite-axis label bounds. Keep a separate label row and preserve plotting height rather than shrinking text. Keep each point/round and its original statistics; date labels never aggregate the data. ci/test-chart-layout.cjs checks the actual components with modelled reads.

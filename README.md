@@ -1,3 +1,4 @@
+<!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 <!-- 212.88: fix CI browser discovery on runners without /opt/pw-browsers; app behavior unchanged. -->
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
 <!-- 212.86.261102: dismissible Update now banner, verified restart result, no unfinished-round gate. See RELEASE_VERIFICATION_212.86.md. -->
