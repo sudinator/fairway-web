@@ -1,3 +1,13 @@
+## 212.95.261107 — responsive charts and readable axis labels (candidate)
+
+- Apply the approved chart design: Recharts automatic Y-axis width, responsive month/year labels for longer histories, and explicit separation between labels from opposite axes. Keep one observation per round, the existing rolling-average calculations and the >30-round dense-view transition.
+- Fit Season Wrapped charts to their host. Use the same responsive chart rules on dashboard differential/stat trends and admin weekly charts. Dense admin counts remain available in dismissible tooltips; top-of-bar values remain only where a responsive width/glyph budget fits them.
+- Render player-card form with Recharts, readable 11px labels, captions aligned to plot edges and a distinct flat-series scale label. Preserve the original form values and average-relative colours. A slightly taller label row preserves plotting height.
+- Share existing tooltip close/remount behavior without changing default dashboard tooltip formatting. A 2px chart-edge safety margin and tiny inward endpoint-label shifts accommodate SVG/DOM glyph measurement rounding. New player/admin tooltips stay closed until deliberate interaction after dismissal, including touch.
+- Add real-browser bounds, within-axis and opposite-axis clearance tests, responsive round trips, tooltip reopening, invalid-date fixtures and historical calculation/render differential checks. Extend the font guard to cover SVG font attributes.
+- Correct a pre-existing route-test fixture that used the UTC day instead of the club report’s Eastern day near midnight; server behavior is unchanged.
+- Full-source candidate. No migration, schema, scoring, handicap, score-saving, membership, report-cadence or update-policy changes. esbuild is a development-only dependency for the browser regression fixture. See RELEASE_VERIFICATION_212.95.md; external release gates remain pending.
+
 ## 212.94.261106 — gross and net club scoring (candidate)
 
 - Show Gross and Net side by side, with separate eligible-hole counts and percentages. Labels are Eagles+, Birdies, Pars, Bogeys and Doubles+. No personal names or rankings.

@@ -32,17 +32,11 @@ function IndexSpark({ series }: { series: { date: string; index: number }[] }) {
 // The Dashboard's Scoring Form chart (shared component), sized for a story card.
 function SeasonForm({ points, label, lowerBetter = true }: { points: { date: string; course: string; value: number }[]; label: string; lowerBetter?: boolean }) {
   if (points.length < 3) return null;
-  const data = withRolling(points.map((p) => ({ value: p.value, course: p.course, name: fmtMatchDate(p.date.slice(0, 10)) || p.date })));
+  const data = withRolling(points.map((p) => ({ value: p.value, course: p.course, name: fmtMatchDate(p.date.slice(0, 10)) || p.date, playedAt: p.date })));
   const avg = points.reduce((s, p) => s + p.value, 0) / points.length;
-  // A season of rounds numbered 1..26 crowds the axis; label by MONTH instead — one tick at the first
-  // round of each month (205.1).
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthOf = (k: number) => Number(points[k].date.slice(5, 7)) - 1;
-  const ticks: number[] = []; const label_: Record<number, string> = {};
-  points.forEach((_, k) => { if (k === 0 || monthOf(k) !== monthOf(k - 1)) { ticks.push(k + 1); label_[k + 1] = MONTHS[monthOf(k)]; } });
   return (
     <div data-season-chart={label} style={{ marginTop: 14 }}>
-      <FormBars data={data} avg={avg} lowerBetter={lowerBetter} width={340} height={170} ticks={ticks} tickFormatter={(i) => label_[i] ?? ""} />
+      <div style={{ height: 182 }}><FormBars data={data} avg={avg} lowerBetter={lowerBetter} height={182} /></div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each bar is one round, in date order · green beat your season average ({Math.round(avg * 10) / 10}), red didn't · the cream line is your 5-round average</div>
     </div>
   );

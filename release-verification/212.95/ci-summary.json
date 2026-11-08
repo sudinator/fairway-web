@@ -1,0 +1,25 @@
+{
+  "release": "212.95.261107",
+  "baseline": "212.94.261106",
+  "local_ci_exit": 0,
+  "node": "22.23.4",
+  "unit_assertions": 441709,
+  "registered_unit_suites": 106,
+  "ticking_clock_suites": 169,
+  "chart_assertions": 1069,
+  "chart_data_viewport_cases": 324,
+  "chart_widths": [
+    320,
+    390,
+    430,
+    768
+  ],
+  "modelled_reads": true,
+  "live_database_writes": false,
+  "physical_phone_validated": false,
+  "github_verify_executed": false,
+  "vercel_staging_ready_verified": false,
+  "staging_integration_executed": false,
+  "production_deployment_executed": false,
+  "ci_log_sha256": "7e097b4091362dccc05ecdf6ec6c6e384d0d3b45e1f153c4fc7d72f8a04c0c53"
+}

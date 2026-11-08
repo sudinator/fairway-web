@@ -1,4 +1,6 @@
 "use client";
+import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, ReferenceLine } from "recharts";
+import { ChartTip, ChartTooltip, DismissableChart } from "@/components/charts/chart-tip";
 import { rpcAll } from "@/lib/fetch-all";
 import { useEffect, useId, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
@@ -62,63 +64,27 @@ function buildBadges(rows: EarnedLite[]): BadgeItem[] {
   return capped.map((x) => ({ key: x.key, icon: x.def.icon, label: x.def.label, tier: x.def.tier, count: x.def.kind === "count" ? x.count : undefined }));
 }
 
-// Contextual mini-chart for the rolling-form series: y-scale labels (best/worst
-// differential in the window), a faint average baseline, a dot per round, and the
-// current value called out. Lower differential = lower on screen (down is better).
-function FormChart({ data }: { data: number[] }) {
-  const gid = "formgrad-" + useId().replace(/[^a-zA-Z0-9]/g, "");
-  if (data.length < 2) return null;
-  const W = 300, H = 88, LG = 30, RG = 34, top = 10, bot = H - 20; // left gutter for labels, right for end value
-  const min = Math.min(...data), max = Math.max(...data);
-  const span = max - min || 1;
-  const avg = data.reduce((a, b) => a + b, 0) / data.length;
-  const x = (i: number) => LG + (i / (data.length - 1)) * (W - LG - RG);
-  const y = (v: number) => top + ((max - v) / span) * (bot - top); // max at top, min at bottom
-  const pts = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const area = `${x(0)},${bot} ${pts} ${x(data.length - 1)},${bot}`;
-  const last = data[data.length - 1];
-  // Colour relative to the player's average (the gold line): at/under average = green (better,
-  // since lower differential is better), over = red. A vertical gradient flips at the avg's y so
-  // the line/area are green below the avg line and red above it; dots + the end value are coloured
-  // per-point. (Matches the dashboard trend chart's stated behaviour.)
-  // On C.greenLight the old RED was 3.00:1. Same hue, lifted for a dark ground.
-  const GREEN = "#8FE0B0", RED = "#FFB3BC";
-  const colorFor = (v: number) => (v <= avg ? GREEN : RED);
-  const avgY = y(avg);
-  const off = Math.max(0.0001, Math.min(0.9999, (avgY - top) / (bot - top)));
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }}>
-      <defs>
-        <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1={0} y1={top} x2={0} y2={bot}>
-          <stop offset={0} stopColor={RED} />
-          <stop offset={off} stopColor={RED} />
-          <stop offset={off} stopColor={GREEN} />
-          <stop offset={1} stopColor={GREEN} />
-        </linearGradient>
-      </defs>
-      {/* scale gridlines + labels (worst at top, best at bottom) */}
-      {[max, min].map((v, k) => {
-        const yy = y(v);
-        return (
-          <g key={k}>
-            <line x1={LG} y1={yy} x2={W - RG} y2={yy} stroke="#ffffff" strokeOpacity={0.12} strokeWidth={1} strokeDasharray="3 3" />
-            <text x={LG - 5} y={yy + 3} textAnchor="end" fontSize="9" fill={C.sage}>{v.toFixed(1)}</text>
-          </g>
-        );
-      })}
-      {/* average baseline */}
-      <line x1={LG} y1={y(avg)} x2={W - RG} y2={y(avg)} stroke="#C9A227" strokeOpacity={0.35} strokeWidth={1} />
-      <text x={W - RG + 3} y={y(avg) + 3} fontSize="8" fill="#C9A227" opacity={0.8}>avg</text>
-      {/* series — gradient flips green/red at the avg line; dots coloured per-point */}
-      <polygon points={area} fill={`url(#${gid})`} opacity={0.12} />
-      <polyline points={pts} fill="none" stroke={`url(#${gid})`} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {data.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 3.5 : 2} fill={colorFor(v)} />)}
-      {/* current value + x caption */}
-      <text x={x(data.length - 1) + 6} y={y(last) + 3} fontSize="11" fontWeight="800" fill={colorFor(last)}>{last.toFixed(1)}</text>
-      <text x={LG} y={H - 4} fontSize="9" fill={C.sage}>{data.length} rounds ago</text>
-      <text x={W - RG} y={H - 4} textAnchor="end" fontSize="9" fill={C.sage}>now</text>
-    </svg>
-  );
+// Responsive form chart; axis captions remain separate from numeric endpoint labels.
+
+function FormChart({data}:{data:number[]}) {
+ const gid='formgrad-'+useId().replace(/[^a-zA-Z0-9]/g,'');
+ if(data.length<2)return null;
+ const min=Math.min(...data),max=Math.max(...data),avg=data.reduce((a,b)=>a+b,0)/data.length,last=data[data.length-1];
+ const lo=min===max?min-1:min,hi=min===max?max+1:max;
+ const GREEN='#8FE0B0',RED='#FFB3BC',color=(v:number)=>v<=avg?GREEN:RED,off=(hi-avg)/(hi-lo);
+ const points=data.map((value,i)=>({i:i+1,value}));
+ return <div style={{fontSize:11,color:C.sage}}>
+ <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span>Average {avg.toFixed(1)}</span><span style={{color:color(last),fontWeight:800}}>Latest {last.toFixed(1)}</span></div>
+ <DismissableChart height={128} holdDismissed><ResponsiveContainer width="100%" height="100%" minWidth={0}>
+ <ComposedChart data={points} margin={{top:7,right:4,left:0,bottom:0}}>
+ <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={RED}/><stop offset={off} stopColor={RED}/><stop offset={off} stopColor={GREEN}/><stop offset="1" stopColor={GREEN}/></linearGradient></defs>
+ <XAxis dataKey="i" ticks={[1,data.length]} tickFormatter={i=>i===1?`${data.length} rounds ago`:'now'} tick={(p:any)=><text x={p.payload.coordinate??p.x} y={p.y} textAnchor={p.payload.value===1?'start':'end'} dominantBaseline="hanging" fill={C.sage} fontSize={11}>{p.payload.value===1?`${data.length} rounds ago`:'now'}</text>} tickLine={false} tickSize={0} tickMargin={16} axisLine={false} height={34} interval="preserveStartEnd" minTickGap={12}/>
+ <YAxis width="auto" tickSize={0} tickMargin={6} ticks={min===max?[min]:[min,max]} domain={[lo,hi]} tick={{fill:C.sage,fontSize:11}} tickFormatter={v=>Number(v).toFixed(1)} tickLine={false} axisLine={false}/>
+ <ReferenceLine y={avg} stroke={C.gold} strokeOpacity={.5}/>
+ <Area tooltipType="none" dataKey="value" type="linear" baseValue={lo} stroke="none" fill={`url(#${gid})`} fillOpacity={.12} isAnimationActive={false}/>
+ <Line dataKey="value" type="linear" stroke={`url(#${gid})`} strokeWidth={2} isAnimationActive={false} dot={(p:any)=><circle key={p.index} cx={p.cx} cy={p.cy} r={p.index===data.length-1?3.5:2} fill={color(p.payload.value)}/>}/>
+ <ChartTooltip wrapperStyle={{ pointerEvents: "auto" }} content={<ChartTip nameMap={{ value: "Differential" }} fmt={(v: number) => v.toFixed(1)} heading={(point: { i: number }) => `Round ${point.i}`} />}/>
+ </ComposedChart></ResponsiveContainer></DismissableChart></div>;
 }
 
 // Presentational — renders any card, self or peer, from normalized view data.

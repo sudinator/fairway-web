@@ -1,3 +1,7 @@
+## 212.95 — chart validation follow-up
+
+- [ ] Run GitHub verify, Vercel staging build, staging integration, physical iPhone/PWA chart and tooltip checks on 212.95 before production approval. Exercise narrow/wide screens, 5/20/Season/All round trips, signed and flat player-card histories and active scoring/save/reopen. No migration required.
+
 ## 212.87 — update rollout validation (open)
 
 - [ ] Investigate the reported staging phone remaining on212.84 after refresh. Collect the exact app origin/URL, Current/Latest versions and deployed build/version metadata; confirm the actual phone upgrade. Cause remains unverified. The saved212.84 build has no restart-result verifier, so it cannot display the new failure messages if that old code is returned.
