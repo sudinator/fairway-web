@@ -20,6 +20,43 @@ const root=path.resolve(__dirname,'..');let checks=0;function ok(value,message){
  await render({kind:'dashboard',n:29,long:true});while(await page.getByRole('button',{name:'＋ More',exact:true}).count())await page.getByRole('button',{name:'＋ More',exact:true}).first().click({force:true});
  for(const label of ['Rounds','Avg vs par','Best round','Avg differential','Stableford avg','Avg on par 3s','Avg on par 4s','Avg on par 5s','Fairways hit','GIR','Scrambling','Putts / round','Sand saves','3+ putts / round','Penalties']){await page.getByText(label,{exact:true}).first().click({force:true});await page.waitForTimeout(50);const title=page.getByText('· TREND',{exact:false}).last();ok(await title.count(),label+' trend opens');const g=await geometry();ok(!g.issues.length,JSON.stringify({width,label,...g}));await page.getByRole('button',{name:'Close',exact:true}).last().click({force:true});}
  }
+ // Approved recent-form UI: real selectors, baseline colours, eligibility and reversible range changes.
+ await page.setViewportSize({width:390,height:1100});
+ await render({kind:'dashboard',n:32,long:true});
+ const form = page.getByText('SCORING FORM · DIFFERENTIAL',{exact:true}).locator('..');
+ const firstHeadline = await form.locator('[data-trend-latest]').textContent();
+ const firstDots = await form.locator('circle[data-round-value]').evaluateAll(es=>es.map(e=>[e.getAttribute('data-round-value'),e.getAttribute('fill')]));
+ ok(firstDots.length===32,'scoring form preserves every eligible round');
+ for(const [value,fill] of firstDots)ok(['#4ADE80','#FB7185'].includes(fill),'visible round marker '+value);
+ await page.getByRole('button',{name:'Last 5',exact:true}).click();await page.waitForTimeout(120);
+ ok(await form.locator('circle[data-round-value]').count()===5,'Last 5 updates chart points');
+ ok(!(await form.textContent()).includes('Previous 5:'),'short range has no invented comparison');
+ await page.getByRole('button',{name:'All',exact:true}).click();await page.waitForTimeout(120);
+ ok(await form.locator('[data-trend-latest]').textContent()===firstHeadline,'All -> Last 5 -> All headline');
+ ok(JSON.stringify(await form.locator('circle[data-round-value]').evaluateAll(es=>es.map(e=>[e.getAttribute('data-round-value'),e.getAttribute('fill')])))===JSON.stringify(firstDots),'range round trip restores values and colours');
+ ok((await form.textContent()).includes('Previous 5:'),'preceding-five comparison available');
+ while(await page.getByRole('button',{name:'＋ More',exact:true}).count())await page.getByRole('button',{name:'＋ More',exact:true}).first().click({force:true});
+ for(const label of ['Avg differential','Stableford avg','Fairways hit','GIR','Scrambling','Putts / round','Sand saves','Penalties']){
+   await page.getByText(label,{exact:true}).first().click({force:true});await page.waitForTimeout(120);
+   const detail=page.getByText('· TREND',{exact:false}).last().locator('../..');
+   const points=detail.locator('circle[data-round-value]');
+   const n=await points.count();ok(n>0,label+' retains eligible observations');
+   ok(await detail.locator('[data-trend-overview]').count()===1,label+' recent summary rendered');
+   for(const p of await points.evaluateAll(es=>es.map(e=>({good:e.getAttribute('data-round-better'),fill:e.getAttribute('fill'),r:+e.getAttribute('r')})))){
+     ok(p.r===3.6&&p.fill===(p.good==='true'?'#4ADE80':'#FB7185'),label+' marker direction and visibility');
+   }
+   if(['Fairways hit','GIR','Scrambling','Sand saves'].includes(label))ok((await detail.textContent()).includes('recorded opportunities'),label+' denominator disclosed');
+   await page.getByRole('button',{name:'Close',exact:true}).last().click({force:true});
+ }
+ // Tap a real round: selected marker, course/date/value/baseline context, close and re-entry.
+ await form.scrollIntoViewIfNeeded();const dot=await form.locator('circle[data-round-value]').nth(12).boundingBox();
+ await page.touchscreen.tap(dot.x+dot.width/2,dot.y+dot.height/2);await page.waitForTimeout(140);
+ ok(await form.locator('.recharts-active-dot').count()>0,'selected round highlighted');
+ const tip=page.locator('.recharts-tooltip-wrapper').filter({has:page.getByText('vs overall average',{exact:true})});
+ ok((await tip.textContent()).includes('The Extremely Long Championship'),'tooltip retains course');
+ ok((await tip.textContent()).includes('Recent form'),'tooltip reports recent form');
+ await tip.getByRole('button',{name:'Close',exact:true}).tap();await page.waitForTimeout(120);
+ ok(await form.locator('circle[data-round-value]').count()===32,'tooltip close preserves data');
  // Real responsive transitions A -> B -> A, with opposite-axis clearance rechecked each time.
  for(const kind of ['profile','form','dense','admin','season']){await render({kind,n:29,mode:'negative'});for(const width of [390,320,768,390]){await page.setViewportSize({width,height:1100});await page.waitForTimeout(100);const g=await geometry();ok(!g.issues.length,JSON.stringify({kind,width,...g}));}}
  // Tooltip dismissal and reopening retain the plotted data and the current range.

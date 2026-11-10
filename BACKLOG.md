@@ -1,3 +1,11 @@
+## 212.96 — recent-form and CI speed validation
+
+- [ ] Benchmark three warm-cache CI runs and one cold run on the same commit. Record total wall time, runner queue time, setup/cache time and all lane timings. Approximately three minutes remains a target, not a proven runtime.
+- [ ] Initial implementation: separate database, application, charts and build jobs; retain fail-closed verify, full coverage, database security reconstruction and serialized staging integration. Confirm actual GitHub execution before further scheduling changes.
+- [ ] Follow-up after measurement: assess isolated bounded ticking-clock/test workers, duplicate test invocations, readiness-based browser waits and dependency-cache keys stable across version-only releases. Do not reduce assertions or scenarios. Do not parallelize shared staging mutations.
+- [ ] Physical iPhone/PWA and staging validation of 20% recent form, marker taps, 5/20/Season/All reversibility, sparse percentages, eligibility and unchanged score save/reopen.
+- [ ] Existing product work retained: restore Courses → Add New Course with duplicate prevention; safe historical rating/slope corrections; individual tee selection independent of yardage; explicit allowed/blocked Manage Game format/state transition matrix. Check current behavior before each fix.
+
 ## 212.95 — chart validation follow-up
 
 - [ ] Run GitHub verify, Vercel staging build, staging integration, physical iPhone/PWA chart and tooltip checks on 212.95 before production approval. Exercise narrow/wide screens, 5/20/Season/All round trips, signed and flat player-card histories and active scoring/save/reopen. No migration required.

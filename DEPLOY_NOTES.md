@@ -1,3 +1,12 @@
+## 212.96.261109 — recent-form charts and independent CI lanes (candidate)
+
+- Use a 20% latest / 80% prior-state recent-form line on dashboard scoring form and all 15 clickable performance trends. Keep individual rounds as visible green/red dots, a cream recent-form line and gold overall-average reference. Add a selected-point highlight and date/course/value/baseline tooltip context.
+- Show the latest five tracked rounds and compare against the preceding five only with ten eligible observations. Percentage summaries pool recorded opportunities; percentage recent form decays successes and opportunities separately at the same 20% rate. Missing observations never become zero or age the trend. Existing per-round sources, eligibility, range selection and higher/lower rules remain.
+- Percentage rate baselines intentionally change from mean-of-round-percentages to pooled hit/opportunity rates. Round dots still show each round's own result. The line is display-only and does not feed handicaps, results or persisted scores. Player-card, season-story and admin charts retain their distinct calculations.
+- Run database reconstruction/parity, application checks, chart browser tests and production compile independently in CI. Preserve the required verify name; it fails closed unless every applicable prerequisite succeeds, including staging integration for staging-to-main PRs. Keep all existing commands/tests and local npm run ci. Serialize automated/manual staging integration without cancelling active cleanup.
+- Install only Chromium headless shell in the two new browser lanes; retain installed-browser failure behavior. Cache Next build intermediates and upload per-lane timings for measured follow-up. Runtime savings remain unmeasured until GitHub runs; no migration or dependency update.
+- Full-source candidate; see RELEASE_VERIFICATION_212.96.md. External GitHub, fresh database, staging, Vercel and phone gates remain pending.
+
 ## 212.95.261107 — responsive charts and readable axis labels (candidate)
 
 - Apply the approved chart design: Recharts automatic Y-axis width, responsive month/year labels for longer histories, and explicit separation between labels from opposite axes. Keep one observation per round, the existing rolling-average calculations and the >30-round dense-view transition.
