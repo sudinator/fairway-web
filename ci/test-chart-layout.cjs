@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..');let checks=0;function ok(value,message){
  }}]});
  const server=http.createServer((req,res)=>{res.setHeader('Cache-Control','no-store');if(req.url==='/bundle.js'){res.setHeader('Content-Type','application/javascript');res.end(bundle.outputFiles[0].text);}else{res.setHeader('Content-Type','text/html');res.end('<style>body{margin:0;background:#0E3B2E;color:#F7F3E8;font:500 16px Arial}*{box-sizing:border-box}#root{padding:16px}</style><div id="root"></div><script>window.process={env:{}}</script><script src="/bundle.js"></script>');}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  let browser;try{browser=await launchUpdateChromium(chromium);const page=await browser.newPage({ hasTouch: true });const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>!!window.renderAudit);checks+=await page.evaluate(()=>window.chartMathChecks());let cases=0;
- async function render(spec){await page.evaluate(s=>window.renderAudit(s),spec);await page.waitForTimeout(80);}
+ async function render(spec){const id=await page.evaluate(s=>{window.renderAudit(s);return window.auditRenderId;},spec);await page.waitForFunction(id=>document.querySelector('[data-audit-render]')?.getAttribute('data-audit-render')===String(id),id);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));if(spec.n>1&&['dashboard','form','dense','admin','season','profile'].includes(spec.kind))await page.locator('.recharts-wrapper svg.recharts-surface').first().waitFor({state:'visible'});}
  async function geometry(){return page.evaluate(()=>{const issues=[];let chartCount=0,minGap=Infinity;for(const chart of document.querySelectorAll('.recharts-wrapper')){chartCount++;const cb=chart.getBoundingClientRect();if(cb.right>innerWidth+.5||cb.left<-.5)issues.push('chart overflow');const texts=[...chart.querySelectorAll('text')];for(const text of texts){const r=text.getBoundingClientRect();if(!r.width||getComputedStyle(text).visibility==='hidden')continue;if(r.left<cb.left-.6||r.right>cb.right+.6||r.top<cb.top-.6||r.bottom>cb.bottom+.6)issues.push('clipped '+text.textContent+' '+JSON.stringify({r:r.toJSON(),cb:cb.toJSON()}));if(parseFloat(getComputedStyle(text).fontSize)<11)issues.push('small '+text.textContent);}
  const countLabels=[...chart.querySelectorAll('.recharts-label-list text')].filter(t=>getComputedStyle(t).visibility!=='hidden');for(let i=1;i<countLabels.length;i++){const a=countLabels[i-1].getBoundingClientRect(),b=countLabels[i].getBoundingClientRect();if(a.right>b.left+.5&&a.top<b.bottom&&a.bottom>b.top)issues.push('count-label collision');}
  const xs=[...chart.querySelectorAll('.recharts-xAxis-tick-labels text')],ys=[...chart.querySelectorAll('.recharts-yAxis-tick-labels text')];for(const x of xs)for(const y of ys){const a=x.getBoundingClientRect(),b=y.getBoundingClientRect(),gap=Math.hypot(Math.max(a.left-b.right,b.left-a.right,0),Math.max(a.top-b.bottom,b.top-a.bottom,0));minGap=Math.min(minGap,gap);if(gap<8)issues.push('cross-axis '+x.textContent+'/'+y.textContent+': '+gap);}
@@ -61,7 +61,40 @@ const root=path.resolve(__dirname,'..');let checks=0;function ok(value,message){
  for(const kind of ['profile','form','dense','admin','season']){await render({kind,n:29,mode:'negative'});for(const width of [390,320,768,390]){await page.setViewportSize({width,height:1100});await page.waitForTimeout(100);const g=await geometry();ok(!g.issues.length,JSON.stringify({kind,width,...g}));}}
  // Tooltip dismissal and reopening retain the plotted data and the current range.
  for(const kind of ['dashboard','profile','admin']){await page.setViewportSize({width:390,height:1100});await render({kind,n:12,mode:'varied',long:true});if(kind==='dashboard'){await page.getByText('GIR',{exact:true}).first().click();await page.waitForTimeout(150);}const chart=page.locator('.recharts-wrapper').last();await chart.scrollIntoViewIfNeeded();const bb=await chart.boundingBox();await page.mouse.move(bb.x+bb.width/2,bb.y+bb.height/2);await page.waitForTimeout(180);const close=page.locator('.recharts-tooltip-wrapper').getByRole('button',{name:'Close',exact:true});ok(await close.count(),kind+' tooltip opens');await close.last().click({force:true});await page.waitForTimeout(100);ok(await page.locator('.recharts-tooltip-wrapper').evaluateAll(es=>es.every(e=>getComputedStyle(e).visibility!=='visible')),kind+' tooltip closes');const again=await page.locator('.recharts-wrapper').last().boundingBox();await page.mouse.move(0,0);await page.mouse.move(again.x+again.width/2,again.y+again.height/2);await page.waitForTimeout(150);ok(await page.locator('.recharts-tooltip-wrapper').getByRole('button',{name:'Close',exact:true}).count(),kind+' tooltip reopens');}
- for(const kind of ['dashboard','profile','admin']){await page.mouse.move(0,0);await render({kind,n:12,long:true});if(kind==='dashboard'){await page.getByText('GIR',{exact:true}).first().click();await page.waitForTimeout(100);}const c=page.locator('.recharts-wrapper').last();await c.scrollIntoViewIfNeeded();const r=await c.boundingBox();await page.touchscreen.tap(r.x+r.width*.6,r.y+r.height*.4);await page.waitForTimeout(120);const close=page.locator('.recharts-tooltip-wrapper').getByRole('button',{name:'Close',exact:true});ok(await close.count(),kind+' touch tooltip opens');await close.last().tap();await page.waitForTimeout(120);ok(await page.locator('.recharts-tooltip-wrapper').evaluateAll(es=>es.every(e=>getComputedStyle(e).visibility!=='visible')),kind+' touch close remains closed');const r2=await page.locator('.recharts-wrapper').last().boundingBox();await page.touchscreen.tap(r2.x+r2.width*.4,r2.y+r2.height*.4);await page.waitForTimeout(120);ok(await page.locator('.recharts-tooltip-wrapper').getByRole('button',{name:'Close',exact:true}).count(),kind+' touch next point reopens');}
+ // Recharts and React commit asynchronously; close.tap() may also scroll the document.
+ // Locator taps re-scroll and wait for stable geometry, so the second tap cannot miss
+ // the chart outside the viewport. Wait for outcomes; never retry a tap or drop assertions.
+ for(const kind of ['dashboard','profile','admin']){
+   await page.mouse.move(0,0);await render({kind,n:12,long:true});
+   if(kind==='dashboard'){await page.getByText('GIR',{exact:true}).first().click();await page.getByText('GIR · TREND',{exact:true}).waitFor({state:'visible'});}
+   const c=page.locator('.recharts-wrapper').last();await c.scrollIntoViewIfNeeded();
+   await c.locator('svg.recharts-surface').waitFor({state:'visible'});
+   const r=await c.boundingBox();await c.tap({position:{x:r.width*.6,y:r.height*.4}});
+   const close=page.locator('.recharts-tooltip-wrapper button[aria-label="Close"]:visible').last();
+   await close.waitFor({state:'visible',timeout:3000});ok(await close.isVisible(),kind+' touch tooltip opens');
+   const firstTip=await page.locator('.recharts-tooltip-wrapper:visible').last().textContent();
+   await close.tap();
+   await page.waitForFunction(()=>[...document.querySelectorAll('.recharts-tooltip-wrapper')].every(e=>getComputedStyle(e).visibility!=='visible'),{},{timeout:3000});
+   ok(await page.locator('.recharts-tooltip-wrapper').evaluateAll(es=>es.every(e=>getComputedStyle(e).visibility!=='visible')),kind+' touch close remains closed');
+   const r2=await c.boundingBox();await c.tap({position:{x:r2.width*.4,y:r2.height*.4}});
+   await close.waitFor({state:'visible',timeout:3000});ok(await close.isVisible(),kind+' touch next point reopens');
+   const nextTip=await page.locator('.recharts-tooltip-wrapper:visible').last().textContent();
+   ok(nextTip!==firstTip,kind+' next tap selects a different point, not stale content');
+   // Held tooltips: hybrid-device round trip in the same mounted profile/admin chart.
+   if(kind!=='dashboard'){
+   await close.tap();await page.waitForFunction(()=>[...document.querySelectorAll('.recharts-tooltip-wrapper')].every(e=>getComputedStyle(e).visibility!=='visible'),{},{timeout:3000});
+   await page.mouse.move(0,0);await c.hover({position:{x:r2.width*.5,y:r2.height*.4}});
+   await close.waitFor({state:'visible',timeout:3000});ok(await close.isVisible(),kind+' touch to mouse restores hover');
+   await close.click();await page.waitForFunction(()=>[...document.querySelectorAll('.recharts-tooltip-wrapper')].every(e=>getComputedStyle(e).visibility!=='visible'),{},{timeout:3000});
+   await c.tap({position:{x:r2.width*.3,y:r2.height*.4}});
+   await close.waitFor({state:'visible',timeout:3000});ok(await close.isVisible(),kind+' mouse to touch restores tap');
+   await close.hover();ok(await close.isVisible(),kind+' mouse approaching touch tooltip close does not dismiss it');
+   await close.click();await page.waitForFunction(()=>[...document.querySelectorAll('.recharts-tooltip-wrapper')].every(e=>getComputedStyle(e).visibility!=='visible'),{},{timeout:3000});
+   ok(await page.locator('.recharts-tooltip-wrapper:visible').count()===0,kind+' mouse closes a touch-opened tooltip');
+
+   }
+
+ }
  ok(!errors.length,'browser errors: '+errors.join('; '));
  // A mutation fixture proves SVG attribute syntax is covered by the shipped minimum-font guard.
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bnn-chart-font-'));try{fs.mkdirSync(path.join(temp,'components'));for(const syntax of ['fontSize="9"','fontSize={9}','fontSize: 9']){fs.writeFileSync(path.join(temp,'components/probe.tsx'),syntax);const run=cp.spawnSync('python3',[path.join(root,'ci/check-min-fontsize.py')],{cwd:temp,encoding:'utf8'});ok(run.status===1,'font guard rejects '+syntax);}}finally{fs.rmSync(temp,{recursive:true,force:true});}

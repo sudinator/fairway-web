@@ -1,3 +1,8 @@
+## 212.97 — installed staging update investigation
+
+- [ ] Installed phone app reports 212.95 while the staging version endpoint reports 212.96 (build 0d002fec2ba4c77c211e9d88207783771fea4b15). Check version reportedly gives no visible response. Obtain the installed app's Latest version/status after a fresh check; verify its actual origin and Vercel authorization before changing update policy. Safari access alone does not prove the installed app's fetch succeeds. Preserve saved drafts; do not clear site data as a diagnostic.
+- [ ] Run updated touch-tooltip CI and physical phone tests. Existing recent-form, CI timing and external release validation items below remain open.
+
 ## 212.96 — recent-form and CI speed validation
 
 - [ ] Benchmark three warm-cache CI runs and one cold run on the same commit. Record total wall time, runner queue time, setup/cache time and all lane timings. Approximately three minutes remains a target, not a proven runtime.

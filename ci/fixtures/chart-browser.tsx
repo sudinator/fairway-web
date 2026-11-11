@@ -14,6 +14,7 @@ const Bars=(InsightsModule as any).Bars;
 import {ShotSynthesis} from '@/components/compare-stats';
 const root=createRoot(document.getElementById('root')!);
 (window as any).renderAudit=({kind,n=29,mode='varied',long=false}:any)=>{
+const renderId = ((window as any).auditRenderId = ((window as any).auditRenderId || 0) + 1);
 const val=(i:number)=>mode==='flat'?25:mode==='zero'?0:mode==='hundred'?100:mode==='negative'?-12+(i%8):mode==='large'?1000+i*13:(i*17)%61;
 const date=(i:number)=>new Date(Date.UTC(2026,0,1+i*9)).toISOString().slice(0,10);
 const course=long?'The Extremely Long Championship Golf Course and Country Club at Berkshire Valley':'Berkshire Valley';
@@ -31,7 +32,7 @@ if(kind==='profile')el=<div style={{padding:16,overflow:'hidden'}}><FormChart da
 if(kind==='insights')el=<Bars title="BY DIFFICULTY" buckets={data.slice(0,4).map((d,i)=>({key:String(i),label:i===0?'hardest holes (stroke index 1–6)':'Par 4s',avgToPar:d.val,netAvg:1.2,holes:519}))}/>;
 if(kind==='tip')el=<ChartTip active payload={[{dataKey:'value',value:25,payload:{course,name:'Jan 1, 2026'}}]} nameMap={{value:'Differential'}} fmt={String}/>;
 if(kind==='shots')el=<ShotSynthesis fir={{hit:20,total:100}} gir={{hit:20,total:100}} puttsPerRound={36} scramble={{hit:10,total:100}} index={12} goalHcp={10} setGoalHcp={()=>{}} detailRounds={n}/>;
-root.render(<div data-audit={kind} style={{background:'#1B5A46',padding:16,borderRadius:14}}>{el}</div>);
+root.render(<div data-audit={kind} data-audit-render={renderId} style={{background:'#1B5A46',padding:16,borderRadius:14}}>{el}</div>);
 };
 
 import {chartXAxis,formatChartDate,showCountLabels} from "@/lib/chart-axis";

@@ -1,3 +1,11 @@
+## 212.97.261109 — reliable chart touch selection and CI interactions (candidate)
+
+- Use click-triggered tooltip selection for touch input inside the existing dismissible profile/admin chart frames; retain hover for mouse input. Close remains explicit and the next deliberate point tap reopens the tooltip. Hybrid mouse/touch changes work in the same mounted chart. Existing dashboard default tooltips, chart values, axes and 20% recent-form calculations are unchanged.
+- Replace arbitrary screen-coordinate second taps with locator-based taps that re-scroll and wait for stable geometry. Wait for committed fixture renders and visible outcomes rather than assuming that 80/120ms is enough. Preserve the full chart matrix and close/reopen assertions; also verify new-point content and touch→mouse→touch transitions.
+- A slower-browser reproduction failed before the correction and passed focused tests at normal, 4× and 8× CPU slowdown afterward. No test was skipped or retried until green. Full-source candidate; no migration or dependency change.
+- The phone report of installed 212.95 not detecting staging 212.96 remains a separate investigation. User-supplied live metadata confirms staging 212.96; an unauthenticated external request redirects to Vercel login, which does not establish the phone's authentication state. No updater policy, cache deletion or automatic reload change is included.
+- See RELEASE_VERIFICATION_212.97.md for executed validation and remaining external gates.
+
 ## 212.96.261109 — recent-form charts and independent CI lanes (candidate)
 
 - Use a 20% latest / 80% prior-state recent-form line on dashboard scoring form and all 15 clickable performance trends. Keep individual rounds as visible green/red dots, a cream recent-form line and gold overall-average reference. Add a selected-point highlight and date/course/value/baseline tooltip context.
