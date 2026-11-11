@@ -117,6 +117,37 @@ async function main() {
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   await act(async () => { settings = renderScreen(<UpdateChecker />); await new Promise(resolve => setTimeout(resolve, 5)); });
   ok(settings.text.includes("Download recovery copies"), "prior recovery copies remain accessible without an update gate");
+  const beforeProtected = JSON.stringify(Object.fromEntries(Object.keys(legacy).map(k => [k, window.localStorage.getItem(k)])));
+  for (const response of [
+    { ok: false, status: 401 }, { ok: false, status: 403 },
+    { ok: false, status: 0, type: "opaqueredirect" },
+    { ok: true, redirected: true },
+    { ok: true, headers: { get: () => "text/html" } },
+  ]) {
+    globalThis.fetch = (async (_url: any, options: any) => {
+      ok(options.redirect === "manual" && options.credentials === "same-origin", "protected checks use own cookies without following login redirects");
+      return response;
+    }) as any;
+    await act(async () => { await checkAutomaticVersion(); });
+    ok(automaticUpdateState().checkFailure === "access" && settings.text.includes("Deployment access is required"), "access failure is distinct from offline");
+    ok(settings.el.querySelector('a[href="/auth/deployment-access"]') != null, "explicit same-origin recovery link is available");
+    ok(banner.text.includes("Reconnect to app"), "deployment access failure has a visible recovery banner");
+    ok(settings.text.includes("Last attempt:"), "failure records an attempted check");
+  }
+  globalThis.fetch = (async () => ({ ok: false, status: 503 })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "server", "server failure has its own explanation");
+  globalThis.fetch = (async () => ({ ok: true, json: async () => { throw Error("invalid JSON"); } })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "invalid", "invalid body has its own explanation");
+  globalThis.fetch = (() => new Promise(() => {})) as any;
+  await act(async () => { await checkAutomaticVersion(10); });
+  ok(automaticUpdateState().checkFailure === "timeout", "bounded timeout is explained");
+  globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "" && settings.text.includes("You’re up to date."), "successful retry clears recovery failure");
+  ok(settings.el.querySelector('a[href="/auth/deployment-access"]') == null, "recovery action disappears after success");
+  ok(beforeProtected === JSON.stringify(Object.fromEntries(Object.keys(legacy).map(k => [k, window.localStorage.getItem(k)]))), "all failure and retry paths preserve scores and drafts");
   settings.unmount(); banner.unmount(); globalThis.fetch = oldFetch;
   report("explicit update banner and status");
 }

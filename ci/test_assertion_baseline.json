@@ -1,5 +1,5 @@
 {
-  "total": 447223,
+  "total": 447254,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -36,7 +36,7 @@
     "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
-    "explicit update banner and status": 37,
+    "explicit update banner and status": 68,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,

@@ -1,7 +1,7 @@
 // Birdie Num Num: background download, explicit activation, fresh online navigation.
 // No clients.claim(): do not take over uncontrolled documents. Activation can
 // change a controlled page’s controller; the new app never reloads on that event.
-const SW_VERSION = "212.97.261109";
+const SW_VERSION = "212.98.261110";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 // Commit an offline shell only after its initial scripts/styles are cached.
 // Otherwise a background update could leave an offline restart with new HTML

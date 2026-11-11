@@ -1,3 +1,11 @@
+## 212.98.261110 — protected-deployment update recovery (candidate)
+
+- Keep deployment protection enabled. Detect denied/redirected version requests, HTML responses, malformed data, server errors and timeouts; report the last attempt and distinguish a failed check from a version never checked. Explicitly send same-origin cookies and inspect redirects without silently following a deployment login.
+- Show an access-recovery banner and Reconnect to app link after a denied/redirected check. Recovery is explicit navigation through /auth/deployment-access, which existing workers already exclude from offline fallback. Vercel still authenticates before the route executes; the route only redirects to a fixed same-origin Home path after access. No token or deployment-protection bypass is introduced.
+- Keep normal update activation explicit. Reconnection warns to save current input before navigation; persisted scores/drafts are not deleted. No automatic sign-in navigation or forced reload is added. Recovery cannot promise to renew an authentication session silently.
+- Add real-browser protected-gateway simulation with actual worker and recovery route: blocked metadata, no background redirect, explicit login, HTTP-only session, fixed return, successful check and preserved drafts. Add access/error/retry UI scenarios. No migration, dependency or scoring change.
+- Full-source candidate. Live protected staging and installed-iPhone validation are required before claiming recovery works in the user's installed environment. A pre-fix installed client does not yet contain the recovery link; the initial protected delivery/reauthentication remains an external validation step. See RELEASE_VERIFICATION_212.98.md.
+
 ## 212.97.261109 — reliable chart touch selection and CI interactions (candidate)
 
 - Use click-triggered tooltip selection for touch input inside the existing dismissible profile/admin chart frames; retain hover for mouse input. Close remains explicit and the next deliberate point tap reopens the tooltip. Hybrid mouse/touch changes work in the same mounted chart. Existing dashboard default tooltips, chart values, axes and 20% recent-form calculations are unchanged.

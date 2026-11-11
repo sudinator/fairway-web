@@ -1,7 +1,7 @@
 "use client";
 import { APP_VERSION } from "./app-version";
-export type AutomaticUpdateState = { latest: string; checking: boolean; message: string; updating: boolean; notice: string; completed: boolean };
-const initial: AutomaticUpdateState = { latest: "", checking: false, message: "", updating: false, notice: "", completed: false };
+export type AutomaticUpdateState = { latest: string; checking: boolean; message: string; updating: boolean; notice: string; completed: boolean; checkFailure: string; checkedAt: string };
+const initial: AutomaticUpdateState = { latest: "", checking: false, message: "", updating: false, notice: "", completed: false, checkFailure: "", checkedAt: "" };
 let state = initial;
 const listeners = new Set<() => void>();
 export const automaticUpdateState = () => state;
@@ -21,12 +21,27 @@ async function bounded<T>(work: (signal: AbortSignal) => Promise<T>, timeout: nu
   try { return await Promise.race([work(controller.signal), new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("Request timed out")); }, timeout); })]); }
   finally { clearTimeout(timer); }
 }
+class VersionCheckError extends Error {
+  constructor(readonly kind: "access" | "invalid" | "server", message: string) { super(message); }
+}
+function checkFailure(error: unknown) {
+  const kind = error instanceof VersionCheckError ? error.kind : error instanceof Error && (error.message === "Request timed out" || error.name === "AbortError") ? "timeout" : "network";
+  const detail = kind === "access" ? "Deployment access is required. Save your current entry, then choose Reconnect to app to open its sign-in page."
+    : kind === "invalid" ? "The server returned invalid version data. A deployment sign-in page or configuration issue may be involved."
+    : kind === "server" ? "The version server returned an error. Retry the check; reconnect if the problem persists."
+    : kind === "timeout" ? "The version request timed out. Retry when the connection is available."
+    : "The version request could not reach the server. Check the connection; deployment access may also need renewing.";
+  return { checkFailure: kind, checkedAt: new Date().toISOString(), message: "Could not check the deployed version. " + detail + " You can continue scoring." };
+}
 async function deployedVersion(timeout: number) {
   return bounded(async signal => {
-    const response = await fetch(`/app-version.json?ts=${Date.now()}`, { cache: "no-store", signal });
-    if (!response.ok) throw new Error("Version unavailable");
-    const data = await response.json();
-    if (!validVersion(data?.version)) throw new Error("Invalid version");
+    const response = await fetch(`/app-version.json?ts=${Date.now()}`, { cache: "no-store", credentials: "same-origin", redirect: "manual", signal });
+    if (response.type === "opaqueredirect" || response.redirected || response.status === 401 || response.status === 403) throw new VersionCheckError("access", "Version access denied or redirected");
+    if (!response.ok) throw new VersionCheckError("server", "Version unavailable");
+    if (response.headers?.get("content-type")?.includes("text/html")) throw new VersionCheckError("access", "Version endpoint returned a login/web page");
+    let data: any;
+    try { data = await response.json(); } catch { throw new VersionCheckError("invalid", "Invalid version JSON"); }
+    if (!validVersion(data?.version)) throw new VersionCheckError("invalid", "Invalid version");
     return data.version as string;
   }, timeout);
 }
@@ -34,11 +49,11 @@ let pending: Promise<void> | null = null;
 export function checkAutomaticVersion(timeout = 7000): Promise<void> {
   if (pending) return pending;
   pending = (async () => {
-    publish({ checking: true });
+    publish({ checking: true, message: "Checking the deployed version…" });
     try {
       const latest = await deployedVersion(timeout);
-      publish({ latest, ...(!newerVersion(latest) && !state.updating && !state.completed ? { notice: "" } : {}), message: newerVersion(latest) ? `Version ${latest} is available. Tap Update now when you are ready to reload.` : latest === APP_VERSION ? "You’re up to date." : `This device is on ${APP_VERSION}; the server reports ${latest}. No older version will be requested.` });
-    } catch { publish({ message: "Could not check the deployed version. You can continue scoring; check again when connected." }); }
+      publish({ latest, checkFailure: "", checkedAt: new Date().toISOString(), ...(!newerVersion(latest) && !state.updating && !state.completed ? { notice: "" } : {}), message: newerVersion(latest) ? `Version ${latest} is available. Tap Update now when you are ready to reload.` : latest === APP_VERSION ? "You’re up to date." : `This device is on ${APP_VERSION}; the server reports ${latest}. No older version will be requested.` });
+    } catch (error) { publish(checkFailure(error)); }
     finally { publish({ checking: false }); }
   })().finally(() => { pending = null; });
   return pending;
@@ -78,9 +93,11 @@ export function requestAppUpdate(timeout = 12000, navigate: (url: string) => voi
   if (state.updating) return Promise.resolve();
   applying = (async () => {
     publish({ updating: true, completed: false, notice: "Checking the connection and downloading the update…" });
+    let versionChecked = false;
     try {
       const latest = await deployedVersion(timeout);
-      publish({ latest });
+      versionChecked = true;
+      publish({ latest, checkFailure: "", checkedAt: new Date().toISOString() });
       if (!newerVersion(latest)) { publish({ updating: false, completed: true, notice: latest === APP_VERSION ? `You’re up to date: ${APP_VERSION}.` : `The server reports ${latest}. This device remains on ${APP_VERSION}; no older version was requested.` }); return; }
       await activateDownloadedWorker(timeout);
       const url = new URL(window.location.href);
@@ -91,7 +108,10 @@ export function requestAppUpdate(timeout = 12000, navigate: (url: string) => voi
       publish({ notice: `Loading version ${latest}…` });
       navigate(url.href);
       navigationTimer = setTimeout(() => publish({ updating: false, notice: `The app did not restart. You are still on ${APP_VERSION}. Check your connection and retry Update now.` }), timeout);
-    } catch { publish({ updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. Check your connection and retry Update now. Saved scores and drafts have not been removed.` }); }
+    } catch (error) {
+      if (versionChecked) publish({ updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. The update download, activation or restart could not complete. Check your connection and retry Update now. Saved scores and drafts have not been removed.` });
+      else { const failure = checkFailure(error); publish({ ...failure, updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. ${failure.message} Saved scores and drafts have not been removed.` }); }
+    }
   })().finally(() => { applying = null; });
   return applying;
 }

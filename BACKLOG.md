@@ -1,3 +1,9 @@
+## 212.98 — protected staging recovery validation
+
+- [ ] Restore Vercel authentication protection by removing the staging-domain exception. Confirm an unauthorized browser is denied.
+- [ ] Validate delivery of this candidate to the existing installed app with protection enabled. Do not claim an old client already has the new recovery link. Confirm deployment login from installed mode, return to the same app origin, working version checks, pending update banner and saved draft recovery. Safari login alone is not proof of installed-app authorization.
+- [ ] Current version-check diagnostics and explicit recovery path implemented; live Vercel/iPhone behavior remains pending. No embedded bypass secret or public staging exception is required by the new code.
+
 ## 212.97 — installed staging update investigation
 
 - [ ] Installed phone app reports 212.95 while the staging version endpoint reports 212.96 (build 0d002fec2ba4c77c211e9d88207783771fea4b15). Check version reportedly gives no visible response. Obtain the installed app's Latest version/status after a fresh check; verify its actual origin and Vercel authorization before changing update policy. Safari access alone does not prove the installed app's fetch succeeds. Preserve saved drafts; do not clear site data as a diagnostic.

@@ -12,9 +12,15 @@ const autoWorker=fs.readFileSync(path.join(root,'ci/fixtures/sw-automatic-21285.
 const newWorker=fs.readFileSync(path.join(root,'public/sw.js'),'utf8'),oldWorker=fs.readFileSync(path.join(root,'ci/fixtures/sw-manual-21283.js'),'utf8');
 const legacyRegistration=fs.readFileSync(path.join(root,'ci/fixtures/register-sw-21278.tsx'),'utf8');
 const legacyReload=legacyRegistration.match(/let reloaded = false;[\s\S]*?const onControllerChange = \(\) => \{[\s\S]*?\n    \};/)[0];
-let version='212.83.261101',pageVersion=null,calls=0;
+let version='212.83.261101',pageVersion=null,calls=0,protectedAccess=false,protectedRouteCalls=0;
+const routeSource=ts.transpileModule(fs.readFileSync(path.join(root,'app/auth/deployment-access/route.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const recoveryModule={exports:{}};new Function('exports',routeSource)(recoveryModule.exports);
 function client(v){return `const modules={${defs.replaceAll(builtVersion,v)}},cache={};function load(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](p=>load(id.slice(0,id.lastIndexOf('/')+1)+p.replace('./','')),m,m.exports);return m.exports;}window.legacySafety=load('lib/update-safety');window.ready=true;window.loadedVersion=${JSON.stringify(v)};${v==='212.83.261101'?'':"window.updates=load('lib/automatic-updates');window.stopUpdates=window.updates.registerAutomaticUpdates();"}`;}
-const server=http.createServer((req,res)=>{if(process.env.BNN_DEBUG)console.log('server',req.url);res.setHeader('Cache-Control','no-store');if(req.url.startsWith('/sw.js')){res.setHeader('Content-Type','application/javascript');res.end(version==='212.83.261101'?oldWorker:(version==='212.84.261101'||version==='212.85.261101'?autoWorker:newWorker).replace(/const SW_VERSION = "[^"]+";/,`const SW_VERSION = "${version}";`));}else if(req.url.startsWith('/client-')){res.setHeader('Content-Type','application/javascript');res.end(client(req.url.slice('/client-'.length).split('.js')[0]));}else if(req.url.startsWith('/api/')){res.end(String(++calls));}else if(req.url.startsWith('/app-version.json')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version}));}else if(req.url.startsWith('/legacy'))res.end('<title>Legacy sleeping window</title>');else{res.setHeader('Content-Type','text/html');res.end(`<title>BNN ${pageVersion||version}</title><input id="score"><a id="reopen" href="/">Reopen</a><button id="update" onclick="void window.updates.requestAppUpdate()">Update</button><script src="/client-${pageVersion||version}.js"></script>`);}});
+const server=http.createServer((req,res)=>{
+ if(req.url.startsWith('/auth/deployment-login')){res.setHeader('Content-Type','text/html');res.end('<title>Deployment sign-in</title><a id="authorize" href="/auth/deployment-authorize">Sign in</a>');return;}
+ if(req.url.startsWith('/auth/deployment-authorize')){res.writeHead(303,{'Set-Cookie':'bnn-access=ok; Path=/; HttpOnly; SameSite=Lax',Location:'/auth/deployment-access'});res.end();return;}
+ if(protectedAccess&&!String(req.headers.cookie||'').includes('bnn-access=ok')){res.writeHead(302,{Location:'/auth/deployment-login'});res.end();return;}
+ if(req.url.startsWith('/auth/deployment-access')){protectedRouteCalls++;const response=recoveryModule.exports.GET();res.writeHead(response.status,Object.fromEntries(response.headers));res.end();return;}
+ if(process.env.BNN_DEBUG)console.log('server',req.url);res.setHeader('Cache-Control','no-store');if(req.url.startsWith('/sw.js')){res.setHeader('Content-Type','application/javascript');res.end(version==='212.83.261101'?oldWorker:(version==='212.84.261101'||version==='212.85.261101'?autoWorker:newWorker).replace(/const SW_VERSION = "[^"]+";/,`const SW_VERSION = "${version}";`));}else if(req.url.startsWith('/client-')){res.setHeader('Content-Type','application/javascript');res.end(client(req.url.slice('/client-'.length).split('.js')[0]));}else if(req.url.startsWith('/api/')){res.end(String(++calls));}else if(req.url.startsWith('/app-version.json')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version}));}else if(req.url.startsWith('/legacy'))res.end('<title>Legacy sleeping window</title>');else{res.setHeader('Content-Type','text/html');res.end(`<title>BNN ${pageVersion||version}</title><input id="score"><a id="reopen" href="/">Reopen</a><a id="reconnect" href="/auth/deployment-access">Reconnect</a><button id="update" onclick="void window.updates.requestAppUpdate()">Update</button><script src="/client-${pageVersion||version}.js"></script>`);}});
 // Drive offline reopening through a real navigation gesture. The postconditions
 // still require a new document, cached application code and byte-identical data.
 async function reopenOffline(page) {
@@ -46,6 +52,20 @@ async function reopenOffline(page) {
  pageVersion=null;await a.click('#update');
  await a.waitForFunction(()=>window.loadedVersion==='212.86.261102'&&window.updates?.automaticUpdateState().notice.includes('Updated successfully'));
  assert.deepEqual(await a.evaluate(keys=>Object.fromEntries(keys.map(k=>[k,localStorage.getItem(k)])),Object.keys(scores)),scores,'successful explicit retry preserves all score data');
+ // Model a deployment gateway in front of every app/static route. No bypass token is embedded.
+ protectedAccess=true;const beforeAccess=await a.url();
+ await a.evaluate(()=>window.updates.checkAutomaticVersion());
+ assert.equal(await a.evaluate(()=>window.updates.automaticUpdateState().checkFailure),'access','manual redirect is diagnosed as deployment access');
+ assert.equal(await a.url(),beforeAccess,'background check never navigates to login');
+ assert.equal(protectedRouteCalls,0,'protected app route has not executed without authentication');
+ await a.click('#reconnect');await a.waitForURL('**/auth/deployment-login');
+ assert.equal(protectedRouteCalls,0,'gateway still blocks the actual recovery route');
+ await a.click('#authorize');await a.waitForFunction(()=>window.ready&&!!window.updates);
+ await a.evaluate(()=>window.updates.checkAutomaticVersion());
+ assert.equal(await a.evaluate(()=>window.updates.automaticUpdateState().checkFailure),'','authorized navigation recovers version checks');
+ assert.equal(protectedRouteCalls,1,'actual fixed-return recovery route executes only after sign-in');
+ assert.deepEqual(await a.evaluate(keys=>Object.fromEntries(keys.map(k=>[k,localStorage.getItem(k)])),Object.keys(scores)),scores,'protected sign-in and return preserve all local scores/drafts');
+ console.log('protected deployment recovery: PASS (real worker, opaque redirect, explicit login, HTTP-only session, actual recovery route, fixed same-origin return, no bypass secret, draft preservation)');
  console.log('explicit update browser: PASS (actual212.78 reload handler stays idle during download, stale HTML detected, retry loads target, verified actual running version, one-shot URL, draft preservation)');
  console.log('automatic update browser: PASS (actual212.83 worker upgrade, 3 versions, legacy/sleeping and active windows, no forced reload, next refresh, offline resume, no score deletion, guarded cache pruning)');
  }catch(error){console.error('Browser scenario failed:',error);throw error;}finally{await Promise.race([b.close(),new Promise(resolve=>setTimeout(resolve,5000))]);server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1;});

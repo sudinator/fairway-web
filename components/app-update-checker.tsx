@@ -15,10 +15,15 @@ export function UpdateChecker() {
   return <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 12 }}>
     <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 700 }}>App version &amp; updates</div>
     <div style={{ color: C.cream, fontSize: 13, marginTop: 12 }}>Current version: <b>{APP_VERSION}</b></div>
-    <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>Latest version: {state.latest || "Not checked yet"}</div>
+    <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{state.checkFailure && state.latest ? "Last known version" : "Latest version"}: {state.latest || (state.checkFailure ? "Check failed" : "Not checked yet")}</div>
     <div style={{ color: C.cream, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>A banner appears when a newer version is available. Update now reloads the app; finish your current entry first. Unfinished rounds and saved scores do not block updates. An already-open game keeps running until you choose to update or refresh.</div>
     {state.notice && <div role="status" style={{ color: C.cream, fontSize: 13, marginTop: 12 }}>{state.notice}</div>}
-    {newerVersion(state.latest) && <button style={{ ...btn(true), marginTop: 12 }} disabled={state.updating} onClick={() => { void requestAppUpdate(); }}>{state.updating ? "Updating…" : "Update now"}</button>}
+    {newerVersion(state.latest) && state.checkFailure !== "access" && <button style={{ ...btn(true), marginTop: 12 }} disabled={state.updating} onClick={() => { void requestAppUpdate(); }}>{state.updating ? "Updating…" : "Update now"}</button>}
+    {state.checkedAt && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Last attempt: {new Date(state.checkedAt).toLocaleTimeString()}</div>}
+    {state.checkFailure && <div style={{ marginTop: 12, color: C.sage, fontSize: 12, lineHeight: 1.5 }}>
+      Save your current entry before reconnecting. This opens the app's protected address for sign-in and returns to Home; saved drafts stay on this device.
+      <a href="/auth/deployment-access" style={{ ...btn(false), display: "inline-block", marginTop: 8 }}>Reconnect to app</a>
+    </div>}
     {state.message && <div role="status" style={{ color: C.cream, fontSize: 13, marginTop: 12 }}>{state.message}</div>}
     <button style={{ ...btn(false), marginTop: 12 }} disabled={state.checking} onClick={() => { void checkAutomaticVersion(); }}>{state.checking ? "Checking…" : "Check version"}</button>
     {copies.length > 0 && <div style={{ marginTop: 16, color: C.sage, fontSize: 13 }}>Previously saved recovery copies remain on this phone. Export them before signing out or clearing website data.
