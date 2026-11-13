@@ -1,19 +1,25 @@
 // Birdie Num Num: background download, explicit activation, fresh online navigation.
 // No clients.claim(): do not take over uncontrolled documents. Activation can
 // change a controlled page’s controller; the new app never reloads on that event.
-const SW_VERSION = "212.98.261110";
+const SW_VERSION = "212.99.261112";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 // Commit an offline shell only after its initial scripts/styles are cached.
 // Otherwise a background update could leave an offline restart with new HTML
 // whose code was never downloaded while the old game was still running.
 async function cacheShell(response, request = "/") {
+  // A followed sign-in redirect is not an application shell. Never retain it
+  // as the offline Home page (installation fetches can follow redirects).
+  if (!response.ok || response.redirected) return;
   const cache = await caches.open(CACHE), html = await response.clone().text();
+  // A same-origin login/error page may be 200 without response.redirected.
+  // Only our RootLayout may become the offline application shell.
+  if (!html.includes('data-bnn-app-shell="v1"')) return;
   const paths = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)].map(m => m[1]);
   paths.push(...[...html.matchAll(/\/_next\/static\/[^"'<>\\\s]+/g)].map(m => m[0]));
   const assets = [...new Set(paths.map(p => new URL(p.replaceAll("&amp;", "&"), self.location.origin)).filter(u => u.origin === self.location.origin && /\.(?:js|css)(?:\?|$)/.test(u.pathname + u.search)).map(u => u.href))];
   await Promise.all(assets.map(async url => {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
-    try { const asset = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!asset.ok) throw new Error("Shell asset unavailable"); await cache.put(url, asset); }
+    try { const asset = await fetch(url, { cache: "no-store", signal: controller.signal }); if (!asset.ok || asset.redirected || asset.headers.get("content-type")?.includes("text/html")) throw new Error("Shell asset unavailable"); await cache.put(url, asset); }
     finally { clearTimeout(timer); }
   }));
   await cache.put(request, response.clone());
@@ -55,6 +61,10 @@ self.addEventListener("fetch", event => {
       // Navigation is always fresh online; a failure retains offline scoring.
       try {
         const fresh = await fetch(req, { cache: "no-store" });
+        // Navigation fetches use manual redirect handling. An opaque redirect
+        // has status 0 and ok=false, but must reach the browser to continue
+        // authentication. Replacing it with saved HTML strands the old app.
+        if (fresh.type === "opaqueredirect" || (fresh.status >= 300 && fresh.status < 400)) return fresh;
         if (fresh.ok) { event.waitUntil(cacheShell(fresh.clone(), req).catch(() => { /* cache quota cannot block a fresh page */ })); return fresh; }
         const saved = await (await caches.open(CACHE)).match(req) || await (await caches.open(CACHE)).match("/") || await caches.match(req) || await caches.match("/");
         return saved || fresh;

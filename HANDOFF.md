@@ -1,3 +1,9 @@
+# 212.99 candidate — redirect handling and release hold
+
+Navigation redirects are forwarded to the browser, never substituted with cached Home. Followed redirects are not cached as the application shell. Explicit Update, offline fallback and score persistence are retained. Test redirects with ci/test-update-redirect-browser.cjs; default Chromium runs in mandatory CI and BNN_UPDATE_BROWSER=webkit runs the same suite in WebKit when installed (failure is never silently skipped). The login fixture is cross-origin and the callback is outside /auth/, so it cannot accidentally bypass the navigation handler under test.
+
+Physical testing must use the owner's existing working 212.98 Home Screen installation; no replacement shortcut. The original 212.97 session incident is unresolved and must not be described as repaired by this candidate. No production readiness until the external gates in RELEASE_VERIFICATION_212.99.md pass. No migration or Vercel protection change.
+
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
 # Current update policy — 212.87
 The pending-update banner offers Update now only, with no Later/Dismiss control. Downloaded workers wait for that action to activate while app pages remain open. Failed attempts keep retry feedback visible. Confirmed success expires after8seconds only when no newer release is pending. Explicit action reloads; deployment/focus/controller changes never force an open page to restart. Unfinished rounds never gate updating. Confirm success from the version actually loaded; report failures/timeouts and keep all drafts/outboxes. This supersedes earlier no-banner guidance below.

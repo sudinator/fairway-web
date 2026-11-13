@@ -1,3 +1,12 @@
+## 212.99.261112 — preserve redirects during app navigation (candidate)
+
+- Correct the worker regression introduced in 212.84: forward navigation redirect responses to the browser before considering saved-HTML fallback. A deployment sign-in redirect must not be replaced by the old app. Preserve explicit update activation, normal successful navigation, offline scoring and all saved data.
+- Refuse to cache followed redirect responses or unmarked 200 login/error pages as an offline application shell. A non-visible RootLayout marker identifies BNN HTML before cache admission. Redirected or HTML sign-in responses cannot count as downloaded JS/CSS assets; an incomplete shell retains the old offline copy. Keep existing version/access diagnostics and the explicit recovery route; no new automatic navigation, sign-out, storage cleanup or protection bypass.
+- Permanently execute historical/current worker redirect comparisons for 301/302/303/307/308 and same/cross-origin destinations. Add same-installation 212.98→candidate→next-fixture update tests, normal navigation and explicit reconnect recovery, cross-origin login/non-excluded callback, repeated access loss, server/offline failure and retry, verified target version and draft preservation.
+- Add handler-model checks for opaque/status redirects, followed-login cache safety and outage fallback. Existing older-window, active-entry, missing-asset/cache-quota and stale-page/retry tests remain mandatory. No database migration, dependency, scoring, chart or CI workflow change.
+- The original phone's 302 is observed, but its initiating session event and Safari's 20-redirect chain remain unresolved. This candidate does not silently renew Vercel access or deliver code to an installation whose downloads are denied. Use the owner's working 212.98 installation for physical same-installation validation. Do not count a new shortcut as a passing update test.
+- Local validation and remaining external gates: RELEASE_VERIFICATION_212.99.md. Not approved for production while GitHub/Vercel/protected-iPhone checks are pending.
+
 ## 212.98.261110 — protected-deployment update recovery (candidate)
 
 - Keep deployment protection enabled. Detect denied/redirected version requests, HTML responses, malformed data, server errors and timeouts; report the last attempt and distinguish a failed check from a version never checked. Explicitly send same-origin cookies and inspect redirects without silently following a deployment login.

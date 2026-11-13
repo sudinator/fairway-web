@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en" data-env={isStaging ? "staging" : "production"}>
-      <body>
+      <body data-bnn-app-shell="v1">
         {isStaging && (
           <>
             <div aria-hidden="true" style={{ position: "fixed", top: "env(safe-area-inset-top, 0px)", left: 0, right: 0, bottom: 0, border: "6px solid #FFD400", pointerEvents: "none", zIndex: 2147483646 }} />

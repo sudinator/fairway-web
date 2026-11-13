@@ -1,3 +1,11 @@
+## 212.99 update reliability — candidate, not production-cleared
+
+- [ ] Physical iPhone: update the existing working 212.98 installation to 212.99, verify the actual running version and preserved pending scores; no new shortcut.
+- [ ] Physical iPhone: same-installation protected access renewal through normal navigation and Reconnect; save any in-memory entry first. Confirm no redirect loop and restored version checks. Repeat with a second real release before production.
+- [ ] Public production-like origin: existing-installation update, server/offline failure and retry, older/sleeping window and active-entry preservation. Keep Vercel staging protection enabled.
+- [ ] Original 212.97 incident remains open: Vercel CDN log shows /app-version.json HTTP 302 at Nov 12 20:29:25.854 GMT-5, request w4m88-1794533365854-734ad053b147. Logs omit Location/cookie state; initiating session event and Safari loop remain unproven. Do not sign out/clear local data to diagnose.
+- [x] Implement redirect passthrough before saved navigation fallback and exclude followed-redirect shell caching; retain historical regression fixtures in mandatory CI. Local result is recorded in RELEASE_VERIFICATION_212.99.md, not evidence of live iPhone recovery.
+
 ## 212.98 — protected staging recovery validation
 
 - [ ] Restore Vercel authentication protection by removing the staging-domain exception. Confirm an unauthorized browser is denied.
