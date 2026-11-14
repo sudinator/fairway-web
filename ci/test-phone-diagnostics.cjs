@@ -24,6 +24,15 @@ const accountA = '11111111-1111-4111-8111-111111111111', accountB = '22222222-22
   check(report.events.some(e => e.event === 'network.result'), 'history survives new JS runtime');
   check(report.app.origin === 'https://staging.bnn.test', 'exact app origin reported without query');
   check(report.app.environment === 'staging', 'environment marker captured');
+  report = await d.buildPhoneDiagnosticReport('primary', '  Reconnect stalled\u0000 on the phone.  ');
+  check(report.userDescription === 'Reconnect stalled on the phone.', 'explicit context is trimmed and control characters removed');
+  check(!JSON.stringify(report.events).includes('Reconnect stalled'), 'context is not recorded as an automatic event');
+  check(!Object.keys(window.localStorage).some(k => String(window.localStorage.getItem(k)).includes('Reconnect stalled')), 'context is not saved on device');
+  report = await d.buildPhoneDiagnosticReport('primary', 'x'.repeat(2000)); check(report.userDescription.length === 500, 'context is bounded to 500 characters');
+  report = await d.buildPhoneDiagnosticReport('primary', '  '); check(!('userDescription' in report), 'blank context is omitted');
+  report = await d.buildPhoneDiagnosticReport('primary'); check(!('userDescription' in report), 'prior export context is not reused');
+  report = await d.buildPhoneDiagnosticReport('primary', '\u0000\u0001'); check(!('userDescription' in report), 'control-only context is omitted');
+  report = await d.buildPhoneDiagnosticReport('primary', { invalid: true }); check(!('userDescription' in report), 'invalid context input is ignored');
   d.resetPhoneDiagnostics(); d.setPhoneDiagnosticAccount(accountA); d.recordPhoneDiagnostic('save.failed', { entityId: '123456', phase: 'failure' }); d.flushPhoneDiagnostics();
   d.setPhoneDiagnosticAccount(accountB); d.recordPhoneDiagnostic('save.confirmed');
   report = await d.buildPhoneDiagnosticReport();

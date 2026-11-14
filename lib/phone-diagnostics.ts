@@ -198,7 +198,7 @@ async function diagnosticDeadline<T>(work: Promise<T>, fallback: T): Promise<T> 
   try { return await Promise.race([work.catch(() => fallback), new Promise<T>(resolve => { timer = setTimeout(() => resolve(fallback), 1200); })]); }
   finally { clearTimeout(timer); }
 }
-async function workerSnapshot() {
+export async function workerSnapshot(): Promise<Record<string, unknown>> {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return { supported: false };
   try {
     const lookup = await diagnosticDeadline(navigator.serviceWorker.getRegistration().then(reg => ({ reg })), null);
@@ -221,19 +221,21 @@ async function workerSnapshot() {
   } catch { return { supported: true, state: 'unavailable' }; }
 }
 function configuredBackend() { try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').origin; } catch { return 'unavailable'; } }
-export async function buildPhoneDiagnosticReport(deviceState = 'unknown') {
+export async function buildPhoneDiagnosticReport(deviceState = 'unknown', description = '') {
   recordPhoneDiagnostic('diagnostics.export');
   const timeline = collectedEvents();
   const worker = await workerSnapshot();
   let cachesFound: string[] = [], storedScoreKeys = 0;
   try { if (typeof caches !== 'undefined') cachesFound = (await diagnosticDeadline(caches.keys(), [] as string[])).filter(k => /^bnn-shell-\d+\.\d+\.\d{6}$/.test(k)).slice(-12); } catch { /* unavailable cache API is diagnostic, not fatal */ }
   try { const s = window.localStorage; for (let i = 0; i < s.length; i++) if (/^bnn_(?:device_scores:|game_scores_|round_draft_v1)|^bnn:altshot-side-drafts:/.test(s.key(i) || '')) storedScoreKeys++; } catch { /* no draft values or key contents are read */ }
+  const userDescription = typeof description === 'string' ? description.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, 500) : '';
   return {
     schema: 'bnn-phone-diagnostics/v1', exportedAt: new Date().toISOString(),
+    ...(userDescription ? { userDescription } : {}),
     app: { origin: window.location.origin, backendOrigin: configuredBackend(), version: APP_VERSION, buildId: APP_BUILD_ID, builtAt: APP_BUILT_AT, environment: typeof document !== 'undefined' && document.documentElement.dataset.env === 'staging' ? 'staging' : 'production' },
     device: { userAgent: navigator.userAgent, timezoneOffsetMinutes: new Date().getTimezoneOffset(), viewport: { width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio }, notifications: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission, pushSupported: 'PushManager' in window, online: navigator.onLine, standalone: !!(navigator as Navigator & { standalone?: boolean }).standalone || !!window.matchMedia?.('(display-mode: standalone)').matches, scoringRole: LABELS.has(deviceState) ? deviceState : 'unknown' },
     storage: { diagnosticsPersistent: storageAvailable, storedScoreKeys, note: 'Counts are not a verdict on whether scores are synced.', limits: { eventsPerSession: MAX_EVENTS, sessions: MAX_SESSIONS, maxCharsPerSession: MAX_CHARS, days: 7 } },
     worker, caches: cachesFound, events: timeline,
-    limitations: ['Records begin with this diagnostic-enabled version; earlier phone activity cannot be reconstructed.', 'No cookies, credentials, request bodies, personal names or score values are included. No automatic upload.', 'HTTP success is a transport result, not proof that a business action succeeded. Realtime state is sampled, not a record of every message.', 'Cross-origin redirects may appear as opaque status 0. Cookie state and redirect Location are not recorded.'],
+    limitations: ['Records begin with this diagnostic-enabled version; earlier phone activity cannot be reconstructed.', 'Automatic technical records exclude cookies, credentials, request bodies, personal names and score values. The optional user description contains what you choose to type. No automatic upload.', 'HTTP success is a transport result, not proof that a business action succeeded. Realtime state is sampled, not a record of every message.', 'Cross-origin redirects may appear as opaque status 0. Cookie state and redirect Location are not recorded.'],
   };
 }

@@ -1,3 +1,11 @@
+# 212.101 candidate — diagnostic summary, context and last update outcome
+
+Login owns a vertical scroll context because globals.css locks body scrolling. Test natural wheel/touch access to both sign-in and the expanded support controls; locator auto-scroll alone is not sufficient. The signed-in Home scroll container is unchanged.
+
+The existing updater already verifies the loaded version and shows transient success. Keep that eight-second banner expiry and retain the structured Last update attempt separately; a retained result must not become a new pending banner. bnn-update-result-v1 holds only bounded, validated status/target/running-version/phase/time in sessionStorage, up to seven days, with memory fallback. Restoration is not evidence that a new update occurred. Do not change score gates, worker activation or deployment authentication. Specific failure phase is observational; retries still execute the existing update path.
+
+Diagnostics summary uses the same bounded read-only workerSnapshot as export. The optional userDescription (500 characters) is only included on manual export; never log or persist it. Automatic redaction guarantees apply to technical records; user-written context contains what the user chose to type. Summary refresh checks the deployed version without activating a worker. See RELEASE_VERIFICATION_212.101.md for contracts, validation and pending same-installation phone gates.
+
 # 212.100 candidate — phone diagnostics
 
 Shared local evidence lives in lib/phone-diagnostics.ts and is mounted by PhoneDiagnosticsRecorder in RootLayout. Export panel is available to every member via App version & updates, on sign-in, and in Admin Diagnostics. Exports are manual JSON/share/download, never a remote upload. Do not add raw bodies, auth headers, cookies, query strings, names, score values or raw legacy trace strings. Unknown metadata fields are dropped at write AND export; persisted history is filtered by current account. Storage failures retain memory evidence and never evict score data. Sign-out clears logs through clearAllLocalState, and direct account switches isolate old history. Budgets: 150 events / 48 KiB text per session, four sessions, seven days. Existing raw opt-in tools remain separate.

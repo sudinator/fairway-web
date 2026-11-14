@@ -4,7 +4,7 @@ import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { C } from "@/lib/golf";
 import { APP_VERSION } from "@/lib/app-version";
 import { btn } from "@/components/ui";
-import { automaticUpdateState, serverAutomaticUpdateState, subscribeAutomaticUpdates, checkAutomaticVersion, requestAppUpdate, newerVersion } from "@/lib/automatic-updates";
+import { automaticUpdateState, serverAutomaticUpdateState, subscribeAutomaticUpdates, checkAutomaticVersion, requestAppUpdate, newerVersion, updateOutcomeMessage } from "@/lib/automatic-updates";
 
 export function UpdateChecker() {
   const state = useSyncExternalStore(subscribeAutomaticUpdates, automaticUpdateState, serverAutomaticUpdateState);
@@ -19,6 +19,7 @@ export function UpdateChecker() {
     <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{state.checkFailure && state.latest ? "Last known version" : "Latest version"}: {state.latest || (state.checkFailure ? "Check failed" : "Not checked yet")}</div>
     <div style={{ color: C.cream, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>A banner appears when a newer version is available. Update now reloads the app; finish your current entry first. Unfinished rounds and saved scores do not block updates. An already-open game keeps running until you choose to update or refresh.</div>
     {state.notice && <div role="status" style={{ color: C.cream, fontSize: 13, marginTop: 12 }}>{state.notice}</div>}
+    {state.outcome && <div data-update-outcome style={{ color: C.cream, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}><b>Last update attempt</b><div>{updateOutcomeMessage(state.outcome)}</div><div style={{ color: C.sage, fontSize: 12 }}>{new Date(state.outcome.at).toLocaleString()}</div></div>}
     {newerVersion(state.latest) && state.checkFailure !== "access" && <button style={{ ...btn(true), marginTop: 12 }} disabled={state.updating} onClick={() => { void requestAppUpdate(); }}>{state.updating ? "Updating…" : "Update now"}</button>}
     {state.checkedAt && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Last attempt: {new Date(state.checkedAt).toLocaleTimeString()}</div>}
     {state.checkFailure && <div style={{ marginTop: 12, color: C.sage, fontSize: 12, lineHeight: 1.5 }}>

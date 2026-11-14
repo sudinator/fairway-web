@@ -1,3 +1,9 @@
+# 212.101 candidate follow-up
+
+- Same existing phone installation: keep 212.100 open through staging deployment; verify banner, Update now, actual 212.101 app/worker, retained success after banner expiry and saved scores. No replacement shortcut or storage clearing.
+- Physical phone: summary match/no-reply clarity, refresh after offline/reconnect; context export/share/cancel/retry and optional-description reset after reopening; inspect exported JSON; disposable staging score/offline sync test still required.
+- Original stuck installation: root trigger of protected-access expiry/redirect loop remains unresolved. A healthy second installation does not prove the old one recovered.
+
 ## 212.100 phone support reports — candidate
 
 - [x] Shared local, exportable diagnostic history with account filtering, bounded storage, transport/save/update observations and memory fallback; existing recovery exports remain separate.

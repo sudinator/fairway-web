@@ -1,8 +1,9 @@
 "use client";
 import { recordPhoneDiagnostic, flushPhoneDiagnostics } from "./phone-diagnostics";
 import { APP_VERSION } from "./app-version";
-export type AutomaticUpdateState = { latest: string; checking: boolean; message: string; updating: boolean; notice: string; completed: boolean; checkFailure: string; checkedAt: string };
-const initial: AutomaticUpdateState = { latest: "", checking: false, message: "", updating: false, notice: "", completed: false, checkFailure: "", checkedAt: "" };
+export type UpdateOutcome = { status: "success" | "failure"; target: string; runningVersion: string; phase: "check" | "download" | "activation" | "restart"; at: string };
+export type AutomaticUpdateState = { latest: string; checking: boolean; message: string; updating: boolean; notice: string; completed: boolean; checkFailure: string; checkedAt: string; outcome: UpdateOutcome | null };
+const initial: AutomaticUpdateState = { latest: "", checking: false, message: "", updating: false, notice: "", completed: false, checkFailure: "", checkedAt: "", outcome: null };
 let state = initial;
 const listeners = new Set<() => void>();
 export const automaticUpdateState = () => state;
@@ -17,6 +18,27 @@ function publish(patch: Partial<AutomaticUpdateState>) {
   if (patch.completed === true) recordPhoneDiagnostic("update.result", { phase: "complete" });
   state = { ...state, ...patch }; listeners.forEach(fn => fn()); }
 const validVersion = (v: unknown): v is string => typeof v === "string" && /^\d+\.\d+\.\d{6}$/.test(v);
+const OUTCOME_KEY = "bnn-update-result-v1";
+function rememberOutcome(status: UpdateOutcome["status"], target: string, phase: UpdateOutcome["phase"]) {
+  const outcome: UpdateOutcome = { status, target: validVersion(target) ? target : APP_VERSION, runningVersion: APP_VERSION, phase, at: new Date().toISOString() };
+  publish({ outcome });
+  try { sessionStorage.setItem(OUTCOME_KEY, JSON.stringify(outcome)); } catch { /* in-memory feedback remains available */ }
+}
+function restoreOutcome() {
+  try {
+    const raw = sessionStorage.getItem(OUTCOME_KEY); if (!raw || raw.length > 1000) return;
+    const value = JSON.parse(raw);
+    if (!["success", "failure"].includes(value?.status) || !validVersion(value?.target) || !validVersion(value?.runningVersion) || !["check", "download", "activation", "restart"].includes(value?.phase) || typeof value?.at !== "string") return;
+    const time = Date.parse(value.at);
+    if (!Number.isFinite(time) || time > Date.now() + 60000 || time < Date.now() - 7 * 86400000) return;
+    publish({ outcome: { status: value.status, target: value.target, runningVersion: value.runningVersion, phase: value.phase, at: new Date(time).toISOString() } });
+  } catch { /* corrupt/disabled session storage does not affect updates */ }
+}
+export function updateOutcomeMessage(outcome: UpdateOutcome) {
+  if (outcome.status === "success") return `Updated successfully to version ${outcome.runningVersion}.`;
+  const reason = outcome.phase === "check" ? "The version check failed." : outcome.phase === "download" ? "The update download or installation failed." : outcome.phase === "activation" ? "The downloaded update could not be activated." : "The app did not restart into the requested version.";
+  return `Update to ${outcome.target} did not complete. ${reason} Running version at that attempt: ${outcome.runningVersion}.`;
+}
 export function newerVersion(candidate: string, current = APP_VERSION) {
   if (!validVersion(candidate) || !validVersion(current)) return false;
   const a = candidate.split(".").map(Number), b = current.split(".").map(Number);
@@ -72,7 +94,7 @@ export function clearConfirmedUpdateNotice() {
 }
 let applying: Promise<void> | null = null;
 let navigationTimer: ReturnType<typeof setTimeout> | undefined;
-async function activateDownloadedWorker(timeout: number) {
+async function activateDownloadedWorker(timeout: number, phase: (value: UpdateOutcome["phase"]) => void) {
   if (!("serviceWorker" in navigator)) return;
   await bounded(async signal => {
     const reg = await navigator.serviceWorker.getRegistration();
@@ -85,7 +107,7 @@ async function activateDownloadedWorker(timeout: number) {
       const cleanup = () => { worker.removeEventListener("statechange", changed); signal.removeEventListener("abort", aborted); };
       const aborted = () => { cleanup(); reject(new Error("Update timed out")); };
       const changed = () => {
-        if (worker.state === "installed") worker.postMessage("SKIP_WAITING");
+        if (worker.state === "installed") { phase("activation"); worker.postMessage("SKIP_WAITING"); }
         if (worker.state === "activated" || worker.state === "redundant") {
           cleanup();
           if (worker.state === "redundant") reject(new Error("Update installation failed")); else resolve();
@@ -102,12 +124,15 @@ export function requestAppUpdate(timeout = 12000, navigate: (url: string) => voi
   applying = (async () => {
     publish({ updating: true, completed: false, notice: "Checking the connection and downloading the update…" });
     let versionChecked = false;
+    let phase: UpdateOutcome["phase"] = "check", target = state.latest;
     try {
       const latest = await deployedVersion(timeout);
+      target = latest;
       versionChecked = true;
       publish({ latest, checkFailure: "", checkedAt: new Date().toISOString() });
       if (!newerVersion(latest)) { publish({ updating: false, completed: true, notice: latest === APP_VERSION ? `You’re up to date: ${APP_VERSION}.` : `The server reports ${latest}. This device remains on ${APP_VERSION}; no older version was requested.` }); return; }
-      await activateDownloadedWorker(timeout);
+      phase = "download";
+      await activateDownloadedWorker(timeout, value => { phase = value; });
       const url = new URL(window.location.href);
       url.searchParams.set("bnnUpdate", latest);
       url.searchParams.set("bnnUpdateAt", String(Date.now()));
@@ -115,21 +140,25 @@ export function requestAppUpdate(timeout = 12000, navigate: (url: string) => voi
       try { sessionStorage.setItem("bnn-update-attempt", latest); } catch { /* URL also carries the target */ }
       publish({ notice: `Loading version ${latest}…` });
       recordPhoneDiagnostic("update.navigate", { target: latest }); flushPhoneDiagnostics();
+      phase = "restart";
       navigate(url.href);
-      navigationTimer = setTimeout(() => publish({ updating: false, notice: `The app did not restart. You are still on ${APP_VERSION}. Check your connection and retry Update now.` }), timeout);
+      navigationTimer = setTimeout(() => { rememberOutcome("failure", latest, "restart"); publish({ updating: false, notice: `The app did not restart. You are still on ${APP_VERSION}. Check your connection and retry Update now.` }); }, timeout);
     } catch (error) {
-      if (versionChecked) publish({ updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. The update download, activation or restart could not complete. Check your connection and retry Update now. Saved scores and drafts have not been removed.` });
+      rememberOutcome("failure", target, phase);
+      if (versionChecked) publish({ updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. ${updateOutcomeMessage(state.outcome!)} Check your connection and retry Update now. Saved scores and drafts have not been removed.` });
       else { const failure = checkFailure(error); publish({ ...failure, updating: false, notice: `Update could not finish. You are still on ${APP_VERSION}. ${failure.message} Saved scores and drafts have not been removed.` }); }
     }
   })().finally(() => { applying = null; });
   return applying;
 }
 function restoreUpdateResult() {
+  restoreOutcome();
   const url = new URL(window.location.href);
   let target = url.searchParams.get("bnnUpdate");
   try { target ||= sessionStorage.getItem("bnn-update-attempt"); sessionStorage.removeItem("bnn-update-attempt"); } catch { /* URL result still works */ }
   if (url.searchParams.has("bnnUpdate")) { url.searchParams.delete("bnnUpdate"); url.searchParams.delete("bnnUpdateAt"); window.history.replaceState(window.history.state, "", url.href); }
   if (!validVersion(target)) return;
+  rememberOutcome(!newerVersion(target) ? "success" : "failure", target, "restart");
   publish({ completed: !newerVersion(target), notice: !newerVersion(target) ? `Updated successfully. You’re on version ${APP_VERSION}.` : `Update did not complete: this device is still on ${APP_VERSION}; requested ${target}. Reconnect and retry Update now.`, updating: false });
 }
 // Background download waits for explicit activation. The banner offers an

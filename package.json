@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "212.100.261112",
+  "version": "212.101.261113",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/check-vapid-key.mjs && node scripts/write-version.mjs",
@@ -25,7 +25,7 @@
     "ci:app": "node scripts/check-deps.mjs || true; npm run test:scoring-device && npm run test:round-editor && npm run test:game-recovery && npm run test:ci-workflow && npm run lint:hooks && npx tsc --noEmit && npm test && node ci/test-ticking-clock.cjs && npm run test:setup-nav && npm run guards:lifecycle && npm run guards",
     "test:ci-workflow": "node ci/test-ci-workflow.cjs",
     "test:updates": "node ci/test-automatic-worker.cjs && node ci/test-update-browser.cjs && node ci/test-update-redirect-browser.cjs",
-    "test:diagnostics": "node ci/test-phone-diagnostics.cjs && node ci/test-diagnostics-differential.cjs && node ci/test-phone-diagnostics-browser.cjs"
+    "test:diagnostics": "node ci/test-phone-diagnostics.cjs && node ci/test-diagnostics-differential.cjs && node ci/test-phone-diagnostics-browser.cjs && node ci/test-update-outcome.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

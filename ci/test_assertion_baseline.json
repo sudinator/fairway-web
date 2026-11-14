@@ -1,4 +1,5 @@
 {
+  "total": 447288,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -35,7 +36,7 @@
     "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
-    "explicit update banner and status": 68,
+    "explicit update banner and status": 76,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
@@ -73,7 +74,7 @@
     "odd field": 26,
     "one-step walkthrough": 154,
     "personal bests": 16,
-    "phone diagnostic export": 15,
+    "phone diagnostic export": 26,
     "player-scoring": 71,
     "recap additions": 46,
     "recap stat contract": 59,
@@ -108,6 +109,5 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "update safety": 38
-  },
-  "total": 447269
+  }
 }
