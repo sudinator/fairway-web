@@ -1,3 +1,4 @@
+<!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 <!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 ## 212.18 — course_field_averages (0215)
 

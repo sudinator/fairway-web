@@ -1,3 +1,4 @@
+<!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 ## 192.16.260929 — migration 0158
 
 Apply 0158_profile_privilege_boundaries.sql to staging first. It closes privileged profile INSERT and non-owner direct admin updates. Existing accounts are unchanged. Do not edit or reapply earlier migrations. Full release gates remain required.

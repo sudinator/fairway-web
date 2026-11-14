@@ -1,3 +1,8 @@
+## 212.102 — saved-tee selection correction
+
+- Implemented a shared validated option list for Organizer tee selection and saving; regression checks cover round trips and failure/retry. Live staging validation remains pending.
+- Stale-game policy proposal remains undecided: scheduled hourly execution, complete cards after inactivity, organizer review for partials, archive empty drafts. No policy/database change in this candidate.
+
 # 212.101 candidate follow-up
 
 - Same existing phone installation: keep 212.100 open through staging deployment; verify banner, Update now, actual 212.101 app/worker, retained success after banner expiry and saved scores. No replacement shortcut or storage clearing.

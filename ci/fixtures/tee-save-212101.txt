@@ -1,0 +1,23 @@
+  const setPlayerTee = async (p: Player, teeName: string) => {
+    if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
+    const tee = courseTees.find((t) => t.name === teeName);
+    if (!tee) return;
+    const ch =
+      p.handicap_index != null &&
+      tee.rating != null &&
+      tee.slope != null &&
+      game.course_par != null
+        ? courseHandicap(p.handicap_index, tee.slope, tee.rating, game.course_par)
+        : null;
+    const { error: teeErr } = await supabase
+      .from("game_players")
+      .update({
+        rating: tee.rating,
+        slope: tee.slope,
+        tee_name: tee.name,
+        course_handicap: ch,
+      })
+      .eq("id", p.id);
+    saved(teeErr, `change ${p.display_name}'s tee`, `${p.display_name} now plays the ${tee.name} tees.`);
+    await load();
+  };

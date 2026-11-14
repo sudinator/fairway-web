@@ -1,3 +1,10 @@
+## 212.102.261114 — Organizer saved-tee selection
+
+- Use the same validated library/saved-player tee options for displaying and saving individual tee selections.
+- Keep library precedence, optional yardages, setup confirmations, handicap calculation and reload behavior.
+- Show a recovery message if a requested tee is unavailable; exclude missing/non-finite/non-positive rating or slope.
+- No database migration, dependency update, course refresh overwrite or stale-game policy change.
+
 ## 212.101.261113 — readable diagnostics and retained update results (candidate)
 
 - Add an expandable, readable device summary: installed app, actual controlling-worker version, waiting-worker state, latest/last-known release, last version-check timestamp/result and diagnostic-storage status. Opening queries the worker without activation; Refresh summary rechecks version/worker. A mismatch/no reply is reported without guessing its cause. Available at the existing member, sign-in and Admin diagnostics entry points.

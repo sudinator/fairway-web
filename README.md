@@ -1,3 +1,4 @@
+<!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 <!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 <!-- 212.88: fix CI browser discovery on runners without /opt/pw-browsers; app behavior unchanged. -->
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->

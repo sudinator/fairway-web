@@ -1,7 +1,7 @@
 // Birdie Num Num: background download, explicit activation, fresh online navigation.
 // No clients.claim(): do not take over uncontrolled documents. Activation can
 // change a controlled page’s controller; the new app never reloads on that event.
-const SW_VERSION = "212.101.261113";
+const SW_VERSION = "212.102.261114";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 // Best-effort metadata only. Reporting must not change install/cache outcomes.
 function noteWorkerFailure(phase, status = 0, errorName = "Error") {

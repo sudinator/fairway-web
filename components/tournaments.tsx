@@ -127,6 +127,7 @@ import { isLateScoreRefusal, lateScoreNotice, lateScoreHold, keepsSideScores } f
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
+import { gameTeeOptions } from "@/lib/game-tee-options";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
 import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
@@ -3347,8 +3348,11 @@ function GameRoom({
 
   const setPlayerTee = async (p: Player, teeName: string) => {
     if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
-    const tee = courseTees.find((t) => t.name === teeName);
-    if (!tee) return;
+    const tee = gameTeeOptions(courseTees, players, game.course_par).find((t) => t.name === teeName);
+    if (!tee) {
+      alert("This tee is no longer available. Select another tee, or reload the app to refresh course data.");
+      return;
+    }
     const ch =
       p.handicap_index != null &&
       tee.rating != null &&
