@@ -1,4 +1,5 @@
 "use client";
+import { recordPhoneDiagnostic, flushPhoneDiagnostics } from "./phone-diagnostics";
 import { APP_VERSION } from "./app-version";
 export type AutomaticUpdateState = { latest: string; checking: boolean; message: string; updating: boolean; notice: string; completed: boolean; checkFailure: string; checkedAt: string };
 const initial: AutomaticUpdateState = { latest: "", checking: false, message: "", updating: false, notice: "", completed: false, checkFailure: "", checkedAt: "" };
@@ -7,7 +8,14 @@ const listeners = new Set<() => void>();
 export const automaticUpdateState = () => state;
 export const serverAutomaticUpdateState = () => initial;
 export const subscribeAutomaticUpdates = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
-function publish(patch: Partial<AutomaticUpdateState>) { state = { ...state, ...patch }; listeners.forEach(fn => fn()); }
+function publish(patch: Partial<AutomaticUpdateState>) {
+  if (patch.checking === true) recordPhoneDiagnostic("update.check", { phase: "start" });
+  if (patch.checkFailure) recordPhoneDiagnostic("update.failure", { category: patch.checkFailure });
+  if (patch.latest) recordPhoneDiagnostic("update.result", { latest: patch.latest });
+  if (patch.updating === true) recordPhoneDiagnostic("update.start");
+  if (patch.updating === false && patch.notice && !patch.completed) recordPhoneDiagnostic("update.failure", { phase: "failure" });
+  if (patch.completed === true) recordPhoneDiagnostic("update.result", { phase: "complete" });
+  state = { ...state, ...patch }; listeners.forEach(fn => fn()); }
 const validVersion = (v: unknown): v is string => typeof v === "string" && /^\d+\.\d+\.\d{6}$/.test(v);
 export function newerVersion(candidate: string, current = APP_VERSION) {
   if (!validVersion(candidate) || !validVersion(current)) return false;
@@ -106,6 +114,7 @@ export function requestAppUpdate(timeout = 12000, navigate: (url: string) => voi
       // A fallback copy survives a worker's offline-root fallback. It contains no scores.
       try { sessionStorage.setItem("bnn-update-attempt", latest); } catch { /* URL also carries the target */ }
       publish({ notice: `Loading version ${latest}…` });
+      recordPhoneDiagnostic("update.navigate", { target: latest }); flushPhoneDiagnostics();
       navigate(url.href);
       navigationTimer = setTimeout(() => publish({ updating: false, notice: `The app did not restart. You are still on ${APP_VERSION}. Check your connection and retry Update now.` }), timeout);
     } catch (error) {

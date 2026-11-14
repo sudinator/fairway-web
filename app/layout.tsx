@@ -1,3 +1,4 @@
+import { PhoneDiagnosticsRecorder } from "@/components/phone-diagnostics";
 import { RegisterSW } from "@/components/register-sw";
 import { ViewportSync } from "@/components/viewport-sync";
 import "./globals.css";
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div aria-hidden="true" style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", right: 10, background: "#FFD400", color: "#111", fontSize: 11, fontWeight: 800, letterSpacing: 1.4, padding: "4px 8px", borderRadius: "0 0 6px 6px", pointerEvents: "none", zIndex: 2147483647 }}>STAGING</div>
           </>
         )}
+        <PhoneDiagnosticsRecorder />
         <RegisterSW />
         <ViewportSync />
         {children}

@@ -7,6 +7,7 @@ import { prepareRound } from "@/lib/round-prep";
 import { SeasonWrappedEntry } from "@/components/season-wrapped";
 
 import { ScoringDeviceNotice, usePrimaryScoringDevice } from "@/components/scoring-device";
+import { recordPhoneDiagnostic } from "@/lib/phone-diagnostics";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -175,6 +176,7 @@ export function Home({ session }: { session: any }) {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("dashboard");
+  useEffect(() => { recordPhoneDiagnostic("app.screen", { screen: tab }); }, [tab]);
   // When a reused page (Members / Club settings) is opened FROM the admin home, we remember
   // that origin so the page shows an iOS-style back bar to return there. null = no back bar.
   const [returnTab, setReturnTab] = useState<Tab | null>(null);

@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import { signInWithGoogle } from "@/lib/google-sign-in";
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
@@ -26,6 +27,7 @@ export function Login() {
           One tap to sign in. Your rounds are private to you — no one else can see them.
         </div>
       </div>
+      <PhoneDiagnosticsPanel />
     </div>
   );
 }

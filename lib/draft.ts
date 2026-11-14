@@ -1,3 +1,4 @@
+import { diagnosticError, recordPhoneDiagnostic, resetPhoneDiagnostics } from "./phone-diagnostics";
 import { scoringStorage, tidyScoringStorage, noteStorageWriteFailure, registerStorageTidy } from "./scoring-device";
 // In-progress round draft, stored in the browser's localStorage.
 // localStorage writes are SYNCHRONOUS — they complete before the phone can lock
@@ -30,7 +31,9 @@ export function saveDraft(round: Round, force = false): void {
       if (existingScored && existing && sameDraftRound(existing.round, round)) return;
     }
     scoringStorage().setItem(KEY, JSON.stringify({ savedAt: Date.now(), round }));
-  } catch {
+    recordPhoneDiagnostic("storage.saved", { phase: "round", entityId: round.id || round.draft_session_id, holeCount: round.holes?.length || 0 });
+  } catch (error) {
+    recordPhoneDiagnostic("storage.failed", diagnosticError(error));
     // Storage can be unavailable (private mode, quota). Fail silently — DB save on
     // Finish is still the backstop.
   }
@@ -210,6 +213,7 @@ export function saveGameScores(
     // entry vanished. Tidy the storage and retry once; if it still fails, report it (the writer then sends from memory).
     try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); }
     catch { tidyScoringStorage(); try { scoringStorage().setItem(gameScoreKey(gameId, playerId), value); } catch (e) { backupWriteFailed = true; noteStorageWriteFailure(); throw e; } }
+    recordPhoneDiagnostic("storage.saved", { phase: "game", entityId: playerId, holeCount: data.scores?.length || 0 });
   } catch {}
 }
 
@@ -410,6 +414,7 @@ export function rowPendingHoles(
 // nothing about the previous user's session lingers in browser storage on a shared device.
 // Sweeps by prefix so keys added later (bnn_edit_*, bnn_course_draft:*) are covered automatically.
 export function clearAllLocalState(): void {
+  resetPhoneDiagnostics();
   try {
     if (typeof window === "undefined") return;
     const raw = window.localStorage;

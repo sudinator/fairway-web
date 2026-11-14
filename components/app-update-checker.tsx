@@ -1,4 +1,5 @@
 "use client";
+import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { C } from "@/lib/golf";
 import { APP_VERSION } from "@/lib/app-version";
@@ -33,6 +34,7 @@ export function UpdateChecker() {
         const a = document.createElement("a"); a.href = url; a.download = "BNN-recovery-copies.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
       }}>Download recovery copies</button>
     </div>}
+    <PhoneDiagnosticsPanel />
     <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Birdie Num Num — created by Amit Sud · © 2026 Amit Sud</div>
   </div>;
 }

@@ -1,3 +1,11 @@
+## 212.100 phone support reports — candidate
+
+- [x] Shared local, exportable diagnostic history with account filtering, bounded storage, transport/save/update observations and memory fallback; existing recovery exports remain separate.
+- [ ] On the existing working Home Screen installation: keep it open through the next staging release, verify banner → Update now → actual 212.100, then export through the phone share sheet/Files and review event version, worker version and ordinary workflow entries.
+- [ ] Stage a disposable score-save/offline/reconnect scenario, export after reopening and confirm report/draft preservation. Complete protected same-installation recovery, GitHub/Vercel gates and a second actual release transition before production clearance.
+- [ ] Original 212.97 session incident remains unresolved; support reports only start with this diagnostic-enabled code. Do not delete the original app/drafts or interpret missing older events as proof of no request.
+- [ ] Repository housekeeping: separately review the ~7.5 MB of root documents and historical verification records in 212.99 for archiving; preserve CI regression fixtures and reproducibility. Source ZIP size is distinct from phone download size.
+
 ## 212.99 update reliability — candidate, not production-cleared
 
 - [ ] Physical iPhone: update the existing working 212.98 installation to 212.99, verify the actual running version and preserved pending scores; no new shortcut.

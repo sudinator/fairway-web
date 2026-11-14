@@ -1,5 +1,6 @@
 "use client";
 
+import { recordPhoneDiagnostic, setPhoneDiagnosticAccount } from "@/lib/phone-diagnostics";
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
@@ -29,6 +30,8 @@ export default function Page() {
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
+      setPhoneDiagnosticAccount(data.session?.user?.id || null);
+      recordPhoneDiagnostic("auth.state", { state: "INITIAL_SESSION", authenticated: !!data.session });
       if (!mounted) return;
       if (data.session) { setSession(data.session); saveLastSession(data.session.user); }
       else if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -39,12 +42,30 @@ export default function Page() {
       } else setSession(null);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setPhoneDiagnosticAccount(s?.user?.id || null);
+      recordPhoneDiagnostic("auth.state", { state: _e, authenticated: !!s });
       if (s) { setSession(s); saveLastSession(s.user); }
       else if (typeof navigator === "undefined" || navigator.onLine) setSession(null);
       // Ignore offline null events so we never sign out a user mid-round.
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
+
+  // Read-only realtime transport samples: no channel/topic/payload capture.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    let previous = "";
+    const sample = () => {
+      try {
+        const state = supabase.realtime.connectionState();
+        const count = supabase.getChannels().length;
+        const key = `${state}:${count}`;
+        if (key !== previous) { previous = key; recordPhoneDiagnostic("realtime.state", { state, count }); }
+      } catch { /* Observability must not change the transport. */ }
+    };
+    sample(); const timer = window.setInterval(sample, 30000); window.addEventListener("focus", sample);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", sample); };
+  }, [session?.user?.id]);
 
   // On app open, quietly re-save this device's push subscription if permission is already
   // granted. Heals an iOS-rotated endpoint (the SW re-subscribes but can't persist it) without

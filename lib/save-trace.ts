@@ -1,3 +1,4 @@
+import { recordPhoneDiagnostic } from "./phone-diagnostics";
 // 212.25 — SAVE TRACE (diagnostic, staging only). Owner, Oct 23: scores entered in a stroke play game showed, then
 // vanished ~10 s later, with no save request reaching the database and no status shown. This records each step of a
 // save — the tap, whether this device is the scorer, why the writer held it, what was sent and what the database said,
@@ -7,6 +8,14 @@ const lines: string[] = [];
 const subs = new Set<() => void>();
 let version = 0;
 export function trace(msg: string) {
+  // Bridge only known categories; the original trace includes names/scores and
+  // must never be copied wholesale into a support export.
+  if (msg.startsWith("held:")) {
+    for (const [reason, phase] of [["not the scorer", "viewer"], ["recovery not ready", "checking"], ["reset in progress", "reset"], ["game ended", "finish"], ["offline", "offline"]])
+      if (msg.includes(reason)) recordPhoneDiagnostic("sync.held", { phase });
+  } else if (msg.startsWith("refused:")) recordPhoneDiagnostic("sync.failed", { code: msg.slice(8).trim().split(" ")[0] });
+  else if (msg.includes("phone backup DISCARDED")) recordPhoneDiagnostic("recovery.discarded", { phase: "game" });
+  else if (msg.startsWith("tap ")) recordPhoneDiagnostic("score.input", { phase: "game" });
   const t = new Date();
   const stamp = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:${String(t.getSeconds()).padStart(2, "0")}`;
   lines.unshift(`${stamp} ${msg}`);

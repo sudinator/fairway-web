@@ -3,7 +3,7 @@ const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),asse
 const source=fs.readFileSync(path.join(__dirname,'../public/sw.js'),'utf8');
 const origin='https://bnn-worker.test';
 function setup({failAssets=false,redirectAssets=false,loginAssets=false,quota=false,offline=false}={}) {
- const events={},stores=new Map(),windows=[{id:'page'}];let skipped=0,rootResponse=null,root='<body data-bnn-app-shell="v1"><script src="/chunk.js"></script>new shell';
+ const events={},stores=new Map(),messages=[],windows=[{id:'page',postMessage:value=>messages.push(value)}];let skipped=0,rootResponse=null,root='<body data-bnn-app-shell="v1"><script src="/chunk.js"></script>new shell';
  function store(name){if(!stores.has(name))stores.set(name,new Map());const data=stores.get(name);return{async match(req){return data.get(typeof req==='string'?new URL(req,origin).href:req.url)?.clone()},async put(req,response){if(quota)throw Error('quota');data.set(typeof req==='string'?new URL(req,origin).href:req.url,response.clone());}};}
  const caches={open:async name=>store(name),keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name),async match(req){for(const name of stores.keys()){const r=await store(name).match(req);if(r)return r;}}};
  const self={location:{origin},addEventListener:(name,fn)=>events[name]=fn,skipWaiting:async()=>{skipped++},clients:{matchAll:async()=>windows}};
@@ -11,7 +11,7 @@ function setup({failAssets=false,redirectAssets=false,loginAssets=false,quota=fa
  vm.runInNewContext(source,{self,caches,fetch,URL,Response,AbortController,setTimeout,clearTimeout,Uint8Array,atob,console});
  async function event(name,extra={}){const wait=[];let response;events[name]({...extra,waitUntil:p=>wait.push(p),respondWith:p=>{response=p}});const result=response?await response:undefined;await Promise.all(wait);return result;}
  const nav=()=>event('fetch',{request:{url:origin+'/',method:'GET',mode:'navigate'}});
- return {event,nav,caches,stores,windows,get skipped(){return skipped},setRoot:v=>root=v,setResponse:v=>rootResponse=v};
+ return {event,nav,caches,stores,windows,messages,get skipped(){return skipped},setRoot:v=>root=v,setResponse:v=>rootResponse=v};
 }
 (async()=>{
  let s=setup();await s.event('install');assert.equal(s.skipped,0,'install does not restart older open pages');await s.event('message',{data:'SKIP_WAITING'});assert.equal(s.skipped,1,'existing production button explicitly activates without score gates');let cache=(await s.caches.keys()).find(k=>k.startsWith('bnn-shell-'));assert.equal(await(await(await s.caches.open(cache)).match('/chunk.js')).text(),'code','shell scripts cached before root commit');assert.match(await(await(await s.caches.open(cache)).match('/')).text(),/new shell/);s.setRoot('fresh online shell');assert.equal(await(await s.nav()).text(),'fresh online shell','network beats old cached HTML');
@@ -27,6 +27,8 @@ function setup({failAssets=false,redirectAssets=false,loginAssets=false,quota=fa
   assert.equal(await(await s.caches.open(currentCache)).match('/'),undefined,'login/redirected asset cannot commit a broken offline shell');
   assert.equal(await(await(await s.caches.open('bnn-shell-old')).match('/')).text(),'old working shell','old offline app retained after asset access failure');
  }
+ s=setup({failAssets:true});await s.event('install');assert.ok(s.messages.some(m=>m.kind==='bnn-diagnostic-event'&&m.phase==='download'&&m.status===404),'failed worker asset download emits safe support metadata');
+ assert.ok(s.messages.every(m=>!('url' in m)&&!('body' in m)),'worker events never contain URLs/bodies');
  // Navigation redirects are responses to forward, not offline failures.
  for(const response of [{type:'opaqueredirect',status:0,ok:false}, ...[301,302,303,307,308].map(status=>new Response(null,{status,headers:{Location:'/sign-in'}}))]) {
   s=setup();await(await s.caches.open('bnn-shell-old')).put('/',new Response('old working shell'));s.setResponse(response);
@@ -41,5 +43,9 @@ function setup({failAssets=false,redirectAssets=false,loginAssets=false,quota=fa
  assert.equal(await(await s.caches.open('bnn-shell-'+JSON.parse(source.match(/const SW_VERSION = ("[^"]+")/)[1]))).match('/'),undefined,'200 login without app marker is not cached');
  s=setup();await(await s.caches.open('bnn-shell-old')).put('/',new Response('old working shell'));s.setResponse(new Response('temporarily unavailable',{status:503}));
  assert.equal(await(await s.nav()).text(),'old working shell','server outage retains offline scoring fallback');
+ s=setup();let reply;await s.event('message',{data:{kind:'bnn-diagnostic-status'},ports:[{postMessage:value=>{reply=value;}}]});
+ assert.equal(reply.version,JSON.parse(source.match(/const SW_VERSION = ("[^"]+")/)[1]),'read-only diagnostic query reports actual worker version');
+ assert.equal(s.skipped,0,'diagnostic query does not activate a waiting worker');assert.equal((await s.caches.keys()).length,0,'diagnostic query never mutates caches');
+ await s.event('message',{data:{kind:'bnn-diagnostic-status'}});
  console.log('automatic worker: PASS (actual handlers; modelled network/cache quota and asset failures, complete offline fallback, cache cleanup safety, API/auth/version bypass)');
 })().catch(e=>{console.error(e);process.exitCode=1;});

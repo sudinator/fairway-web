@@ -14,16 +14,27 @@ const workers = {
   legacy: read('ci/fixtures/sw-manual-21283.js'),
   regression21284: read('ci/fixtures/sw-redirect-regression-21284.js'),
   regression21298: read('ci/fixtures/sw-redirect-regression-21298.js'),
+  previous21299: read("ci/fixtures/sw-diagnostics-baseline-21299.js"),
   current,
 };
 const engine = process.env.BNN_UPDATE_BROWSER || 'chromium';
 assert.ok(['chromium', 'webkit'].includes(engine), 'unsupported browser must fail, never skip');
-const oldVersion = '212.98.261110';
+const oldVersion = '212.98.261110', previousVersion = '212.99.261112';
 const candidate = JSON.parse(read('package.json')).version;
 const afterCandidate = candidate.replace(/^(\d+)\.(\d+)\./, (_, major, edit) => `${major}.${Number(edit) + 1}.`);
-const updateSource = ts.transpileModule(read('lib/automatic-updates.ts'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText;
+const modules = {};
+function bundle(name) {
+  if (modules[name]) return;
+  modules[name] = ts.transpileModule(read(name + '.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  for (const match of modules[name].matchAll(/require\("([^"]+)"\)/g)) { assert.ok(match[1].startsWith('.')); bundle(path.posix.normalize(path.posix.join(path.posix.dirname(name), match[1]))); }
+}
+bundle('lib/automatic-updates');
+const legacyModules = { ...modules, 'lib/automatic-updates': ts.transpileModule(read('ci/fixtures/automatic-updates-21299.ts.txt'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText };
+const builtVersion = JSON.parse(read('lib/app-version.ts').match(/APP_VERSION = ("[^"]+")/)[1]);
+function clientSource(v) {
+  const defs = Object.entries(v === oldVersion || v === previousVersion ? legacyModules : modules).map(([name, source]) => `${JSON.stringify(name)}:function(require,module,exports){${source}\n}`).join(',').replaceAll(builtVersion, v);
+  return `const definitions={${defs}},cache={};function load(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};definitions[id](p=>load(id.slice(0,id.lastIndexOf('/')+1)+p.replace('./','')),m,m.exports);return m.exports;}window.updates=load('lib/automatic-updates');window.loadedVersion=${JSON.stringify(v)};window.stopUpdates=window.updates.registerAutomaticUpdates();`;
+}
 const recoverySource = ts.transpileModule(read('app/auth/deployment-access/route.ts'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
@@ -73,7 +84,7 @@ const app = http.createServer((req, res) => {
   }
   if (pathname === '/sw.js') {
     res.setHeader('Content-Type', 'application/javascript');
-    res.end((version === oldVersion ? workers.regression21298 : current).replace(/const SW_VERSION = "[^"]+";/, `const SW_VERSION = "${version}";`)); return;
+    res.end((version === oldVersion ? workers.regression21298 : version === previousVersion ? workers.previous21299 : current).replace(/const SW_VERSION = "[^"]+";/, `const SW_VERSION = "${version}";`)); return;
   }
   if (pathname === '/app-version.json') {
     res.setHeader('Content-Type', 'application/json');
@@ -83,7 +94,7 @@ const app = http.createServer((req, res) => {
   if (pathname.startsWith('/client-')) {
     const pageVersion = pathname.slice('/client-'.length, -'.js'.length);
     res.setHeader('Content-Type', 'application/javascript');
-    res.end(`const module={exports:{}};(function(require,module,exports){${updateSource}\n})(()=>({APP_VERSION:${JSON.stringify(pageVersion)}}),module,module.exports);window.updates=module.exports;window.loadedVersion=${JSON.stringify(pageVersion)};window.stopUpdates=window.updates.registerAutomaticUpdates();`); return;
+    res.end(clientSource(pageVersion)); return;
   }
   html(res, `<body data-bnn-app-shell="v1"><title>BNN ${version}</title><input id="score"><a id="reconnect" href="/auth/deployment-access">Reconnect</a><button id="update" onclick="void window.updates.requestAppUpdate()">Update</button><script src="/client-${version}.js"></script>`);
 });
@@ -106,7 +117,7 @@ async function matrix(browser) {
       }
       await page.evaluate(data => { for (const [key, value] of Object.entries(data)) localStorage.setItem(key, value); }, drafts);
       await page.goto(`${origin}/?reauth=${cases}`);
-      const shouldFollow = ['none', 'legacy', 'current'].includes(name);
+      const shouldFollow = ['none', 'legacy', 'previous21299', 'current'].includes(name);
       assert.equal(await page.title(), shouldFollow ? 'Deployment sign-in' : 'BNN saved app', `${name}/${code}/${external}: observable redirect outcome`);
       assert.equal(loginHits, shouldFollow ? 1 : 0, 'redirect reaches login exactly once, never a loop');
       assert.equal(appHits, 1, 'real network redirect was requested');
@@ -134,8 +145,8 @@ async function matrix(browser) {
   }
   console.log(`redirect matrix: PASS (${engine}, ${cases} historical/current/control cases, 301/302/303/307/308, same/cross origin, login once, draft preservation, offline/cache safety)`);
 }
-async function lifecycle(browser) {
-  mode = 'lifecycle'; version = oldVersion; protectedAccess = false;
+async function lifecycle(browser, baseline = oldVersion) {
+  mode = 'lifecycle'; version = baseline; protectedAccess = false;
   const context = await browser.newContext(); context.setDefaultTimeout(25000);
   try {
     const page = await context.newPage(); await page.goto(origin); await page.waitForFunction(() => !!window.updates);
@@ -145,7 +156,7 @@ async function lifecycle(browser) {
     version = candidate;
     await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration()).update(); await window.updates.checkAutomaticVersion(); });
     await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting);
-    assert.equal(await page.evaluate(() => window.loadedVersion), oldVersion, '212.98 document remains until explicit update');
+    assert.equal(await page.evaluate(() => window.loadedVersion), baseline, 'baseline document remains until explicit update');
     assert.equal(await page.inputValue('#score'), '7', 'background download preserves active entry');
     await page.click('#update');
     await page.waitForFunction(v => window.loadedVersion === v && window.updates.automaticUpdateState().notice.includes('Updated successfully'), candidate);
@@ -181,7 +192,7 @@ async function lifecycle(browser) {
     await page.evaluate(() => window.updates.checkAutomaticVersion()); await page.click('#update');
     await page.waitForFunction(v => window.loadedVersion === v && window.updates.automaticUpdateState().notice.includes('Updated successfully'), afterCandidate);
     await assertDrafts(page, 'retry and second version-to-version update preserve same installation');
-    console.log(`same-installation lifecycle: PASS (${engine}; actual update module, 212.98→candidate→next fixture release, denied access, cross-origin login, normal/reconnect recovery, re-entry, 503/offline retry, verified restart, drafts retained)`);
+    console.log(`same-installation lifecycle: PASS (${engine}; actual update module, ${baseline}→candidate→next fixture release, denied access, cross-origin login, normal/reconnect recovery, re-entry, 503/offline retry, verified restart, drafts retained)`);
   } finally { await context.close(); }
 }
 (async () => {
@@ -190,6 +201,6 @@ async function lifecycle(browser) {
   let browser;
   try {
     browser = engine === 'webkit' ? await webkit.launch({ headless: true }) : await launchUpdateChromium(chromium);
-    await matrix(browser); await lifecycle(browser);
+    await matrix(browser); await lifecycle(browser, oldVersion); await lifecycle(browser, previousVersion);
   } finally { if (browser) await browser.close(); await close(app); await close(identity); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

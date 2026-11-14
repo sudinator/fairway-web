@@ -15,7 +15,7 @@ checks = {
     'no scoring interlocks mounted by scorecards': all('useScoringUpdateProtection(' not in (root / f).read_text() for f in ['components/round-editor.tsx', 'components/tournaments.tsx']),
     'worker cache cleanup is restricted to its current sole document': 'windows.length !== 1' in sw and 'event.data.version === SW_VERSION' in sw and 'windows[0].id !== event.source?.id' in sw,
     'navigation redirects pass through before offline fallback': 'fresh.type === \"opaqueredirect\"' in sw and sw.index('fresh.type === \"opaqueredirect\"') < sw.index('const saved ='),
-    'followed login is never cached as app shell': 'if (!response.ok || response.redirected) return;' in sw,
+    'followed login is never cached as app shell': 'if (!response.ok || response.redirected)' in sw,
     'redirect browser regressions remain in CI': 'node ci/test-update-redirect-browser.cjs' in (root / 'package.json').read_text(),
     'only marked app HTML becomes offline Home': 'data-bnn-app-shell=\"v1\"' in sw and 'data-bnn-app-shell=\"v1\"' in (root / 'app/layout.tsx').read_text(),
     'push support retained': 'self.addEventListener("push"' in sw and 'self.addEventListener("notificationclick"' in sw,

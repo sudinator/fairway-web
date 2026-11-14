@@ -1,3 +1,4 @@
+import { recordPhoneDiagnostic, diagnosticError } from "./phone-diagnostics";
 import { changedCols, pickCols, type ScoreCol } from "./sync-cols";
 
 export type ScoreBundle = { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] };
@@ -20,25 +21,29 @@ export function createGameScoreWriter(deps: SyncDeps) {
     get busy() { return queues.size > 0; },
     async idle() { await Promise.allSettled([...queues.values()]); },
     write(rowId: string, clock?: Record<string, unknown>): Promise<boolean> {
-      if (deps.paused()) return Promise.resolve(false);
+      if (deps.paused()) { recordPhoneDiagnostic("sync.held", { phase: "paused", entityId: rowId }); return Promise.resolve(false); }
       const previous = queues.get(rowId) ?? Promise.resolve(true);
       const task = previous.catch(() => false).then(async () => {
-        if (deps.paused()) return false;
+        if (deps.paused()) { recordPhoneDiagnostic("sync.held", { phase: "paused", entityId: rowId }); return false; }
         const bundle = deps.backup(rowId);
-        if (!bundle) return false;
+        if (!bundle) { recordPhoneDiagnostic("sync.held", { phase: "missing", entityId: rowId }); return false; }
         const wm = deps.watermark(rowId);
         const dirty = changedCols(bundle, wm);
         const locked = deps.locked(rowId);
         const cols: ScoreCol[] = locked ? dirty.filter(c => c !== "scores") : dirty;
-        if (!cols.length) return dirty.length === 0;
+        if (!cols.length) { recordPhoneDiagnostic("sync.held", { phase: locked ? "locked" : "unchanged", entityId: rowId }); return dirty.length === 0; }
         deps.revision();
+        recordPhoneDiagnostic("sync.start", { entityId: rowId, columns: cols.length });
         try {
-          if (!await deps.send(rowId, pickCols(bundle, cols), locked, clock)) return false;
+          if (!await deps.send(rowId, pickCols(bundle, cols), locked, clock)) { recordPhoneDiagnostic("sync.failed", { entityId: rowId }); return false; }
           deps.confirm(rowId, { scores: [], putts: [], fairways: [], penalties: [], sand: [], ...wm, ...pickCols(bundle, cols) });
           // A new tap while this request was in flight stays pending.
           const newest = deps.backup(rowId);
-          return !!newest && changedCols(newest, deps.watermark(rowId)).length === 0;
-        } catch {
+          const synced = !!newest && changedCols(newest, deps.watermark(rowId)).length === 0;
+          recordPhoneDiagnostic("sync.confirmed", { entityId: rowId, pending: synced ? 0 : 1 });
+          return synced;
+        } catch (error) {
+          recordPhoneDiagnostic("sync.failed", { entityId: rowId, ...diagnosticError(error) });
           return false;
         } finally {
           deps.revision();

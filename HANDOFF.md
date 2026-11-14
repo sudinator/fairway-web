@@ -1,3 +1,11 @@
+# 212.100 candidate — phone diagnostics
+
+Shared local evidence lives in lib/phone-diagnostics.ts and is mounted by PhoneDiagnosticsRecorder in RootLayout. Export panel is available to every member via App version & updates, on sign-in, and in Admin Diagnostics. Exports are manual JSON/share/download, never a remote upload. Do not add raw bodies, auth headers, cookies, query strings, names, score values or raw legacy trace strings. Unknown metadata fields are dropped at write AND export; persisted history is filtered by current account. Storage failures retain memory evidence and never evict score data. Sign-out clears logs through clearAllLocalState, and direct account switches isolate old history. Budgets: 150 events / 48 KiB text per session, four sessions, seven days. Existing raw opt-in tools remain separate.
+
+Save instrumentation must preserve baseline helpers in ci/fixtures/*-21299.ts.txt; npm run test:diagnostics executes baseline/current comparisons and recorder/browser contracts. HTTP outcomes are transport evidence, not automatic business-success claims. Realtime state is sampled read-only. The worker status query returns only its compiled version, with no activation/cache action. Best-effort worker failure notifications contain only fixed phase/status/error-class/version metadata and never change install/cache outcomes. Reports can expose page/worker-version differences while a worker is waiting; that difference alone is not a failed update.
+
+Records cannot reconstruct the old 212.97 phone session. External GitHub/Vercel and same-installation iPhone tests remain required; see RELEASE_VERIFICATION_212.100.md. No production-ready claim before those gates pass.
+
 # 212.99 candidate — redirect handling and release hold
 
 Navigation redirects are forwarded to the browser, never substituted with cached Home. Followed redirects are not cached as the application shell. Explicit Update, offline fallback and score persistence are retained. Test redirects with ci/test-update-redirect-browser.cjs; default Chromium runs in mandatory CI and BNN_UPDATE_BROWSER=webkit runs the same suite in WebKit when installed (failure is never silently skipped). The login fixture is cross-origin and the callback is outside /auth/, so it cannot accidentally bypass the navigation handler under test.
