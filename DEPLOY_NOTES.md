@@ -1,3 +1,22 @@
+## 212.104.261114 — Daily stale-game maintenance
+
+- Migration 0234 replaces app-open maintenance with one server job at 4 a.m. Eastern, rescheduling the same named daily job across DST without changing other jobs' timezone.
+- Delete genuinely empty games seven Eastern calendar days after the later of creation/play date. Preserve Test clubs, future games, financial/contest records, posted rounds and Cup schedules (unlink the empty session game only).
+- Complete scheduled 9/18-hole individual or canonical shared-ball cards after 24 hours without scoring; guests count and explicit no-shows are excluded. Existing posting/handicap rules remain authoritative.
+- Send one existing in-app game notification to the organizer for inactive partial cards after 48 hours. New scoring resets the review flag; partial scores remain unchanged.
+- Retain completed/failed daily run counts and bounded technical details; reuse Operations for schedule/result visibility. Remove the old Home sweep calls and browser execution grants.
+- Track actual score changes; optional stats do not restart the timer. Existing unfinished cards receive an installation-time grace baseline because older personal/initial-insert score timestamps were not recorded reliably.
+- Reuse the existing personal-round finish helper for complete saved 9/18-hole plans. No deletion of personal rounds. Source migration and rollback/concurrency assertions run in both fresh-database gates.
+- Includes the 212.102 tee fix and 212.103 yellow recovery-panel consolidation. No dependency update.
+
+## 212.103.261114 — One yellow round recovery panel
+
+- Reuse the yellow Resume design for local-only, server-only and matching local/server unfinished rounds.
+- Match with existing stable round/draft-session identity; distinct rounds remain separate. Prefer local draft for Resume, preserving unsynced scores.
+- Keep Mark complete/Delete/Discard all under Round options. Pending local changes route completion through the existing scorecard save flow.
+- Clear matching local recovery only after successful completion/deletion; bulk discard clears only draft IDs returned by the server.
+- No migration, dependency update or stale-game automation change. Includes 212.102 tee correction.
+
 ## 212.102.261114 — Organizer saved-tee selection
 
 - Use the same validated library/saved-player tee options for displaying and saving individual tee selections.

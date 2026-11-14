@@ -1,3 +1,5 @@
+<!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
+<!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 <!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 <!-- 212.88: fix CI browser discovery on runners without /opt/pw-browsers; app behavior unchanged. -->
@@ -853,3 +855,16 @@ Create Game uses the Lean Create flow: **Game → Players → Format → Review*
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+### 212.104 — Daily cleanup verification
+
+Migration `0234_daily_stale_games` is required. Validate staging first. The job is named `bnn-daily-stale-games`; its UTC cron hour adjusts to keep 4 a.m. Eastern. Other jobs' timezone settings are unchanged. Existing unfinished cards get an installation-time scoring-age baseline; the empty-game seven-day date rule is unchanged.
+
+Read-only SQL checks:
+```sql
+select jobid,jobname,schedule,active from cron.job where jobname='bnn-daily-stale-games';
+select id,job_date,finished_at,status,completed_games,deleted_games,reviewed_games,completed_rounds,failures,details from public.stale_game_job_runs order by id desc limit 5;
+select status,start_time,end_time,return_message from cron.job_run_details where jobid in (select jobid from cron.job where jobname='bnn-daily-stale-games') order by runid desc limit 5;
+```
+
+Do not trigger destructive maintenance as a production smoke test. Inspect the schedule and next actual run instead. Client recovery refresh removes acknowledged finalized copies only after successful reads; pending edits stay recoverable.

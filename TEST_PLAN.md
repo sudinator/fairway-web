@@ -145,3 +145,10 @@ Mode/source switches require A -> B -> A round-trip coverage. A modelled scenari
 ## Correction workflow terminal-path rule (177.23+)
 - When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
 - For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
+
+## 212.104 — Daily stale-game maintenance
+
+- Automated: `ci/assert-daily-stale-games.sql` executes against the entire migration chain; includes date boundaries, future/Test clubs, guests/no-shows, individual/shared cards, legacy partial eighteen versus full nine, posting rollback/retry, review deduplication, private execution grants, admin visibility and server-controlled timing.
+- Automated: `ci/test_daily_stale_concurrency.sh` uses competing PostgreSQL sessions on an explicitly disposable localhost database; preserves concurrent game/personal edits and rejects overlapping jobs.
+- Automated: `ci/test-stale-round-reconcile.cjs` / `ci/test-stale-ops.cjs` exercise actual Home/Operations code with modelled RPC reads, including pending/offline/error preservation.
+- Staging pending: migration 0234 recorded; exactly one named daily job; Operations scheduled status; observe a scheduled run/log; verify fresh/refreshed yellow recovery state. No destructive production tests.

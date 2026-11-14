@@ -1046,10 +1046,24 @@ function OpsMetrics() {
         {tile(`${m.nudge_clicked_28d ?? 0}/${m.nudge_shown_28d ?? 0}`, "Nudge clicks · 28d", ctr(m.nudge_clicked_28d ?? 0, m.nudge_shown_28d ?? 0))}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-        {tile(m.stale_ready ?? 0, "Stuck & complete", "auto-finished on next sweep")}
+        {tile(m.stale_ready ?? 0, "Stuck & complete", "daily job after 24h without scoring")}
         {tile(m.stale_partial ?? 0, "Stuck & partial", "left for the player to resolve")}
         {tile(m.auto_finished_7d ?? 0, "Auto-finished · 7d", "recovered into handicaps")}
       </div>
+      {m.stale_job && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+          <strong style={{ color: C.gold }}>Daily cleanup · 4 a.m. Eastern</strong>
+          <div>{m.stale_job.scheduled ? "Scheduled" : "Not scheduled — check database setup"}</div>
+          {m.stale_job.last_run ? <div>
+            Last run: {m.stale_job.last_run.finished_at ? new Date(m.stale_job.last_run.finished_at).toLocaleString() : "in progress"}
+            {" · "}{m.stale_job.last_run.completed_games ?? 0} games completed
+            {" · "}{m.stale_job.last_run.deleted_games ?? 0} empty games deleted
+            {" · "}{m.stale_job.last_run.reviewed_games ?? 0} sent for review
+            {" · "}{m.stale_job.last_run.completed_rounds ?? 0} personal rounds completed
+            <span style={{ color: m.stale_job.last_run.failures ? C.gold : C.sage }}> · {m.stale_job.last_run.failures ?? 0} failures</span>
+          </div> : <div>No daily cleanup run recorded yet.</div>}
+        </div>
+      )}
       {sg ? (() => {
         const clean = sg.filter((g) => g.verdict === "fully_scored").length;
         const abandoned = sg.filter((g) => g.verdict === "in_progress" || g.verdict === "no_scores" || g.verdict === "empty").length;
@@ -1059,7 +1073,7 @@ function OpsMetrics() {
           <div style={{ marginTop: 16 }}>
             <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 700 }}>Stale games · 24h+</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
-              Unfinished games older than a day, app-wide. Fully-scored ones (gold) auto-complete on the next sweep if under 30 days old; the rest are abandoned shells you can Delete here (games with posted rounds are protected).
+              Unfinished games created over a day ago, excluding future dates and Test clubs. Complete cards finish in the daily job after 24 hours without scoring. Empty games are deleted seven days after the later of creation or play date; partial cards go to the organizer for review.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
               {tile(sg.length, "Total stale", "not ended, 24h+")}

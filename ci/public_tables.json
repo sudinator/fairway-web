@@ -57,6 +57,7 @@
     "scoring_devices",
     "settlement_allocations",
     "settlements",
+    "stale_game_job_runs",
     "system_jobs",
     "team_round_email_log",
     "tee_time_rsvps",

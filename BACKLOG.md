@@ -1,3 +1,15 @@
+## 212.104 — Agreed stale-game process implemented
+
+- Daily 4 a.m. Eastern execution replaces the old app-open sweeps. Empty games delete seven days after later of created/play date; full cards complete after 24h scoring inactivity; partials go to organizer review; Test clubs excluded.
+- Guests, no-shows, canonical team cards, 9/18 personal rounds, retry/rollback, score-write serialization, job history and Operations status are covered by the new migration-chain tests. Live staging validation and deployment remain pending.
+- Existing unfinished cards begin with a conservative migration-time score-age baseline. Partial scores are preserved; meaningful financial/contest/history records are not treated as empty.
+
+## 212.103 — Round recovery consolidation
+
+- Implemented one yellow card per identified round; preserve local recovery and server management actions. Local recovery, browser and application checks passed; live staging validation pending.
+- CI follow-up: investigate intermittent chart-tooltip Close tap timeout observed during local validation; unchanged baseline and candidate later passed. No chart test was weakened.
+- Approved stale-game policy remains separate and unimplemented: daily 4 a.m. Eastern; empty game deletion seven days after later of created/scheduled date; completed cards after 24h scoring inactivity; partials for organizer review; Test clubs excluded.
+
 ## 212.102 — saved-tee selection correction
 
 - Implemented a shared validated option list for Organizer tee selection and saving; regression checks cover round trips and failure/retry. Live staging validation remains pending.

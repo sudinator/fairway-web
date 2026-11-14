@@ -1,3 +1,5 @@
+<!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
+<!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 <!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 ## 212.18 — course_field_averages (0215)
@@ -643,3 +645,11 @@ The baseline intentionally reproduces current Production behavior. Any later pri
 ## 212.78 candidate — missing-handicap comparison
 
 Manual course handicap is authoritative for differential comparisons via a game-specific equivalent index using the saved course par, tee rating and slope. Without an entered manual value, use a real recorded game-row index (including explicit0); missing is unavailable, never scratch. No profile writes, stored round changes or 9-hole comparison expansion. See RELEASE_VERIFICATION_212.78.md. Application deployment remains pending; this is a new fix beyond 212.77.
+
+## 212.104 / 0234 — daily stale maintenance
+
+- `games.last_score_change_at`, `games.stale_review_notified_at`, `rounds.last_score_change_at`: server-owned timestamps; triggers observe actual scoring and eligibility changes. Browser writes cannot spoof maintenance timing or backdate game creation.
+- `stale_game_job_runs`: RLS enabled, system-admin SELECT only for authenticated clients; records daily outcome counts, bounded game-ID/SQLSTATE details and 90-day history.
+- `run_daily_stale_games(timestamptz)`: server-only daily runner, game lock 163 and global job lock; legacy sweep helpers lose browser execution grants. Existing posting, primary-device, reset and RLS rules remain in force.
+- One named pg_cron job (`bnn-daily-stale-games`) computes its next 4 a.m. Eastern schedule across DST without changing global cron timezone.
+- `get_ops_metrics` and `admin_stale_games` reuse the same card classification used by the worker. Test clubs and future games are excluded; financial, contest and posted-history dependencies block automatic deletion.

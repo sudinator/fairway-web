@@ -4,6 +4,7 @@ import { parseScoreCorrection } from "@/lib/score-correction-links";
 import { parseAppLink } from "@/lib/app-links";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { prepareRound } from "@/lib/round-prep";
+import { RoundRecovery } from "@/components/round-recovery";
 import { SeasonWrappedEntry } from "@/components/season-wrapped";
 
 import { ScoringDeviceNotice, usePrimaryScoringDevice } from "@/components/scoring-device";
@@ -16,7 +17,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { write } from "@/lib/db-write";
 import { Toaster, notifyInfo } from "@/components/toast";
-import { loadDraft, personalDraftIsPending, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
+import { loadDraft, clearDraft, sameDraftRound, personalRoundFingerprint, personalDraftIsPending, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
@@ -566,7 +567,8 @@ export function Home({ session }: { session: any }) {
     if (!rs) { setRounds([]); setLoading(false); return; }
     const ids = rs.map((r: any) => r.id);
     let hs: any[] = [];
-    try { hs = await fetchAllIn<any>(supabase, "holes", "round_id", ids); } catch { hs = []; }
+    let holesLoaded = true;
+    try { hs = await fetchAllIn<any>(supabase, "holes", "round_id", ids); } catch { hs = []; holesLoaded = false; }
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
     // Shared preparation (lib/round-prep): the season summary uses exactly the same step.
@@ -577,32 +579,23 @@ export function Home({ session }: { session: any }) {
     const inProgAll = merged.filter((r: any) => (r.status ?? "final") === "in_progress")
       .sort((a: any, b: any) => +new Date(b.played_at) - +new Date(a.played_at));
     const inProg = inProgAll[0] || null;
+    // Daily completion may have happened while this installation was closed.
+    // Retire only an acknowledged local copy after a successful complete read;
+    // unknown server state and unacknowledged phone edits remain recoverable.
+    const local = loadDraft()?.round;
+    if (holesLoaded && local?.id && !personalDraftIsPending(local) && rs.some((r: any) => r.id === local.id && r.status === "final")) {
+      clearDraft(local.id);
+      refreshDraft();
+    }
     setRounds(finished);
     setDbInProgress(inProg);
     setInProgressCount(inProgAll.length);
     setLoading(false);
-  }, [user.id]);
+  }, [user.id, refreshDraft]);
 
   useEffect(() => { loadRounds(); }, [loadRounds]);
 
-  // Best-effort: auto-finish stale-but-complete in-progress rounds (self-throttled to
-  // once/hour server-side, so calling on each open is fine). Reloads if any were fixed.
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.rpc("finish_stale_rounds").then(({ data }: any) => {
-      if (typeof data === "number" && data > 0) loadRounds();
-    }, () => {});
-  }, [user?.id, loadRounds]);
-
-  // Best-effort: nudge organizers of fully-scored games to end them, and auto-complete any that are
-  // past the end of their ET day (self-throttled to once/hour server-side). Reloads if any completed,
-  // since the current user may have had a round posted by the auto-complete.
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.rpc("sweep_stale_games").then(({ data }: any) => {
-      if (typeof data === "number" && data > 0) loadRounds();
-    }, () => {});
-  }, [user?.id, loadRounds]);
+  // Stale-game/round maintenance is a daily server job (0234), not an app-open side effect.
 
   // Keep achievements in step with finished rounds. This single reconcile covers
   // every finalize path (new round, mark-complete, game-recorded) and doubles as
@@ -620,7 +613,15 @@ export function Home({ session }: { session: any }) {
     return () => { alive = false; };
   }, [rounds, user?.id]);
 
+  const clearRecoveredDraft = (id: string, before: Round | null) => {
+    const current = loadDraft()?.round;
+    // A delayed server reply must not clear edits entered after the action began.
+    if (before && current && sameDraftRound(current, before) && personalRoundFingerprint(current) === personalRoundFingerprint(before)) clearDraft(id);
+    refreshDraft();
+  };
+
   const deleteRound = async (id: string) => {
+    const draftAtStart = loadDraft()?.round ?? null;
     const r = rounds.find((x) => x.id === id);
     // A round recorded from a game is just a personal copy — deleting it never
     // touches the game result, the leaderboard, or any posted/paid winnings
@@ -636,21 +637,26 @@ export function Home({ session }: { session: any }) {
     // doesn't permit silently removes 0 rows; an owner UPDATE is allowed, so setting
     // deleted_at reliably removes the round from all stats/handicap. It also survives
     // any re-post (recordMyGameRound finds the hidden row and updates it in place).
-    const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    const { data: deleted, error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
     if (error) { alert(failureMessage("Couldn't delete that round", error)); return; }
+    if (!deleted?.some((row: { id: string }) => row.id === id)) { alert("That round was not deleted. Your local scores are still saved. Reload and try again."); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
+    clearRecoveredDraft(id, draftAtStart);
     await loadRounds();
   };
 
   // Finalize an in-progress round exactly as it stands (e.g. only 9 or 15 holes played).
   // status='final' is what makes a round count in stats; a partial round is legitimate.
   const markRoundComplete = async (r: Round) => {
+    const draftAtStart = loadDraft()?.round ?? null;
     const gross = (r.holes || []).reduce((s: number, h: any) => s + (h.strokes || 0), 0);
-    const { error } = await supabase.from("rounds")
+    const { data: completed, error } = await supabase.from("rounds")
       .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString(), finished_by: user.id, finished_at: new Date().toISOString() })
-      .eq("id", r.id);
+      .eq("id", r.id).select("id");
     if (error) { alert(failureMessage("Couldn't mark that round complete", error)); return; }
+    if (!completed?.some((row: { id: string }) => row.id === r.id)) { alert("That round was not completed. Your local scores are still saved. Reload and try again."); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
+    clearRecoveredDraft(r.id, draftAtStart);
     await loadRounds();
   };
 
@@ -658,14 +664,29 @@ export function Home({ session }: { session: any }) {
   // counted toward stats or handicap (the app ignores in_progress), so this only clears
   // clutter. Soft-delete (deleted_at) so it's recoverable server-side if ever needed.
   const discardAllInProgress = async () => {
+    const draftAtStart = loadDraft()?.round ?? null;
     if (typeof window !== "undefined" && !window.confirm(
       `Discard ${inProgressCount > 1 ? `all ${inProgressCount} unfinished rounds` : "this unfinished round"}? They were never completed, so this doesn't touch your stats or handicap.`
     )) return;
-    const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() })
-      .eq("user_id", user.id).eq("status", "in_progress").is("deleted_at", null);
+    const { data: discarded, error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() })
+      .eq("user_id", user.id).eq("status", "in_progress").is("deleted_at", null).select("id");
     if (error) { alert(failureMessage("Couldn't discard that", error)); return; }
+    const local = loadDraft()?.round;
+    if (local?.id && discarded?.some((r: { id: string }) => r.id === local.id)) clearRecoveredDraft(local.id, draftAtStart);
+    refreshDraft();
     setStage(null);
     await loadRounds();
+  };
+
+  const resumePersonalRound = (round: Round) => { setViewing(null); setTab("dashboard"); setStage({ round }); };
+  const completeRecoveredRound = (round: Round) => {
+    const local = loadDraft()?.round;
+    if (local && sameDraftRound(local, round) && personalDraftIsPending(local)) {
+      notifyInfo("Finish this round from its scorecard so your latest scores saved on this device are included.");
+      resumePersonalRound(local);
+      return;
+    }
+    void markRoundComplete(local && sameDraftRound(local, round) ? local : round);
   };
 
   const chooseGroup = async (id: string) => {
@@ -859,42 +880,12 @@ export function Home({ session }: { session: any }) {
         }}>＋ New round</button>}
       </div>
 
-      {/* Resume an in-progress round from anywhere in the app */}
-      {draftRound && !(stage && typeof stage === "object" && "round" in stage) && (
-        <button
-          onClick={() => { setViewing(null); setTab("dashboard"); setStage({ round: draftRound }); }}
-          style={{
-            display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
-            background: C.gold, color: "#16201C", border: "none", cursor: "pointer",
-            borderRadius: 12, padding: "12px 16px", marginTop: 14,
-          }}
-        >
-          <span style={{ fontSize: 20 }}>⛳</span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: "block", fontWeight: 800, fontSize: 14 }}>Round in progress — tap to resume</span>
-            <span style={{ display: "block", fontSize: 12, opacity: 0.8 }}>
-              {draftRound.course || "Your round"} · {draftRound.holes?.filter((h) => h.strokes != null).length || 0} holes entered
-            </span>
-          </span>
-          <span style={{ fontWeight: 800, fontSize: 13 }}>Resume →</span>
-        </button>
-      )}
-
-      {/* Unfinished-round nudge: a started round only counts once it's completed, so
-          prompt to finish it (partial is fine), mark it complete as-is, or discard it. */}
-      {dbInProgress && !(stage && typeof stage === "object" && "round" in stage) && (
-        <div style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
-          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ {inProgressCount > 1 ? `You have ${inProgressCount} unfinished rounds` : "You have an unfinished round"}</div>
-          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
-            {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts once it's completed — finishing a 9- or 15-hole round is fine. {inProgressCount > 1 ? "Showing the most recent; discard all to clear the rest. " : ""}You'll need to resolve this before starting a new round.
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            <button onClick={() => { setViewing(null); setTab("dashboard"); setStage({ round: dbInProgress }); }} style={{ ...btn(true), flex: 1, minWidth: 110, fontSize: 12 }}>Finish scoring</button>
-            <button onClick={() => markRoundComplete(dbInProgress)} style={{ ...btn(false), flex: 1, minWidth: 110, fontSize: 12 }}>Mark complete</button>
-            <button onClick={() => deleteRound(dbInProgress.id)} style={{ ...btn(false), flex: 1, minWidth: 90, fontSize: 12 }}>Delete</button>
-            {inProgressCount > 1 && <button onClick={discardAllInProgress} style={{ ...btn(false), flex: 1, minWidth: 110, fontSize: 12 }}>Discard all {inProgressCount}</button>}
-          </div>
-        </div>
+      {!(stage && typeof stage === "object" && "round" in stage) && (
+        <RoundRecovery draft={draftRound} server={dbInProgress} count={inProgressCount}
+          onResume={resumePersonalRound}
+          onComplete={completeRecoveredRound}
+          onDelete={(r) => { if (window.confirm(`Delete this unfinished round at ${r.course || "this course"}, including any scores saved on this device?`)) void deleteRound(r.id); }}
+          onDiscardAll={discardAllInProgress} />
       )}
 
       {/* Weekly profile-completion nudge — shown in-app when the profile is missing a
