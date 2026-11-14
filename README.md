@@ -1,3 +1,9 @@
+## 212.105.261114 — fresh-database permission-test correction
+
+The new daily stale-game test attempted to call EXECUTE-revoked maintenance as an authenticated member. This repeats the Supabase-image crash pattern documented in 208.4 and HANDOFF.md. Replace that call with has_function_privilege(current_user, ...), preserving the real timestamp-tampering and admin/member RLS checks. Add all seven private maintenance helpers to the existing central privilege assertion. Extend the existing recurrence guard with app-role direct-call detection and nine executable canaries.
+
+No application behavior, scoring rules, migration SQL, database grants or policies change. Migration 0234 remains byte-identical to 212.104; no additional migration is required. The full source includes all 212.104 functionality. The screenshot proves a lost backend connection in the app-role DO block; confirming the native supautils crash signature requires the expanded database diagnostics. Hosted GitHub/Supabase and Vercel staging checks remain release gates.
+
 <!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
 <!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->

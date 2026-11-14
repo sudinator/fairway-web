@@ -1,3 +1,7 @@
+## 212.105 fresh-database test correction
+
+Run the full source guards, including the nine app-role denial-call canaries. Reintroducing the 212.104 perform call must fail before database execution. Replay all migrations and assertions on a disposable database; validate the actual-role catalogue denial, authorized timestamp-tampering checks, member/admin history RLS and existing concurrency tests. Hosted Supabase CI is required because the local PostgreSQL shim lacks supautils. No production destructive tests.
+
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
 ## 179.7 Staging-integration workflow corrective

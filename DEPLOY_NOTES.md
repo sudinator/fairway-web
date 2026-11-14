@@ -1,3 +1,9 @@
+## 212.105.261114 — fresh-database permission-test correction
+
+The new daily stale-game test attempted to call EXECUTE-revoked maintenance as an authenticated member. This repeats the Supabase-image crash pattern documented in 208.4 and HANDOFF.md. Replace that call with has_function_privilege(current_user, ...), preserving the real timestamp-tampering and admin/member RLS checks. Add all seven private maintenance helpers to the existing central privilege assertion. Extend the existing recurrence guard with app-role direct-call detection and nine executable canaries.
+
+No application behavior, scoring rules, migration SQL, database grants or policies change. Migration 0234 remains byte-identical to 212.104; no additional migration is required. The full source includes all 212.104 functionality. The screenshot proves a lost backend connection in the app-role DO block; confirming the native supautils crash signature requires the expanded database diagnostics. Hosted GitHub/Supabase and Vercel staging checks remain release gates.
+
 ## 212.104.261114 — Daily stale-game maintenance
 
 - Migration 0234 replaces app-open maintenance with one server job at 4 a.m. Eastern, rescheduling the same named daily job across DST without changing other jobs' timezone.

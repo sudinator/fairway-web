@@ -1,3 +1,7 @@
+## 212.105 — CI permission-call regression
+
+Corrected in candidate: stale-game assertions repeat the documented 208.4 revoked-function-call failure pattern. Central privilege catalogue and recurrence guard extended. Confirm native GitHub/Supabase database lane before staging promotion. Analytics review paused at owner request; no analytics changes included.
+
 ## 212.104 — Agreed stale-game process implemented
 
 - Daily 4 a.m. Eastern execution replaces the old app-open sweeps. Empty games delete seven days after later of created/play date; full cards complete after 24h scoring inactivity; partials go to organizer review; Test clubs excluded.

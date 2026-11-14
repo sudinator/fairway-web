@@ -1,3 +1,7 @@
+# 212.105 candidate — revoked-function test regression
+
+Use the central server-only catalogue in ci/assert-no-app-call-to-revoked.sql. Never call these functions under anon/authenticated to test denial. ci/check_recurrence_guards.py now checks direct calls in app-role SQL sections. Migration 0234 is unchanged. See RELEASE_VERIFICATION_212.105.md for evidence and remaining external gates.
+
 # 212.101 candidate — diagnostic summary, context and last update outcome
 
 Login owns a vertical scroll context because globals.css locks body scrolling. Test natural wheel/touch access to both sign-in and the expanded support controls; locator auto-scroll alone is not sufficient. The signed-in Home scroll container is unchanged.

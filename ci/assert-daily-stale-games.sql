@@ -134,13 +134,15 @@ end $$;
 grant select on stale_cases to authenticated;
 select set_config('request.jwt.claim.sub','23400000-0000-0000-0000-000000000001',true);
 set local role authenticated;
-do $$declare denied boolean:=false; stamp timestamptz; created_stamp timestamptz; gid uuid; begin
+do $$declare stamp timestamptz; created_stamp timestamptz; gid uuid; begin
  select id into gid from stale_cases where label='partial';
  select last_score_change_at,created_at into stamp,created_stamp from games where id=gid;
  update games set created_at='2000-01-01',last_score_change_at='2000-01-01',stale_review_notified_at='2000-01-01' where id=gid;
  if (select created_at from games where id=gid) is distinct from created_stamp or (select last_score_change_at from games where id=gid) is distinct from stamp or (select stale_review_notified_at from games where id=gid) is not null then raise exception 'FAIL: member spoofed maintenance fields'; end if;
- begin perform public.run_daily_stale_games(); exception when insufficient_privilege then denied:=true; end;
- if not denied then raise exception 'FAIL: member executed destructive maintenance'; end if;
+ -- 208.4 / 212.105: never CALL an EXECUTE-revoked function as an app role.
+ -- The pinned Supabase image can crash in supautils before returning permission denied.
+ -- Check the actual role's privilege instead; keep the real authorized writes/RLS reads above/below.
+ if has_function_privilege(current_user,'public.run_daily_stale_games(timestamptz)','execute') then raise exception 'FAIL: member can execute destructive maintenance'; end if;
  if exists(select 1 from public.stale_game_job_runs) then raise exception 'FAIL: ordinary member sees maintenance history'; end if;
 end $$;
 reset role;

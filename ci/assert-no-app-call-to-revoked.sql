@@ -13,7 +13,14 @@ begin
     ('public.find_duplicate_member(uuid)'),
     ('public.valid_invite(text)'),
     ('public.remind_pending_signups()'),
-    ('public.claim_game_recap(uuid,text)')
+    ('public.claim_game_recap(uuid,text)'),
+    ('public.run_daily_stale_games(timestamptz)'),
+    ('public.finish_stale_rounds()'),
+    ('public.sweep_stale_games()'),
+    ('public.stale_game_card_state(uuid)'),
+    ('public.stale_job_next_schedule(timestamptz)'),
+    ('public.guard_stale_maintenance_fields()'),
+    ('public.track_stale_score_change()')
   ) v(f)
   where to_regprocedure(f) is not null
     and (has_function_privilege('authenticated', f, 'execute') or has_function_privilege('anon', f, 'execute'));

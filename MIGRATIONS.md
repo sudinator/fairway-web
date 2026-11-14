@@ -1,3 +1,4 @@
+<!-- 212.105: no additional migration. 0234 SQL is byte-identical to 212.104; this release corrects CI assertions only. -->
 <!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 ## 192.16.260929 — migration 0158

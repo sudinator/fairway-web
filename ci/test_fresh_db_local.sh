@@ -11,6 +11,7 @@
 # cron.database_name set to the scratch database name below (bnn_local_chain).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python3 "$ROOT/ci/check_recurrence_guards.py"
 # Run from a scratch directory exactly as ci/test_fresh_db_rebuild.sh does (cd "$TMP"), so anything
 # that silently depends on the working directory fails HERE, not in GitHub. 196.0's freshness sync
 # did exactly that.
