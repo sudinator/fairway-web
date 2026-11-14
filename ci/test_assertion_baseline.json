@@ -1,5 +1,5 @@
 {
-  "total": 441709,
+  "total": 447288,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -15,7 +15,13 @@
     "bucket-model": 34,
     "card": 11,
     "chart-helpers": 10,
+    "chart-trend": 5514,
+    "club activity periods and scores": 151,
+    "club engagement": 43,
+    "club engagement route": 45,
+    "club net scoring": 334,
     "club report view": 11,
+    "combined club directory": 58,
     "compact team editor": 12,
     "competition": 16,
     "component render": 17,
@@ -30,7 +36,7 @@
     "cup roster row": 5,
     "cup scramble": 13,
     "draft games": 11,
-    "explicit update banner and status": 37,
+    "explicit update banner and status": 76,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
@@ -68,6 +74,7 @@
     "odd field": 26,
     "one-step walkthrough": 154,
     "personal bests": 16,
+    "phone diagnostic export": 26,
     "player-scoring": 71,
     "recap additions": 46,
     "recap stat contract": 59,
@@ -101,11 +108,6 @@
     "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20,
-    "update safety": 38,
-    "combined club directory": 58,
-    "club engagement": 43,
-    "club engagement route": 45,
-    "club activity periods and scores": 151,
-    "club net scoring": 334
+    "update safety": 38
   }
 }

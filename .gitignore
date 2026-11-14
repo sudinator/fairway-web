@@ -25,3 +25,6 @@ CHANGES.md
 
 # 212.16: design gallery screenshots (npm run gallery)
 .design-gallery/
+
+# Per-run CI timings are uploaded as workflow artifacts.
+ci-timings/

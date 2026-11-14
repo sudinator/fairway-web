@@ -19,6 +19,9 @@ jobs:
   staging:
     runs-on: ubuntu-latest
     environment: staging
+    concurrency:
+      group: bnn-staging-integration
+      cancel-in-progress: false
 
     env:
       BNN_STAGING_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}

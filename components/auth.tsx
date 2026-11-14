@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import { signInWithGoogle } from "@/lib/google-sign-in";
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
@@ -13,6 +14,7 @@ export function Login() {
     await signInWithGoogle({ chooseAccount: true });
   };
   return (
+    <div data-login-scroll style={{ position: "fixed", top: 0, left: 0, right: 0, height: "var(--app-h, 100dvh)", boxSizing: "border-box", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}>
     <div style={{ maxWidth: 420, margin: "80px auto", padding: 24, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={300} /></div>
       <div style={{ color: C.sage, fontSize: 15, marginTop: 16 }}>Track your scores, handicap & stats.</div>
@@ -26,6 +28,8 @@ export function Login() {
           One tap to sign in. Your rounds are private to you — no one else can see them.
         </div>
       </div>
+      <PhoneDiagnosticsPanel />
+    </div>
     </div>
   );
 }

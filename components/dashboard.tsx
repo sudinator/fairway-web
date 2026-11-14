@@ -4,14 +4,12 @@ import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { InsightsCard } from "@/components/insights";
 import React, { useEffect, useState, useMemo } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, BarChart, Bar, Rectangle, ComposedChart, Legend,
+  Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ComposedChart,
 } from "recharts";
-import { barShapeValue } from "@/lib/chart-helpers";
+import { recentForm, trendSummary, type TrendSample } from "@/lib/chart-trend";
 import { ChartTip, DismissableChart } from "@/components/charts/chart-tip";
 import { ChartAxisTick } from "@/components/charts/axis-tick";
 import { chartXAxis } from "@/lib/chart-axis";
-import { FormBars } from "@/components/charts/form-bars";
 import { roundStatCompleteness } from "@/lib/round-stats";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
@@ -41,25 +39,11 @@ import { goalOptions } from "@/lib/benchmarks";
 // Shared chart tooltip — solid deep-green card, thin gold ring, gold label (course ·
 // player/date), cream values. `nameMap` maps each series' dataKey to a display label;
 // `fmt` formats each value. Replaces the old white contentStyle tooltip on every chart.
-// Dense-view trend chart: faint raw dots + a single 5-round rolling line that runs green when
-// you're beating your average and red when you're not (gradient keyed to the rolling line's own
-// range vs `avg`), a dashed average reference, and a date x-axis. Used once a range has enough
-// rounds that per-round bars would be unreadable.
+// Dashboard performance trends: each round remains visible; the cream line shows recent form.
 function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctStat, nameMap, fmt }: {
   data: any[]; valueKey: string; rollKey: string; avg: number | null; lowerBetter: boolean;
   domain?: any; pctStat?: boolean; nameMap: Record<string, string>; fmt: (v: any) => any;
 }) {
-  const rolls = data.map((d) => d[rollKey]).filter((v: any): v is number => v != null);
-  const rMax = rolls.length ? Math.max(...rolls) : 1;
-  const rMin = rolls.length ? Math.min(...rolls) : 0;
-  const span = rMax - rMin || 1;
-  const off = Math.max(0, Math.min(1, avg == null ? 0.5 : (rMax - avg) / span));
-  const gid = `rollgrad-${valueKey}-${rollKey}`;
-  const beat = "#9be9c0", miss = "#f3a3a0";
-  // Gradient runs top(0)=rMax … bottom(1)=rMin. lowerBetter: above avg (top) is worse → red.
-  const stops: [number, string][] = lowerBetter
-    ? [[0, miss], [off, miss], [off, beat], [1, beat]]
-    : [[0, beat], [off, beat], [off, miss], [1, miss]];
   // Self-fit: if no domain is passed, fit the axis to the data range so the chart always uses its
   // vertical space well (pct stats clamped 0–100). Callers can still override with `domain`.
   const fitVals = data.flatMap((d) => [d[valueKey], d[rollKey]]).filter((v: any): v is number => v != null && Number.isFinite(v));
@@ -70,21 +54,61 @@ function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctS
     : [0, 1];
   return (
     <ResponsiveContainer>
-      <ComposedChart data={data} margin={{ top: 5, right: 2, left: 2, bottom: 0 }}>
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            {stops.map(([o, c], i) => <stop key={i} offset={o} stopColor={c} />)}
-          </linearGradient>
-        </defs>
+      <ComposedChart data={data} margin={{ top: 6, right: 7, left: 2, bottom: 0 }}>
         <XAxis dataKey="i" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(data)} />
         <YAxis domain={domain ?? autoDomain} allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} />
-        <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<ChartTip nameMap={nameMap} fmt={fmt} />} />
+        <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<PerformanceTip nameMap={nameMap} fmt={fmt} avg={avg} valueKey={valueKey} pctStat={pctStat} />} />
         {avg != null && <ReferenceLine y={Math.round(avg * 10) / 10} stroke={C.gold} strokeDasharray="5 4" />}
-        <Line type="monotone" dataKey={valueKey} stroke="transparent" isAnimationActive={false} dot={{ r: 2, fill: C.sage, fillOpacity: 0.28, stroke: "none" }} />
-        <Line type="monotone" dataKey={rollKey} stroke={`url(#${gid})`} strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
+        <Line type="monotone" dataKey={valueKey} stroke="transparent" isAnimationActive={false} dot={(p: any) => {
+          const v = p.payload[valueKey];
+          if (v == null || !Number.isFinite(v)) return <g />;
+          const good = avg == null || (lowerBetter ? v <= avg : v >= avg);
+          return <circle cx={p.cx} cy={p.cy} r={3.6} fill={good ? "#4ADE80" : "#FB7185"} stroke={C.greenLight} strokeWidth={1.2} data-round-value={v} data-round-better={good} />;
+        }} activeDot={{ r: 5, fill: C.gold, stroke: C.cream, strokeWidth: 2 }} />
+        <Line type="monotone" dataKey={rollKey} stroke={C.cream} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
+}
+
+// Keep the existing tooltip close/remount behavior. Add context without any score mutation.
+function PerformanceTip({ avg, valueKey, pctStat, ...props }: any) {
+  const point = props.payload?.[0]?.payload;
+  const extra: any[] = [];
+  if (point && avg != null && Number.isFinite(point[valueKey])) extra.push({ dataKey: "vsAverage", value: point[valueKey] - avg });
+  if (point?.total > 0) extra.push({ dataKey: "opportunities", value: `${point.hit}/${point.total}` });
+  return <ChartTip {...props} payload={[...(props.payload || []), ...extra]}
+    nameMap={{ ...props.nameMap, vsAverage: "vs overall average", opportunities: "Recorded opportunities" }}
+    fmt={(v: any, key: string) => key === "opportunities" ? v : key === "vsAverage" ? `${v > 0 ? "+" : ""}${v.toFixed(1)}${pctStat ? " pp" : ""}` : props.fmt(v)} />;
+}
+
+function TrendOverview({ samples, lowerBetter, rate = false, unit = "strokes" }: { samples: TrendSample[]; lowerBetter: boolean; rate?: boolean; unit?: string }) {
+  const summary = trendSummary(samples, lowerBetter, rate);
+  if (summary.latest == null) return null;
+  const format = (v: number) => `${v.toFixed(1)}${rate ? "%" : ""}`;
+  const change = summary.improvement;
+  const improved = change != null && change > 0;
+  return <div data-trend-overview style={{ marginTop: 10 }}>
+    <div style={{ color: C.sage, fontSize: 11 }}>{summary.count} eligible round{summary.count === 1 ? "" : "s"} in selected period</div>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+      <span data-trend-latest style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream }}>{format(summary.latest)}</span>
+      <span style={{ color: C.sage, fontSize: 12 }}>Last {summary.lastCount} tracked round{summary.lastCount === 1 ? "" : "s"}</span>
+    </div>
+    {rate && <div style={{ color: C.sage, fontSize: 11 }}>{summary.hits}/{summary.opportunities} recorded opportunities</div>}
+    {change != null && <div style={{ marginTop: 8, color: Math.abs(change) < 0.05 ? C.sage : improved ? "#9be9c0" : "#f3a3a0", fontSize: 12, fontWeight: 700 }}>
+      {Math.abs(change) < 0.05 ? "Unchanged vs previous 5 tracked rounds" : `${(improved === lowerBetter) ? "↓" : "↑"} ${Math.abs(change).toFixed(1)} ${rate ? "percentage points" : unit} ${improved ? "better" : "worse"} than previous 5 tracked rounds`}
+      <div style={{ color: C.sage, fontSize: 11, fontWeight: 500, marginTop: 4 }}>Previous 5: {format(summary.prior!)}</div>
+    </div>}
+    <div style={{ marginTop: 8, color: C.sage, fontSize: 11 }}>{summary.betterCount} of last {summary.lastCount} at or {lowerBetter ? "below" : "above"} overall average ({format(summary.average!)})</div>
+  </div>;
+}
+
+function TrendKey({ rate, lowerBetter }: { rate: boolean; lowerBetter: boolean }) {
+  return <div style={{ color: C.sage, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
+    <span style={{ color: "#4ADE80" }}>● At or {lowerBetter ? "below" : "above"} average</span> · <span style={{ color: "#FB7185" }}>● {lowerBetter ? "Above" : "Below"} average</span><br />
+    Cream: recent form · Gold dashed: overall average. {lowerBetter ? "Lower" : "Higher"} is better.<br />
+    {rate ? "Recent form weights recorded successes and opportunities, with older rounds fading by 20% each round." : "Recent form: 20% latest round + 80% prior trend."} Tap a dot for round details.
+  </div>;
 }
 
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved, onViewAchievements }: {
@@ -182,21 +206,11 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const diffSeries = sorted
     .map((r) => ({ r, d: roundDifferential(r) }))
     .filter((x): x is { r: Round; d: number } => x.d != null);
-  const diffTrend = diffSeries.map((x, i) => {
-    const w = diffSeries.slice(Math.max(0, i - 4), i + 1);
-    return {
-      i: i + 1,
-      playedAt: x.r.played_at, name: fmtDate(x.r.played_at),
-      course: x.r.course,
-      diff: Math.round(x.d * 10) / 10,
-      roll: Math.round((w.reduce((s, y) => s + y.d, 0) / w.length) * 10) / 10,
-    };
-  });
-  const diffFormAvg = diffTrend.length ? diffTrend.reduce((s, t) => s + t.diff, 0) / diffTrend.length : null;
-  const diffFormDomain = niceDomain(diffTrend.map((t) => t.diff), 2);
-  const last5 = diffTrend.slice(-5);
-  const last5Avg = last5.length ? last5.reduce((s, t) => s + t.diff, 0) / last5.length : null;
-  const formDelta = last5Avg != null && diffTrend.length ? diffTrend[0].diff - last5Avg : null; // + = improved (lower now)
+  const diffSamples = diffSeries.map(x => ({ value: x.d }));
+  const diffRecent = recentForm(diffSamples);
+  const diffTrend = diffSeries.map((x, i) => ({ i: i + 1, playedAt: x.r.played_at, name: fmtDate(x.r.played_at), course: x.r.course, diff: x.d, roll: diffRecent[i] }));
+  const diffFormAvg = trendSummary(diffSamples, true).average;
+  const diffFormDomain = niceDomain(diffTrend.map(t => t.diff), 2);
   const unratedTrend = sorted.length - diffTrend.length;
   const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [
@@ -337,33 +351,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       {diffTrend.length >= 2 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
           <Eyebrow>SCORING FORM · DIFFERENTIAL</Eyebrow>
-          {last5Avg != null && (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
-              <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{last5Avg.toFixed(1)}</div>
-              <div style={{ color: C.sage, fontSize: 12 }}>last {last5.length}-round avg differential</div>
-              {formDelta != null && Math.abs(formDelta) >= 0.1 && (
-                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: formDelta > 0 ? "#143a2b" : "#3a1717", color: formDelta > 0 ? "#9be9c0" : "#f3a3a0" }}>
-                  {formDelta > 0 ? "▼" : "▲"} {Math.abs(formDelta).toFixed(1)} vs your start
-                </div>
-              )}
-            </div>
-          )}
-          <DismissableChart height={212} marginTop={12}>
-            {diffTrend.length > 30 ? (
-              <AdaptiveTrend data={diffTrend} valueKey="diff" rollKey="roll" avg={diffFormAvg} lowerBetter domain={diffFormDomain}
-                nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />
-            ) : (
-            <FormBars data={diffTrend.map((t) => ({ ...t, value: t.diff }))} avg={diffFormAvg} domain={diffFormDomain} lowerBetter
-              tooltip={<ChartTip nameMap={{ value: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />} />
-            )}
+          <TrendOverview samples={diffSamples} lowerBetter />
+          <DismissableChart height={240} marginTop={12}>
+            <AdaptiveTrend data={diffTrend} valueKey="diff" rollKey="roll" avg={diffFormAvg} lowerBetter domain={diffFormDomain}
+              nameMap={{ diff: "Differential", roll: "Recent form" }} fmt={(v: any) => typeof v === "number" ? v.toFixed(1) : v} />
           </DismissableChart>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-            {diffTrend.length > 30 ? (
-              <>Each dot is one round’s differential (course-adjusted, lower is better); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it’s under your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: C.overRedDark }}>red</span> when over.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
-            ) : (
-              <>Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: C.overRedDark }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
-            )}
-          </div>
+          <TrendKey rate={false} lowerBetter />
+          {unratedTrend > 0 && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{unratedTrend} round{unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).</div>}
+
         </div>
       )}
 
@@ -432,48 +427,28 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             const key = detail as StatKey;
             const series = sorted.map((r) => ({ r, v: perRoundNum(key, r) })).filter((x) => x.v != null && Number.isFinite(x.v)) as { r: Round; v: number }[];
             if (series.length === 0) return <div style={{ color: C.sage, fontSize: 13, padding: "12px 2px" }}>No rounds with this stat yet — log a few and the trend appears here.</div>;
-            const roll = (i: number, w: number) => { if (i < w - 1) return null; let sum = 0; for (let j = i - w + 1; j <= i; j++) sum += series[j].v; return Math.round((sum / w) * 10) / 10; };
-            const data = series.map((x, i) => ({ i: i + 1, val: Math.round(x.v * 10) / 10, roll5: roll(i, 5), roll10: series.length >= 10 ? roll(i, 10) : null, course: x.r.course, playedAt: x.r.played_at, name: fmtDate(x.r.played_at) }));
             const pctStat = key === "gir" || key === "fir" || key === "scramble" || key === "sandsave";
-            const seriesAvg = series.reduce((s, x) => s + x.v, 0) / series.length;
-            const dense = data.length > 30;
+            const samples: TrendSample[] = series.map(({ r, v }) => {
+              if (!pctStat) return { value: v };
+              const counts = key === "gir" ? girStats([r]) : key === "fir" ? firStats([r]) : key === "scramble" ? scrambleStats([r]) : sandSaveStats([r]);
+              return { value: v, hit: counts.hit, total: counts.total };
+            });
+            const recent = recentForm(samples, pctStat);
+            const data = series.map((x, i) => ({ i: i + 1, val: x.v, recent: recent[i], hit: samples[i].hit, total: samples[i].total, course: x.r.course, playedAt: x.r.played_at, name: fmtDate(x.r.played_at) }));
+            const seriesAvg = trendSummary(samples, dirLower.has(key), pctStat).average;
             const vals = data.map((d) => d.val);
             const valDomain: [number, number] = pctStat
               ? [Math.max(0, Math.floor(Math.min(...vals) - 3)), Math.min(100, Math.ceil(Math.max(...vals) + 3))]
               : niceDomain(vals, 1);
-            const isBetter = dirLower.has(key) ? (v: number) => v <= seriesAvg : (v: number) => v >= seriesAvg;
-            const barColor = (v: number) => (isBetter(v) ? "#4ADE80" : "#FB7185");
             return (
               <>
-                <DismissableChart height={222} marginTop={10}>
-                  {dense ? (
-                    <AdaptiveTrend data={data} valueKey="val" rollKey="roll5" avg={seriesAvg} lowerBetter={dirLower.has(key)} pctStat={pctStat} domain={valDomain}
-                      nameMap={{ val: detailLabels[key], roll5: "5-rd avg" }}
-                      fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />
-                  ) : (
-                  <ResponsiveContainer>
-                    <ComposedChart data={data} margin={{ top: 5, right: 2, left: 2, bottom: 0 }}>
-                      <XAxis dataKey="i" tick={<ChartAxisTick />} axisLine={{ stroke: C.greenMid }} tickLine={false} {...chartXAxis(data)} />
-                      <YAxis allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width="auto" tickSize={0} tickMargin={4} domain={valDomain} />
-                      <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ val: detailLabels[key], roll5: "5-rd avg", roll10: "10-rd avg" }} fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />} />
-                      <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26} shape={(props: any) => {
-                        // Per-bar conditional color (replaces the deprecated <Cell>): barColor(val).
-                        const v = barShapeValue(props, "val");
-                        return <Rectangle x={props.x} y={props.y} width={props.width} height={props.height} radius={[3, 3, 0, 0]} fill={v != null ? barColor(v) : "#FB7185"} />;
-                      }} />
-                      <Line type="monotone" dataKey="roll5" stroke={C.cream} strokeWidth={2.5} dot={false} connectNulls />
-                      {series.length >= 10 && <Line type="monotone" dataKey="roll10" stroke={C.gold} strokeWidth={2.5} dot={false} connectNulls />}
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                  )}
+                <TrendOverview samples={samples} lowerBetter={dirLower.has(key)} rate={pctStat} unit={key === "putts" ? "putts" : key === "pts" ? "points" : key === "pen" ? "penalties" : key === "threeputt" ? "three-putt holes" : "strokes"} />
+                <DismissableChart height={240} marginTop={12}>
+                  <AdaptiveTrend data={data} valueKey="val" rollKey="recent" avg={seriesAvg} lowerBetter={dirLower.has(key)} pctStat={pctStat} domain={valDomain}
+                    nameMap={{ val: detailLabels[key], recent: "Recent form" }}
+                    fmt={(v: any) => typeof v === "number" ? v.toFixed(1) + (pctStat ? "%" : "") : v} />
                 </DismissableChart>
-                <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>
-                  {dense ? (
-                    <>Each dot is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it beats your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: C.overRedDark }}>red</span> when it doesn’t.</>
-                  ) : (
-                    <>Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: "#4ADE80" }}>Green</span> beat your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: C.overRedDark }}>red</span> didn’t. The cream line is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: C.gold }}>gold</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}</>
-                  )}
-                </div>
+                <TrendKey rate={pctStat} lowerBetter={dirLower.has(key)} />
               </>
             );
           })()}

@@ -9,27 +9,20 @@ permissions:
   contents: read
   packages: read   # 212.16: signed-in downloads of the Supabase images from ghcr.io (see "Sign in to the container registry")
 
+# Independent read-only lanes run on separate filesystems/runners. No tests are skipped.
 jobs:
-  verify:
+  database:
     runs-on: ubuntu-latest
     environment: staging
-
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
-
+      # The fresh-DB provider/freshness harness compiles the actual app helpers.
+      # Keep its TypeScript/runtime dependencies even though this is the SQL lane.
       - run: npm ci
-      # 212.73: the gallery overflow guard (ci/check_gallery_overflow.mjs) lays every design-gallery screen out in Chromium
-      - run: npx playwright install chromium --with-deps
-
       - uses: supabase/setup-cli@v3
         with:
           # Kept on 2.101.0 (209.2): its image matches the hosted databases' grants. 2.111.0's newer image no longer
@@ -73,7 +66,7 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Rebuild a fresh Supabase database from committed migrations
-        run: bash ci/test_fresh_db_rebuild.sh
+        run: node ci/time-command.cjs database bash ci/test_fresh_db_rebuild.sh
 
       - name: Save the Supabase images for later runs
         id: sbsave
@@ -99,15 +92,112 @@ jobs:
           BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
         run: node ci/check_live_migration_parity.mjs staging
 
-      - run: npm run ci
-        env:
-          # Falls back to the committed sw.js value when the repository variable is unset,
-          # so a missing variable does not block CI. The authoritative comparison — Vercel's
-          # environment against sw.js — happens in the Vercel build, which also runs prebuild.
-          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
+      - name: Save database timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-timing-database-${{ github.run_attempt }}
+          path: ci-timings/
+          if-no-files-found: error
 
+  application:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps --only-shell
+      - name: Timed application checks
+        run: node ci/time-command.cjs application npm run ci:app
+      - name: Save application timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-timing-application-${{ github.run_attempt }}
+          path: ci-timings/
+          if-no-files-found: error
+
+  charts:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps --only-shell
+      - name: Timed charts checks
+        run: node ci/time-command.cjs charts npm run test:charts
+      - name: Save charts timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-timing-charts-${{ github.run_attempt }}
+          path: ci-timings/
+          if-no-files-found: error
+
+  build:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - name: Restore Next build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'next.config.mjs', 'tsconfig.json') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      - name: Timed build checks
+        run: node ci/time-command.cjs build npm run build
+      - name: Save build timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-timing-build-${{ github.run_attempt }}
+          path: ci-timings/
+          if-no-files-found: error
+
+  staging-integration:
+    needs: [database, application, charts, build]
+    if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    # Shared with the manual integration workflow. Never cancel a running cleanup.
+    concurrency:
+      group: bnn-staging-integration
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
       - name: Real staging integration gate
-        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging'
         env:
           BNN_STAGING_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
           BNN_STAGING_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
@@ -115,6 +205,23 @@ jobs:
           BNN_STAGING_ALLOW_MUTATION: YES
           BNN_PRODUCTION_SUPABASE_PROJECT_REF: epmbsmykyrnoiccwnoxq
         run: npm run test:staging
+
+  verify:
+    # Keep the existing required check name. always() prevents a failed/skipped
+    # prerequisite from silently skipping this final gate.
+    if: always()
+    needs: [database, application, charts, build, staging-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Require every applicable gate
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+          CI_REQUIRE_STAGING: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging' }}
+        run: node ci/required-ci-results.cjs
 
   production-migration-parity:
     # Production credentials must never be exposed to code controlled by a pull request.

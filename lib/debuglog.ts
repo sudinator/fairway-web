@@ -1,3 +1,4 @@
+import { recordPhoneDiagnostic } from "./phone-diagnostics";
 // Lightweight, opt-in diagnostics for the round-save path. Everything here is a no-op
 // unless the user explicitly enables logging in the admin Diagnostics panel, so there is
 // zero overhead for normal players. The log lives in localStorage specifically so it
@@ -26,6 +27,7 @@ export function setReproduceBug(on: boolean): void {
 
 // Append an event. No-op unless diagnostics are enabled.
 export function dbg(ev: string, sid: string, d?: Record<string, any>): void {
+  recordPhoneDiagnostic("round.event", { phase: ev, state: d?.outcome });
   if (!diagEnabled()) return;
   try {
     const raw = localStorage.getItem(LOG_KEY);

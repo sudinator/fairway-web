@@ -1,5 +1,6 @@
 import { HelpPage } from "@/components/manage";
 import { TGC_GROUP_ID } from "@/lib/golf";
+import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import { UpdateChecker } from "@/components/app-update-checker";
 /**
  * 212.16 — DESIGN GALLERY (owner, Oct 22: "these are basic design choices that you should be proactively looking to
@@ -226,5 +227,10 @@ add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
   ))}
 </div>);
 
+// Exportable phone support report, available to every member.
+add("70-phone-diagnostics", <PhoneDiagnosticsPanel />);
+
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);
+
+

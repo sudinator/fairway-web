@@ -1,3 +1,25 @@
+# 212.101 candidate — diagnostic summary, context and last update outcome
+
+Login owns a vertical scroll context because globals.css locks body scrolling. Test natural wheel/touch access to both sign-in and the expanded support controls; locator auto-scroll alone is not sufficient. The signed-in Home scroll container is unchanged.
+
+The existing updater already verifies the loaded version and shows transient success. Keep that eight-second banner expiry and retain the structured Last update attempt separately; a retained result must not become a new pending banner. bnn-update-result-v1 holds only bounded, validated status/target/running-version/phase/time in sessionStorage, up to seven days, with memory fallback. Restoration is not evidence that a new update occurred. Do not change score gates, worker activation or deployment authentication. Specific failure phase is observational; retries still execute the existing update path.
+
+Diagnostics summary uses the same bounded read-only workerSnapshot as export. The optional userDescription (500 characters) is only included on manual export; never log or persist it. Automatic redaction guarantees apply to technical records; user-written context contains what the user chose to type. Summary refresh checks the deployed version without activating a worker. See RELEASE_VERIFICATION_212.101.md for contracts, validation and pending same-installation phone gates.
+
+# 212.100 candidate — phone diagnostics
+
+Shared local evidence lives in lib/phone-diagnostics.ts and is mounted by PhoneDiagnosticsRecorder in RootLayout. Export panel is available to every member via App version & updates, on sign-in, and in Admin Diagnostics. Exports are manual JSON/share/download, never a remote upload. Do not add raw bodies, auth headers, cookies, query strings, names, score values or raw legacy trace strings. Unknown metadata fields are dropped at write AND export; persisted history is filtered by current account. Storage failures retain memory evidence and never evict score data. Sign-out clears logs through clearAllLocalState, and direct account switches isolate old history. Budgets: 150 events / 48 KiB text per session, four sessions, seven days. Existing raw opt-in tools remain separate.
+
+Save instrumentation must preserve baseline helpers in ci/fixtures/*-21299.ts.txt; npm run test:diagnostics executes baseline/current comparisons and recorder/browser contracts. HTTP outcomes are transport evidence, not automatic business-success claims. Realtime state is sampled read-only. The worker status query returns only its compiled version, with no activation/cache action. Best-effort worker failure notifications contain only fixed phase/status/error-class/version metadata and never change install/cache outcomes. Reports can expose page/worker-version differences while a worker is waiting; that difference alone is not a failed update.
+
+Records cannot reconstruct the old 212.97 phone session. External GitHub/Vercel and same-installation iPhone tests remain required; see RELEASE_VERIFICATION_212.100.md. No production-ready claim before those gates pass.
+
+# 212.99 candidate — redirect handling and release hold
+
+Navigation redirects are forwarded to the browser, never substituted with cached Home. Followed redirects are not cached as the application shell. Explicit Update, offline fallback and score persistence are retained. Test redirects with ci/test-update-redirect-browser.cjs; default Chromium runs in mandatory CI and BNN_UPDATE_BROWSER=webkit runs the same suite in WebKit when installed (failure is never silently skipped). The login fixture is cross-origin and the callback is outside /auth/, so it cannot accidentally bypass the navigation handler under test.
+
+Physical testing must use the owner's existing working 212.98 Home Screen installation; no replacement shortcut. The original 212.97 session incident is unresolved and must not be described as repaired by this candidate. No production readiness until the external gates in RELEASE_VERIFICATION_212.99.md pass. No migration or Vercel protection change.
+
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
 # Current update policy — 212.87
 The pending-update banner offers Update now only, with no Later/Dismiss control. Downloaded workers wait for that action to activate while app pages remain open. Failed attempts keep retry feedback visible. Confirmed success expires after8seconds only when no newer release is pending. Explicit action reloads; deployment/focus/controller changes never force an open page to restart. Unfinished rounds never gate updating. Confirm success from the version actually loaded; report failures/timeouts and keep all drafts/outboxes. This supersedes earlier no-banner guidance below.

@@ -1,3 +1,4 @@
+import { recordPhoneDiagnostic, diagnosticError } from "./phone-diagnostics";
 // One save in flight at a time; the NEWEST request always wins (206.1, review finding 9).
 // While a save runs, further requests are held — only the latest is kept — and sent when it
 // finishes. A save is acknowledged ("saved") only when what completed is the latest requested, so
@@ -13,6 +14,7 @@ export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s:
   let pending: T | null = null;
   let latest: T | null = null;
   const run = async (v: T): Promise<void> => {
+    recordPhoneDiagnostic("save.start");
     inFlight = v;
     onState({ status: "saving", value: v });
     try {
@@ -20,8 +22,9 @@ export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s:
       inFlight = null;
       if (pending !== null && !same(pending, v)) { const next = pending; pending = null; return run(next); }
       pending = null;
-      if (latest !== null && same(latest, v)) onState({ status: "saved", value: v });
+      if (latest !== null && same(latest, v)) { recordPhoneDiagnostic("save.confirmed"); onState({ status: "saved", value: v }); }
     } catch (e) {
+      recordPhoneDiagnostic("save.failed", diagnosticError(e));
       inFlight = null;
       const next = pending; pending = null;
       if (next !== null && !same(next, v)) return run(next);
@@ -31,8 +34,8 @@ export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s:
   return {
     request(v: T): Promise<void> {
       latest = v;
-      if (inFlight !== null) { pending = v; return Promise.resolve(); }
-      if (isStored?.(v)) return Promise.resolve();
+      if (inFlight !== null) { recordPhoneDiagnostic("save.queued"); pending = v; return Promise.resolve(); }
+      if (isStored?.(v)) { recordPhoneDiagnostic("save.skipped", { phase: "stored" }); return Promise.resolve(); }
       return run(v);
     },
   };

@@ -140,6 +140,7 @@
     "lib/club-directory.test.tsx",
     "lib/club-engagement.test.tsx",
     "lib/club-activity-expansion.test.tsx",
-    "lib/club-net-scoring.test.tsx"
+    "lib/club-net-scoring.test.tsx",
+    "lib/phone-diagnostics.test.tsx"
   ]
 }

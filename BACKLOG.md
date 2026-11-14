@@ -1,3 +1,44 @@
+# 212.101 candidate follow-up
+
+- Same existing phone installation: keep 212.100 open through staging deployment; verify banner, Update now, actual 212.101 app/worker, retained success after banner expiry and saved scores. No replacement shortcut or storage clearing.
+- Physical phone: summary match/no-reply clarity, refresh after offline/reconnect; context export/share/cancel/retry and optional-description reset after reopening; inspect exported JSON; disposable staging score/offline sync test still required.
+- Original stuck installation: root trigger of protected-access expiry/redirect loop remains unresolved. A healthy second installation does not prove the old one recovered.
+
+## 212.100 phone support reports — candidate
+
+- [x] Shared local, exportable diagnostic history with account filtering, bounded storage, transport/save/update observations and memory fallback; existing recovery exports remain separate.
+- [ ] On the existing working Home Screen installation: keep it open through the next staging release, verify banner → Update now → actual 212.100, then export through the phone share sheet/Files and review event version, worker version and ordinary workflow entries.
+- [ ] Stage a disposable score-save/offline/reconnect scenario, export after reopening and confirm report/draft preservation. Complete protected same-installation recovery, GitHub/Vercel gates and a second actual release transition before production clearance.
+- [ ] Original 212.97 session incident remains unresolved; support reports only start with this diagnostic-enabled code. Do not delete the original app/drafts or interpret missing older events as proof of no request.
+- [ ] Repository housekeeping: separately review the ~7.5 MB of root documents and historical verification records in 212.99 for archiving; preserve CI regression fixtures and reproducibility. Source ZIP size is distinct from phone download size.
+
+## 212.99 update reliability — candidate, not production-cleared
+
+- [ ] Physical iPhone: update the existing working 212.98 installation to 212.99, verify the actual running version and preserved pending scores; no new shortcut.
+- [ ] Physical iPhone: same-installation protected access renewal through normal navigation and Reconnect; save any in-memory entry first. Confirm no redirect loop and restored version checks. Repeat with a second real release before production.
+- [ ] Public production-like origin: existing-installation update, server/offline failure and retry, older/sleeping window and active-entry preservation. Keep Vercel staging protection enabled.
+- [ ] Original 212.97 incident remains open: Vercel CDN log shows /app-version.json HTTP 302 at Nov 12 20:29:25.854 GMT-5, request w4m88-1794533365854-734ad053b147. Logs omit Location/cookie state; initiating session event and Safari loop remain unproven. Do not sign out/clear local data to diagnose.
+- [x] Implement redirect passthrough before saved navigation fallback and exclude followed-redirect shell caching; retain historical regression fixtures in mandatory CI. Local result is recorded in RELEASE_VERIFICATION_212.99.md, not evidence of live iPhone recovery.
+
+## 212.98 — protected staging recovery validation
+
+- [ ] Restore Vercel authentication protection by removing the staging-domain exception. Confirm an unauthorized browser is denied.
+- [ ] Validate delivery of this candidate to the existing installed app with protection enabled. Do not claim an old client already has the new recovery link. Confirm deployment login from installed mode, return to the same app origin, working version checks, pending update banner and saved draft recovery. Safari login alone is not proof of installed-app authorization.
+- [ ] Current version-check diagnostics and explicit recovery path implemented; live Vercel/iPhone behavior remains pending. No embedded bypass secret or public staging exception is required by the new code.
+
+## 212.97 — installed staging update investigation
+
+- [ ] Installed phone app reports 212.95 while the staging version endpoint reports 212.96 (build 0d002fec2ba4c77c211e9d88207783771fea4b15). Check version reportedly gives no visible response. Obtain the installed app's Latest version/status after a fresh check; verify its actual origin and Vercel authorization before changing update policy. Safari access alone does not prove the installed app's fetch succeeds. Preserve saved drafts; do not clear site data as a diagnostic.
+- [ ] Run updated touch-tooltip CI and physical phone tests. Existing recent-form, CI timing and external release validation items below remain open.
+
+## 212.96 — recent-form and CI speed validation
+
+- [ ] Benchmark three warm-cache CI runs and one cold run on the same commit. Record total wall time, runner queue time, setup/cache time and all lane timings. Approximately three minutes remains a target, not a proven runtime.
+- [ ] Initial implementation: separate database, application, charts and build jobs; retain fail-closed verify, full coverage, database security reconstruction and serialized staging integration. Confirm actual GitHub execution before further scheduling changes.
+- [ ] Follow-up after measurement: assess isolated bounded ticking-clock/test workers, duplicate test invocations, readiness-based browser waits and dependency-cache keys stable across version-only releases. Do not reduce assertions or scenarios. Do not parallelize shared staging mutations.
+- [ ] Physical iPhone/PWA and staging validation of 20% recent form, marker taps, 5/20/Season/All reversibility, sparse percentages, eligibility and unchanged score save/reopen.
+- [ ] Existing product work retained: restore Courses → Add New Course with duplicate prevention; safe historical rating/slope corrections; individual tee selection independent of yardage; explicit allowed/blocked Manage Game format/state transition matrix. Check current behavior before each fix.
+
 ## 212.95 — chart validation follow-up
 
 - [ ] Run GitHub verify, Vercel staging build, staging integration, physical iPhone/PWA chart and tooltip checks on 212.95 before production approval. Exercise narrow/wide screens, 5/20/Season/All round trips, signed and flat player-card histories and active scoring/save/reopen. No migration required.

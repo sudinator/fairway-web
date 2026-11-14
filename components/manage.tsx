@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import { UpdateChecker } from "@/components/app-update-checker";
 import { SaveTraceToggle } from "@/components/save-trace-view";
 import { StorageMeter } from "@/components/storage-meter";
@@ -2816,7 +2817,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "friction": title = "Friction review"; panel = <AdminFrictionReview />; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
-      case "diagnostics": title = "Diagnostics"; panel = <><StorageMeter /><SaveTraceToggle /><RoundSaveDiag /></>; break;   // 212.27 / 212.28: storage meter + the score-save trace switch
+      case "diagnostics": title = "Diagnostics"; panel = <><PhoneDiagnosticsPanel /><StorageMeter /><SaveTraceToggle /><RoundSaveDiag /></>; break;   // 212.27 / 212.28: storage meter + the score-save trace switch
       case "clubreports": title = "Club reports"; panel = <AdminClubReport />; break;
       case "clubrequests": title = "Club requests"; panel = <AdminClubRequests user={user} onCount={setClubReqCount} />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;

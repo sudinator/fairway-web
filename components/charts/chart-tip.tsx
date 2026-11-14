@@ -29,19 +29,31 @@ export function ChartTip({ active, payload, nameMap, fmt, heading }: any) {
 export function DismissableChart({ height, marginTop, children, holdDismissed = false }: { height: number | string; marginTop?: number; children: React.ReactNode; holdDismissed?: boolean }) {
   const [nonce, setNonce] = useState(0);
   const [suppressed, setSuppressed] = useState(false);
+  const [trigger, setTrigger] = useState<"hover" | "click">("hover");
   useEffect(() => {
     const h = () => { if (holdDismissed) setSuppressed(true); else setNonce((n) => n + 1); };
     window.addEventListener("bnn-chart-dismiss", h);
     return () => window.removeEventListener("bnn-chart-dismiss", h);
   }, [holdDismissed]);
-  if (holdDismissed) return <ChartDismissal.Provider value={suppressed}><div style={{ height, marginTop }} onPointerLeave={(event) => { if (event.pointerType !== "touch") setSuppressed(false); }} onPointerDownCapture={() => setSuppressed(false)}>{children}</div></ChartDismissal.Provider>;
+  if (holdDismissed) return <ChartDismissal.Provider value={{ suppressed, trigger }}><div style={{ height, marginTop }}
+    onPointerMoveCapture={(event) => {
+      const target = event.target as Element;
+      if (target.closest?.(".recharts-tooltip-wrapper") || target.closest?.(".recharts-cartesian-axis")) return;
+      if (event.pointerType === "mouse") { setTrigger("hover"); if (trigger === "click") setSuppressed(false); }
+    }}
+    onPointerLeave={(event) => { if (event.pointerType !== "touch") { setSuppressed(false); setTrigger("hover"); } }}
+    onPointerDownCapture={(event) => {
+      const target = event.target as Element;
+      if (target.closest?.(".recharts-tooltip-wrapper") || target.closest?.(".recharts-cartesian-axis")) return;
+      setTrigger(event.pointerType === "touch" ? "click" : "hover"); setSuppressed(false);
+    }}>{children}</div></ChartDismissal.Provider>;
   return <div key={nonce} style={{ height, marginTop }}>{children}</div>;
 }
 
-const ChartDismissal = createContext(false);
+const ChartDismissal = createContext<{ suppressed: boolean; trigger: "hover" | "click" }>({ suppressed: false, trigger: "hover" });
 // New interactive charts hide a dismissed tooltip until the next deliberate
 // point interaction or pointer re-entry. Existing dashboard defaults are intact.
 export function ChartTooltip(props: any) {
-  const suppressed = useContext(ChartDismissal);
-  return <Tooltip {...props} active={suppressed ? false : props.active} />;
+  const { suppressed, trigger } = useContext(ChartDismissal);
+  return <Tooltip {...props} trigger={props.trigger ?? trigger} active={suppressed ? false : props.active} />;
 }

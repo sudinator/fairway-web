@@ -64,6 +64,7 @@ async function main() {
   globalThis.fetch = (async () => { throw new Error("offline"); }) as any;
   await act(async () => { await requestAppUpdate(10, () => { throw new Error("must not navigate"); }); });
   ok(banner.text.includes("Update could not finish") && banner.text.includes(APP_VERSION) && !automaticUpdateState().updating, "offline update identifies installed version and allows retry");
+  ok(automaticUpdateState().outcome?.status === 'failure' && automaticUpdateState().outcome?.phase === 'check', 'failed check has a structured retryable outcome');
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: "999.1.261102" }) })) as any;
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   await act(async () => { await checkAutomaticVersion(); });
@@ -79,6 +80,7 @@ async function main() {
   await act(async () => { await requestAppUpdate(10, () => { prematureNavigation = true; }); });
   installing.state = "installed";workerEvents.dispatchEvent(new window.Event("statechange"));
   ok(!prematureNavigation && activationMessages === 0 && !automaticUpdateState().updating, "installation timeout removes listener: no delayed activation or navigation after failure");
+  ok(automaticUpdateState().outcome?.phase === 'download', 'installation timeout identifies the download/installation phase');
   (navigator.serviceWorker as any).getRegistration = async () => ({ update: async () => {}, waiting: installing });
   await act(async () => { await requestAppUpdate(10, () => {}); });
   ok(activationMessages === 1 && installing.state === "activated", "explicit action activates a waiting worker before navigation");
@@ -90,6 +92,7 @@ async function main() {
   ok(automaticUpdateState().updating && !banner.text.includes("Updated successfully"), "navigation alone is not success");
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); });
   ok(!automaticUpdateState().updating && banner.text.includes("did not restart"), "stalled navigation produces retry feedback");
+  ok(automaticUpdateState().outcome?.phase === 'restart', 'stalled navigation identifies the restart phase');
   banner.unmount();
   // Bootstrap old/current versions using the real component; no score mutations.
   window.sessionStorage.setItem("bnn-update-attempt", "999.1.261102");
@@ -99,6 +102,7 @@ async function main() {
   window.sessionStorage.setItem("bnn-update-attempt", APP_VERSION);
   await act(async () => { banner = renderScreen(<RegisterSW />); await new Promise(resolve => setTimeout(resolve, 5)); });
   ok(banner.text.includes("Updated successfully") && banner.text.includes(APP_VERSION), "restart success names actual running version");
+  ok(automaticUpdateState().outcome?.status === 'success' && automaticUpdateState().outcome?.runningVersion === APP_VERSION, 'only verified running version records update success');
   ok(Object.entries(legacy).every(([k, v]) => window.localStorage.getItem(k) === v), "failure/retry/re-entry/success preserve every score/draft string");
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   const originalTimer = window.setTimeout;
@@ -111,12 +115,49 @@ async function main() {
   ok(typeof expireSuccess === "function", "confirmed success schedules the actual eight-second expiry effect");
   await act(async () => { expireSuccess?.(); });
   ok(banner.text === "", "confirmed success expires through the real component effect when no update is pending");
+  ok(settings.text.includes('Last update attempt') && settings.text.includes(`Updated successfully to version ${APP_VERSION}`), 'settings retain verified success after the transient banner expires');
   window.setTimeout = originalTimer;
   window.localStorage.setItem("bnn_verified_score_recovery:old", '{"backup":{"scores":[6]}}');
   settings.unmount();
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
   await act(async () => { settings = renderScreen(<UpdateChecker />); await new Promise(resolve => setTimeout(resolve, 5)); });
   ok(settings.text.includes("Download recovery copies"), "prior recovery copies remain accessible without an update gate");
+  const beforeProtected = JSON.stringify(Object.fromEntries(Object.keys(legacy).map(k => [k, window.localStorage.getItem(k)])));
+  for (const response of [
+    { ok: false, status: 401 }, { ok: false, status: 403 },
+    { ok: false, status: 0, type: "opaqueredirect" },
+    { ok: true, redirected: true },
+    { ok: true, headers: { get: () => "text/html" } },
+  ]) {
+    globalThis.fetch = (async (_url: any, options: any) => {
+      ok(options.redirect === "manual" && options.credentials === "same-origin", "protected checks use own cookies without following login redirects");
+      return response;
+    }) as any;
+    await act(async () => { await checkAutomaticVersion(); });
+    ok(automaticUpdateState().checkFailure === "access" && settings.text.includes("Deployment access is required"), "access failure is distinct from offline");
+    ok(settings.el.querySelector('a[href="/auth/deployment-access"]') != null, "explicit same-origin recovery link is available");
+    ok(banner.text.includes("Reconnect to app"), "deployment access failure has a visible recovery banner");
+    ok(settings.text.includes("Last attempt:"), "failure records an attempted check");
+  }
+  globalThis.fetch = (async () => ({ ok: false, status: 503 })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "server", "server failure has its own explanation");
+  globalThis.fetch = (async () => ({ ok: true, json: async () => { throw Error("invalid JSON"); } })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "invalid", "invalid body has its own explanation");
+  globalThis.fetch = (() => new Promise(() => {})) as any;
+  await act(async () => { await checkAutomaticVersion(10); });
+  ok(automaticUpdateState().checkFailure === "timeout", "bounded timeout is explained");
+  globalThis.fetch = (async () => ({ ok: true, json: async () => ({ version: APP_VERSION }) })) as any;
+  await act(async () => { await checkAutomaticVersion(); });
+  ok(automaticUpdateState().checkFailure === "" && settings.text.includes("You’re up to date."), "successful retry clears recovery failure");
+  ok(settings.el.querySelector('a[href="/auth/deployment-access"]') == null, "recovery action disappears after success");
+  ok(beforeProtected === JSON.stringify(Object.fromEntries(Object.keys(legacy).map(k => [k, window.localStorage.getItem(k)]))), "all failure and retry paths preserve scores and drafts");
+  banner.unmount();
+  const savedOutcome = window.sessionStorage.getItem('bnn-update-result-v1');
+  await act(async () => { banner = renderScreen(<RegisterSW />); await new Promise(resolve => setTimeout(resolve, 5)); });
+  ok(automaticUpdateState().outcome?.status === 'success' && savedOutcome === window.sessionStorage.getItem('bnn-update-result-v1'), 're-entry restores the retained result without another success banner');
+  ok(banner.text === '', 'retained historical success does not reappear as a pending update');
   settings.unmount(); banner.unmount(); globalThis.fetch = oldFetch;
   report("explicit update banner and status");
 }
