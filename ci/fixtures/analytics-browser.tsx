@@ -1,0 +1,21 @@
+// Actual components with read-only synthetic data for browser scenario/visual checks.
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {Dashboard} from '@/components/dashboard';
+import {AdminAnalytics,AdminEngagement,AdminPowerUsers,AdminDailyReport,AdminExtraStats,OpsMetrics} from '@/components/manage';
+import {PersonalBestsCard} from '@/components/personal-bests-card';
+const root=createRoot(document.getElementById('root')!);
+const rounds=Array.from({length:32},(_,i)=>({id:'r'+i,course:i%2?'Pine Valley':'Oak Hollow',tee_name:i%4<2?'Blue':'White',played_at:new Date(Date.UTC(2026,9,1+i)).toISOString(),status:'final',rating:72,slope:113,course_par:i%5?72:36,handicap_index:12,course_handicap:12,holes:Array.from({length:i%5?18:9},(_,j)=>({hole_number:j+1,par:4,stroke_index:j+1,strokes:i%2?6:4,putts:i%3?2:null,fairway:i%3?'hit':null,penalties:0}))}));
+const metric={totals:{users:64,active_groups:5,games:120,rounds:214},active:{dau:8,wau:21,mau:38,series:[]},formats:{stroke:21,scramble:18,alt_shot:9},features:{avatars_set:40,ai_summaries:6,live_shared:7},health:{completion_pct:73,round_completion_pct:89,abandoned_pct:12,avg_holes:17,activation_cohort:{n:18,d:40,pct:45},second_round_cohort:{n:12,d:30,pct:40},retention_w1:{n:22,d:40,pct:55},retention_w4:{n:15,d:30,pct:50}},funnels:{repeat_clubs:{n:3,d:5,pct:60},formats:[{game_type:'scramble',players:24,repeat_players:10}],reminders:{sent:12,resumed:5,completed:4},feature_use:[{action:'analytics_insights_open',uses:42,users:17,repeat_users:8,returned:{n:6,d:12,pct:50}}]},quality:{feature_note:'Observed actions start with this release. Return cohorts need 28 days.',lifecycle_note:'Deleted drafts remain in historical game counts; earlier deleted games cannot be reconstructed.'}};
+(window as any).analyticsData=(fn:string)=>['get_power_users','admin_stat_users','admin_stale_games'].includes(fn)?[]:fn==='get_ops_metrics'?{stale_job:{scheduled:true,last_run:{finished_at:'2026-11-14T09:00Z',completed_games:3,deleted_games:1,reviewed_games:2,completed_rounds:4,failures:0}}}:metric;
+(window as any).renderAnalytics=(kind='dashboard')=>{let element:any;
+ if(kind==='dashboard')element=<Dashboard rounds={rounds as any} name="Sample member" currentIndex={12} saveIndex={()=>{}} onOpen={()=>{}} savedCoach={{text:'A saved summary from an earlier selection.',date:'2026-11-01T12:00Z',rounds:20}}/>;
+ if(kind==='admin')element=<AdminAnalytics/>;
+ if(kind==='engagement')element=<AdminEngagement/>;
+ if(kind==='power')element=<AdminPowerUsers/>;
+ if(kind==='daily')element=<AdminDailyReport/>;
+ if(kind==='devices')element=<AdminExtraStats/>;
+ if(kind==='ops')element=<OpsMetrics/>;
+ if(kind==='bests')element=<PersonalBestsCard rounds={[rounds[1],{...rounds[1],id:'tied',played_at:'2026-11-14'}] as any} now={new Date('2026-11-15T12:00Z')} onOpen={()=>{}}/>;
+ root.render(<main key={kind} data-analytics-fixture={kind} style={{padding:16}}>{element}</main>);
+};

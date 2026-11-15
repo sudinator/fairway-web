@@ -30,7 +30,9 @@ const g = (gross: number, day: string): Round => ({
   ok("rounds counted", s.rounds === 8);
   ok("form present", s.form.length > 0);
   ok("index computed (>=3 rounds)", s.idx != null);
-  ok("trend improving after low rounds (<= 0)", s.idx_trend != null && s.idx_trend <= 0);
+  ok("provisional movement is not a trend", s.idx_trend == null);
+  const established = Array.from({length:25}, (_,i)=>g(i<20?90:74, new Date(Date.UTC(2026,0,i+1)).toISOString()));
+  ok("established improvement survives", computeCardStats(established).idx_trend! < 0);
 }
 {
   // 7 rounds: prior (excluding last 5) has only 2 rounds -> trend null by design

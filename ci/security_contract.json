@@ -54,6 +54,9 @@
   "admin_wipe_group(uuid)": "authenticated",
   "admin_wipe_user(uuid)": "authenticated",
   "admit_signup(uuid,uuid)": "authenticated",
+  "analytics_member_eligible(uuid)": "",
+  "analytics_participation()": "",
+  "analytics_player_holes(uuid,text,jsonb)": "",
   "announce_game_players(uuid)": "authenticated",
   "announce_game_recap(uuid,text,jsonb,jsonb)": "",
   "apply_course_freshness(uuid,bigint)": "authenticated",
@@ -161,6 +164,7 @@
   "record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text,jsonb)": "",
   "record_course_freshness_internal(uuid,jsonb,jsonb,boolean)": "",
   "record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)": "",
+  "record_feature_use(text,uuid,uuid)": "authenticated",
   "record_migration(text)": "",
   "record_round_email(uuid,uuid,text,text,text,text)": "",
   "record_settlement(uuid,uuid,uuid,integer,text,uuid,text,text,jsonb)": "authenticated",
@@ -243,6 +247,12 @@
    "cmd": "r",
    "roles": "public",
    "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
+  },
+  "analytics_game_lifecycle.analytics_lifecycle_admin_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "is_admin()"
   },
   "banned_emails.banned_emails_admin_select": {
    "check": null,
@@ -1083,6 +1093,7 @@
  },
  "table_grants": {
   "authenticated:activity_log": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:analytics_game_lifecycle": "SELECT",
   "authenticated:banned_emails": "SELECT",
   "authenticated:club_reports": "SELECT",
   "authenticated:competition_players": "DELETE,INSERT,SELECT,UPDATE",

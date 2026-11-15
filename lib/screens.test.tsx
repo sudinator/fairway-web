@@ -294,7 +294,7 @@ const round = (over: Partial<Record<string, unknown>> = {}) => ({
         index={14.2}
         goalHcp={8}
         setGoalHcp={() => {}}
-        detailRounds={20}
+        detailRounds={20} coverage={{rounds:20,holes:360,puttingRounds:20,puttHoles:360,fairwayRounds:20,fairwayHoles:14,fairwayEligible:280,girRounds:20,scrambleRounds:20,detailedRounds:20}} puttingRounds={20}
       />
     </div>,
     { background: C.greenLight },

@@ -1,3 +1,7 @@
+## 212.107 analytics cleanup
+
+Implemented approved analytics corrections and repeat-use observability; definitions and limits in ANALYTICS_212.107.md. Release gates: native 212.107 GitHub/Supabase CI, Vercel staging feature/regression checks and existing production docs/sql/data_profile.sql review. Observe 28 days before interpreting new feature-return cohorts. Earlier deleted drafts/feature observations cannot be backfilled. Preserve all pre-existing course/setup backlog items below.
+
 ## 212.106.261114 — scheduler permission-test correction
 
 Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.

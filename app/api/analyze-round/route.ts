@@ -133,9 +133,9 @@ nextTime - one concrete achievable goal for the next round.
 
 Rules: Base everything ONLY on the numbers given plus standard golf benchmarks for the stated handicap. Do not invent the golfer's own stats. Keep the whole thing under 150 words. Warm but honest.`;
 
-  const dashboardPrompt = `You are a friendly, expert golf coach reviewing an amateur golfer's CAREER stats accumulated across many rounds. Zoom out and find the big patterns. Be specific, encouraging, and practical.
+  const dashboardPrompt = `You are a friendly, expert golf coach reviewing an amateur golfer's selected stats. Respect analysisScope and coverage: the selection may be a course, tee, round length or time window, not their career. Be specific, encouraging, and practical.
 
-ACCUMULATED STATS (across all the golfer's logged rounds):
+SELECTED STATS (use the recorded scope and coverage):
 ${JSON.stringify(sAggregate)}
 
 Return JSON with exactly these string fields:
@@ -144,7 +144,7 @@ strengths - 2-3 specific strengths grounded in the stats and benchmarked appropr
 biggestOpportunities - 2-3 weaknesses costing the most strokes, with why.
 whatToWorkOn - a short prioritized practice plan.
 
-Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handicap hits ~6-8 GIR and ~32-34 putts; a ~20 handicap hits ~3-5 GIR, more doubles, 34-36 putts; scratch hits 10+ GIR). Base everything ONLY on the numbers given plus these benchmarks; do not invent stats. Keep it under 200 words. Warm, honest, motivating.`;
+Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handicap hits ~6-8 GIR and ~32-34 putts; a ~20 handicap hits ~3-5 GIR, more doubles, 34-36 putts; scratch hits 10+ GIR). Base everything ONLY on the numbers given plus these benchmarks; do not invent stats. Do not infer a strength or weakness from missing or sparse stat coverage. Putts per round use complete cards; raw scoring and penalties use rawRoundHoles. Benchmark comparisons are approximate proxies, not measured strokes gained; do not invent peer values outside the supported handicap-index range of 0–20. Keep it under 200 words. Warm, honest, motivating.`;
 
   const prompt = mode === "dashboard" ? dashboardPrompt : roundPrompt;
 
@@ -190,6 +190,7 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
           lastStatus = 502;
           continue;
         }
+        try { await supabase.rpc("record_feature_use", { p_feature: mode === "dashboard" ? "ai_dashboard" : "ai_round" }); } catch { /* feature observation is supplementary */ }
         return NextResponse.json({ analysis: formatModelAnalysis(mode, structured) });
       }
       lastDetail = (await resp.text()).slice(0, 400);

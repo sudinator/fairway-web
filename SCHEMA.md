@@ -1,3 +1,7 @@
+## 212.107 — analytics quality (0235)
+
+Private analytics_game_lifecycle retains aggregate provenance after empty-game deletion, with RLS admin SELECT and no member writes. activity_log and archive.activity_log add bounded details JSON. record_feature_use derives the caller and accepts four allowlisted observations; private eligible-account/qualifying-participation helpers back existing admin readers. Existing retention preserves details; no new job. Account-reference registry covers organizer_id. See ANALYTICS_212.107.md and migration 0235 for exact definitions and ACLs.
+
 <!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
 <!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->

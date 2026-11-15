@@ -19,6 +19,8 @@ export type Bucket = { key: string; label: string; holes: number; avgToPar: numb
 export type Finding = { key: string; title: string; detail: string; text: string; shots: number; tone: "leak" | "strength" | "info" };
 export type Insights = {
   roundsUsed: number;
+  netRounds: number;
+  puttingRounds: number;
   ready: boolean;                      // at least INSIGHT_MIN_ROUNDS valid rounds
   overall: number | null;              // average to par per hole
   overallNet: number | null;           // average against expectation per hole (≈ 0 by construction)
@@ -48,6 +50,7 @@ export function computeInsights(rounds: Round[]): Insights {
   // shape). Each round's expectations add up to its actual score, so a player who pars everything expects par
   // everywhere (no leak invented), and a +12 round expects about 0.9 over on the hardest holes.
   // (the strokes come from the ONE allocation — lib/golf allocateStrokes, by stroke-index rank)
+  let netRounds = 0;
   let within = 0, withinRounds = 0, blowSum = 0, blowRounds = 0, tpSum = 0, tpRounds = 0;
   for (const r of used) {
     const holes = r.holes;
@@ -64,6 +67,7 @@ export function computeInsights(rounds: Round[]): Insights {
       const totalW = holes.reduce((n, h) => n + w(h.hole_number), 0);
       expOf = (hn: number) => (totalW ? (over * w(hn)) / totalW : 0);
     }
+    if (expOf) netRounds++;
     let scored = 0, blow = 0, putted = 0, tp = 0;
     holes.forEach((h, i) => {
       const s = holeScore(h.strokes);
@@ -84,10 +88,10 @@ export function computeInsights(rounds: Round[]): Insights {
         add(`n:${stretch}`, nd);
       }
       if (d >= 2) blow += d - 1;
-      if (h.putts != null && h.putts >= 0) { putted++; if (h.putts >= 3) tp++; }
+      if (Number.isInteger(h.putts) && h.putts != null && h.putts >= 0) { putted++; if (h.putts >= 3) tp++; }
     });
     if (scored) { blowSum += blow * (18 / scored); blowRounds++; }
-    if (putted >= 9) { tpSum += tp * (18 / putted); tpRounds++; }
+    if (scored === 18 && putted === 18) { tpSum += tp; tpRounds++; }
     const ch = handicapReading(chBasisOrNull(r, r.course_par, holes.length));
     if (isFullCard(holes.map((h) => h.strokes), holes.length) && holes.length === 18 && ch != null) {
       const par = holes.reduce((n, h) => n + (h.par || 0), 0);
@@ -113,10 +117,10 @@ export function computeInsights(rounds: Round[]): Insights {
   const findings: Finding[] = [];
   const F = (key: string, tone: Finding["tone"], shots: number, title: string, detail: string) => findings.push({ key, tone, shots, title, detail, text: `${title}: ${detail}` });
   const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
-  if (ready && overallNet != null) {
+  if (ready && netRounds >= INSIGHT_MIN_ROUNDS && overallNet != null) {
     // shots a round versus the member's average NET hole, for categories with enough holes
     const cats = [...byPar, ...byDifficulty].filter((b) => b.netHoles >= MIN_HOLES && b.netAvg != null)
-      .map((b) => ({ b, perHole: b.netAvg! - overallNet, shots: (b.netAvg! - overallNet) * (b.netHoles / used.length) }));
+      .map((b) => ({ b, perHole: b.netAvg! - overallNet, shots: (b.netAvg! - overallNet) * (b.netHoles / netRounds) }));
     const worst = cats.reduce<(typeof cats)[number] | null>((m, c) => (!m || c.shots > m.shots ? c : m), null);
     const best = cats.reduce<(typeof cats)[number] | null>((m, c) => (!m || c.shots < m.shots ? c : m), null);
     if (worst && worst.shots >= 0.3) F("leak", "leak", worst.shots, `${cap(worst.b.label)} cost you most`,
@@ -127,12 +131,15 @@ export function computeInsights(rounds: Round[]): Insights {
   if (ready && overall != null) {
     const last = byStretch[2], first = byStretch[0];
     if (last.holes >= MIN_HOLES && last.avgToPar != null) {
-      const d = last.avgToPar - overall;
+      const rest = (overall * (acc.get("all")?.n || 0) - last.avgToPar * last.holes) / Math.max(1, (acc.get("all")?.n || 0) - last.holes);
+      const d = last.avgToPar - rest;
       if (d <= -0.15) F("finish", "strength", -d * 3, "Strong finisher", `your last three holes average ${(-d).toFixed(1)} a hole better than the rest of your round`);
       else if (d >= 0.15) F("finish", "leak", d * 3, "Fading late", `your last three holes average ${d.toFixed(1)} a hole worse than the rest of your round`);
     }
-    if (first.holes >= MIN_HOLES && first.avgToPar != null && first.avgToPar - overall >= 0.15)
-      F("start", "leak", (first.avgToPar - overall) * 3, "Slow starter", `your first three holes average ${(first.avgToPar - overall).toFixed(1)} a hole worse than the rest of your round`);
+    if (first.holes >= MIN_HOLES && first.avgToPar != null) {
+      const rest = (overall * (acc.get("all")?.n || 0) - first.avgToPar * first.holes) / Math.max(1, (acc.get("all")?.n || 0) - first.holes);
+      if (first.avgToPar - rest >= 0.15) F("start", "leak", (first.avgToPar - rest) * 3, "Slow starter", `your first three holes average ${(first.avgToPar - rest).toFixed(1)} a hole worse than the rest of your round`);
+    }
     if (blowUpCost != null && blowUpCost >= 1) F("blowups", "leak", blowUpCost, "Blow-up holes", `double bogey or worse costs you ${blowUpCost.toFixed(1)} shots a round beyond bogey`);
     if (threePutts != null && threePutts >= 1) F("putts", "info", threePutts * 0.9, "Three-putts", `${threePutts.toFixed(1)} a round`);
     if (withinHandicap) F("within", "info", 0, "Playing to your handicap", withinHandicap.within === withinHandicap.rounds ? `within 3 of it in all of your last ${withinHandicap.rounds} full rounds` : `within 3 of it in ${withinHandicap.within} of your last ${withinHandicap.rounds} full rounds`);
@@ -140,5 +147,5 @@ export function computeInsights(rounds: Round[]): Insights {
   // problems first, then strengths, then the general figures — each by the shots it's worth
   const rank = { leak: 0, strength: 1, info: 2 } as const;
   findings.sort((a, b) => rank[a.tone] - rank[b.tone] || b.shots - a.shots);
-  return { roundsUsed: used.length, ready, overall, overallNet, byPar, byDifficulty, byStretch, withinHandicap, blowUpCost, threePutts, findings };
+  return { roundsUsed: used.length, netRounds, puttingRounds: tpRounds, ready, overall, overallNet, byPar, byDifficulty, byStretch, withinHandicap, blowUpCost, threePutts, findings };
 }

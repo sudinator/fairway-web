@@ -77,7 +77,7 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, typ
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
-import { logActivity } from "@/lib/activity";
+import { logActivity, recordFeatureUse } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles, backupWriteFailed } from "@/lib/draft";
 import {
   btn,
@@ -3661,6 +3661,7 @@ function GameRoom({
     let slug: string | null = null;
     if (on) { const { data: g2 } = await supabase.from("games").select("lineup_slug").eq("id", game.id).maybeSingle(); slug = (g2 as any)?.lineup_slug ?? null; }
     setGame({ ...game, share_token: (data as string | null) ?? null, lineup_slug: slug });
+    if (data && !game.share_token) void recordFeatureUse(supabase, "live_share", game.id);
   };
 
   // Organizer: wipe all entered scores and the round clock so the game is fresh

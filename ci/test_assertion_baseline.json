@@ -1,5 +1,4 @@
 {
-  "total": 447288,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -10,10 +9,12 @@
     "alt shot scoring": 30,
     "alt shot side score model": 5006,
     "alt shot simulation": 181751,
+    "analytics quality": 35,
+    "analytics read": 12,
     "approved match results presentation": 574,
     "badges": 75,
     "bucket-model": 34,
-    "card": 11,
+    "card": 12,
     "chart-helpers": 10,
     "chart-trend": 5514,
     "club activity periods and scores": 151,
@@ -109,5 +110,6 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "update safety": 38
-  }
+  },
+  "total": 447336
 }

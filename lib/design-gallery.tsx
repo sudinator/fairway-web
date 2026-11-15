@@ -1,3 +1,5 @@
+import { Dashboard } from "@/components/dashboard";
+import { AdminAnalytics, AdminDailyReport, AdminExtraStats } from "@/components/manage";
 import { HelpPage } from "@/components/manage";
 import { TGC_GROUP_ID } from "@/lib/golf";
 import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
@@ -229,6 +231,13 @@ add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
 
 // Exportable phone support report, available to every member.
 add("70-phone-diagnostics", <PhoneDiagnosticsPanel />);
+
+// 212.107: real Dashboard; loaded admin screens are also photographed interactively by
+// ci/test-analytics-browser.cjs (server rendering correctly shows loading rather than fake figures).
+add("71-analytics-dashboard", <Dashboard rounds={pbSampleRounds} name="Sample member" currentIndex={14.7} saveIndex={()=>{}} onOpen={()=>{}} />);
+add("72-admin-analytics", <AdminAnalytics />);
+add("73-admin-daily", <AdminDailyReport />);
+add("74-admin-devices", <AdminExtraStats />);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

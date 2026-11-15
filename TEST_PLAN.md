@@ -1,3 +1,7 @@
+## 212.107 analytics regression plan
+
+Run npm run ci and the complete fresh DB chain; new analytics tests run inside the existing lanes. Test missing vs manual-zero handicaps; 9/18-hole selection; partial/zero/invalid putts; provisional/established index movement; matched records and email suppression; first/last-vs-rest arithmetic; sparse stat gates; AI bounded scope; retry, timeout, unmount and late responses. Browser-test course → tee → length intersections, reset and A/B/A, all admin read failures/retries, existing Insights observation and phone widths 320/390/430/768. Database-test normal/shared participation, empty/no-show/future/Test/deactivated exclusions, mature signup/return denominators, lifecycle deletion retention, ownership/RLS/ACL, event dedup/spoofing/repeat use, archival metadata and group cascade. Adjacent existing scoring/account/cleanup/security/provider tests must pass. Review real 212.106/212.107 phone screenshots; do not use mock before-images. Native staging/production gates remain as documented.
+
 ## 212.106.261114 — scheduler permission-test correction
 
 Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.

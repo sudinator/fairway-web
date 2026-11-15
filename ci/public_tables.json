@@ -5,6 +5,7 @@
     "activity_log",
     "ai_usage_daily",
     "ai_usage_global",
+    "analytics_game_lifecycle",
     "api_rate_limits",
     "app_settings",
     "banned_emails",

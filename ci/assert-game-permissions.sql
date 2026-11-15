@@ -154,6 +154,8 @@ begin
        'save_game_score_bundle', 'save_hole_scores', 'save_hole_stats', 'save_alt_shot_score_fenced', 'save_scramble_score_fenced', 'save_alt_shot_side_score',
        'begin_game_score_write', 'claim_group_marker', 'release_group_marker', 'set_group_marker', 'claim_marker', 'release_marker', 'join_group_to_marker',
        'set_my_scorer', 'disband_group_scoring', 'finish_tee_group', 'finish_tee_group_and_post', 'post_group_rounds', 'log_contest_entry', 'void_contest_entry',
+       -- telemetry only: derives actor; live_share requires organizer/admin + enabled link (0235 assertion)
+       'record_feature_use',
        -- read-only answers
        'can_see_game', 'is_game_organizer', 'is_tee_group_marker', 'plays_with_guest', 'game_announced_or_mine', 'ensure_game_event',
        -- the club's Money tab (club admins manage money; not game setup)

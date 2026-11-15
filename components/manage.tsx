@@ -1,4 +1,5 @@
 "use client";
+import { useAnalyticsRpc, AnalyticsReadStatus } from "@/components/analytics-read";
 
 import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
 import { UpdateChecker } from "@/components/app-update-checker";
@@ -598,17 +599,13 @@ function openStatDrill(p: DrillPayload) { _openDrill?.(p); }
 function StatDrawerHost() {
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState<DrillPayload | null>(null);
-  const [rows, setRows] = useState<any[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const read = useAnalyticsRpc(supabase, payload?.stat.startsWith("push_") ? "admin_push_devices" : "admin_stat_users",
+    payload?.stat.startsWith("push_") ? { p_kind: payload.stat } : { p_stat: payload?.stat, p_arg: payload?.arg ?? null, p_date: payload?.date ?? null },
+    ["name", "detail", "tag"], open && !!payload);
+  const rows: any[] | null = read.data;
+  const err = read.error;
   useEffect(() => {
-    _openDrill = (p) => {
-      setPayload(p); setOpen(true); setRows(null); setErr(null);
-      // push_* stats come from admin_push_devices (0170), same row shape; everything else from the shared engine.
-      const call = p.stat.startsWith("push_")
-        ? rpcAll(supabase, "admin_push_devices", { p_kind: p.stat }, ["name", "detail", "tag"])
-        : rpcAll(supabase, "admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null }, ["name", "detail", "tag"]);
-      call.then(({ data, error }: any) => { if (error) setErr(failureMessage("Couldn't stat drawer host", error)); else setRows(data || []); });
-    };
+    _openDrill = (p) => { setPayload(p); setOpen(true); };
     return () => { _openDrill = null; };
   }, []);
   const close = () => setOpen(false);
@@ -628,7 +625,8 @@ function StatDrawerHost() {
           {rows ? <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{rows.length} {rows.length === 1 ? "user" : "users"}</div> : null}
         </div>
       }>
-          {err ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Couldn't load: {err}</div> :
+          <AnalyticsReadStatus {...read} />
+          {err && !rows ? null :
            !rows ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Loading…</div> :
            rows.length === 0 ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>No users for this metric.</div> :
            rows.map((u: any, i: number) => {
@@ -652,17 +650,11 @@ function StatDrawerHost() {
 // payload from the is_admin-gated get_admin_analytics() RPC.
 // ★ Golf-cadence engagement — reads the is_admin-gated get_admin_engagement() RPC (migration
 // 0078). Measures the round (real golf activity) on a weekly cycle, not daily app-opens.
-function AdminEngagement() {
-  const [e, setE] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+export function AdminEngagement() {
+  const read = useAnalyticsRpc(supabase, "get_admin_engagement");
+  const e = read.data;
   const [chartWidth, setChartWidth] = useState(0);
-  useEffect(() => {
-    supabase.rpc("get_admin_engagement").then(({ data, error }: any) => {
-      if (error) setErr(failureMessage("Couldn't load the contest", error)); else setE(data);
-    });
-  }, []);
-  if (err) return null; // supplementary; stay quiet if the RPC isn't deployed yet
-  if (!e) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading engagement…</div>;
+  if (!e) return <AnalyticsReadStatus {...read} />;
 
   const ws: { week: string; golfers: number; rounds: number }[] = e.weekend_series || [];
   const nr: { week: string; new: number; returning: number }[] = e.weekly_new_returning || [];
@@ -679,7 +671,7 @@ function AdminEngagement() {
   );
 
   return (
-    <div style={{ marginTop: 18 }}>
+    <div style={{ marginTop: 18 }}><AnalyticsReadStatus {...read} />
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Engagement — golf cadence</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>Measured on rounds (the real unit of golf) on a weekly cycle — not daily app-opens.</div>
 
@@ -747,21 +739,14 @@ function AdminEngagement() {
 type PUCol =
   | "score" | "completed_rounds" | "games_played" | "active_days" | "total_opens"
   | "completion_pct" | "unfinished_rounds" | "deleted_rounds" | "days_since_active";
-function AdminPowerUsers() {
-  const [rows, setRows] = useState<any[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+export function AdminPowerUsers() {
   const [days, setDays] = useState<number | null>(null); // null = all-time
   const [sortCol, setSortCol] = useState<PUCol>("score");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
 
-  useEffect(() => {
-    setRows(null); setErr(null);
-    // bounded: function returns the top 25
-    supabase.rpc("get_power_users", { p_days: days }).then(({ data, error }: any) => {
-      if (error) setErr(failureMessage("Couldn't save the entry", error)); else setRows(data || []);
-    });
-  }, [days]);
+  const read = useAnalyticsRpc(supabase, "get_power_users", { p_days: days });
+  const rows: any[] | null = read.data;
 
   // Photos, best-effort: if row-level security lets this admin read the profiles, show avatars;
   // otherwise the Avatar falls back to initials. Never blocks the table.
@@ -788,15 +773,14 @@ function AdminPowerUsers() {
     else { setSortCol(c); setSortDir("desc"); }
   };
 
-  if (err) return null; // supplementary; stay quiet if the RPC isn't deployed yet
 
   const cols: { key: PUCol; label: string; title: string }[] = [
     { key: "score", label: "Score", title: "Composite: completed×4 + games×2 + active days×1 + opens×0.1" },
     { key: "completed_rounds", label: "Rnds", title: "Completed rounds (final, not deleted)" },
-    { key: "games_played", label: "Games", title: "Games played" },
+    { key: "games_played", label: "Games", title: "Qualifying completed games played" },
     { key: "active_days", label: "Days", title: "Days active (opened the app)" },
     { key: "total_opens", label: "Opens", title: "Total app opens" },
-    { key: "completion_pct", label: "Cmpl%", title: "Completed ÷ all started rounds" },
+    { key: "completion_pct", label: "Cmpl%", title: "Completed participation ÷ completed participation plus open personal rounds" },
     { key: "unfinished_rounds", label: "Unfin", title: "Started but never finished (in-progress)" },
     { key: "deleted_rounds", label: "Del", title: "Soft-deleted rounds (mostly phantom-round cleanup)" },
     { key: "days_since_active", label: "Idle", title: "Days since last active" },
@@ -804,7 +788,7 @@ function AdminPowerUsers() {
   const arrow = (c: PUCol) => (c === sortCol ? (sortDir === "desc" ? " ▾" : " ▴") : "");
 
   return (
-    <div style={{ marginTop: 18 }}>
+    <div style={{ marginTop: 18 }}><AnalyticsReadStatus {...read} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Power users</div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -875,16 +859,10 @@ function AdminPowerUsers() {
   );
 }
 
-function AdminAnalytics() {
-  const [a, setA] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.rpc("get_admin_analytics").then(({ data, error }: any) => {
-      if (error) setErr(failureMessage("Couldn't load the contest", error)); else setA(data);
-    });
-  }, []);
-  if (err) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Analytics unavailable: {err}</div>;
-  if (!a) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading analytics…</div>;
+export function AdminAnalytics() {
+  const read = useAnalyticsRpc(supabase, "get_admin_analytics");
+  const a = read.data;
+  if (!a) return <AnalyticsReadStatus {...read} />;
 
   const t = a.totals || {}, ac = a.active || {}, f = a.formats || {}, fe = a.features || {}, h = a.health || {}, en = a.engagement || {};
   const series: { day: string; n: number }[] = ac.series || [];
@@ -915,29 +893,29 @@ function AdminAnalytics() {
     </div>
   );
 
-  const fmtName: Record<string, string> = { stableford: "Stableford", fourball: "Four-ball", match: "Singles match", skins: "Skins", trifecta: "Trifecta" };
+  const fmtName: Record<string, string> = { stroke: "Stroke play", scramble: "Scramble", alt_shot: "Alternate shot", stableford: "Stableford", fourball: "Four-ball", match: "Singles match", skins: "Skins", trifecta: "Trifecta" };
   const fmtColors: Record<string, string> = { stableford: "#5BD08A", fourball: "#5AA9E6", match: "#C9A227", skins: "#E0915B", trifecta: "#B084E0" };
   const fmtEntries = (Object.entries(f) as [string, number][]).sort((x, y) => y[1] - x[1]);
   const fmtMax = Math.max(1, ...fmtEntries.map(([, n]) => n));
-  const feat: [string, number][] = [["Avatars set", fe.avatars_set || 0], ["AI summaries", fe.ai_summaries || 0], ["Live links (now)", fe.live_shared || 0], ["Courses added (30d)", fe.courses_added_30d || 0]];
+  const feat: [string, number][] = [["Avatars set", fe.avatars_set || 0], ["Members with saved AI coaching", fe.ai_summaries || 0], ["Live links (now)", fe.live_shared || 0], ["Courses added (30d)", fe.courses_added_30d || 0]];
   const featMax = Math.max(1, ...feat.map(([, n]) => n));
 
   const hrow = (label: string, val: string, good?: boolean, drill?: { stat: string; cap?: string }) => (
-    <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
-      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, cursor: drill ? "pointer" : "default" }}>
+    <div key={label} onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
+      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, cursor: drill ? "pointer" : "default" }}>
       <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span>
-      <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
+      <span style={{ flexShrink: 0, textAlign: "right", fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
     </div>
   );
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 8 }}><AnalyticsReadStatus {...read} />
       <StatDrawerHost />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined, C.greenLight, { stat: "users_total", cap: "All active (non-test) users" })}
         {tile(t.active_groups ?? "—", "Active clubs")}
-        {tile(t.games ?? "—", "Games", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
-        {tile(t.rounds ?? "—", "Rounds done", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`, C.greenLight, { stat: "rounds_done", cap: "Players with completed rounds" })}
+        {tile(t.games ?? "—", "Games created", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
+        {tile(t.rounds ?? "—", "Rounds played", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`, C.greenLight, { stat: "rounds_done", cap: "Players with completed rounds" })}
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -969,20 +947,21 @@ function AdminAnalytics() {
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}>Games by format</div>
         {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
-        <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Feature usage</div>
-        {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6", k === "Avatars set" ? "avatars_set" : k === "AI summaries" ? "ai_summaries" : undefined))}
+        <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Saved settings &amp; records</div>
+        {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6", k === "Avatars set" ? "avatars_set" : k === "Members with saved AI coaching" ? "ai_summaries" : undefined))}
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
-        {hrow("Game completion (ended \u00f7 created)", `${h.completion_pct ?? 0}%`, true)}
-        {hrow("Round completion (done \u00f7 started)", `${h.round_completion_pct ?? 0}%`, true, { stat: "unfinished", cap: "Users with unfinished / abandoned rounds" })}
-        {hrow("Abandoned games + rounds (never finished)", `${h.abandoned_pct ?? 0}%`, false, { stat: "abandoned", cap: "Users with stale unfinished or deleted rounds" })}
-        {hrow("Avg holes entered / game", `${h.avg_holes ?? 0}`)}
-        {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true, { stat: "users_new_30d", cap: "Recently-joined users" })}
-        {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
-        {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
-        {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
+        {hrow("Game completion · retained lifecycle counts", h.completion_pct == null ? "—" : `${h.completion_pct}%`, true)}
+        {hrow("Round completion · excludes deleted records", h.round_completion_pct == null ? "—" : `${h.round_completion_pct}%`, true, { stat: "unfinished", cap: "Users with unfinished personal rounds" })}
+        {hrow("Unresolved / deleted unfinished games", h.abandoned_pct == null ? "—" : `${h.abandoned_pct}%`, false)}
+        {hrow("Avg scored holes / played card", `${h.avg_holes ?? 0}`)}
+        {hrow("First completed round within 7 days", h.activation_cohort?.d ? `${h.activation_cohort.n}/${h.activation_cohort.d} (${h.activation_cohort.pct}%)` : "No mature cohort yet")}
+        {hrow("Second completed round within 28 days", h.second_round_cohort?.d ? `${h.second_round_cohort.n}/${h.second_round_cohort.d} (${h.second_round_cohort.pct}%)` : "No mature cohort yet")}
+        {hrow("Signups never joined a club", h.never_joined_group_pct == null ? "—" : `${h.never_joined_group_pct}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
+        {hrow("Retention \u2014 week 1", h.retention_w1?.d ? `${h.retention_w1.n}/${h.retention_w1.d} (${h.retention_w1.pct}%)` : "No mature cohort yet")}
+        {hrow("Retention \u2014 week 4", h.retention_w4?.d ? `${h.retention_w4.n}/${h.retention_w4.d} (${h.retention_w4.pct}%)` : "No mature cohort yet")}
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Participation counts qualifying completed personal and game cards, including team attendance once per member. Activation cohorts have had their full 7/28-day opportunity; retention measures return app activity. Test, deactivated and unavailable accounts and Test clubs are excluded. All days use US Eastern.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -995,25 +974,39 @@ function AdminAnalytics() {
         {hrow("Joins via invite (all-time)", `${en.joins_via_invite ?? 0}`)}
         {hrow("Games using a group scorer", `${en.group_scoring_pct ?? 0}%`, true)}
       </div>
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+        <Eyebrow>ACTIVATION &amp; REPEAT PLAY</Eyebrow>
+        {hrow("Clubs playing 2+ games · 90 days", a.funnels?.repeat_clubs?.d ? `${a.funnels.repeat_clubs.n}/${a.funnels.repeat_clubs.d} (${a.funnels.repeat_clubs.pct}%)` : "No qualifying clubs yet")}
+        {(a.funnels?.formats || []).map((f: any) => hrow(`${fmtName[f.game_type] || f.game_type} · repeat participants`, `${f.repeat_players}/${f.players}`))}
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Repeat = at least two completed games in the same format during the last 90 days. Club repeat counts clubs with qualifying member participation.</div>
+        {hrow("Reminded games · sent / resumed / completed", `${a.funnels?.reminders?.sent ?? 0} / ${a.funnels?.reminders?.resumed ?? 0} / ${a.funnels?.reminders?.completed ?? 0}`)}
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Unique games with a reminder in the last 90 days. Resumed means a later scoring change; completed means a later game completion. This is an observed association.</div>
+        <Eyebrow style={{ marginTop: 16 }}>OBSERVED FEATURE USE · 30 DAYS</Eyebrow>
+        {(a.funnels?.feature_use || []).map((f: any) => <div key={f.action} style={{ color: C.cream, fontSize: 12, marginTop: 10 }}>{({ analytics_insights_open: "Scoring insights", analytics_ai_dashboard: "Dashboard coaching", analytics_ai_round: "Round coaching", analytics_live_share: "Live links enabled" } as Record<string, string>)[f.action] || f.action}: {f.uses} actions · {f.users} members · {f.repeat_users} repeat users<div style={{ color: C.sage, fontSize: 11 }}>Returned within 28 days: {f.returned?.d ? `${f.returned.n}/${f.returned.d} (${f.returned.pct}%)` : "waiting for a mature cohort"}</div></div>)}
+        {!(a.funnels?.feature_use || []).length && <div style={{ color: C.sage, fontSize: 12 }}>No observed feature actions yet.</div>}
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>{a.quality?.feature_note}</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>{a.quality?.lifecycle_note}</div>
+      </div>
     </div>
   );
 }
 
-function OpsMetrics() {
-  const [m, setM] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+export function OpsMetrics() {
+  const read = useAnalyticsRpc(supabase, "get_ops_metrics");
+  const m = read.data;
   const [sg, setSg] = useState<any[] | null>(null);
+  const [sgError, setSgError] = useState(false);
   const [delId, setDelId] = useState<string | null>(null);
   useEffect(() => {
-    supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
-      if (error) setErr(failureMessage("Couldn't load these figures", error)); else setM(data);
-    });
-    rpcAll(supabase, "admin_stale_games", undefined, "game_id").then(({ data }: any) => {
-      if (Array.isArray(data)) setSg(data);
-    }, () => {});
-  }, []);
-  if (err) return null; // supplementary; quiet if the RPC isn't deployed yet
-  if (!m || Object.keys(m).length === 0) return null;
+    let live = true;
+    rpcAll(supabase, "admin_stale_games", undefined, "game_id").then(({ data, error }: any) => {
+      if (!live) return;
+      setSgError(!!error);
+      if (!error && Array.isArray(data)) setSg(data);
+    }, () => { if (live) setSgError(true); });
+    return () => { live = false; };
+  }, [read.revision]);
+  if (!m || Object.keys(m).length === 0) return <AnalyticsReadStatus {...read} />;
 
   const delStale = async (g: any) => {
     if (g.rounds_posted > 0 || delId) return;
@@ -1037,7 +1030,8 @@ function OpsMetrics() {
   );
 
   return (
-    <div style={{ marginTop: 18 }}>
+    <div style={{ marginTop: 18 }}><AnalyticsReadStatus {...read} />
+      {sgError && <div role="alert" style={{ color: C.cream, fontSize: 12 }}>The stale-game list could not be loaded. Refresh to retry.</div>}
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Operations</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>Profile-completion funnel and round hygiene. Nudge counts accumulate from when logging shipped, so they build up over time.</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2416,18 +2410,10 @@ function SystemTools({ user }: { user: any }) {
 // club cards jump to the shared tabs, system cards render the panel inline.
 // ★ Stage-2 analytics: new drillable summary tiles (platform, notifications, sharing, guests).
 // Counts from get_admin_extra_stats (0091); every tile drills via the shared engine (0090).
-function AdminExtraStats() {
-  const [x, setX] = useState<any | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.rpc("get_admin_extra_stats").then(({ data, error }: any) => {
-      if (error) setErr(failureMessage("Couldn't save the entry", error)); else setX(data);
-      // Push device health (0170): failing (delivery trouble) and dormant (not seen 14+ days) are
-      // different problems and are counted separately.
-      supabase.rpc("admin_push_device_stats").then(({ data: ph }: any) => { if (ph) setX((prev: any) => ({ ...(prev || {}), push: ph })); }, () => {});
-    });
-  }, []);
-  if (err || !x) return null; // supplementary; stays hidden until 0091 is deployed
+export function AdminExtraStats() {
+  const read = useAnalyticsRpc(supabase, "get_admin_extra_stats");
+  const x = read.data;
+  if (!x) return <AnalyticsReadStatus {...read} />;
 
   const tile = (n: React.ReactNode, l: string, stat: string, cap?: string, arg?: string) => (
     <button onClick={() => openStatDrill({ stat, title: l, cap, arg })}
@@ -2448,11 +2434,11 @@ function AdminExtraStats() {
   const mutedTypes = NOTIF_TYPES.map((t) => ({ ...t, n: mutes[t.key] || 0 })).filter((t) => t.n > 0).sort((a, b) => b.n - a.n);
 
   return (
-    <div>
+    <div><AnalyticsReadStatus {...read} />
       {hdr("Platform", "how people open BNN")}
       <div style={{ display: "flex", gap: 10 }}>
-        {tile(x.installed ?? 0, "Installed app", "installed", "Latest open = home-screen app")}
-        {tile(x.browser ?? 0, "Browser only", "browser", "Latest open = browser tab")}
+        {tile(x.installed ?? 0, "Last opened as app", "installed", "Latest open = home-screen app")}
+        {tile(x.browser ?? 0, "Last opened in browser", "browser", "Latest open = browser tab")}
       </div>
       <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
         {x.platform_unknown ? `${x.platform_unknown} not yet recorded \u00b7 ` : ""}counts forward from launch — no backfill.
@@ -2500,12 +2486,13 @@ function AdminExtraStats() {
 // ★ Stage-3 analytics: Daily report. Pick a day; see active users + that day's rounds, both
 // drillable. Reuses engine branches active_day / rounds_day (0090) — no new migration. Counts
 // are just the length of those lists; the inline list is the rounds_day rows color-coded by status.
-function AdminDailyReport() {
+export function AdminDailyReport() {
   const [days, setDays] = useState<{ label: string; iso: string }[]>([]);
   const [sel, setSel] = useState<string>("");
-  const [active, setActive] = useState<any[] | null>(null);
-  const [rounds, setRounds] = useState<any[] | null>(null);
-  const [gone, setGone] = useState(false);
+  const activeRead = useAnalyticsRpc(supabase, "admin_stat_users", { p_stat: "active_day", p_arg: null, p_date: sel || null }, ["name", "detail", "tag"]);
+  const roundsRead = useAnalyticsRpc(supabase, "admin_stat_users", { p_stat: "rounds_day", p_arg: null, p_date: sel || null }, ["name", "detail", "tag"]);
+  const active: any[] | null = activeRead.data;
+  const rounds: any[] | null = roundsRead.data;
 
   useEffect(() => {
     // Days are US Eastern (America/New_York) for everyone — "Today" is the same midnight-to-midnight
@@ -2521,21 +2508,13 @@ function AdminDailyReport() {
     setDays(arr); setSel(arr[0].iso);
   }, []);
 
-  useEffect(() => {
-    if (!sel) return;
-    setActive(null); setRounds(null);
-    rpcAll(supabase, "admin_stat_users", { p_stat: "active_day", p_arg: null, p_date: sel }, ["name", "detail", "tag"]).then(({ data, error }: any) => { if (error) setGone(true); else setActive(data || []); });
-    rpcAll(supabase, "admin_stat_users", { p_stat: "rounds_day", p_arg: null, p_date: sel }, ["name", "detail", "tag"]).then(({ data, error }: any) => { if (!error) setRounds(data || []); });
-  }, [sel]);
-
-  if (gone) return null;
   const dotColor = (tag: string) =>
     tag === "completed" ? "#5BBE7E" : tag === "in progress" ? C.gold : tag === "auto-finished" ? "#5AA9E6" : tag === "deleted" ? C.birdie : C.sage;
   const selLabel = days.find((d) => d.iso === sel)?.label || sel;
   const dot = (bg: string) => <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: bg, marginRight: 4 }} />;
 
   return (
-    <div>
+    <div><AnalyticsReadStatus {...activeRead} /><AnalyticsReadStatus {...roundsRead} />
       <div style={{ margin: "18px 0 8px" }}>
         <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Daily report</span>
         <span style={{ color: C.sage, fontSize: 11 }}> · pick a day</span>
@@ -2557,18 +2536,18 @@ function AdminDailyReport() {
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active ? active.length : "…"}</div>
           <div style={{ color: C.sage, fontSize: 11 }}>Active users</div>
         </button>
-        <button onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Rounds played that day", date: sel })}
+        <button onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Round records that day", date: sel })}
           style={{ flex: 1, background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", textAlign: "left", cursor: "pointer", position: "relative" }}>
           <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 11, fontWeight: 800 }}>list ›</span>
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{rounds ? rounds.length : "…"}</div>
-          <div style={{ color: C.sage, fontSize: 11 }}>Rounds played</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Round records</div>
         </button>
       </div>
 
       {rounds && rounds.length > 0 ? (
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 6, marginTop: 10 }}>
           {rounds.map((r: any, i: number) => (
-            <div key={i} onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Rounds played that day", date: sel })}
+            <div key={i} onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Round records that day", date: sel })}
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 8px", borderTop: i ? `1px solid ${C.greenMid}` : "none", cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", flex: "0 0 8px", background: dotColor(r.tag) }} />
               <div style={{ minWidth: 0 }}>
@@ -2584,7 +2563,7 @@ function AdminDailyReport() {
 
       <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.7 }}>
         {dot("#5BBE7E")}completed &nbsp; {dot(C.gold)}in progress &nbsp; {dot("#5AA9E6")}auto-finished &nbsp; {dot(C.birdie)}deleted / issue
-        <div style={{ marginTop: 4 }}>Days run midnight–midnight US Eastern.</div>
+        <div style={{ marginTop: 4 }}>Days run midnight–midnight US Eastern. Round records include unfinished/deleted records for diagnosis; they are separate from completed-participation totals.</div>
       </div>
     </div>
   );
@@ -2905,7 +2884,7 @@ export function ActivityTab() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(300);
+      const { data } = await supabase.from("activity_log").select("*").not("action", "like", "analytics_%").order("created_at", { ascending: false }).limit(300);
       setRows(data || []);
     })();
   }, []);

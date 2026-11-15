@@ -1,6 +1,8 @@
 "use client";
 // 212.18 — Insights (owner, Oct 22): a dashboard card with the two strongest findings, opening a full Insights screen —
 // scoring against par by hole type, difficulty and stretch, consistency, and every finding. lib/insights computes it.
+import { recordFeatureUse } from "@/lib/activity";
+import { createClient } from "@/lib/supabase";
 import React, { useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
@@ -23,8 +25,9 @@ function FindingLine({ f }: { f: Finding }) {
 }
 
 /** The dashboard card: the two strongest findings, and the way into the full screen. */
-export function InsightsCard({ rounds }: { rounds: Round[] }) {
+export function InsightsCard({ rounds, previousRounds = [] }: { rounds: Round[]; previousRounds?: Round[] }) {
   const ins = useMemo(() => computeInsights(rounds), [rounds]);
+  const prior = useMemo(() => computeInsights(previousRounds), [previousRounds]);
   const [open, setOpen] = useState(false);
   return (
     <div data-insights-card style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
@@ -33,9 +36,10 @@ export function InsightsCard({ rounds }: { rounds: Round[] }) {
         <div style={{ color: C.sage, fontSize: 14 }}>Insights appear after {INSIGHT_MIN_ROUNDS} rounds with hole-by-hole scores — you have {ins.roundsUsed}.</div>
       ) : (
         <>
+          {prior.ready && ins.ready && ins.overall != null && prior.overall != null && <div data-insight-comparison style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Compared with the preceding {prior.roundsUsed} qualifying rounds: {Math.abs(ins.overall - prior.overall).toFixed(2)} strokes per hole {ins.overall < prior.overall ? "better" : ins.overall > prior.overall ? "worse" : "different"} against par. Current sample: {ins.roundsUsed} rounds. Course and tee filters apply to both periods.</div>}
           {ins.findings.slice(0, 2).map((f) => <FindingLine key={f.key} f={f} />)}
           {!ins.findings.length ? <div style={{ color: C.sage, fontSize: 14 }}>No standout patterns in your last {ins.roundsUsed} rounds — a very even game.</div> : null}
-          <button onClick={() => setOpen(true)} style={{ ...btn(false), marginTop: 14, fontSize: 13, width: "100%" }}>See all insights →</button>
+          <button onClick={() => { setOpen(true); void recordFeatureUse(createClient(), "insights_open"); }} style={{ ...btn(false), marginTop: 14, fontSize: 13, width: "100%" }}>See all insights →</button>
         </>
       )}
       {open ? <InsightsScreen ins={ins} onClose={() => setOpen(false)} /> : null}
@@ -73,6 +77,7 @@ export function InsightsScreen({ ins, onClose }: { ins: Insights; onClose: () =>
         <button onClick={onClose} style={{ ...btn(false), fontSize: 13 }}>‹ Back</button>
         <div style={{ color: C.cream, fontSize: 26, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 14 }}>Your insights</div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 2 }}>From your last {ins.roundsUsed} rounds with hole-by-hole scores · {toPar(ins.overall)} a hole overall</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Against-expectation findings use {ins.netRounds} complete 18-hole cards with a known handicap; putting uses {ins.puttingRounds} complete 18-hole putting cards.</div>
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
           <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>WHAT STANDS OUT</div>
           {ins.findings.length ? ins.findings.map((f) => <FindingLine key={f.key} f={f} />) : <div style={{ color: C.sage, fontSize: 14, marginTop: 8 }}>No standout patterns — a very even game.</div>}
@@ -85,7 +90,7 @@ export function InsightsScreen({ ins, onClose }: { ins: Insights; onClose: () =>
           {[
             ["Within 3 of your handicap", ins.withinHandicap ? `${ins.withinHandicap.within} of ${ins.withinHandicap.rounds} full rounds` : "needs 5 full rounds with a handicap"],
             ["Blow-up holes cost", ins.blowUpCost != null ? `${ins.blowUpCost.toFixed(1)} shots a round` : "–"],
-            ["Three-putts", ins.threePutts != null ? `${ins.threePutts.toFixed(1)} a round` : "record putts to see this"],
+            ["Three-putts", ins.threePutts != null ? `${ins.threePutts.toFixed(1)} per complete 18-hole putting card` : "needs 5 complete 18-hole putting cards"],
           ].map(([k, v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10, fontSize: 14 }}>
               <span style={{ color: C.cream }}>{k}</span><span style={{ color: C.cream, fontWeight: 800, textAlign: "right" }}>{v}</span>

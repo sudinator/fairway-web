@@ -1,3 +1,9 @@
+## 212.107.261114 — analytics quality and repeat use
+
+212.106 GitHub CI is green per the owner. This candidate implements the approved analytics cleanup in the existing screens: missing-handicap net awards, complete putting samples, established-index trends, separate raw 9/18-hole comparisons, course/tee/length scope, prior-period Insights, tied personal bests, per-stat evidence and bounded peer proxies, scope-aware AI, consistent admin populations, mature activation/retention cohorts, cleanup-stable game lifecycle counts, observed feature/repeat/reminder outcomes and visible error/retry/freshness states. See ANALYTICS_212.107.md for definitions and preserved contracts.
+
+Migration 0235 required; all earlier migration SQL remains unchanged. Full local release evidence is recorded in RELEASE_VERIFICATION_212.107.md. Native GitHub/Supabase CI, Vercel staging and the existing production data-profile review remain external release gates. This is not production approval.
+
 ## 212.106.261114 — scheduler permission-test correction
 
 Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.

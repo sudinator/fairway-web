@@ -31,7 +31,7 @@ if(kind==='season')el=<div style={{padding:16}}><SeasonCardView card={{kind:'ind
 if(kind==='profile')el=<div style={{padding:16,overflow:'hidden'}}><FormChart data={data.map(d=>d.val)}/></div>;
 if(kind==='insights')el=<Bars title="BY DIFFICULTY" buckets={data.slice(0,4).map((d,i)=>({key:String(i),label:i===0?'hardest holes (stroke index 1–6)':'Par 4s',avgToPar:d.val,netAvg:1.2,holes:519}))}/>;
 if(kind==='tip')el=<ChartTip active payload={[{dataKey:'value',value:25,payload:{course,name:'Jan 1, 2026'}}]} nameMap={{value:'Differential'}} fmt={String}/>;
-if(kind==='shots')el=<ShotSynthesis fir={{hit:20,total:100}} gir={{hit:20,total:100}} puttsPerRound={36} scramble={{hit:10,total:100}} index={12} goalHcp={10} setGoalHcp={()=>{}} detailRounds={n}/>;
+if(kind==='shots')el=<ShotSynthesis fir={{hit:20,total:100}} gir={{hit:20,total:100}} puttsPerRound={36} scramble={{hit:10,total:100}} index={12} goalHcp={10} setGoalHcp={()=>{}} detailRounds={n} coverage={{rounds:n,holes:n*18,puttingRounds:n,puttHoles:n*18,fairwayRounds:n,fairwayHoles:n*14,fairwayEligible:n*14,girRounds:n,scrambleRounds:n,detailedRounds:n}} puttingRounds={n}/>;
 root.render(<div data-audit={kind} data-audit-render={renderId} style={{background:'#1B5A46',padding:16,borderRadius:14}}>{el}</div>);
 };
 

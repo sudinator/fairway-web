@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import type { analyticsCoverage } from "@/lib/analytics-quality";
 import { C } from "@/lib/golf";
 import { BENCH_DIR, BENCH_LABEL, bandFor, goalOptions, type StatKey, type Band } from "@/lib/benchmarks";
 import { Eyebrow } from "@/components/ui";
@@ -81,7 +82,7 @@ function CatBar({ name, score, sub, statKey, open, onToggle }: {
 }
 
 // ---- Gaining / losing shots (summary + biggest opportunity) ---------------
-export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHcp, setGoalHcp, detailRounds }: {
+export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHcp, setGoalHcp, detailRounds, coverage, puttingRounds }: {
   fir: { hit: number; total: number };
   gir: { hit: number; total: number };
   puttsPerRound: number | null;
@@ -90,35 +91,38 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
   goalHcp: number | null;
   setGoalHcp: (h: number | null) => void;
   detailRounds: number;
+  coverage?: ReturnType<typeof analyticsCoverage>;
+  puttingRounds?: number;
 }) {
   const [openCat, setOpenCat] = useState<StatKey | null>(null);
   if (index == null) return null;
+  if (index < 0 || index > 20) return <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>Peer comparisons cover indexes 0–20. Your recorded stats remain available; no peer verdict is inferred outside that range.</div>;
   const goals = goalOptions(index);
   const you = bandFor(index);
   const goalBands = goalHcp != null ? bandFor(goalHcp) : null;
 
-  const defs: { key: StatKey; cat: string; value: number | null; min: number }[] = [
-    { key: "fir", cat: "Off the tee", value: fir.total ? (100 * fir.hit) / fir.total : null, min: 5 },
-    { key: "gir", cat: "Approach", value: gir.total ? (100 * gir.hit) / gir.total : null, min: 5 },
-    { key: "scramble", cat: "Short game", value: scramble.total ? (100 * scramble.hit) / scramble.total : null, min: 15 },
-    { key: "putts", cat: "Putting", value: puttsPerRound, min: 5 },
+  const defs: { key: StatKey; cat: string; value: number | null; min: number; sample: number; opportunities: number }[] = [
+    { key: "fir", cat: "Off the tee", value: fir.total ? (100 * fir.hit) / fir.total : null, min: 5, sample: coverage?.fairwayRounds ?? 0, opportunities: fir.total },
+    { key: "gir", cat: "Approach", value: gir.total ? (100 * gir.hit) / gir.total : null, min: 5, sample: coverage?.girRounds ?? 0, opportunities: gir.total },
+    { key: "scramble", cat: "Short game", value: scramble.total ? (100 * scramble.hit) / scramble.total : null, min: 15, sample: coverage?.scrambleRounds ?? 0, opportunities: scramble.total },
+    { key: "putts", cat: "Putting", value: puttsPerRound, min: 5, sample: puttingRounds ?? coverage?.puttingRounds ?? 0, opportunities: puttingRounds ?? coverage?.puttingRounds ?? 0 },
   ];
   const rows = defs
-    .filter((d) => d.value != null && detailRounds >= d.min)
+    .filter((d) => d.value != null && d.sample >= d.min && (d.key !== "scramble" || d.opportunities >= 30))
     .map((d) => {
       const band = you[d.key], half = (band.hi - band.lo) / 2 || 1;
       const value = d.value as number;
       const gap = goalBands ? BENCH_DIR[d.key] * (goalBands[d.key].avg - value) / half : 0;
-      return { key: d.key, cat: d.cat, value, score: catScore(d.key, value, band), gap };
+      return { key: d.key, cat: d.cat, value, sample: d.sample, opportunities: d.opportunities, score: catScore(d.key, value, band), gap };
     });
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return detailRounds ? <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>Peer comparisons need 5 rounds recording each stat; scrambling needs 15 tracked rounds and 30 missed-green opportunities.</div> : null;
 
   const opps = rows.filter((r) => r.gap > 0.02).sort((a, b) => b.gap - a.gap);
   const top = opps[0] ?? [...rows].sort((a, b) => a.score - b.score)[0];
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12, border: "1px solid #245A47" }}>
-      <Eyebrow>WHERE YOU’RE GAINING &amp; LOSING SHOTS</Eyebrow>
+      <Eyebrow>YOUR GAME VS HANDICAP PEERS</Eyebrow>
 
       {goals.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 11, flexWrap: "wrap" }}>
@@ -147,12 +151,12 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
           const goalTxt = goalBands
             ? (r.gap > 0.02 ? `you ${fmtVal(r.key, r.value)} → ${synGoalLabel(goalHcp as number)} avg ${fmtVal(r.key, goalBands[r.key].avg)}` : `you ${fmtVal(r.key, r.value)} · already ${synGoalLabel(goalHcp as number)}-level`)
             : `you ${fmtVal(r.key, r.value)} · peer avg ${fmtVal(r.key, you[r.key].avg)}`;
-          return <CatBar key={r.key} name={r.cat} score={r.score} sub={goalTxt} statKey={r.key} open={openCat === r.key} onToggle={() => setOpenCat((o) => (o === r.key ? null : r.key))} />;
+          return <CatBar key={r.key} name={r.cat} score={r.score} sub={<>{goalTxt} · {r.sample} tracked rounds · {r.opportunities} {r.key === "putts" ? "complete putting cards" : "recorded opportunities"}</>} statKey={r.key} open={openCat === r.key} onToggle={() => setOpenCat((o) => (o === r.key ? null : r.key))} />;
         })}
       </div>
 
       <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
-        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; scrambling needs ~15+ tracked rounds to read reliably.
+        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; these are statistical proxies, not measured strokes gained. Scrambling needs 15 tracked rounds and 30 opportunities.
       </div>
     </div>
   );
