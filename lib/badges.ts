@@ -1,6 +1,7 @@
 // Achievements / badges. This module is PURE: `evaluateRound` takes a finished
 // round + the player's prior badge state and returns the awards that round earns.
 // No I/O here — the caller (compute-on-finish / backfill) persists to member_badges.
+import { completePenaltyRound } from "./round-penalties";
 import { Round, Hole, played, isGrossOnly, isGIR, roundDifferential, allocateStrokes, courseHandicap } from "./golf";
 
 export type BadgeKind = "once" | "count" | "best" | "milestone";
@@ -176,7 +177,7 @@ export function evaluateRound(r: Round, prior: PriorBadges): Award[] {
 
     // Penalties
     if (holes.length >= 18 && holes.every((h) => h.strokes != null)) {
-      if (holes.reduce((s, h) => s + (h.penalties || 0), 0) === 0) add("no_penalties", "count");
+      if (completePenaltyRound(r,18) && holes.reduce((s, h) => s + h.penalties, 0) === 0) add("no_penalties", "count");
     }
 
     // Fairways / greens (best in a round)

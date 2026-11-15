@@ -87,6 +87,8 @@ export type Round = {
   id: string;
   /** Stable local identity before an in-progress round reaches the server. */
   draft_session_id?: string;
+  /** Explicit whole-card penalty confirmation; legacy/default zeros are unknown. */
+  penalties_tracked?: boolean;
   group_id?: string | null;
   group_name?: string | null;
   course: string;
@@ -736,7 +738,7 @@ export function nextRoundOutlook(rounds: Round[]): { rollOff: Round; threshold: 
 
 // Average number of three-or-more-putt holes per round (only counts rounds with putts recorded).
 export function threePuttsPerRound(rounds: Round[]): number | null {
-  const withPutts = rounds.filter((r) => played(r).some((h) => h.putts != null));
+  const withPutts = rounds.filter((r) => played(r).length === 18 && played(r).every((h) => Number.isInteger(h.putts) && h.putts! >= 0));
   if (!withPutts.length) return null;
   const total = withPutts.reduce((s, r) => s + played(r).filter((h) => (h.putts || 0) >= 3).length, 0);
   return total / withPutts.length;

@@ -14,6 +14,7 @@ export type Best = {
   /** The best this one beat (the previous best), when there was one. */
   prev: { value: number; display: string } | null;
   isNew: boolean;
+  matched?: boolean;
 };
 export type PersonalBests = { rounds: number; bests: Best[]; newest: Best | null };
 
@@ -24,7 +25,7 @@ const sorted = (r: Round) => [...played(r)].sort((a, b) => a.hole_number - b.hol
 const gross = (r: Round) => strokesOf(r);
 const net = (r: Round) => (r.course_handicap != null ? strokesOf(r) - r.course_handicap : null);
 const birdies = (r: Round) => played(r).filter((h) => h.strokes != null && h.strokes <= h.par - 1).length;
-const putts = (r: Round) => { const hs = played(r); return hs.length === 18 && hs.every((h) => h.putts != null) ? hs.reduce((s, h) => s + (h.putts || 0), 0) : null; };
+const putts = (r: Round) => { const hs = played(r); return hs.length === 18 && hs.every((h) => Number.isInteger(h.putts) && h.putts != null && h.putts >= 0) ? hs.reduce((s, h) => s + (h.putts || 0), 0) : null; };
 const streak = (r: Round) => { let best = 0, run = 0; for (const h of sorted(r)) { run = h.strokes != null && h.strokes <= h.par ? run + 1 : 0; best = Math.max(best, run); } return best; };
 const nines = (r: Round): { value: number; which: string }[] => {
   const hs = sorted(r);
@@ -40,7 +41,7 @@ function pick(cands: Cand[], lowerIsBetter: boolean, min = 1): { best: Cand; pre
   const order = [...ok].sort((a, b) => (lowerIsBetter ? a.value - b.value : b.value - a.value) || (+new Date(b.r.played_at) - +new Date(a.r.played_at)));
   const best = order[0];
   // the previous best: the best among rounds BEFORE the best's round
-  const before = order.filter((c) => +new Date(c.r.played_at) < +new Date(best.r.played_at));
+  const before = order.filter((c) => c.r.id !== best.r.id && +new Date(c.r.played_at) <= +new Date(best.r.played_at));
   return { best, prev: before[0] ?? null };
 }
 const whenOf = (r: Round) => { const d = new Date(`${String(r.played_at).slice(0, 10)}T12:00:00`); return isNaN(+d) ? String(r.played_at).slice(0, 10) : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };   // "Oct 25"
@@ -53,7 +54,7 @@ export function personalBests(rounds: Round[], now = new Date()): PersonalBests 
     if (!picked) return;
     const { best, prev } = picked;
     out.push({ key, label: LABEL[key], value: best.value, display: fmt(best.value), lowerIsBetter, roundId: best.r.id, course: best.r.course, tee: best.r.tee_name ?? null, playedAt: best.r.played_at, when: whenOf(best.r),
-      detail: detail ? detail(best) : [best.r.course, best.r.tee_name].filter(Boolean).join(" · "), prev: prev ? { value: prev.value, display: fmt(prev.value) } : null, isNew: isNew(best.r, now) });
+      detail: detail ? detail(best) : [best.r.course, best.r.tee_name].filter(Boolean).join(" · "), prev: prev ? { value: prev.value, display: fmt(prev.value) } : null, isNew: isNew(best.r, now) && (!prev || best.value !== prev.value), matched: !!prev && best.value === prev.value });
   };
   add("gross", true, pick(r18.map((r) => ({ r, value: gross(r) })), true), (v) => String(v));
   add("net", true, pick(r18.filter((r) => net(r) != null).map((r) => ({ r, value: net(r) as number })), true), (v) => String(v));
@@ -68,12 +69,13 @@ export function personalBests(rounds: Round[], now = new Date()): PersonalBests 
 
 /** The bests a given round set — for the recap's "new personal best" line and the round email. */
 export function newBestsOf(rounds: Round[], roundId: string): Best[] {
-  return personalBests(rounds, new Date(8640000000000000)).bests.filter((b) => b.roundId === roundId);
+  return personalBests(rounds, new Date(8640000000000000)).bests.filter((b) => b.roundId === roundId && !b.matched);
 }
 
 /** "beat your 81 by two" / "first one" */
 export function beatLine(b: Best): string {
   if (!b.prev) return "your first";
+  if (b.value === b.prev.value) return `matched your best of ${b.prev.display}`;
   const d = Math.abs(b.value - b.prev.value), word = b.key === "points" ? "point" : b.key === "birdies" ? "birdie" : b.key === "streak" ? "hole" : b.key === "putts" ? "putt" : "shot";
   return `beat your ${b.prev.display} by ${d === 1 ? "one" : d === 2 ? "two" : d === 3 ? "three" : d} ${d === 1 ? word : word + "s"}`;
 }

@@ -1,5 +1,8 @@
 "use client";
+import { completePenaltyRound } from "@/lib/round-penalties";
+import { AnalyticsFilterSheet } from "@/components/analytics-filters";
 
+import { analyticsScope, analyticsNameKey, analyticsCoverage, completeScoringRound, completePuttingRound, establishedIndexChange } from "@/lib/analytics-quality";
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { InsightsCard } from "@/components/insights";
 import React, { useEffect, useState, useMemo } from "react";
@@ -10,11 +13,10 @@ import { recentForm, trendSummary, type TrendSample } from "@/lib/chart-trend";
 import { ChartTip, DismissableChart } from "@/components/charts/chart-tip";
 import { ChartAxisTick } from "@/components/charts/axis-tick";
 import { chartXAxis } from "@/lib/chart-axis";
-import { roundStatCompleteness } from "@/lib/round-stats";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
-  played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, handicapRounds, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
+  roundHoleCount, played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, hasHoleDetail,
+  girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, handicapRounds, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
@@ -119,27 +121,36 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 }) {
   const [win, setWin] = useState<"5" | "20" | "season" | "all">("all");
   const allDone = handicapRounds(rounds);
-  const nowYear = new Date().getFullYear();
-  const byRecent = [...allDone].sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at));
-  const done = win === "5" ? byRecent.slice(0, 5)
-    : win === "20" ? byRecent.slice(0, 20)
-    : win === "season" ? allDone.filter((r) => new Date(r.played_at).getFullYear() === nowYear)
-    : allDone;
+  const [courseFilter, setCourseFilter] = useState("");
+  const [teeFilter, setTeeFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const scope = { window: win, course: courseFilter, tee: teeFilter, length: "all" as const };
+  const scopedAll = analyticsScope(allDone, { ...scope, window: "all" });
+  const done = analyticsScope(allDone, scope);
+  const coverage = analyticsCoverage(done);
+  const rawLength = done.length > 0 && done.every(r => roundHoleCount(r) === 9) ? 9 : 18;
+  const rawRounds = done.filter(r => completeScoringRound(r, rawLength));
+  const priorRounds = win === "season"
+    ? scopedAll.filter(r => Number(r.played_at.slice(0, 4)) === Number(done[0]?.played_at.slice(0, 4)) - 1)
+    : scopedAll.slice(win === "5" ? 5 : 20, win === "5" ? 10 : 40);
+  const courseOptions = [...new Map(allDone.map(r => [analyticsNameKey(r.course), r.course])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
-  const avgDiff = done.length ? done.reduce((s, r) => s + diffOf(r), 0) / done.length : null;
-  const best = done.length ? Math.min(...done.map(diffOf)) : null;
+  const avgDiff = rawRounds.length ? rawRounds.reduce((s, r) => s + diffOf(r), 0) / rawRounds.length : null;
+  const best = rawRounds.length ? Math.min(...rawRounds.map(diffOf)) : null;
   const allHoles = done.flatMap(played);
   // Per-hole putting remains valid on partial tracking because both numerator and denominator are known.
   // Whole-round putting below is intentionally stricter and never infers missing holes.
   const withPutts = allHoles.filter((h) => h.putts != null);
   const avgPuttsPerHole = withPutts.length ? withPutts.reduce((s, h) => s + (h.putts || 0), 0) / withPutts.length : null;
-  const completePuttRounds = done.filter((r) => roundStatCompleteness(r.holes).puttsRoundEligible);
+  const completePuttRounds = done.filter(r => completePuttingRound(r, rawLength));
   const avgPuttsPerRound = completePuttRounds.length
     ? completePuttRounds.reduce((s, r) => s + puttsOf(r), 0) / completePuttRounds.length
     : null;
   const gir = girStats(done), fir = firStats(done), scramble = scrambleStats(done), sand = sandSaveStats(done);
-  const pens = done.reduce((s, r) => s + pensOf(r), 0);
-  const fulls = done.filter((r) => played(r).length >= 14 || isGrossOnly(r));
+  const penaltyRounds = rawRounds.filter(r=>completePenaltyRound(r,rawLength));
+  const pens = penaltyRounds.reduce((s, r) => s + pensOf(r), 0);
+  const fulls = rawRounds;
   const estimablePts = fulls.filter(stablefordEstimable);
   const avgPts = estimablePts.length ? estimablePts.reduce((s, r) => s + estimatedStablefordPts(r), 0) / estimablePts.length : null;
   const anyEstimatedPts = estimablePts.some(hasEstimatedStableford);
@@ -150,20 +161,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const hcp = runningHandicap(allDone);
 
   // Index trajectory: the running index recomputed after each round (full history, WHS).
-  const idxTrail = useMemo(() => {
-    const chron = handicapRounds(rounds)
-      .sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
-    const pts: number[] = [];
-    for (let i = 0; i < chron.length; i++) {
-      const rh = runningHandicap(chron.slice(0, i + 1));
-      if (rh.index != null) pts.push(rh.index);
-    }
-    return pts;
-  }, [rounds]);
-  const idxDelta = idxTrail.length >= 2
-    ? { first: idxTrail[0], cur: idxTrail[idxTrail.length - 1], delta: idxTrail[idxTrail.length - 1] - idxTrail[0] }
-    : null;
-  const threePutts = threePuttsPerRound(done);
+  const idxDelta = useMemo(() => establishedIndexChange(allDone), [rounds]);
+  const threePutts = completePuttRounds.length ? completePuttRounds.reduce((n, r) => n + played(r).filter(h => h.putts! >= 3).length, 0) / completePuttRounds.length : null;
   const puttsPerRound = avgPuttsPerRound == null ? null : Math.round(avgPuttsPerRound * 10) / 10;
   // Shared aspire goal (drives BOTH the synthesis and the "How you compare" card).
   const [goalHcp, setGoalHcp] = useState<number | null>(null);
@@ -174,7 +173,12 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const detailRounds = done.filter(hasHoleDetail).length;
 
   // Compact, numbers-only career summary for the AI coach.
+  const scopeLabel = `${win === "all" ? "All recorded rounds" : win === "season" ? "This season" : `Last ${win} rounds`} · ${courseFilter ? courseOptions.find(([k]) => k === courseFilter)?.[1] : "all courses"} · ${courseFilter ? teeFilter || "all recorded tees at this course" : "course/tee not filtered"} · ${rawLength}-hole raw comparisons`;
   const coachAggregate = {
+    analysisScope: scopeLabel.slice(0, 120),
+    coverage,
+    rawRoundHoles: rawLength,
+    avgPuttsPerRound,
     handicapIndex: hcp.index ?? currentIndex ?? null,
     roundsLogged: done.length,
     avgScoreVsPar: avgDiff == null ? null : Math.round(avgDiff * 10) / 10,
@@ -188,7 +192,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     sandSavePct: sand.total ? Math.round((100 * sand.hit) / sand.total) : null,
     avgByPar: byPar,
     scoringMix: buckets, // eagles/birdies/pars/bogeys/doubles totals
-    penaltiesTotal: pens,
+    penaltiesTotal: penaltyRounds.length ? pens : null,
+    penaltyRounds: penaltyRounds.length,
   };
 
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
@@ -241,7 +246,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const perRoundNum = (key: StatKey, r: Round): number | null => {
     const hs = played(r);
     switch (key) {
-      case "rounds": case "avgpar": case "best": return diffOf(r);
+      case "rounds": return diffOf(r);
+      case "avgpar": case "best": return completeScoringRound(r, rawLength) ? diffOf(r) : null;
       case "diff": return roundDifferential(r);
       case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
       case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
@@ -251,9 +257,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "scramble": { const sc = scrambleStats([r]); return sc.total ? 100 * sc.hit / sc.total : null; }
       case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? 100 * ss.hit / ss.total : null; }
       case "fir": { const f = firStats([r]); return f.total ? 100 * f.hit / f.total : null; }
-      case "putts": return roundStatCompleteness(r.holes).puttsRoundEligible ? puttsOf(r) : null;
-      case "threeputt": { const pp = hs.filter((h) => h.putts != null); return pp.length ? hs.filter((h) => (h.putts || 0) >= 3).length : null; }
-      case "pen": return pensOf(r);
+      case "putts": return completePuttingRound(r, rawLength) ? puttsOf(r) : null;
+      case "threeputt": return completePuttingRound(r, rawLength) ? hs.filter(h => h.putts! >= 3).length : null;
+      case "pen": return completePenaltyRound(r, rawLength) ? pensOf(r) : null;
     }
     return null;
   };
@@ -297,9 +303,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 <span onClick={() => setShowDiffs((v) => !v)} style={{ color: C.gold, cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{showDiffs ? "hide" : "how?"}</span>
               )}</>}
         </div>
+        {hcp.index != null && hcp.total < 20 && <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>Establishing your index · {hcp.total} of 20 differentials. Changes during this stage reflect the growing sample.</div>}
         {idxDelta && Math.abs(idxDelta.delta) >= 0.1 && (
           <div style={{ color: idxDelta.delta < 0 ? "#8FE0B0" : "#FB7185", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
-            {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
+            {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your established index ({idxDelta.first.toFixed(1)})
           </div>
         )}
         {hcp.index != null && hcp.recentDetail.length > 0 && showDiffs && (
@@ -338,7 +345,12 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 background: win === k ? C.gold : C.greenLight, color: win === k ? C.green : C.sage, fontWeight: win === k ? 700 : 400,
               }}>{label}</button>
             )))}
+            <button type="button" data-analytics-filter-toggle aria-label="Filter by course and tee" aria-expanded={showFilters} aria-pressed={!!courseFilter}
+              title={courseFilter ? `Filters applied: ${courseOptions.find(([k])=>k===courseFilter)?.[1] || courseFilter}${teeFilter ? ` · ${teeFilter}` : ""}` : "Filter by course and tee"}
+              style={{ flex: "0 0 34px", minHeight: 34, textAlign: "center", fontSize: 18, borderRadius: 6, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: courseFilter ? C.gold : C.greenLight, color: courseFilter ? C.green : C.sage }}
+              onClick={()=>setShowFilters(true)}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false" style={{ display: "block", margin: "0 auto" }}><line x1="2" y1="5" x2="18" y2="5" /><line x1="5" y1="10" x2="15" y2="10" /><line x1="8" y1="15" x2="12" y2="15" /></svg></button>
           </div>
+          {showFilters && <AnalyticsFilterSheet rounds={allDone} course={courseFilter} tee={teeFilter} onClose={()=>setShowFilters(false)} onApply={(course,tee)=>{setCourseFilter(course);setTeeFilter(tee);setShowFilters(false);}} />}
           <div data-dashboard-range-caption style={{ color: C.sage, fontSize: 11, marginTop: 5, textAlign: "center", whiteSpace: "nowrap" }}>
             Stats: {done.length} round{done.length === 1 ? "" : "s"} · WHS index: best 8 of 20
           </div>
@@ -346,7 +358,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       )}
 
       {/* 212.18: the two strongest findings, right after the handicap — the full screen one tap away */}
-      <InsightsCard rounds={rounds} />
+      <InsightsCard rounds={done} previousRounds={priorRounds} />
 
       {diffTrend.length >= 2 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
@@ -364,6 +376,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 
       <DashboardCoach
         aggregate={coachAggregate}
+        scopeLabel={scopeLabel}
         roundsUsed={done.length}
         userEmail={userEmail}
         userId={userId}
@@ -376,10 +389,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       {sectionHead("SCORING", anyHoleDetail ? expandBtn(moreScoring, () => setMoreScoring((v) => !v)) : undefined)}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
-        <Clk k="avgpar" d={detail} set={setDetail}><StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
-        <Clk k="best" d={detail} set={setDetail}><StatCard label="Best round" value={best == null ? "—" : toParStr(best)} /></Clk>
+        <Clk k="avgpar" d={detail} set={setDetail}><StatCard label={`Avg vs par · ${rawLength}H`} value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
+        <Clk k="best" d={detail} set={setDetail}><StatCard label={`Best round · ${rawLength}H`} value={best == null ? "—" : toParStr(best)} /></Clk>
         <Clk k="diff" d={detail} set={setDetail}><StatCard label="Avg differential" value={avgDifferential == null ? "—" : avgDifferential.toFixed(1)}
-          sub={diffs.length ? `${diffs.length} full round${diffs.length === 1 ? "" : "s"} w/ rating·slope` : "needs 18 holes + rating/slope"} /></Clk>
+          sub={diffs.length ? `${diffs.length} rated round${diffs.length === 1 ? "" : "s"} · 9+ holes` : "needs 9+ holes + rating/slope"} /></Clk>
         <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub={anyEstimatedPts ? "includes estimates" : "full rounds"} /></Clk>
       </div>
       {anyHoleDetail && moreScoring && (
@@ -400,13 +413,13 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           {sectionHead("SHORT GAME & PUTTING", expandBtn(moreShort, () => setMoreShort((v) => !v)))}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
-            <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / round" value={avgPuttsPerRound == null ? "—" : avgPuttsPerRound.toFixed(1)} sub={completePuttRounds.length ? `${completePuttRounds.length} complete 18-hole round${completePuttRounds.length === 1 ? "" : "s"}` : "needs putts on all 18 holes"} /></Clk>
+            <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / round" value={avgPuttsPerRound == null ? "—" : avgPuttsPerRound.toFixed(1)} sub={completePuttRounds.length ? `${completePuttRounds.length} complete ${rawLength}-hole round${completePuttRounds.length === 1 ? "" : "s"}` : `needs putts on all ${rawLength} holes`} /></Clk>
           </div>
           {moreShort && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
               <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
               <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
-              <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
+              <Clk k="pen" d={detail} set={setDetail}><StatCard label="Recorded penalties" value={penaltyRounds.length ? (pens / penaltyRounds.length).toFixed(1) : "—"} sub={`${penaltyRounds.length} confirmed complete ${rawLength}-hole cards`} /></Clk>
             </div>
           )}
         </>
@@ -455,7 +468,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         </div>
       )}
 
-      <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
+      <div data-analytics-coverage style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>
+        Recorded evidence: putts on {coverage.puttHoles}/{coverage.holes} scored holes; fairways on {coverage.fairwayHoles}/{coverage.fairwayEligible} eligible holes. Round putting averages use {completePuttRounds.length} complete {rawLength}-hole cards. Missing putting and fairway entries are excluded, not scored as zero. Penalty averages use {penaltyRounds.length} explicitly confirmed complete cards.
+      </div>
+      <ShotSynthesis coverage={coverage} puttingRounds={rawLength === 18 ? completePuttRounds.length : 0} fir={fir} gir={gir} puttsPerRound={rawLength === 18 ? puttsPerRound : null} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
 
       {allHoles.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
@@ -510,14 +526,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 // stats. Collapsible, date-stamped, shows how many rounds it used, and persists
 // on the user's profile so it's there whenever they return. Uses the same daily
 // quota as the per-round analysis; the owner email is exempt.
-function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSaved }: {
-  aggregate: any; roundsUsed: number; userEmail?: string | null; userId?: string; saved?: any; onSaved?: () => void;
+function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSaved, scopeLabel }: {
+  aggregate: any; roundsUsed: number; scopeLabel: string; userEmail?: string | null; userId?: string; saved?: any; onSaved?: () => void;
 }) {
   const UNLIMITED_EMAIL = "amitsud@gmail.com";
   const unlimited = (userEmail || "").trim().toLowerCase() === UNLIMITED_EMAIL;
   // saved shape: { text, date (ISO), rounds }
   const initial = saved && saved.text ? saved : null;
-  const [data, setData] = useState<{ text: string; date: string; rounds: number } | null>(initial);
+  const [data, setData] = useState<{ text: string; date: string; rounds: number; scopeLabel?: string } | null>(initial);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   const [err, setErr] = useState("");
@@ -537,7 +553,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
       const d = await resp.json();
       if (!resp.ok) { setErr(d.error || "Couldn't generate your summary."); setState("error"); return; }
       if (!unlimited) { recordAiUse(); setLeft(aiUsesLeft()); }
-      const payload = { text: d.analysis || "", date: new Date().toISOString(), rounds: roundsUsed };
+      const payload = { text: d.analysis || "", date: new Date().toISOString(), rounds: roundsUsed, scopeLabel };
       setData(payload); setState("idle");
       if (userId) {
         supabase.from("profiles").update({ dashboard_ai: payload }).eq("id", userId).then(() => { onSaved && onSaved(); });
@@ -559,6 +575,8 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
         {data && <span style={{ color: C.sage, fontSize: 16 }}>{open ? "▾" : "▸"}</span>}
       </div>
 
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Current selection: {scopeLabel}</div>
+      {data && data.scopeLabel !== scopeLabel && <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>The saved coaching summary covers {data.scopeLabel || "an earlier selection without recorded filters"}. Generate a new review for the current selection.</div>}
       {data && !open && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
           Summary from {fmt(data.date)} · {data.rounds} round{data.rounds === 1 ? "" : "s"} — tap to expand
@@ -567,7 +585,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
 
       {!data && state !== "loading" && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          Get a coaching review across all your rounds — strengths, biggest opportunities, and what to work on to shoot lower.
+          Get a coaching review of this selection — strengths, biggest opportunities, and what to work on to shoot lower.
           {unlimited ? " (unlimited)" : ` (${left} left today)`}
         </div>
       )}

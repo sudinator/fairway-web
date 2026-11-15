@@ -1,3 +1,42 @@
+## 212.108 analytics follow-ups
+
+Implemented: owner-approved inline descending-line filter icon + course/dependent-tee popup; qualified partnership results rate; minimum recorded-opportunity floors; explicit penalty confirmation with legacy unknowns, snapshot protection and edit invalidation. Preserve all earlier backlog items below. Before production: native 212.108 CI/Vercel staging and required feature checks, statistics data-profile review, actual 0234–0236 ledger reconciliation against reported production 212.101, staging-to-main verify and Production Ready/safe smoke check. No native result is inferred from local checks.
+
+## 212.107 analytics cleanup
+
+Implemented approved analytics corrections and repeat-use observability; definitions and limits in ANALYTICS_212.107.md. Release gates: native 212.107 GitHub/Supabase CI, Vercel staging feature/regression checks and existing production docs/sql/data_profile.sql review. Observe 28 days before interpreting new feature-return cohorts. Earlier deleted drafts/feature observations cannot be backfilled. Preserve all pre-existing course/setup backlog items below.
+
+## 212.106.261114 — scheduler permission-test correction
+
+Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.
+
+The concurrency helper directly updated provider-owned cron.job to pause and restore the daily job. Supabase rejects both writes, producing the two errors in the reported CI failure. Replace both writes with cron.alter_job, restore the original enabled state independently of fixture-cleanup success, and verify restoration. Extend the existing recurrence guard to reject direct scheduler metadata writes, including multiline SQL.
+
+Local evidence includes the full 232-migration chain and a restricted non-superuser reproduction: the old helper fails with the two reported errors; the corrected helper passes actual competing sessions with initially enabled and disabled jobs; an injected setup failure remains a failure and restores the scheduler. These checks supplement the native Supabase gate.
+
+No additional migration. All existing SQL migrations, including 0234, and application behavior source remain byte-identical to 212.105. Generated version metadata advances to 212.106. Analytics is paused and no analytics changes are included. See RELEASE_VERIFICATION_212.106.md.
+
+## 212.105 — CI permission-call regression
+
+Corrected in candidate: stale-game assertions repeat the documented 208.4 revoked-function-call failure pattern. Central privilege catalogue and recurrence guard extended. Confirm native GitHub/Supabase database lane before staging promotion. Analytics review paused at owner request; no analytics changes included.
+
+## 212.104 — Agreed stale-game process implemented
+
+- Daily 4 a.m. Eastern execution replaces the old app-open sweeps. Empty games delete seven days after later of created/play date; full cards complete after 24h scoring inactivity; partials go to organizer review; Test clubs excluded.
+- Guests, no-shows, canonical team cards, 9/18 personal rounds, retry/rollback, score-write serialization, job history and Operations status are covered by the new migration-chain tests. Live staging validation and deployment remain pending.
+- Existing unfinished cards begin with a conservative migration-time score-age baseline. Partial scores are preserved; meaningful financial/contest/history records are not treated as empty.
+
+## 212.103 — Round recovery consolidation
+
+- Implemented one yellow card per identified round; preserve local recovery and server management actions. Local recovery, browser and application checks passed; live staging validation pending.
+- CI follow-up: investigate intermittent chart-tooltip Close tap timeout observed during local validation; unchanged baseline and candidate later passed. No chart test was weakened.
+- Approved stale-game policy remains separate and unimplemented: daily 4 a.m. Eastern; empty game deletion seven days after later of created/scheduled date; completed cards after 24h scoring inactivity; partials for organizer review; Test clubs excluded.
+
+## 212.102 — saved-tee selection correction
+
+- Implemented a shared validated option list for Organizer tee selection and saving; regression checks cover round trips and failure/retry. Live staging validation remains pending.
+- Stale-game policy proposal remains undecided: scheduled hourly execution, complete cards after inactivity, organizer review for partials, archive empty drafts. No policy/database change in this candidate.
+
 # 212.101 candidate follow-up
 
 - Same existing phone installation: keep 212.100 open through staging deployment; verify banner, Update now, actual 212.101 app/worker, retained success after banner expiry and saved scores. No replacement shortcut or storage clearing.

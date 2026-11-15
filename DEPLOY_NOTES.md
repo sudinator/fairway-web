@@ -1,3 +1,57 @@
+## 212.108.261114 — approved Summary filters and analytics follow-ups
+
+Use the owner-approved three descending horizontal lines beside the time-range controls; green without a course/tee filter and yellow after Apply. Popup criteria are course and dependent tee only. Remove the round-length selector while keeping raw nine-/eighteen-hole comparisons separate. Partner table and highlighted record now rank by qualified points rate, not accumulated points. Fairway/GIR peer verdicts require five rounds plus fifty recorded opportunities. Penalty averages/trends/coaching use explicitly confirmed complete cards; legacy/default zeros remain unknown. Round-detail confirmation is acknowledged, reversible and invalidated by later score/penalty edits.
+
+Migration 0236 required. All earlier SQL migrations remain byte-identical. Includes all 212.102–107 work relative to the reported production 212.101 baseline; verify actual applied migration IDs before any production SQL. See ANALYTICS_212.108.md and RELEASE_VERIFICATION_212.108.md. Native staging/production gates remain required; no production approval or merge has occurred.
+
+## 212.107.261114 — analytics quality and repeat use
+
+212.106 GitHub CI is green per the owner. This candidate implements the approved analytics cleanup in the existing screens: missing-handicap net awards, complete putting samples, established-index trends, separate raw 9/18-hole comparisons, course/tee/length scope, prior-period Insights, tied personal bests, per-stat evidence and bounded peer proxies, scope-aware AI, consistent admin populations, mature activation/retention cohorts, cleanup-stable game lifecycle counts, observed feature/repeat/reminder outcomes and visible error/retry/freshness states. See ANALYTICS_212.107.md for definitions and preserved contracts.
+
+Migration 0235 required; all earlier migration SQL remains unchanged. Full local release evidence is recorded in RELEASE_VERIFICATION_212.107.md. Native GitHub/Supabase CI, Vercel staging and the existing production data-profile review remain external release gates. This is not production approval.
+
+## 212.106.261114 — scheduler permission-test correction
+
+Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.
+
+The concurrency helper directly updated provider-owned cron.job to pause and restore the daily job. Supabase rejects both writes, producing the two errors in the reported CI failure. Replace both writes with cron.alter_job, restore the original enabled state independently of fixture-cleanup success, and verify restoration. Extend the existing recurrence guard to reject direct scheduler metadata writes, including multiline SQL.
+
+Local evidence includes the full 232-migration chain and a restricted non-superuser reproduction: the old helper fails with the two reported errors; the corrected helper passes actual competing sessions with initially enabled and disabled jobs; an injected setup failure remains a failure and restores the scheduler. These checks supplement the native Supabase gate.
+
+No additional migration. All existing SQL migrations, including 0234, and application behavior source remain byte-identical to 212.105. Generated version metadata advances to 212.106. Analytics is paused and no analytics changes are included. See RELEASE_VERIFICATION_212.106.md.
+
+## 212.105.261114 — fresh-database permission-test correction
+
+The new daily stale-game test attempted to call EXECUTE-revoked maintenance as an authenticated member. This repeats the Supabase-image crash pattern documented in 208.4 and HANDOFF.md. Replace that call with has_function_privilege(current_user, ...), preserving the real timestamp-tampering and admin/member RLS checks. Add all seven private maintenance helpers to the existing central privilege assertion. Extend the existing recurrence guard with app-role direct-call detection and nine executable canaries.
+
+No application behavior, scoring rules, migration SQL, database grants or policies change. Migration 0234 remains byte-identical to 212.104; no additional migration is required. The full source includes all 212.104 functionality. The screenshot proves a lost backend connection in the app-role DO block; confirming the native supautils crash signature requires the expanded database diagnostics. Hosted GitHub/Supabase and Vercel staging checks remain release gates.
+
+## 212.104.261114 — Daily stale-game maintenance
+
+- Migration 0234 replaces app-open maintenance with one server job at 4 a.m. Eastern, rescheduling the same named daily job across DST without changing other jobs' timezone.
+- Delete genuinely empty games seven Eastern calendar days after the later of creation/play date. Preserve Test clubs, future games, financial/contest records, posted rounds and Cup schedules (unlink the empty session game only).
+- Complete scheduled 9/18-hole individual or canonical shared-ball cards after 24 hours without scoring; guests count and explicit no-shows are excluded. Existing posting/handicap rules remain authoritative.
+- Send one existing in-app game notification to the organizer for inactive partial cards after 48 hours. New scoring resets the review flag; partial scores remain unchanged.
+- Retain completed/failed daily run counts and bounded technical details; reuse Operations for schedule/result visibility. Remove the old Home sweep calls and browser execution grants.
+- Track actual score changes; optional stats do not restart the timer. Existing unfinished cards receive an installation-time grace baseline because older personal/initial-insert score timestamps were not recorded reliably.
+- Reuse the existing personal-round finish helper for complete saved 9/18-hole plans. No deletion of personal rounds. Source migration and rollback/concurrency assertions run in both fresh-database gates.
+- Includes the 212.102 tee fix and 212.103 yellow recovery-panel consolidation. No dependency update.
+
+## 212.103.261114 — One yellow round recovery panel
+
+- Reuse the yellow Resume design for local-only, server-only and matching local/server unfinished rounds.
+- Match with existing stable round/draft-session identity; distinct rounds remain separate. Prefer local draft for Resume, preserving unsynced scores.
+- Keep Mark complete/Delete/Discard all under Round options. Pending local changes route completion through the existing scorecard save flow.
+- Clear matching local recovery only after successful completion/deletion; bulk discard clears only draft IDs returned by the server.
+- No migration, dependency update or stale-game automation change. Includes 212.102 tee correction.
+
+## 212.102.261114 — Organizer saved-tee selection
+
+- Use the same validated library/saved-player tee options for displaying and saving individual tee selections.
+- Keep library precedence, optional yardages, setup confirmations, handicap calculation and reload behavior.
+- Show a recovery message if a requested tee is unavailable; exclude missing/non-finite/non-positive rating or slope.
+- No database migration, dependency update, course refresh overwrite or stale-game policy change.
+
 ## 212.101.261113 — readable diagnostics and retained update results (candidate)
 
 - Add an expandable, readable device summary: installed app, actual controlling-worker version, waiting-worker state, latest/last-known release, last version-check timestamp/result and diagnostic-storage status. Opening queries the worker without activation; Refresh summary rechecks version/worker. A mismatch/no reply is reported without guessing its cause. Available at the existing member, sign-in and Admin diagnostics entry points.

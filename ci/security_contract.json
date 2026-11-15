@@ -54,6 +54,9 @@
   "admin_wipe_group(uuid)": "authenticated",
   "admin_wipe_user(uuid)": "authenticated",
   "admit_signup(uuid,uuid)": "authenticated",
+  "analytics_member_eligible(uuid)": "",
+  "analytics_participation()": "",
+  "analytics_player_holes(uuid,text,jsonb)": "",
   "announce_game_players(uuid)": "authenticated",
   "announce_game_recap(uuid,text,jsonb,jsonb)": "",
   "apply_course_freshness(uuid,bigint)": "authenticated",
@@ -102,7 +105,7 @@
   "find_duplicate_member(uuid)": "",
   "finish_game(uuid)": "authenticated",
   "finish_game_and_post_rounds(uuid)": "authenticated",
-  "finish_stale_rounds()": "authenticated",
+  "finish_stale_rounds()": "",
   "finish_tee_group(uuid)": "authenticated",
   "finish_tee_group_and_post(uuid)": "authenticated",
   "game_added_note(uuid,uuid)": "",
@@ -161,6 +164,7 @@
   "record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text,jsonb)": "",
   "record_course_freshness_internal(uuid,jsonb,jsonb,boolean)": "",
   "record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)": "",
+  "record_feature_use(text,uuid,uuid)": "authenticated",
   "record_migration(text)": "",
   "record_round_email(uuid,uuid,text,text,text,text)": "",
   "record_settlement(uuid,uuid,uuid,integer,text,uuid,text,text,jsonb)": "authenticated",
@@ -181,6 +185,7 @@
   "restore_account(uuid)": "authenticated",
   "restore_course_version(uuid,integer,text)": "authenticated",
   "review_course_correction(uuid,text)": "authenticated",
+  "run_daily_stale_games(timestamp with time zone)": "",
   "run_log_retention()": "",
   "save_alt_shot_score_fenced(uuid,integer,text,text,integer,integer)": "authenticated",
   "save_alt_shot_side_score(uuid,text,text,integer,integer)": "authenticated",
@@ -213,9 +218,10 @@
   "set_tee_time_captain(uuid,uuid)": "authenticated",
   "setup_lock_exempt()": "",
   "shares_active_club(uuid)": "authenticated",
+  "stale_game_card_state(uuid)": "",
   "submit_course_correction(uuid,uuid,text,text,jsonb,text,text)": "authenticated",
   "sweep_friction(boolean)": "authenticated",
-  "sweep_stale_games()": "authenticated",
+  "sweep_stale_games()": "",
   "team_rounds_in_year(integer)": "",
   "update_game_contest(uuid,text,integer[],text,text)": "authenticated",
   "upsert_tee_time_rsvp(uuid,uuid,text,text[])": "authenticated",
@@ -241,6 +247,12 @@
    "cmd": "r",
    "roles": "public",
    "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))"
+  },
+  "analytics_game_lifecycle.analytics_lifecycle_admin_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "is_admin()"
   },
   "banned_emails.banned_emails_admin_select": {
    "check": null,
@@ -998,6 +1010,12 @@
    "roles": "public",
    "using": "((from_user_id = auth.uid()) OR (to_user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = settlements.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text) AND (gm.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))"
   },
+  "stale_game_job_runs.stale_job_admin_read": {
+   "check": null,
+   "cmd": "r",
+   "roles": "authenticated",
+   "using": "is_admin()"
+  },
   "tee_time_rsvps.ttr_delete": {
    "check": null,
    "cmd": "d",
@@ -1075,6 +1093,7 @@
  },
  "table_grants": {
   "authenticated:activity_log": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:analytics_game_lifecycle": "SELECT",
   "authenticated:banned_emails": "SELECT",
   "authenticated:club_reports": "SELECT",
   "authenticated:competition_players": "DELETE,INSERT,SELECT,UPDATE",
@@ -1117,6 +1136,7 @@
   "authenticated:score_audit": "SELECT",
   "authenticated:settlement_allocations": "SELECT",
   "authenticated:settlements": "DELETE,INSERT,SELECT,UPDATE",
+  "authenticated:stale_game_job_runs": "SELECT",
   "authenticated:tee_time_rsvps": "DELETE,INSERT,SELECT,UPDATE",
   "authenticated:tee_times": "DELETE,INSERT,SELECT,UPDATE"
  }

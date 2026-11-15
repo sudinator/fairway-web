@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python3 "$ROOT/ci/check_recurrence_guards.py"
 TMP="$(mktemp -d)"
 cleanup() {
   local result=$?
@@ -269,6 +270,10 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.
 # The daily course-check claim (0156): budget, remainder, idling, ageing, oldest-first, the cap,
 # retention of last-known values, and the permission boundary.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-api-checks.sql"
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-daily-stale-games.sql"
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-analytics-quality.sql"
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-penalty-tracking.sql"
+BNN_DISPOSABLE_DATABASE=1 bash "$ROOT/ci/test_daily_stale_concurrency.sh" "$DB_URL"
 
 # 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot
 # (ci/security_contract.json). A difference fails the build; recording it is a deliberate --update.

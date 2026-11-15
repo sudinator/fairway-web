@@ -19,6 +19,10 @@ export type RoundAiSummary = {
 };
 
 export type DashboardAiSummary = {
+  analysisScope?: string;
+  coverage?: Record<string, unknown>;
+  rawRoundHoles?: number;
+  avgPuttsPerRound?: number | null;
   handicapIndex?: number | null;
   roundsLogged?: number | null;
   avgScoreVsPar?: number | null;
@@ -33,6 +37,7 @@ export type DashboardAiSummary = {
   avgByPar?: Record<string, unknown> | null;
   scoringMix?: Record<string, unknown> | null;
   penaltiesTotal?: number | null;
+  penaltyRounds?: number;
 };
 
 export type AiRequest =
@@ -45,9 +50,10 @@ const ROUND_KEYS = new Set([
   "doublesOrWorse",
 ]);
 const DASHBOARD_KEYS = new Set([
+  "analysisScope", "coverage", "rawRoundHoles", "avgPuttsPerRound",
   "handicapIndex", "roundsLogged", "avgScoreVsPar", "bestVsPar", "avgDifferential",
   "avgPuttsPerHole", "threePuttsPerRound", "girPct", "fairwayPct", "scramblingPct",
-  "sandSavePct", "avgByPar", "scoringMix", "penaltiesTotal",
+  "sandSavePct", "avgByPar", "scoringMix", "penaltiesTotal", "penaltyRounds",
 ]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -84,7 +90,11 @@ function validateDashboard(value: unknown): value is DashboardAiSummary {
   const keys = Object.keys(value);
   if (keys.length > DASHBOARD_KEYS.size || keys.some((k) => !DASHBOARD_KEYS.has(k))) return false;
   for (const [key, v] of Object.entries(value)) {
-    if (key === "avgByPar" || key === "scoringMix") {
+    if (key === "analysisScope") {
+      if (typeof v !== "string" || v.length > 120) return false;
+    } else if (key === "coverage") {
+      if (!isPlainObject(v) || Object.keys(v).length > 20 || Object.entries(v).some(([k, x]) => k.length > 40 || !finiteNumberOrNull(x))) return false;
+    } else if (key === "avgByPar" || key === "scoringMix") {
       if (!boundedNumericObject(v)) return false;
     } else if (!finiteNumberOrNull(v)) {
       return false;

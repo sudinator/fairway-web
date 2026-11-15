@@ -1,3 +1,7 @@
+<!-- 212.106: CI-only scheduler test correction. No new migration; 0234 is unchanged. -->
+<!-- 212.105: no additional migration. 0234 SQL is byte-identical to 212.104; this release corrects CI assertions only. -->
+<!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
+<!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->
 ## 192.16.260929 — migration 0158
 
 Apply 0158_profile_privilege_boundaries.sql to staging first. It closes privileged profile INSERT and non-owner direct admin updates. Existing accounts are unchanged. Do not edit or reapply earlier migrations. Full release gates remain required.
@@ -164,7 +168,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 218 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 221 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -386,6 +390,9 @@ Total: 218 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0231_test_clubs_out_of_stats.sql
 - [ ] 0232_name_change_reaches_games.sql
 - [ ] 0233_club_score_and_report_contracts.sql
+- [ ] 0234_daily_stale_games.sql
+- [ ] 0235_analytics_quality.sql
+- [ ] 0236_confirmed_penalty_tracking.sql
 
 <!-- NOTES:START -->
 

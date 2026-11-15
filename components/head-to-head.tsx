@@ -6,7 +6,7 @@ import { C } from "@/lib/golf";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { fetchTestClubIds, withoutTestClubs } from "@/lib/test-clubs";
-import { matchOutcomes, memberRecord, BEST_PARTNER_MIN, formatsLabel, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
+import { matchOutcomes, memberRecord, bestPartnerRecord, partnerRate, BEST_PARTNER_MIN, formatsLabel, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
@@ -54,7 +54,7 @@ export function HeadToHead({ user }: { user: { id: string } }) {
   );
   if (!rec) return null;
   if (!rec.headToHead.length && !rec.partners.length) return null;   // nothing to show until there are finished matches
-  const best = rec.partners.find((p) => p.played >= BEST_PARTNER_MIN);   // 210.7: enough matches to mean something
+  const best = bestPartnerRecord(rec.partners);   // 210.7: enough matches to mean something
   const th: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 700, textAlign: "right", paddingTop: 4, paddingBottom: 4 };
   const td: React.CSSProperties = { borderTop: `1px solid ${C.green}`, paddingTop: 6, paddingBottom: 6, textAlign: "right", fontSize: 13, color: C.cream };
   return (
@@ -71,13 +71,14 @@ export function HeadToHead({ user }: { user: { id: string } }) {
       ) : null}
       {rec.partners.length ? (
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }} data-partners>
-          <thead><tr><th style={{ ...th, textAlign: "left" }}>With · four-ball, alt shot, Trifecta</th><th style={th}>Played</th><th style={th}>Won</th><th style={th}>Pts</th></tr></thead>
+          <thead><tr><th style={{ ...th, textAlign: "left" }}>With · four-ball, alt shot, Trifecta</th><th style={th}>Played</th><th style={th}>Won</th><th style={th}>Pts</th><th style={th}>Rate</th></tr></thead>
           <tbody>{rec.partners.map((r) => (
-            <tr key={r.userId}><td style={{ ...td, textAlign: "left" }}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""}</td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td></tr>
+            <tr key={r.userId}><td style={{ ...td, textAlign: "left" }}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""}</td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td><td style={td}>{r.played >= BEST_PARTNER_MIN && partnerRate(r) != null ? `${Math.round(100 * partnerRate(r)!)}%` : "—"}</td></tr>
           ))}</tbody>
         </table>
       ) : null}
-      {best ? <div style={{ color: C.cream, fontSize: 13, marginTop: 8 }} data-best-partner>⛳ Your best partner: <b>{best.name}</b> — {best.won} win{best.won === 1 ? "" : "s"} in {best.played} <span style={{ color: C.sage }}>({formatsLabel(best.formats)})</span></div> : null}
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Partnership rate counts a win as 1 point and a halved match as ½. At least {BEST_PARTNER_MIN} matches together; equal rates favour more matches.</div>
+      {best ? <div style={{ color: C.cream, fontSize: 13, marginTop: 8 }} data-best-partner>⛳ Best partnership record: <b>{best.name}</b> — {Math.round(100 * best.points / best.played)}% of available points in {best.played} matches <span style={{ color: C.sage }}>({formatsLabel(best.formats)})</span></div> : null}
     </div>
   );
 }

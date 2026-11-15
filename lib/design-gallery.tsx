@@ -1,3 +1,8 @@
+import { HeadToHead } from "@/components/head-to-head";
+import { AnalyticsFilterSheet } from "@/components/analytics-filters";
+import { PenaltyTracking } from "@/components/penalty-tracking";
+import { Dashboard } from "@/components/dashboard";
+import { AdminAnalytics, AdminDailyReport, AdminExtraStats } from "@/components/manage";
 import { HelpPage } from "@/components/manage";
 import { TGC_GROUP_ID } from "@/lib/golf";
 import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
@@ -229,6 +234,18 @@ add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
 
 // Exportable phone support report, available to every member.
 add("70-phone-diagnostics", <PhoneDiagnosticsPanel />);
+
+// 212.107: real Dashboard; loaded admin screens are also photographed interactively by
+// ci/test-analytics-browser.cjs (server rendering correctly shows loading rather than fake figures).
+add("71-analytics-dashboard", <Dashboard rounds={pbSampleRounds} name="Sample member" currentIndex={14.7} saveIndex={()=>{}} onOpen={()=>{}} />);
+add("72-admin-analytics", <AdminAnalytics />);
+add("73-admin-daily", <AdminDailyReport />);
+add("74-admin-devices", <AdminExtraStats />);
+
+add("75-summary-filter-course", <AnalyticsFilterSheet rounds={pbSampleRounds} course="" tee="" onApply={()=>{}} onClose={()=>{}} />);
+add("76-penalty-confirmation", <PenaltyTracking round={{...pbSampleRounds[0],penalties_tracked:false}} />);
+// Loaded partner and round-detail views are photographed by the real-browser analytics fixture.
+add("77-partnership-record", <HeadToHead user={{id:"gallery-member"}} />);
 
 for (const [name, html] of Object.entries(shots)) fs.writeFileSync(path.join(outDir, `${name}.html`), html);
 console.log(`design gallery: ${Object.keys(shots).length} screens → ${outDir}`);

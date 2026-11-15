@@ -8,7 +8,8 @@
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { allocateStrokes } from "@/lib/golf";
-import { chBasis, pkey } from "@/lib/game-shape";
+import { clubIndividualHandicap } from "./club-net-scoring";
+import { pkey } from "@/lib/game-shape";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { buildHighlights } from "@/lib/game-highlights";
 import { matchOutcomes } from "@/lib/match-outcomes";
@@ -101,13 +102,14 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
       const scores = raw.map(holeScore);
       const gross = scores.reduce<number>((a, b) => a + (b ?? 0), 0);
       // Whole-number course handicap — the recap's own rule (lib/game-highlights: Math.round(chBasis)).
-      const ch = Math.round(Number(chBasis(p, game.course_par, nh >= 18 ? undefined : nh) ?? 0));
-      const net = gross - ch;
+      const basis = clubIndividualHandicap(p, game.course_par, nh);
+      const ch = basis == null ? null : Math.round(basis);
+      const net = ch == null ? null : gross - ch;
       if (individual && isFull18(p, nh)) {
         if (!bestGross || gross < bestGross.score) bestGross = { ...who, score: gross, course, date };
-        if (!bestNet || net < bestNet.score) bestNet = { ...who, score: net, course, date };
+        if (net != null && (!bestNet || net < bestNet.score)) bestNet = { ...who, score: net, course, date };
       }
-      const alloc = allocateStrokes(holes, ch);
+      const alloc = ch == null ? null : allocateStrokes(holes, ch);
       if (individual) scores.forEach((s, i) => {
         const h = holes[i]; if (!h || s == null) return;
         const key = `${course}#${h.hole_number}`;
@@ -117,7 +119,7 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
       });
       if (!uid) continue;   // per-member lists: members only (guests have no account)
       members.add(uid);
-      if (individual) {
+      if (individual && alloc) {
         const nb = scores.filter((s, i) => s != null && holes[i] && s - (alloc[holes[i].hole_number] || 0) <= holes[i].par - 1).length;
         const b = netBirdies.get(uid) || { ...who, count: 0, rounds: 0 }; b.count += nb; b.rounds = (b.rounds || 0) + 1; netBirdies.set(uid, b);
       }

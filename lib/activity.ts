@@ -35,3 +35,12 @@ export async function logActivity(supabase: any, entry: ActivityEntry): Promise<
     // Never let logging break the underlying action.
   }
 }
+
+/** Allowlisted, idempotent feature observations. No names, scores or free text. */
+export async function recordFeatureUse(supabase: any, feature: 'insights_open' | 'ai_dashboard' | 'ai_round' | 'live_share', gameId: string | null = null): Promise<void> {
+  try {
+    const event = globalThis.crypto?.randomUUID?.();
+    if (!event) return;
+    await supabase.rpc('record_feature_use', { p_feature: feature, p_event: event, p_game: gameId });
+  } catch { /* analytics must never block the member's action */ }
+}

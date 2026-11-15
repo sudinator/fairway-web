@@ -3,11 +3,12 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 panel = (root / "components/game/organizer-panel.tsx").read_text(encoding="utf-8")
+options = (root / "lib/game-tee-options.ts").read_text(encoding="utf-8")
 tournaments = (root / "components/tournaments.tsx").read_text(encoding="utf-8")
 
 checks = [
     ("player tee selector always rendered", 'disabled={teeOptions.length === 0 || blocked({ type: "set_tee"' in panel and 'No tee data available' in panel),
-    ("tee options merge player snapshots", 'byName.set(p.tee_name' in panel and 'p.rating == null || p.slope == null' in panel),
+    ("tee options merge player snapshots", 'byName.set(p.tee_name!' in options and 'gameTeeOptions(courseTees, players, game.course_par)' in panel and 'gameTeeOptions(courseTees, players, game.course_par).find' in tournaments),
     ("yardage is not a tee-selection prerequisite", 'yardages' not in panel[panel.find('const teeOptions = useMemo'):panel.find('const groupOptions')]),
     ("handicap override uses the player tee only", 'const rating = p.rating ?? null;' in tournaments and 'const slope = p.slope ?? null;' in tournaments),
     ("handicap override does not borrow another player tee", 'players.find((x) => x.rating != null && x.slope != null)' not in tournaments[tournaments.find('const overridePlayerHandicap'):tournaments.find('const setPlayerTeam')]),

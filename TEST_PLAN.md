@@ -1,3 +1,25 @@
+## 212.108 — filter and analytics regression checks
+
+Run full npm run ci and fresh database migration chain. Simulate inactive/draft/applied/cleared filter colours; popup Apply/Cancel/×/re-entry; course A→B→A with stale tees cleared; 320/390/430/768 row alignment and overflow. Test partner volume versus rate, halves, ties, under-minimum and invalid records; table/highlight agreement without changing match outcomes. Test 49/50 opportunities and four/five rounds. Test unknown versus confirmed-zero penalties, complete 9/18 cards, partial/invalid exclusion, write failure/retry/remove, old A response after A→B→A and unmount, real RLS/device/ownership refusal, snapshot races, score/penalty edit invalidation and unrelated-stat preservation. Retain all adjacent account/posting/stale-game/concurrency/security/provider tests. Review actual before/after Summary, partner and round-detail renders. Do not promote to production before native/staging/data-profile gates.
+
+## 212.107 analytics regression plan
+
+Run npm run ci and the complete fresh DB chain; new analytics tests run inside the existing lanes. Test missing vs manual-zero handicaps; 9/18-hole selection; partial/zero/invalid putts; provisional/established index movement; matched records and email suppression; first/last-vs-rest arithmetic; sparse stat gates; AI bounded scope; retry, timeout, unmount and late responses. Browser-test course → tee → length intersections, reset and A/B/A, all admin read failures/retries, existing Insights observation and phone widths 320/390/430/768. Database-test normal/shared participation, empty/no-show/future/Test/deactivated exclusions, mature signup/return denominators, lifecycle deletion retention, ownership/RLS/ACL, event dedup/spoofing/repeat use, archival metadata and group cascade. Adjacent existing scoring/account/cleanup/security/provider tests must pass. Review real 212.106/212.107 phone screenshots; do not use mock before-images. Native staging/production gates remain as documented.
+
+## 212.106.261114 — scheduler permission-test correction
+
+Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.
+
+The concurrency helper directly updated provider-owned cron.job to pause and restore the daily job. Supabase rejects both writes, producing the two errors in the reported CI failure. Replace both writes with cron.alter_job, restore the original enabled state independently of fixture-cleanup success, and verify restoration. Extend the existing recurrence guard to reject direct scheduler metadata writes, including multiline SQL.
+
+Local evidence includes the full 232-migration chain and a restricted non-superuser reproduction: the old helper fails with the two reported errors; the corrected helper passes actual competing sessions with initially enabled and disabled jobs; an injected setup failure remains a failure and restores the scheduler. These checks supplement the native Supabase gate.
+
+No additional migration. All existing SQL migrations, including 0234, and application behavior source remain byte-identical to 212.105. Generated version metadata advances to 212.106. Analytics is paused and no analytics changes are included. See RELEASE_VERIFICATION_212.106.md.
+
+## 212.105 fresh-database test correction
+
+Run the full source guards, including the nine app-role denial-call canaries. Reintroducing the 212.104 perform call must fail before database execution. Replay all migrations and assertions on a disposable database; validate the actual-role catalogue denial, authorized timestamp-tampering checks, member/admin history RLS and existing concurrency tests. Hosted Supabase CI is required because the local PostgreSQL shim lacks supautils. No production destructive tests.
+
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
 ## 179.7 Staging-integration workflow corrective
@@ -145,3 +167,10 @@ Mode/source switches require A -> B -> A round-trip coverage. A modelled scenari
 ## Correction workflow terminal-path rule (177.23+)
 - When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
 - For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
+
+## 212.104 — Daily stale-game maintenance
+
+- Automated: `ci/assert-daily-stale-games.sql` executes against the entire migration chain; includes date boundaries, future/Test clubs, guests/no-shows, individual/shared cards, legacy partial eighteen versus full nine, posting rollback/retry, review deduplication, private execution grants, admin visibility and server-controlled timing.
+- Automated: `ci/test_daily_stale_concurrency.sh` uses competing PostgreSQL sessions on an explicitly disposable localhost database; preserves concurrent game/personal edits and rejects overlapping jobs.
+- Automated: `ci/test-stale-round-reconcile.cjs` / `ci/test-stale-ops.cjs` exercise actual Home/Operations code with modelled RPC reads, including pending/offline/error preservation.
+- Staging pending: migration 0234 recorded; exactly one named daily job; Operations scheduled status; observe a scheduled run/log; verify fresh/refreshed yellow recovery state. No destructive production tests.

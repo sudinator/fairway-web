@@ -19,9 +19,11 @@ export function rollingForm(rounds: Round[]): number[] {
 export type CardStats = { idx: number | null; idx_trend: number | null; form: number[]; rounds: number };
 
 export function computeCardStats(rounds: Round[]): CardStats {
-  const idx = runningHandicap(rounds).index;
+  const current = runningHandicap(rounds);
+  const idx = current.index;
   // trend = index now vs index before the most recent 5 rounds (negative = improving)
-  const prior = rounds.length > 5 ? runningHandicap(rounds.slice().sort(chrono).slice(0, -5)).index : null;
+  const priorState = rounds.length > 5 ? runningHandicap(rounds.slice().sort(chrono).slice(0, -5)) : null;
+  const prior = current.total >= 20 && priorState && priorState.total >= 20 ? priorState.index : null;
   const idx_trend = idx != null && prior != null ? Math.round((idx - prior) * 10) / 10 : null;
   return { idx, idx_trend, form: rollingForm(rounds).slice(-10), rounds: rounds.length };
 }

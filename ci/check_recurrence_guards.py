@@ -95,8 +95,68 @@ for f in list((ROOT / "components").rglob("*.tsx")) + list((ROOT / "lib").rglob(
         if re.search(r"\.split\(\s*[\"']\s[\"']\s*\)\s*\[\s*0\s*\]|\.split\(/\\s\+/\)", line) and ("name" in line.lower()):
             problems.append(f"E {f.relative_to(ROOT)}:{i}: shortens a name by hand — use shortNamer/shortLabels from lib/short-names (202.2)")
 
+# I. Never CALL an EXECUTE-revoked function as anon/authenticated (208.4, 212.105).
+# Reuse the central server-only catalogue; inspect direct calls inside app-role
+# sections, including DO bodies. Literals/comments are data, not calls. This is
+# a source guard for direct SQL; the database security contract remains authoritative.
+def app_role_calls(sql, names):
+    clean = re.sub(r"'(?:''|[^'])*'|--[^\n]*|/\*[\s\S]*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group()), sql)
+    tokens = re.compile(r'\bset\s+(?:local\s+|session\s+)?role\s+"?([a-z_][a-z0-9_]*)"?|\breset\s+role\b|\b(?:public\.)?(' + '|'.join(re.escape(n) for n in sorted(names)) + r')\s*\(', re.I)
+    role = None
+    found = []
+    for m in tokens.finditer(clean):
+        if m.group(1): role = m.group(1).lower()
+        elif m.group(2):
+            if role in ('anon', 'authenticated'):
+                found.append((sql.count('\n', 0, m.start()) + 1, m.group(2)))
+        else: role = None
+    return found
+
+# Canaries: actual regression, multiline/anon, caught denials, owner/reset,
+# and privilege-catalogue strings. These execute every time this guard runs.
+for sql, expected in [
+    ("set local role authenticated; do $$begin perform public.private_job(); exception when insufficient_privilege then null; end $$;", 1),
+    ("set role anon; select public.\nprivate_job();", 1),
+    ("set role authenticated; select private_job();", 1),
+    ("select public.private_job();", 0),
+    ("set role authenticated; reset role; select public.private_job();", 0),
+    ("set role authenticated; set role postgres; select public.private_job();", 0),
+    ("set role authenticated; select has_function_privilege(current_user,'public.private_job()','execute');", 0),
+    ("set role authenticated; -- perform public.private_job();\nselect 1;", 0),
+    ("set role authenticated; /* perform public.private_job(); */ select 1;", 0),
+]:
+    if len(app_role_calls(sql, {'private_job'})) != expected:
+        problems.append('I revoked-function source-guard canary failed')
+
+catalogue = (ROOT / 'ci' / 'assert-no-app-call-to-revoked.sql').read_text(encoding='utf-8')
+private_names = set(re.findall(r"\('public\.([a-z_][a-z0-9_]*)\(", catalogue))
+if not {'run_daily_stale_games', 'finish_stale_rounds', 'sweep_stale_games'} <= private_names:
+    problems.append('I stale maintenance is missing from the central server-only privilege check')
+for f in sorted((ROOT / 'ci').glob('assert-*.sql')):
+    for line, name in app_role_calls(f.read_text(encoding='utf-8'), private_names):
+        problems.append(f'I {f.relative_to(ROOT)}:{line}: app role calls server-only {name} — check has_function_privilege instead (208.4, 212.105)')
+
+# J. Provider-owned scheduler tables are read-only to Supabase's database role.
+# Job mutations in test helpers must use cron.schedule/alter_job/unschedule.
+cron_write = re.compile(r'\b(?:update\s+|insert\s+into\s+|delete\s+from\s+)"?cron"?\s*\.\s*"?job"?\b', re.I)
+for sql, expected in [
+    ('update cron.job set active=false', True),
+    ('DELETE FROM "cron"."job" where jobid=1', True),
+    ('insert into cron.job values (1)', True),
+    ('update\n cron.job set active=false', True),
+    ('select cron.alter_job(1, active := false)', False),
+    ('select active from cron.job', False),
+]:
+    if bool(cron_write.search(sql)) != expected:
+        problems.append('J scheduler metadata source-guard canary failed')
+for f in list((ROOT / 'ci').glob('*.sh')) + list((ROOT / 'ci').glob('assert-*.sql')):
+    text = '\n'.join('' if line.lstrip().startswith(('#', '--')) else line for line in f.read_text(encoding='utf-8').splitlines())
+    for m in cron_write.finditer(text):
+        line = text.count('\n', 0, m.start()) + 1
+        problems.append(f'J {f.relative_to(ROOT)}:{line}: writes provider-owned cron.job directly — use the scheduler API (212.106)')
+
 if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks, no app-role calls to server-only functions; 9 denial-call canaries; scheduler API only, 6 metadata canaries)")

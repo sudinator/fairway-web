@@ -77,7 +77,7 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, typ
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
-import { logActivity } from "@/lib/activity";
+import { logActivity, recordFeatureUse } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles, backupWriteFailed } from "@/lib/draft";
 import {
   btn,
@@ -127,6 +127,7 @@ import { isLateScoreRefusal, lateScoreNotice, lateScoreHold, keepsSideScores } f
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
+import { gameTeeOptions } from "@/lib/game-tee-options";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
 import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
@@ -3347,8 +3348,11 @@ function GameRoom({
 
   const setPlayerTee = async (p: Player, teeName: string) => {
     if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
-    const tee = courseTees.find((t) => t.name === teeName);
-    if (!tee) return;
+    const tee = gameTeeOptions(courseTees, players, game.course_par).find((t) => t.name === teeName);
+    if (!tee) {
+      alert("This tee is no longer available. Select another tee, or reload the app to refresh course data.");
+      return;
+    }
     const ch =
       p.handicap_index != null &&
       tee.rating != null &&
@@ -3657,6 +3661,7 @@ function GameRoom({
     let slug: string | null = null;
     if (on) { const { data: g2 } = await supabase.from("games").select("lineup_slug").eq("id", game.id).maybeSingle(); slug = (g2 as any)?.lineup_slug ?? null; }
     setGame({ ...game, share_token: (data as string | null) ?? null, lineup_slug: slug });
+    if (data && !game.share_token) void recordFeatureUse(supabase, "live_share", game.id);
   };
 
   // Organizer: wipe all entered scores and the round clock so the game is fresh

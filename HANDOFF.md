@@ -1,3 +1,29 @@
+## 212.108.261114 — approved Summary filters and analytics follow-ups
+
+Use the owner-approved three descending horizontal lines beside the time-range controls; green without a course/tee filter and yellow after Apply. Popup criteria are course and dependent tee only. Remove the round-length selector while keeping raw nine-/eighteen-hole comparisons separate. Partner table and highlighted record now rank by qualified points rate, not accumulated points. Fairway/GIR peer verdicts require five rounds plus fifty recorded opportunities. Penalty averages/trends/coaching use explicitly confirmed complete cards; legacy/default zeros remain unknown. Round-detail confirmation is acknowledged, reversible and invalidated by later score/penalty edits.
+
+Migration 0236 required. All earlier SQL migrations remain byte-identical. Includes all 212.102–107 work relative to the reported production 212.101 baseline; verify actual applied migration IDs before any production SQL. See ANALYTICS_212.108.md and RELEASE_VERIFICATION_212.108.md. Native staging/production gates remain required; no production approval or merge has occurred.
+
+## 212.107.261114 — analytics quality and repeat use
+
+212.106 GitHub CI is green per the owner. This candidate implements the approved analytics cleanup in the existing screens: missing-handicap net awards, complete putting samples, established-index trends, separate raw 9/18-hole comparisons, course/tee/length scope, prior-period Insights, tied personal bests, per-stat evidence and bounded peer proxies, scope-aware AI, consistent admin populations, mature activation/retention cohorts, cleanup-stable game lifecycle counts, observed feature/repeat/reminder outcomes and visible error/retry/freshness states. See ANALYTICS_212.107.md for definitions and preserved contracts.
+
+Migration 0235 required; all earlier migration SQL remains unchanged. Full local release evidence is recorded in RELEASE_VERIFICATION_212.107.md. Native GitHub/Supabase CI, Vercel staging and the existing production data-profile review remain external release gates. This is not production approval.
+
+## 212.106.261114 — scheduler permission-test correction
+
+Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.
+
+The concurrency helper directly updated provider-owned cron.job to pause and restore the daily job. Supabase rejects both writes, producing the two errors in the reported CI failure. Replace both writes with cron.alter_job, restore the original enabled state independently of fixture-cleanup success, and verify restoration. Extend the existing recurrence guard to reject direct scheduler metadata writes, including multiline SQL.
+
+Local evidence includes the full 232-migration chain and a restricted non-superuser reproduction: the old helper fails with the two reported errors; the corrected helper passes actual competing sessions with initially enabled and disabled jobs; an injected setup failure remains a failure and restores the scheduler. These checks supplement the native Supabase gate.
+
+No additional migration. All existing SQL migrations, including 0234, and application behavior source remain byte-identical to 212.105. Generated version metadata advances to 212.106. Analytics is paused and no analytics changes are included. See RELEASE_VERIFICATION_212.106.md.
+
+# 212.105 candidate — revoked-function test regression
+
+Use the central server-only catalogue in ci/assert-no-app-call-to-revoked.sql. Never call these functions under anon/authenticated to test denial. ci/check_recurrence_guards.py now checks direct calls in app-role SQL sections. Migration 0234 is unchanged. See RELEASE_VERIFICATION_212.105.md for evidence and remaining external gates.
+
 # 212.101 candidate — diagnostic summary, context and last update outcome
 
 Login owns a vertical scroll context because globals.css locks body scrolling. Test natural wheel/touch access to both sign-in and the expanded support controls; locator auto-scroll alone is not sufficient. The signed-in Home scroll container is unchanged.

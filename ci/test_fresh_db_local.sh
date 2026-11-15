@@ -11,6 +11,7 @@
 # cron.database_name set to the scratch database name below (bnn_local_chain).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python3 "$ROOT/ci/check_recurrence_guards.py"
 # Run from a scratch directory exactly as ci/test_fresh_db_rebuild.sh does (cd "$TMP"), so anything
 # that silently depends on the working directory fails HERE, not in GitHub. 196.0's freshness sync
 # did exactly that.
@@ -32,10 +33,11 @@ echo "applied $n migrations"
 # Same files, same order as ci/test_fresh_db_rebuild.sh (the concurrency test needs the CLI stack and is skipped).
 for f in assert-historical-baseline-columns assert-core-rls-live assert-core-rls-behavior assert-profile-privileges \
          assert-personal-round-persistence assert-primary-scoring-device assert-notifications assert-course-reviews assert-admin-course-status assert-push-device-health assert-live-lineup assert-no-rpc-overloads assert-readable-live-links assert-finish-game-clocks assert-season-wrapped assert-security-posture assert-course-freshness-integrity assert-game-structure-atomic assert-course-versions assert-course-status-view assert-game-recap-announce assert-account-signup assert-account-merge assert-no-app-call-to-revoked assert-season-wrapped-active assert-course-selective assert-round-email assert-guest-scoring assert-club-reports assert-merge-guards assert-active-accounts assert-email-announce assert-club-requests assert-support-visit assert-notification-links assert-admin-reads-clubs assert-scramble assert-anon-boundary assert-member-privileges assert-policy-review assert-club-isolation assert-team-rounds assert-security-contract-state assert-course-field assert-retired-functions assert-log-retention assert-live-skins assert-structure-behaviour assert-create-game-complete assert-create-game-announce assert-draft-private assert-group-changes-after-scores assert-setup-locks assert-game-permissions assert-organizer-group-scoring assert-score-owner assert-posted-rounds assert-profile-flags assert-test-clubs assert-name-change assert-agreed-audit-fixes assert-game-reset-fencing \
-         assert-game-round-manual-handicap assert-match-length-roundtrip assert-course-api-checks; do
+         assert-game-round-manual-handicap assert-match-length-roundtrip assert-course-api-checks assert-daily-stale-games assert-analytics-quality assert-penalty-tracking; do
   psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$ROOT/ci/$f.sql" >/dev/null 2>/tmp/bnn_local_chain.err || { echo "FAILED $f.sql"; grep -i "ERROR\|DETAIL\|CONTEXT" /tmp/bnn_local_chain.err | head -5; exit 1; }
   echo "ok   $f.sql"
 done
+BNN_DISPOSABLE_DATABASE=1 bash "$ROOT/ci/test_daily_stale_concurrency.sh" "$DB_URL"
 # 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot.
 python3 "$ROOT/ci/check_security_contract.py" "$DB_URL" || { echo "FAILED security contract"; exit 1; }
 for mode_and_exit in ok:0 midquota:2 drift:1 ledgerdown:2 freshness:0; do

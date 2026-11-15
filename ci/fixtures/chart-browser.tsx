@@ -19,7 +19,7 @@ const val=(i:number)=>mode==='flat'?25:mode==='zero'?0:mode==='hundred'?100:mode
 const date=(i:number)=>new Date(Date.UTC(2026,0,1+i*9)).toISOString().slice(0,10);
 const course=long?'The Extremely Long Championship Golf Course and Country Club at Berkshire Valley':'Berkshire Valley';
 const data=Array.from({length:n},(_,i)=>({i:i+1,playedAt:date(i),name:date(i),course,value:val(i),val:val(i),roll: i<4?null:val(i),roll5:i<4?null:val(i)}));
-const rounds=Array.from({length:n},(_,i)=>({id:'r'+i,course,played_at:date(i),status:'final',rating:72,slope:113,course_par:72,handicap_index:12,course_handicap:12,holes:Array.from({length:18},(_,j)=>({hole_number:j+1,par:j%3===0?3:j%3===1?4:5,stroke_index:j+1,strokes:j%3===0?3:5+(i%3),putts:2+(i%2),fairway:(j+i)%2===0?'hit':'left',penalties:0,sand:true}))}));
+const rounds=Array.from({length:n},(_,i)=>({id:'r'+i,course,played_at:date(i),status:'final',penalties_tracked:true,rating:72,slope:113,course_par:72,handicap_index:12,course_handicap:12,holes:Array.from({length:18},(_,j)=>({hole_number:j+1,par:j%3===0?3:j%3===1?4:5,stroke_index:j+1,strokes:j%3===0?3:5+(i%3),putts:2+(i%2),fairway:(j+i)%2===0?'hit':'left',penalties:0,sand:true}))}));
 (window as any).auditRpc= {weekend_series:data.map((d)=>({week:d.name,golfers:d.val,rounds:d.val})),weekly_new_returning:data.map(d=>({week:d.name,new:d.val,returning:d.val})),active:{series:data.map(d=>({day:d.name,n:d.val}))},formats:{fourball:100,match:20,skins:1},features:{avatars_set:50},totals:{},health:{}};
 let el:any;
 if(kind==='dashboard')el=<Dashboard key={JSON.stringify({n,mode,long})} rounds={rounds as any} name="Audit" currentIndex={12} saveIndex={()=>{}} onOpen={()=>{}}/>;
@@ -31,7 +31,7 @@ if(kind==='season')el=<div style={{padding:16}}><SeasonCardView card={{kind:'ind
 if(kind==='profile')el=<div style={{padding:16,overflow:'hidden'}}><FormChart data={data.map(d=>d.val)}/></div>;
 if(kind==='insights')el=<Bars title="BY DIFFICULTY" buckets={data.slice(0,4).map((d,i)=>({key:String(i),label:i===0?'hardest holes (stroke index 1–6)':'Par 4s',avgToPar:d.val,netAvg:1.2,holes:519}))}/>;
 if(kind==='tip')el=<ChartTip active payload={[{dataKey:'value',value:25,payload:{course,name:'Jan 1, 2026'}}]} nameMap={{value:'Differential'}} fmt={String}/>;
-if(kind==='shots')el=<ShotSynthesis fir={{hit:20,total:100}} gir={{hit:20,total:100}} puttsPerRound={36} scramble={{hit:10,total:100}} index={12} goalHcp={10} setGoalHcp={()=>{}} detailRounds={n}/>;
+if(kind==='shots')el=<ShotSynthesis fir={{hit:20,total:100}} gir={{hit:20,total:100}} puttsPerRound={36} scramble={{hit:10,total:100}} index={12} goalHcp={10} setGoalHcp={()=>{}} detailRounds={n} coverage={{rounds:n,holes:n*18,puttingRounds:n,puttHoles:n*18,fairwayRounds:n,fairwayHoles:n*14,fairwayEligible:n*14,girRounds:n,scrambleRounds:n,detailedRounds:n}} puttingRounds={n}/>;
 root.render(<div data-audit={kind} data-audit-render={renderId} style={{background:'#1B5A46',padding:16,borderRadius:14}}>{el}</div>);
 };
 

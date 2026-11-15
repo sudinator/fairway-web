@@ -1,3 +1,7 @@
+<!-- 212.108: Summary filter popup is course + dependent tee only; descending-line icon remains inline, yellow only for committed filters. Partner verdicts use qualified results rate. Penalty averages require explicit confirmation; never infer tracked zero from historical defaults. -->
+<!-- 212.107 analytics: known net handicaps only; raw round comparisons use one length; complete putting cards; established index trends; statistical sample/confidence disclosures. Admin population/cohort/lifecycle definitions: ANALYTICS_212.107.md. -->
+<!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
+<!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.95: responsive chart axes and tested cross-axis label separation; display-only, no database migration. See RELEASE_VERIFICATION_212.95.md. -->
 <!-- 212.87: pending update banners have Update now only, no Later/Dismiss. Failed attempts retain retry feedback. Confirmed success expires after8seconds only when no newer release is pending. Supersedes dismissal guidance below. -->
 # Current update policy — 212.87
@@ -371,3 +375,5 @@ When shipping a member-facing feature, review lib/capabilities.json and the rele
 ## Chart label clearance — 212.95
 
 Use the shared chart-axis policy and Recharts automatic axis width. Keep text at least 11px. Labels must fit their chart and must not overlap labels from either axis; the browser regression requires at least 8px between opposite-axis label bounds. Keep a separate label row and preserve plotting height rather than shrinking text. Keep each point/round and its original statistics; date labels never aggregate the data. ci/test-chart-layout.cjs checks the actual components with modelled reads.
+
+<!-- 212.102: Organizer tee options and saving share the same validated source; no global rule changes. -->

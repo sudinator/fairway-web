@@ -4,12 +4,14 @@
 // in lib/badges (sand save = greenside bunker, missed green, par or better; scramble = missed green, par or
 // better). Owner decisions (Oct 2026): opt-out; all rounds; an hour after the round, then "Updated:" on change;
 // round stats only when recorded on most holes; scorecard on cream with the app's circles and squares.
-import type { Hole } from "@/lib/golf";
+import { completePenaltyRound } from "@/lib/round-penalties";
+import type { Round, Hole } from "@/lib/golf";
 import { allocateStrokes } from "@/lib/golf";
 import { roundStats, isGIR } from "@/lib/round-stats";
 import { chBasis } from "@/lib/game-shape";
 
 export type EmailRound = {
+  penalties_tracked?: boolean;
   id: string; course: string; tee_name?: string | null; played_at: string; course_handicap: number | null;
   handicap_index?: number | null; rating?: number | null; slope?: number | null;
   course_handicap_source?: "derived" | "manual" | null;
@@ -114,8 +116,11 @@ export function buildRoundEmail(o: {
   if (puttsTracked) {
     statRow1.push(box(`${pct(st.girHit, st.withPutts)}%`, `GREENS · ${st.girHit} OF ${st.withPutts}`));
     statRow1.push(box(String(st.totalPutts), `PUTTS · ${threePutts} THREE-PUTT${threePutts === 1 ? "" : "S"}`));
-    statRow1.push(box(String(penalties), `PENALT${penalties === 1 ? "Y" : "IES"}`));
+
   }
+  const confirmedPenalties = completePenaltyRound({ ...o.round, holes } as Round, n === 9 ? 9 : 18);
+  if (confirmedPenalties) statRow1.push(box(String(penalties), `PENALT${penalties === 1 ? "Y" : "IES"}`));
+  else if (penalties > 0) statRow1.push(box(`${penalties}+`, `RECORDED PENALT${penalties === 1 ? "Y" : "IES"}`));
   if (statRow1.length) statBlocks.push(row(statRow1));
   const statRow2: string[] = [];
   if (parAvg.length) statRow2.push(box(parAvg.map(([, v]) => v).join(" · "), `AVG ON ${parAvg.map(([p]) => `PAR ${p}s`).join(" · ")}`));

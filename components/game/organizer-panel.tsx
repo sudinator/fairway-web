@@ -1,4 +1,5 @@
 "use client";
+import { gameTeeOptions } from "@/lib/game-tee-options";
 import { ScrambleSettings, type ScramblePatch } from "@/components/game/scramble-settings";
 import { byName } from "@/lib/names";
 import { rpcAll } from "@/lib/fetch-all";
@@ -237,23 +238,7 @@ export function OrganizerPanel({
   // Tee choice is a player-level setting and must not depend on yardage availability.
   // Merge the course library tees with tee snapshots already stored on game_players so
   // the organizer keeps a usable selector even if the course link/library lookup is stale.
-  const teeOptions = useMemo(() => {
-    const byName = new Map<string, CourseTee>();
-    for (const t of courseTees || []) {
-      if (!t?.name) continue;
-      byName.set(t.name, t);
-    }
-    for (const p of players) {
-      if (!p.tee_name || p.rating == null || p.slope == null || byName.has(p.tee_name)) continue;
-      byName.set(p.tee_name, {
-        name: p.tee_name,
-        rating: p.rating,
-        slope: p.slope,
-        par: game.course_par ?? 0,
-      });
-    }
-    return Array.from(byName.values());
-  }, [courseTees, players, game.course_par]);
+  const teeOptions = useMemo(() => gameTeeOptions(courseTees, players, game.course_par), [courseTees, players, game.course_par]);
   const groupOptions = Array.from({ length: Math.max(1, Math.ceil(players.length / 4) + 1) }, (_, i) => i + 1);
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const teamLabel = (key: string | null | undefined) => teams.find((t) => t.key === key)?.name || "No team";
