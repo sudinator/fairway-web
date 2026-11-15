@@ -1,3 +1,16 @@
+## 212.110.261114 — The Summary filter (dropdowns in the app's field style, Reset / Apply / X); the line-up title's doubled date; a description for the live link
+
+Owner (Nov 14): "look at the filter in the main screen and how it chooses the courses and tees — make it conform to the display rules at BNN. there should be a clear way to reset the filters and dismiss the popup"; "fixing the line up description which includes the date twice"; the live link description.
+
+- **Summary filter (components/analytics-filters):** dropdowns kept (owner: a list of every course "doesn't make sense" past a few), in the app's own field style — inputStyle and the uppercase FieldLabel every other select uses — each course option with its round count ("Oak Hollow · 3 rounds"), the tee dropdown only once a course is chosen (a note when no tee names were recorded). The footer changed: "Clear filters" only cleared the draft (two taps to clear, and it looked like nothing happened); now **Reset** applies no filter at once and closes, **Apply** commits and is live only when something changed, the **X** dismisses without applying. Tests: lib/summary-filter (9); the analytics browser scenario (85 assertions) updated to the new footer with every behaviour check kept; the gallery renders both states (75, 76).
+- **Line-up title:** an automatic game name already ends with the date ("Stableford / Oak Hollow / Nov 14, 2026"), and the title appended "Sat, Nov 14, 2026" after it. The title adds the date only when the name carries none (nameCarriesDate, matched by shape so differently set-up phones work). A typed name without a date still gets it.
+- **Live scores link:** it had no server-side metadata, so chat previews showed nothing useful. app/live/[token]/layout.tsx now gives it a title and description in the line-up's shape: "Live scores · <game> · <date unless the name has it>" / "<course> · N players · <format> — the scorecard and leaderboard as they happen." (after the end: "<game> · final"). Tests in lib/lineup-meta.
+- ci/check_gallery_overflow.mjs honours PLAYWRIGHT_CHROMIUM like the gallery script (the development machine's Chromium layout changed; the GitHub install is unaffected).
+
+212.109 was the first cut of the same work with the courses as a list of option rows, superseded the same day (a list doesn't scale past a few courses); 212.110 is the dropdown form. Nothing from 212.109 shipped.
+
+Deploy: code only. No migration.
+
 ## 212.108.261114 — approved Summary filters and analytics follow-ups
 
 Use the owner-approved three descending horizontal lines beside the time-range controls; green without a course/tee filter and yellow after Apply. Popup criteria are course and dependent tee only. Remove the round-length selector while keeping raw nine-/eighteen-hole comparisons separate. Partner table and highlighted record now rank by qualified points rate, not accumulated points. Fairway/GIR peer verdicts require five rounds plus fifty recorded opportunities. Penalty averages/trends/coaching use explicitly confirmed complete cards; legacy/default zeros remain unknown. Round-detail confirmation is acknowledged, reversible and invalidated by later score/penalty edits.

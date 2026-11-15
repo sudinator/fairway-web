@@ -68,6 +68,7 @@
     "lib/recap-additions.test.tsx",
     "lib/share-links-form.test.tsx",
     "lib/personal-bests.test.tsx",
+    "lib/summary-filter.test.tsx",
     "lib/cup-roster-row.test.tsx",
     "lib/manual-handicap-clear.test.ts",
     "lib/course-handicap-one-source.test.tsx",
