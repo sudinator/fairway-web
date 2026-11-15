@@ -1,5 +1,6 @@
 import { HeadToHead } from "@/components/head-to-head";
 import { AnalyticsFilterSheet } from "@/components/analytics-filters";
+import { analyticsNameKey } from "@/lib/analytics-quality";
 import { PenaltyTracking } from "@/components/penalty-tracking";
 import { Dashboard } from "@/components/dashboard";
 import { AdminAnalytics, AdminDailyReport, AdminExtraStats } from "@/components/manage";
@@ -243,6 +244,7 @@ add("73-admin-daily", <AdminDailyReport />);
 add("74-admin-devices", <AdminExtraStats />);
 
 add("75-summary-filter-course", <AnalyticsFilterSheet rounds={pbSampleRounds} course="" tee="" onApply={()=>{}} onClose={()=>{}} />);
+add("76-summary-filter-tees", <AnalyticsFilterSheet rounds={pbSampleRounds} course={analyticsNameKey("Oak Hollow")} tee={analyticsNameKey("Blue")} onApply={()=>{}} onClose={()=>{}} />);   // 212.109: a course chosen, its tees as pills
 add("76-penalty-confirmation", <PenaltyTracking round={{...pbSampleRounds[0],penalties_tracked:false}} />);
 // Loaded partner and round-detail views are photographed by the real-browser analytics fixture.
 add("77-partnership-record", <HeadToHead user={{id:"gallery-member"}} />);

@@ -1,4 +1,5 @@
 {
+  "total": 447378,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -104,6 +105,7 @@
     "stroke agreement": 38,
     "stroke rounding": 24,
     "structure behaviour": 34,
+    "summary filter": 9,
     "sync/column tests": 6,
     "team colour dot": 10,
     "team rounds": 11,
@@ -112,6 +114,5 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "update safety": 38
-  },
-  "total": 447369
+  }
 }

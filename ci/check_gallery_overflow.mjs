@@ -10,7 +10,8 @@ execSync("node .testout-screens/lib/design-gallery.js " + out, { stdio: "pipe" }
 // Chromium: Playwright's own install (GitHub: `npx playwright install chromium`), or a pre-provisioned /opt/pw-browsers
 const provisioned = fs.existsSync("/opt/pw-browsers") ? fs.readdirSync("/opt/pw-browsers").filter((x) => x.startsWith("chromium_headless_shell")).map((x) => path.join("/opt/pw-browsers", x, "chrome-linux", "headless_shell"))[0] : undefined;
 let browser;
-try { browser = await chromium.launch(provisioned ? { executablePath: provisioned } : {}); }
+const exe = process.env.PLAYWRIGHT_CHROMIUM || provisioned;   // 212.109: honour the same override the gallery script does
+try { browser = await chromium.launch(exe ? { executablePath: exe } : {}); }
 catch (e) { console.log("GALLERY OVERFLOW: FAIL — Chromium is not available to Playwright (run `npx playwright install chromium`): " + (e && e.message ? e.message.split("\n")[0] : e)); process.exit(1); }
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const bad = [];

@@ -13,11 +13,35 @@ export function fmtMatchDate(ymd: string | null | undefined): string | null {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
+/** 212.109 (owner, Nov 14: the line-up description "includes the date twice"): an AUTOMATIC game name already ends with
+ *  the date ("Stableford / Oak Hollow / Nov 14, 2026"), so the title must not add it again. Matched by shape — a
+ *  month name followed by a day — because dates are written differently on differently set-up phones. */
+export function nameCarriesDate(name: string | null | undefined): boolean {
+  return /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}(,? \d{4})?\b|\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/i.test(name || "");
+}
+
 export function lineupTitle(d: { ended?: boolean; name?: string | null; played_on?: string | null; played_at?: string | null } | null | undefined): string {
   if (!d) return "Line-up · Birdie Num Num";
   const name = (d.name || "Game").trim();
   if (d.ended) return `${name} · finished · Birdie Num Num`;
-  return ["Line-up", name, fmtMatchDate(d.played_on) || d.played_at || null].filter(Boolean).join(" · ");
+  const date = nameCarriesDate(name) ? null : (fmtMatchDate(d.played_on) || d.played_at || null);   // 212.109: never the date twice
+  return ["Line-up", name, date].filter(Boolean).join(" · ");
+}
+
+/** 212.109: the live scores link's title and description — the same shape as the line-up's, for chat previews. */
+export function liveTitle(d: { ended?: boolean; name?: string | null; played_on?: string | null; played_at?: string | null } | null | undefined): string {
+  if (!d) return "Live scores · Birdie Num Num";
+  const name = (d.name || "Game").trim();
+  if (d.ended) return `${name} · final · Birdie Num Num`;
+  const date = nameCarriesDate(name) ? null : (fmtMatchDate(d.played_on) || d.played_at || null);
+  return ["Live scores", name, date].filter(Boolean).join(" · ");
+}
+export function liveDescription(d: { ended?: boolean; course?: string | null; players?: unknown[]; game_type?: string | null } | null | undefined): string {
+  if (!d) return "The scorecard and leaderboard as they happen.";
+  if (d.ended) return "This game has finished — the final scorecard and leaderboard.";
+  const n = Array.isArray(d.players) ? d.players.length : 0;
+  const bits = [d.course || null, n ? `${n} player${n === 1 ? "" : "s"}` : null, d.game_type ? gameTypeLabel(d.game_type as GameTypeOpt) : null].filter(Boolean);
+  return `${bits.join(" · ")}${bits.length ? " — " : ""}the scorecard and leaderboard as they happen.`;
 }
 
 export function lineupDescription(d: { ended?: boolean; course?: string | null; players?: unknown[]; allowance_pct?: number | null; game_type?: string | null } | null | undefined): string {
