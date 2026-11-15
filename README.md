@@ -1,4 +1,4 @@
-## 212.109.261114 — The Summary filter on the display rules (option rows, pills, Reset / Apply / X); the line-up title's doubled date; a description for the live link
+## 212.110.261114 — The Summary filter (dropdowns in the app's field style, Reset / Apply / X); the line-up title's doubled date; a description for the live link
 
 Owner (Nov 14): "look at the filter in the main screen and how it chooses the courses and tees — make it conform to the display rules at BNN. there should be a clear way to reset the filters and dismiss the popup"; "fixing the line up description which includes the date twice"; the live link description.
 
