@@ -1,0 +1,24 @@
+// Actual penalty-confirmation component; deferred read/write responses are MODELLED.
+const fs=require('fs'),path=require('path'),Module=require('module'),assert=require('node:assert/strict'),ts=require('typescript');
+const root=path.resolve(__dirname,'..');let requests=[];
+const db={rpc:(name,args)=>new Promise(resolve=>requests.push({name,args,resolve}))};
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,f);
+const orig=Module._load;Module._load=function(id,parent,main){if(id==='@/lib/supabase')return{createClient:()=>db};return orig.call(this,id.startsWith('@/')?path.join(root,id.slice(2)):id,parent,main)};
+require('../lib/test-dom.ts');const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),{PenaltyTracking}=require('../components/penalty-tracking.tsx');
+let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m)},tick=()=>new Promise(r=>setTimeout(r,0));
+const round=id=>({id,course:'Synthetic course',played_at:'2026-11-14',status:'final',holes:Array.from({length:18},(_,i)=>({hole_number:i+1,par:4,strokes:5,putts:2,penalties:0}))});
+(async()=>{let updates=[];const el=document.createElement('div');document.body.append(el);const r=createRoot(el);
+ const render=async round=>act(async()=>{r.render(React.createElement(PenaltyTracking,{round,onUpdated:v=>updates.push(v)}));await tick()});
+ const click=async text=>act(async()=>{[...el.querySelectorAll('button')].find(b=>b.textContent===text).click();await tick()});
+ const settle=async(i,data,error=null)=>act(async()=>{requests[i].resolve({data,error});await tick()});
+ await render(round('A'));ok(el.textContent.includes('Not confirmed'),'legacy state visibly unknown');
+ await click('I recorded penalties on every hole');ok(el.textContent.includes('Saving…'),'saving state visible');ok(requests[0].name==='set_round_penalties_tracked'&&requests[0].args.p_expected.length===18&&requests[0].args.p_expected[0].join(',')==='1,5,0','snapshot matches displayed card including zero');ok(!updates.length,'no optimistic parent mutation');
+ await settle(0,null,{message:'denied'});ok(el.querySelector('[role=alert]')&&el.textContent.includes('Not confirmed')&&!updates.length,'failure keeps unknown and exposes retry');
+ await click('Retry');await settle(1,true);ok(el.textContent.includes('· Confirmed')&&updates.length===1&&updates[0].penalties_tracked===true,'acknowledgement updates view and parent');
+ await click('Remove confirmation');await settle(2,false);ok(el.textContent.includes('Not confirmed')&&updates.at(-1).penalties_tracked===false,'remove round trip updates all state');
+ await click('I recorded penalties on every hole');await render(round('B'));ok(el.textContent.includes('Not confirmed')&&!el.textContent.includes('Saving…'),'scope switch resets busy state');
+ await render(round('A'));await settle(3,true);ok(el.textContent.includes('Not confirmed')&&updates.length===2,'A to B to A rejects old A response');
+ await click('I recorded penalties on every hole');await act(async()=>r.unmount());await settle(4,true);ok(updates.length===2,'unmounted response cannot navigate parent to an old round');el.remove();
+ const el2=document.createElement('div');document.body.append(el2);const r2=createRoot(el2);await act(async()=>r2.render(React.createElement(PenaltyTracking,{round:{...round('partial'),holes:round('partial').holes.map((h,i)=>({...h,strokes:i===17?null:5}))}})));ok(!el2.querySelector('button')&&el2.textContent.includes('Complete the hole-by-hole card'),'partial card cannot confirm');await act(async()=>r2.unmount());el2.remove();
+ console.log(`penalty confirmation UI: ${checks} passed, 0 failed`);
+})().catch(e=>{console.error(e);process.exitCode=1});

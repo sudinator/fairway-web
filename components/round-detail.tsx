@@ -14,6 +14,7 @@ const supabase = createClient();
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, DifferentialSheet, BottomSheet } from "@/components/ui";
 import { ShareRoundModal } from "@/components/share-card";
 import { badgesForRound, BADGE_BY_KEY, badgeEvidence, collapseRoundAwards, type Award } from "@/lib/badges";
+import { PenaltyTracking } from "@/components/penalty-tracking";
 import { roundStatCompleteness, statHoleList } from "@/lib/round-stats";
 
 const ROUND_TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
@@ -45,7 +46,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
             {fmtDate(round.played_at)}{round.rating != null && round.slope != null ? ` · ${round.rating}/${round.slope}` : ""} · {strokesOf(round)}{!gross && played(round).length > 0 && played(round).length < 18 ? ` thru ${played(round).length}` : ""} ({toParStr(diffOf(round))})
-            {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
+            {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts${round.penalties_tracked ? ` · ${pensOf(round)} pen` : " · penalties not confirmed"}`}
           </div>
         </div>
       </div>
@@ -63,6 +64,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
       </div>
 
 
+      {!gross && <PenaltyTracking round={round} onUpdated={onRoundUpdated} />}
       {showGhin && <GhinPanel round={round} ghinNumber={ghinNumber} playerName={playerName} />}
 
       {roundDifferential(round) != null && (

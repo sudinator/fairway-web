@@ -1,3 +1,4 @@
+<!-- 212.108: Summary filter popup is course + dependent tee only; descending-line icon remains inline, yellow only for committed filters. Partner verdicts use qualified results rate. Penalty averages require explicit confirmation; never infer tracked zero from historical defaults. -->
 <!-- 212.107 analytics: known net handicaps only; raw round comparisons use one length; complete putting cards; established index trends; statistical sample/confidence disclosures. Admin population/cohort/lifecycle definitions: ANALYTICS_212.107.md. -->
 <!-- 212.104: 0234 daily 4 a.m. Eastern maintenance; server-only, Test clubs excluded; see release verification. -->
 <!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->

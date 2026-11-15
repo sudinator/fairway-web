@@ -1,3 +1,7 @@
+## 212.108 analytics follow-ups
+
+Implemented: owner-approved inline descending-line filter icon + course/dependent-tee popup; qualified partnership results rate; minimum recorded-opportunity floors; explicit penalty confirmation with legacy unknowns, snapshot protection and edit invalidation. Preserve all earlier backlog items below. Before production: native 212.108 CI/Vercel staging and required feature checks, statistics data-profile review, actual 0234–0236 ledger reconciliation against reported production 212.101, staging-to-main verify and Production Ready/safe smoke check. No native result is inferred from local checks.
+
 ## 212.107 analytics cleanup
 
 Implemented approved analytics corrections and repeat-use observability; definitions and limits in ANALYTICS_212.107.md. Release gates: native 212.107 GitHub/Supabase CI, Vercel staging feature/regression checks and existing production docs/sql/data_profile.sql review. Observe 28 days before interpreting new feature-return cohorts. Earlier deleted drafts/feature observations cannot be backfilled. Preserve all pre-existing course/setup backlog items below.

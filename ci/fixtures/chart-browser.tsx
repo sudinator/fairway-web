@@ -19,7 +19,7 @@ const val=(i:number)=>mode==='flat'?25:mode==='zero'?0:mode==='hundred'?100:mode
 const date=(i:number)=>new Date(Date.UTC(2026,0,1+i*9)).toISOString().slice(0,10);
 const course=long?'The Extremely Long Championship Golf Course and Country Club at Berkshire Valley':'Berkshire Valley';
 const data=Array.from({length:n},(_,i)=>({i:i+1,playedAt:date(i),name:date(i),course,value:val(i),val:val(i),roll: i<4?null:val(i),roll5:i<4?null:val(i)}));
-const rounds=Array.from({length:n},(_,i)=>({id:'r'+i,course,played_at:date(i),status:'final',rating:72,slope:113,course_par:72,handicap_index:12,course_handicap:12,holes:Array.from({length:18},(_,j)=>({hole_number:j+1,par:j%3===0?3:j%3===1?4:5,stroke_index:j+1,strokes:j%3===0?3:5+(i%3),putts:2+(i%2),fairway:(j+i)%2===0?'hit':'left',penalties:0,sand:true}))}));
+const rounds=Array.from({length:n},(_,i)=>({id:'r'+i,course,played_at:date(i),status:'final',penalties_tracked:true,rating:72,slope:113,course_par:72,handicap_index:12,course_handicap:12,holes:Array.from({length:18},(_,j)=>({hole_number:j+1,par:j%3===0?3:j%3===1?4:5,stroke_index:j+1,strokes:j%3===0?3:5+(i%3),putts:2+(i%2),fairway:(j+i)%2===0?'hit':'left',penalties:0,sand:true}))}));
 (window as any).auditRpc= {weekend_series:data.map((d)=>({week:d.name,golfers:d.val,rounds:d.val})),weekly_new_returning:data.map(d=>({week:d.name,new:d.val,returning:d.val})),active:{series:data.map(d=>({day:d.name,n:d.val}))},formats:{fourball:100,match:20,skins:1},features:{avatars_set:50},totals:{},health:{}};
 let el:any;
 if(kind==='dashboard')el=<Dashboard key={JSON.stringify({n,mode,long})} rounds={rounds as any} name="Audit" currentIndex={12} saveIndex={()=>{}} onOpen={()=>{}}/>;

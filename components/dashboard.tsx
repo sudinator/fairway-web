@@ -1,4 +1,6 @@
 "use client";
+import { completePenaltyRound } from "@/lib/round-penalties";
+import { AnalyticsFilterSheet } from "@/components/analytics-filters";
 
 import { analyticsScope, analyticsNameKey, analyticsCoverage, completeScoringRound, completePuttingRound, establishedIndexChange } from "@/lib/analytics-quality";
 import { PersonalBestsCard } from "@/components/personal-bests-card";
@@ -13,7 +15,7 @@ import { ChartAxisTick } from "@/components/charts/axis-tick";
 import { chartXAxis } from "@/lib/chart-axis";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
-  played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, hasHoleDetail,
+  roundHoleCount, played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, hasHoleDetail,
   girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, handicapRounds, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
@@ -121,18 +123,18 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const allDone = handicapRounds(rounds);
   const [courseFilter, setCourseFilter] = useState("");
   const [teeFilter, setTeeFilter] = useState("");
-  const [lengthFilter, setLengthFilter] = useState<"all" | "9" | "18">("all");
-  const scope = { window: win, course: courseFilter, tee: teeFilter, length: lengthFilter };
+  const [showFilters, setShowFilters] = useState(false);
+  const scope = { window: win, course: courseFilter, tee: teeFilter, length: "all" as const };
   const scopedAll = analyticsScope(allDone, { ...scope, window: "all" });
   const done = analyticsScope(allDone, scope);
   const coverage = analyticsCoverage(done);
-  const rawLength = lengthFilter === "9" ? 9 : 18;
+  const rawLength = done.length > 0 && done.every(r => roundHoleCount(r) === 9) ? 9 : 18;
   const rawRounds = done.filter(r => completeScoringRound(r, rawLength));
   const priorRounds = win === "season"
     ? scopedAll.filter(r => Number(r.played_at.slice(0, 4)) === Number(done[0]?.played_at.slice(0, 4)) - 1)
     : scopedAll.slice(win === "5" ? 5 : 20, win === "5" ? 10 : 40);
   const courseOptions = [...new Map(allDone.map(r => [analyticsNameKey(r.course), r.course])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  const teeOptions = [...new Map(allDone.filter(r => !courseFilter || analyticsNameKey(r.course) === courseFilter).filter(r => r.tee_name).map(r => [analyticsNameKey(r.tee_name), r.tee_name!])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
   const avgDiff = rawRounds.length ? rawRounds.reduce((s, r) => s + diffOf(r), 0) / rawRounds.length : null;
   const best = rawRounds.length ? Math.min(...rawRounds.map(diffOf)) : null;
@@ -146,7 +148,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     ? completePuttRounds.reduce((s, r) => s + puttsOf(r), 0) / completePuttRounds.length
     : null;
   const gir = girStats(done), fir = firStats(done), scramble = scrambleStats(done), sand = sandSaveStats(done);
-  const pens = rawRounds.reduce((s, r) => s + pensOf(r), 0);
+  const penaltyRounds = rawRounds.filter(r=>completePenaltyRound(r,rawLength));
+  const pens = penaltyRounds.reduce((s, r) => s + pensOf(r), 0);
   const fulls = rawRounds;
   const estimablePts = fulls.filter(stablefordEstimable);
   const avgPts = estimablePts.length ? estimablePts.reduce((s, r) => s + estimatedStablefordPts(r), 0) / estimablePts.length : null;
@@ -170,7 +173,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const detailRounds = done.filter(hasHoleDetail).length;
 
   // Compact, numbers-only career summary for the AI coach.
-  const scopeLabel = `${win === "all" ? "All recorded rounds" : win === "season" ? "This season" : `Last ${win} rounds`} · ${courseFilter ? courseOptions.find(([k]) => k === courseFilter)?.[1] : "all courses"} · ${teeFilter || "all tees"} · ${lengthFilter === "all" ? "all lengths" : `${lengthFilter} holes`}`;
+  const scopeLabel = `${win === "all" ? "All recorded rounds" : win === "season" ? "This season" : `Last ${win} rounds`} · ${courseFilter ? courseOptions.find(([k]) => k === courseFilter)?.[1] : "all courses"} · ${courseFilter ? teeFilter || "all recorded tees at this course" : "course/tee not filtered"} · ${rawLength}-hole raw comparisons`;
   const coachAggregate = {
     analysisScope: scopeLabel.slice(0, 120),
     coverage,
@@ -189,7 +192,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     sandSavePct: sand.total ? Math.round((100 * sand.hit) / sand.total) : null,
     avgByPar: byPar,
     scoringMix: buckets, // eagles/birdies/pars/bogeys/doubles totals
-    penaltiesTotal: pens,
+    penaltiesTotal: penaltyRounds.length ? pens : null,
+    penaltyRounds: penaltyRounds.length,
   };
 
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
@@ -255,7 +259,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "fir": { const f = firStats([r]); return f.total ? 100 * f.hit / f.total : null; }
       case "putts": return completePuttingRound(r, rawLength) ? puttsOf(r) : null;
       case "threeputt": return completePuttingRound(r, rawLength) ? hs.filter(h => h.putts! >= 3).length : null;
-      case "pen": return completeScoringRound(r, rawLength) ? pensOf(r) : null;
+      case "pen": return completePenaltyRound(r, rawLength) ? pensOf(r) : null;
     }
     return null;
   };
@@ -341,12 +345,12 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 background: win === k ? C.gold : C.greenLight, color: win === k ? C.green : C.sage, fontWeight: win === k ? 700 : 400,
               }}>{label}</button>
             )))}
+            <button type="button" data-analytics-filter-toggle aria-label="Filter by course and tee" aria-expanded={showFilters} aria-pressed={!!courseFilter}
+              title={courseFilter ? `Filters applied: ${courseOptions.find(([k])=>k===courseFilter)?.[1] || courseFilter}${teeFilter ? ` · ${teeFilter}` : ""}` : "Filter by course and tee"}
+              style={{ flex: "0 0 34px", minHeight: 34, textAlign: "center", fontSize: 18, borderRadius: 6, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: courseFilter ? C.gold : C.greenLight, color: courseFilter ? C.green : C.sage }}
+              onClick={()=>setShowFilters(true)}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false" style={{ display: "block", margin: "0 auto" }}><line x1="2" y1="5" x2="18" y2="5" /><line x1="5" y1="10" x2="15" y2="10" /><line x1="8" y1="15" x2="12" y2="15" /></svg></button>
           </div>
-          <div data-analytics-filters style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-            <select aria-label="Analytics course" value={courseFilter} onChange={e => { setCourseFilter(e.target.value); setTeeFilter(""); }} style={{ ...inputStyle, flex: "1 1 180px", minWidth: 0 }}><option value="">All courses</option>{courseOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
-            <select aria-label="Analytics tee" value={teeFilter} onChange={e => setTeeFilter(e.target.value)} style={{ ...inputStyle, flex: "1 1 110px", minWidth: 0 }}><option value="">All tees</option>{teeOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>
-            <select aria-label="Analytics round length" value={lengthFilter} onChange={e => setLengthFilter(e.target.value as typeof lengthFilter)} style={{ ...inputStyle, flex: "1 1 130px", minWidth: 0 }}><option value="all">All lengths</option><option value="9">9 holes</option><option value="18">18 holes</option></select>
-          </div>
+          {showFilters && <AnalyticsFilterSheet rounds={allDone} course={courseFilter} tee={teeFilter} onClose={()=>setShowFilters(false)} onApply={(course,tee)=>{setCourseFilter(course);setTeeFilter(tee);setShowFilters(false);}} />}
           <div data-dashboard-range-caption style={{ color: C.sage, fontSize: 11, marginTop: 5, textAlign: "center", whiteSpace: "nowrap" }}>
             Stats: {done.length} round{done.length === 1 ? "" : "s"} · WHS index: best 8 of 20
           </div>
@@ -415,7 +419,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
               <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
               <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
-              <Clk k="pen" d={detail} set={setDetail}><StatCard label="Recorded penalties" value={rawRounds.length ? (pens / rawRounds.length).toFixed(1) : "—"} sub={`per complete ${rawLength}-hole round`} /></Clk>
+              <Clk k="pen" d={detail} set={setDetail}><StatCard label="Recorded penalties" value={penaltyRounds.length ? (pens / penaltyRounds.length).toFixed(1) : "—"} sub={`${penaltyRounds.length} confirmed complete ${rawLength}-hole cards`} /></Clk>
             </div>
           )}
         </>
@@ -465,7 +469,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       )}
 
       <div data-analytics-coverage style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>
-        Recorded evidence: putts on {coverage.puttHoles}/{coverage.holes} scored holes; fairways on {coverage.fairwayHoles}/{coverage.fairwayEligible} eligible holes. Round putting averages use {completePuttRounds.length} complete {rawLength}-hole cards. Missing putting and fairway entries are excluded, not scored as zero.
+        Recorded evidence: putts on {coverage.puttHoles}/{coverage.holes} scored holes; fairways on {coverage.fairwayHoles}/{coverage.fairwayEligible} eligible holes. Round putting averages use {completePuttRounds.length} complete {rawLength}-hole cards. Missing putting and fairway entries are excluded, not scored as zero. Penalty averages use {penaltyRounds.length} explicitly confirmed complete cards.
       </div>
       <ShotSynthesis coverage={coverage} puttingRounds={rawLength === 18 ? completePuttRounds.length : 0} fir={fir} gir={gir} puttsPerRound={rawLength === 18 ? puttsPerRound : null} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
 

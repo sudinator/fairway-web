@@ -108,14 +108,14 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
     { key: "putts", cat: "Putting", value: puttsPerRound, min: 5, sample: puttingRounds ?? coverage?.puttingRounds ?? 0, opportunities: puttingRounds ?? coverage?.puttingRounds ?? 0 },
   ];
   const rows = defs
-    .filter((d) => d.value != null && d.sample >= d.min && (d.key !== "scramble" || d.opportunities >= 30))
+    .filter((d) => d.value != null && d.sample >= d.min && (d.key === "fir" || d.key === "gir" ? d.opportunities >= 50 : d.key !== "scramble" || d.opportunities >= 30))
     .map((d) => {
       const band = you[d.key], half = (band.hi - band.lo) / 2 || 1;
       const value = d.value as number;
       const gap = goalBands ? BENCH_DIR[d.key] * (goalBands[d.key].avg - value) / half : 0;
       return { key: d.key, cat: d.cat, value, sample: d.sample, opportunities: d.opportunities, score: catScore(d.key, value, band), gap };
     });
-  if (rows.length === 0) return detailRounds ? <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>Peer comparisons need 5 rounds recording each stat; scrambling needs 15 tracked rounds and 30 missed-green opportunities.</div> : null;
+  if (rows.length === 0) return detailRounds ? <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>Peer comparisons need 5 recorded rounds and 50 opportunities for fairways or greens; putting needs 5 complete 18-hole cards. Scrambling needs 15 tracked rounds and 30 opportunities.</div> : null;
 
   const opps = rows.filter((r) => r.gap > 0.02).sort((a, b) => b.gap - a.gap);
   const top = opps[0] ?? [...rows].sort((a, b) => a.score - b.score)[0];
@@ -156,7 +156,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
       </div>
 
       <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
-        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; these are statistical proxies, not measured strokes gained. Scrambling needs 15 tracked rounds and 30 opportunities.
+        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; these are statistical proxies, not measured strokes gained. Fairways and greens need 5 rounds and 50 recorded opportunities each. Scrambling needs 15 tracked rounds and 30 opportunities.
       </div>
     </div>
   );

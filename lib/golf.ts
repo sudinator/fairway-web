@@ -87,6 +87,8 @@ export type Round = {
   id: string;
   /** Stable local identity before an in-progress round reaches the server. */
   draft_session_id?: string;
+  /** Explicit whole-card penalty confirmation; legacy/default zeros are unknown. */
+  penalties_tracked?: boolean;
   group_id?: string | null;
   group_name?: string | null;
   course: string;

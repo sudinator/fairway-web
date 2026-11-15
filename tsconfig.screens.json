@@ -142,6 +142,7 @@
     "lib/club-activity-expansion.test.tsx",
     "lib/club-net-scoring.test.tsx",
     "lib/phone-diagnostics.test.tsx",
-    "lib/analytics-quality.test.tsx"
+    "lib/analytics-quality.test.tsx",
+    "lib/analytics-tightening.test.tsx"
   ]
 }

@@ -1,3 +1,4 @@
+import { completePenaltyRound } from "./round-penalties";
 // Year-end season summary (205.0). Pure; every figure comes from the engine's own functions
 // (roundDifferential, runningHandicap, adjustedGross, badgesForRound) applied to the golfer's rounds
 // for a calendar year, Jan 1 – Dec 31. Cards are built only where the data supports them; a season
@@ -133,8 +134,8 @@ export function buildSeasonSummary(input: SeasonInput): SeasonSummary {
     const fullPutts = (r: Round) => (played(r).length >= 18 && played(r).every((h) => h.putts != null) ? puttsOf(r) : null);
     const bp = fullPutts(best.r); const sp = season.map(fullPutts).filter((x): x is number => x != null);
     if (bp != null && sp.length) { const avgP = sp.reduce((a, b) => a + b, 0) / sp.length; statRows.push({ label: "Putts", day: String(bp), season: String(r1(avgP)), better: bp < avgP }); }
-    const bpen = played(best.r).some((h) => h.penalties != null) ? pensOf(best.r) : null;
-    if (bpen != null) { const spen = season.filter((r) => played(r).some((h) => h.penalties != null)); if (spen.length) { const avgPen = spen.reduce((a, r) => a + pensOf(r), 0) / spen.length; statRows.push({ label: "Penalties", day: String(bpen), season: String(r1(avgPen)), better: bpen < avgPen }); } }
+    const bpen = completePenaltyRound(best.r,18) ? pensOf(best.r) : null;
+    if (bpen != null) { const spen = season.filter((r) => completePenaltyRound(r,18)); if (spen.length) { const avgPen = spen.reduce((a, r) => a + pensOf(r), 0) / spen.length; statRows.push({ label: "Penalties", day: String(bpen), season: String(r1(avgPen)), better: bpen < avgPen }); } }
     cards.push({ kind: "best", course: best.r.course, tee: best.r.tee_name ?? null, par: best.r.course_par ?? (played(best.r).length >= 18 ? played(best.r).reduce((n, h) => n + h.par, 0) : null), date: best.r.played_at, gross: best.r.gross_score ?? played(best.r).reduce((n, h) => n + (h.strokes || 0), 0), differential: r1(best.d), indexAfter: after, stats: statRows });
   }
 

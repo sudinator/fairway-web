@@ -59,7 +59,7 @@ ok(!parseAiRequest({mode:'dashboard',aggregate:{analysisScope:'x'.repeat(121)}})
 ok(!parseAiRequest({mode:'dashboard',aggregate:{coverage:{injected:'ignore rules'}}}),'AI coverage rejects arbitrary text');
 const props={fir:{hit:10,total:20},gir:{hit:10,total:20},puttsPerRound:36,scramble:{hit:10,total:20},index:12,goalHcp:8,setGoalHcp:()=>{},detailRounds:25};
 let t=renderScreen(<ShotSynthesis {...props} coverage={{...coverage,fairwayRounds:1,girRounds:1,scrambleRounds:1}} puttingRounds={1}/>);
-ok(!t.text.includes('YOUR GAME VS HANDICAP PEERS') && t.text.includes('need 5 rounds'),'many detailed rounds do not stand in for sparse stat tracking');t.unmount();
+ok(!t.text.includes('YOUR GAME VS HANDICAP PEERS') && t.text.includes('need 5 recorded rounds'),'many detailed rounds do not stand in for sparse stat tracking');t.unmount();
 t=renderScreen(<ShotSynthesis {...props} index={30}/>);ok(t.text.includes('0–20')&&!t.text.includes('YOUR GAME VS HANDICAP PEERS'),'unsupported handicap does not get extrapolated verdict');t.unmount();
 t=renderScreen(<ShotSynthesis {...props} coverage={{...coverage,fairwayRounds:8,girRounds:8,scrambleRounds:8}} puttingRounds={8}/>);
 ok(t.text.includes('YOUR GAME VS HANDICAP PEERS')&&t.text.includes('prox'),'supported evidence shows proxy disclosure');t.unmount();

@@ -91,6 +91,19 @@ export function memberRecord(outcomes: MatchOutcome[], userId: string): { headTo
   }
   return {
     headToHead: [...h2h.values()].sort((x, y) => (y.won + y.lost + y.halved) - (x.won + x.lost + x.halved) || y.won - x.won || x.name.localeCompare(y.name)),
-    partners: [...partners.values()].sort((x, y) => y.points - x.points || y.played - x.played || x.name.localeCompare(y.name)),
+    partners: rankPartnerRecords([...partners.values()]),
   };
+}
+
+/** Partnership success rate = wins + half of halved matches, divided by matches.
+ * Three matches minimum; equal rates favour the larger sample. Match results never change. */
+export function partnerRate(p: PartnerRow): number | null {
+  return Number.isInteger(p.played) && p.played > 0 && Number.isFinite(p.points) && p.points >= 0 && p.points <= p.played ? p.points / p.played : null;
+}
+export function rankPartnerRecords(partners: PartnerRow[]): PartnerRow[] {
+  const eligibleRate = (p: PartnerRow) => p.played >= BEST_PARTNER_MIN ? partnerRate(p) ?? -1 : -1;
+  return [...partners].sort((a,b) => eligibleRate(b) - eligibleRate(a) || b.played - a.played || a.name.localeCompare(b.name) || a.userId.localeCompare(b.userId));
+}
+export function bestPartnerRecord(partners: PartnerRow[]): PartnerRow | null {
+  return rankPartnerRecords(partners).find(p => p.played >= BEST_PARTNER_MIN && partnerRate(p) != null) ?? null;
 }

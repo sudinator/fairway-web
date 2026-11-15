@@ -1,3 +1,9 @@
+## 212.108.261114 — approved Summary filters and analytics follow-ups
+
+Use the owner-approved three descending horizontal lines beside the time-range controls; green without a course/tee filter and yellow after Apply. Popup criteria are course and dependent tee only. Remove the round-length selector while keeping raw nine-/eighteen-hole comparisons separate. Partner table and highlighted record now rank by qualified points rate, not accumulated points. Fairway/GIR peer verdicts require five rounds plus fifty recorded opportunities. Penalty averages/trends/coaching use explicitly confirmed complete cards; legacy/default zeros remain unknown. Round-detail confirmation is acknowledged, reversible and invalidated by later score/penalty edits.
+
+Migration 0236 required. All earlier SQL migrations remain byte-identical. Includes all 212.102–107 work relative to the reported production 212.101 baseline; verify actual applied migration IDs before any production SQL. See ANALYTICS_212.108.md and RELEASE_VERIFICATION_212.108.md. Native staging/production gates remain required; no production approval or merge has occurred.
+
 ## 212.107.261114 — analytics quality and repeat use
 
 212.106 GitHub CI is green per the owner. This candidate implements the approved analytics cleanup in the existing screens: missing-handicap net awards, complete putting samples, established-index trends, separate raw 9/18-hole comparisons, course/tee/length scope, prior-period Insights, tied personal bests, per-stat evidence and bounded peer proxies, scope-aware AI, consistent admin populations, mature activation/retention cohorts, cleanup-stable game lifecycle counts, observed feature/repeat/reminder outcomes and visible error/retry/freshness states. See ANALYTICS_212.107.md for definitions and preserved contracts.

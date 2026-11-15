@@ -37,6 +37,7 @@ export type DashboardAiSummary = {
   avgByPar?: Record<string, unknown> | null;
   scoringMix?: Record<string, unknown> | null;
   penaltiesTotal?: number | null;
+  penaltyRounds?: number;
 };
 
 export type AiRequest =
@@ -52,7 +53,7 @@ const DASHBOARD_KEYS = new Set([
   "analysisScope", "coverage", "rawRoundHoles", "avgPuttsPerRound",
   "handicapIndex", "roundsLogged", "avgScoreVsPar", "bestVsPar", "avgDifferential",
   "avgPuttsPerHole", "threePuttsPerRound", "girPct", "fairwayPct", "scramblingPct",
-  "sandSavePct", "avgByPar", "scoringMix", "penaltiesTotal",
+  "sandSavePct", "avgByPar", "scoringMix", "penaltiesTotal", "penaltyRounds",
 ]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
