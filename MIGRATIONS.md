@@ -1,3 +1,4 @@
+<!-- 212.106: CI-only scheduler test correction. No new migration; 0234 is unchanged. -->
 <!-- 212.105: no additional migration. 0234 SQL is byte-identical to 212.104; this release corrects CI assertions only. -->
 <!-- 212.103: consolidate round recovery into the existing yellow panel; no database/global-rule changes. -->
 <!-- 212.102: shared validated Organizer tee options; no database/schema/global-rule changes. -->

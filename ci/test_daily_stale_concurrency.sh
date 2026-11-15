@@ -7,17 +7,24 @@ if [[ "${BNN_DISPOSABLE_DATABASE:-}" != 1 || ! "$DB_URL" =~ @(127\.0\.0\.1|local
 fi
 original_active="$(psql "$DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select active from cron.job where jobname='bnn-daily-stale-games'")"
 [[ "$original_active" == t || "$original_active" == f ]] || { echo 'FAIL: daily job missing or ambiguous'; exit 1; }
+can_alter="$(psql "$DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select has_function_privilege(current_user,'cron.alter_job(bigint,text,text,text,text,boolean)','execute')")"
+[[ "$can_alter" == t ]] || { echo 'FAIL: database test role cannot use the supported cron.alter_job API'; exit 1; }
 TMP="$(mktemp -d)"
 cleanup() {
   local result=$?
   trap - EXIT
-  if ! psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "delete from public.game_players where game_id='23400000-0000-0000-0000-000000000901'; delete from public.games where id='23400000-0000-0000-0000-000000000901'; delete from public.holes where round_id='23400000-0000-0000-0000-000000000904'; delete from public.rounds where id='23400000-0000-0000-0000-000000000904'; delete from public.groups where id='23400000-0000-0000-0000-000000000903'; delete from public.profiles where id='23400000-0000-0000-0000-000000000902'; delete from auth.users where id='23400000-0000-0000-0000-000000000902'; delete from public.stale_game_job_runs; update cron.job set active='$original_active'::boolean where jobname='bnn-daily-stale-games';" >/dev/null; then result=1; fi
+  if ! psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "delete from public.game_players where game_id='23400000-0000-0000-0000-000000000901'; delete from public.games where id='23400000-0000-0000-0000-000000000901'; delete from public.holes where round_id='23400000-0000-0000-0000-000000000904'; delete from public.rounds where id='23400000-0000-0000-0000-000000000904'; delete from public.groups where id='23400000-0000-0000-0000-000000000903'; delete from public.profiles where id='23400000-0000-0000-0000-000000000902'; delete from auth.users where id='23400000-0000-0000-0000-000000000902'; delete from public.stale_game_job_runs;" >/dev/null; then result=1; fi
+  # Supabase owns scheduler metadata. Restore through its API even if fixture cleanup failed.
+  if ! psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "select cron.alter_job(jobid, active := '$original_active'::boolean) from cron.job where jobname='bnn-daily-stale-games';" >/dev/null; then result=1; fi
+  local restored_active
+  restored_active="$(psql "$DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select active from cron.job where jobname='bnn-daily-stale-games'")" || result=1
+  if [[ "$restored_active" != "$original_active" ]]; then echo 'FAIL: scheduler state was not restored' >&2; result=1; fi
   rm -rf "$TMP"
   exit "$result"
 }
 trap cleanup EXIT
 psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 <<'SQL'
-update cron.job set active=false where jobname='bnn-daily-stale-games';
+select cron.alter_job(jobid, active := false) from cron.job where jobname='bnn-daily-stale-games';
 insert into auth.users(id) values('23400000-0000-0000-0000-000000000902');
 insert into profiles(id,display_name,account_status) values('23400000-0000-0000-0000-000000000902','Concurrency fixture','active');
 insert into groups(id,name,is_test) values('23400000-0000-0000-0000-000000000903','Concurrency fixture',false);

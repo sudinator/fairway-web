@@ -136,8 +136,27 @@ for f in sorted((ROOT / 'ci').glob('assert-*.sql')):
     for line, name in app_role_calls(f.read_text(encoding='utf-8'), private_names):
         problems.append(f'I {f.relative_to(ROOT)}:{line}: app role calls server-only {name} — check has_function_privilege instead (208.4, 212.105)')
 
+# J. Provider-owned scheduler tables are read-only to Supabase's database role.
+# Job mutations in test helpers must use cron.schedule/alter_job/unschedule.
+cron_write = re.compile(r'\b(?:update\s+|insert\s+into\s+|delete\s+from\s+)"?cron"?\s*\.\s*"?job"?\b', re.I)
+for sql, expected in [
+    ('update cron.job set active=false', True),
+    ('DELETE FROM "cron"."job" where jobid=1', True),
+    ('insert into cron.job values (1)', True),
+    ('update\n cron.job set active=false', True),
+    ('select cron.alter_job(1, active := false)', False),
+    ('select active from cron.job', False),
+]:
+    if bool(cron_write.search(sql)) != expected:
+        problems.append('J scheduler metadata source-guard canary failed')
+for f in list((ROOT / 'ci').glob('*.sh')) + list((ROOT / 'ci').glob('assert-*.sql')):
+    text = '\n'.join('' if line.lstrip().startswith(('#', '--')) else line for line in f.read_text(encoding='utf-8').splitlines())
+    for m in cron_write.finditer(text):
+        line = text.count('\n', 0, m.start()) + 1
+        problems.append(f'J {f.relative_to(ROOT)}:{line}: writes provider-owned cron.job directly — use the scheduler API (212.106)')
+
 if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks, no app-role calls to server-only functions; 9 denial-call canaries)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks, no app-role calls to server-only functions; 9 denial-call canaries; scheduler API only, 6 metadata canaries)")

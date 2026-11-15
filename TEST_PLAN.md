@@ -1,3 +1,13 @@
+## 212.106.261114 — scheduler permission-test correction
+
+Staging test candidate. Native GitHub/Supabase CI and Vercel staging validation remain blocking release gates; this is not production approval.
+
+The concurrency helper directly updated provider-owned cron.job to pause and restore the daily job. Supabase rejects both writes, producing the two errors in the reported CI failure. Replace both writes with cron.alter_job, restore the original enabled state independently of fixture-cleanup success, and verify restoration. Extend the existing recurrence guard to reject direct scheduler metadata writes, including multiline SQL.
+
+Local evidence includes the full 232-migration chain and a restricted non-superuser reproduction: the old helper fails with the two reported errors; the corrected helper passes actual competing sessions with initially enabled and disabled jobs; an injected setup failure remains a failure and restores the scheduler. These checks supplement the native Supabase gate.
+
+No additional migration. All existing SQL migrations, including 0234, and application behavior source remain byte-identical to 212.105. Generated version metadata advances to 212.106. Analytics is paused and no analytics changes are included. See RELEASE_VERIFICATION_212.106.md.
+
 ## 212.105 fresh-database test correction
 
 Run the full source guards, including the nine app-role denial-call canaries. Reintroducing the 212.104 perform call must fail before database execution. Replay all migrations and assertions on a disposable database; validate the actual-role catalogue denial, authorized timestamp-tampering checks, member/admin history RLS and existing concurrency tests. Hosted Supabase CI is required because the local PostgreSQL shim lacks supautils. No production destructive tests.
