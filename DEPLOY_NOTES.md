@@ -1,3 +1,13 @@
+## 212.112.261116 — The CI failure on 212.111: version-date drift between package.json and the stamped build
+
+GitHub's "application" lane failed on 212.111 in ci/test-phone-diagnostics-browser.cjs: the worker answered 212.111.261115, the test expected 212.111.261116.
+
+**Cause.** The version's date segment is AUTO-STAMPED at build time to the US/Eastern date (scripts/write-version.mjs); that is the version the app and the service worker carry. package.json's date is hand-typed. 212.111's date was typed as 261116 at 03:37 UTC on Nov 16 — still Nov 15 in New Jersey — so the build stamped 261115. The test compared the worker (stamped) with package.json (typed) and failed.
+**The fragility it exposed.** Two browser tests used package.json's version as "current": the phone-diagnostics check, and the update-redirect test, which also uses it to rewrite sw.js when it simulates an upgrade. Any build on a different Eastern day from the typed date fails the first and breaks the second's simulation. That is also why the update-redirect test failed on the development machine on the untouched 212.108 last week (typed 261114, built on Eastern Nov 15) — wrongly put down to the Chromium build at the time.
+**Fix.** The phone-diagnostics test now compares the worker with the STAMPED version (lib/app-version.ts, which the writer produces); the update-redirect test is unchanged — its scenarios pass on GitHub (the 212.111 run shows them PASS) and it serves its own fixture versions. Rule: package.json's date is the Eastern date of the day the version is cut; the build stamps the real date; tests compare against the stamped one.
+
+Deploy: code only (a test). No migration.
+
 ## 212.111.261116 — Group card columns in the foursome's order (the trifecta swap); a skipped hole asks before scoring
 
 Owner (Nov 16): "while scoring the trifecta game today the order of players in the scorecard swapped the position between Probir and me in the group card"; "put in a check / warning to prevent a score being entered when a hole is being skipped".

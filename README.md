@@ -1,3 +1,7 @@
+## 212.112.261116 — The CI failure on 212.111: version-date drift between package.json and the stamped build
+
+GitHub's "application" lane failed on 212.111 in ci/test-phone-diagnostics-browser.cjs: the worker answered 212.111.261115, the test expected 212.111.261116.
+
 ## 212.111.261116 — Group card columns in the foursome's order (the trifecta swap); a skipped hole asks before scoring
 
 Owner (Nov 16): "while scoring the trifecta game today the order of players in the scorecard swapped the position between Probir and me in the group card"; "put in a check / warning to prevent a score being entered when a hole is being skipped".

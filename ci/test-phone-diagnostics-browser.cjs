@@ -4,7 +4,10 @@ const ts = require('typescript'), { chromium } = require('playwright');
 const { launchUpdateChromium } = require('./playwright-browser.cjs');
 const root = path.resolve(__dirname, '..'), modules = {};
 const read = name => fs.readFileSync(path.join(root, name), 'utf8');
-const current = JSON.parse(read('package.json')).version;
+// 212.112: the version the app actually carries is the one scripts/write-version.mjs STAMPED (the date segment is the
+// Eastern date at build time) — never package.json's hand-typed date, which differs whenever the build runs on another
+// Eastern day (212.111's CI failure: package.json 261116, the worker 261115).
+const current = JSON.parse(read('lib/app-version.ts').match(/APP_VERSION = ("[^"]+")/)[1]);
 let version = current, rejectAssets = false;
 const assetDelay = Number(process.env.BNN_DIAGNOSTIC_ASSET_DELAY_MS || 0);
 assert.ok(Number.isFinite(assetDelay) && assetDelay >= 0 && assetDelay <= 1000, 'asset delay must be a bounded local fixture value');
