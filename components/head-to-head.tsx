@@ -56,7 +56,9 @@ export function HeadToHead({ user }: { user: { id: string } }) {
   if (!rec.headToHead.length && !rec.partners.length) return null;   // nothing to show until there are finished matches
   const best = bestPartnerRecord(rec.partners);   // 210.7: enough matches to mean something
   const th: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 700, textAlign: "right", paddingTop: 4, paddingBottom: 4 };
-  const td: React.CSSProperties = { borderTop: `1px solid ${C.green}`, paddingTop: 6, paddingBottom: 6, textAlign: "right", fontSize: 13, color: C.cream };
+  // 212.120: the data-row standard (DISPLAY_RULES) — names 13/700, figures 14/700, captions 11 sage
+  const td: React.CSSProperties = { borderTop: `1px solid ${C.green}`, paddingTop: 8, paddingBottom: 8, textAlign: "right", fontSize: 14, fontWeight: 700, color: C.cream };
+  const tdName: React.CSSProperties = { ...td, textAlign: "left", fontSize: 13, fontWeight: 700 };
   return (
     <div data-head-to-head style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
       <Eyebrow>HEAD-TO-HEAD & PARTNERS</Eyebrow>
@@ -65,7 +67,7 @@ export function HeadToHead({ user }: { user: { id: string } }) {
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }} data-h2h>
           <thead><tr><th style={{ ...th, textAlign: "left" }}>Against · singles</th><th style={th}>W</th><th style={th}>L</th><th style={th}>H</th></tr></thead>
           <tbody>{rec.headToHead.map((r) => (
-            <tr key={r.userId}><td style={{ ...td, textAlign: "left" }}>{r.name}</td><td style={td}>{r.won}</td><td style={td}>{r.lost}</td><td style={td}>{r.halved}</td></tr>
+            <tr key={r.userId}><td style={tdName}>{r.name}</td><td style={td}>{r.won}</td><td style={td}>{r.lost}</td><td style={td}>{r.halved}</td></tr>
           ))}</tbody>
         </table>
       ) : null}
@@ -73,7 +75,7 @@ export function HeadToHead({ user }: { user: { id: string } }) {
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }} data-partners>
           <thead><tr><th style={{ ...th, textAlign: "left" }}>With · four-ball, alt shot, Trifecta</th><th style={th}>Played</th><th style={th}>Won</th><th style={th}>Pts</th><th style={th}>Rate</th></tr></thead>
           <tbody>{rec.partners.map((r) => (
-            <tr key={r.userId}><td style={{ ...td, textAlign: "left" }}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""}</td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td><td style={td}>{r.played >= BEST_PARTNER_MIN && partnerRate(r) != null ? `${Math.round(100 * partnerRate(r)!)}%` : "—"}</td></tr>
+            <tr key={r.userId}><td style={tdName}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""}</td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td><td style={td}>{r.played >= BEST_PARTNER_MIN && partnerRate(r) != null ? `${Math.round(100 * partnerRate(r)!)}%` : "—"}</td></tr>
           ))}</tbody>
         </table>
       ) : null}

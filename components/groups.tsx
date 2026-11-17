@@ -373,10 +373,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 <div key={m.id} style={{ background: C.greenMid, border: `1px solid ${C.borderGreen}`,
                   borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex",
                   alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
+                  <Avatar src={m.profiles?.avatar_url} name={name} size={28} />
                   <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ color: C.cream, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
-                    <div style={{ color: C.sage, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
+                    <div style={{ color: C.cream, fontSize: 13, fontWeight: self ? 800 : 700 }}>{name}{self ? " (you)" : ""}</div>
+                    <div style={{ color: C.sage, fontSize: 11 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
                     <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: "auto" }}>

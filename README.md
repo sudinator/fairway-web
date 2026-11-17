@@ -1,3 +1,15 @@
+## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
+
+Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."
+
+## 212.119.261117 — Season standings on the Club tab's idiom (the font and size mismatch)
+
+Owner (Nov 17, two staging screenshots): the standings card next to the club stats table — "completely lost the consistency".
+
+## 212.118.261117 — CI fix: the 0237 assertion test's fixture
+
+GitHub's database lane failed on 212.117 in ci/assert-club-round-standings.sql: the test inserted club memberships without group_members.email, which is NOT NULL. The migration (0237) applied cleanly and the function ran; only the test fixture was wrong. Fixed to insert the email, as ci/assert-club-isolation.sql does. No app change; migration 0237 is unchanged (apply it once, as for 212.117).
+
 ## 212.117.261117 — Season standings: the Rounds tab, the Profile switch, and the refinements from the real data
 
 Owner (Nov 17–18): "2 tabs — one for games and one for individual rounds"; aggregates and ranking only, no hole-by-hole; the switch in Profile, on by default; top 5 with the rest behind Show all; unranked figures shown; top-3s only with five or more finishers.

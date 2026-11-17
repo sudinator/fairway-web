@@ -9,10 +9,10 @@ insert into public.profiles(id, display_name, account_status, email) values
   ('23700000-0000-0000-0000-0000000000a2', 'Private', 'active', 'private@w.test'), ('23700000-0000-0000-0000-0000000000a3', 'Outsider', 'active', 'outsider@w.test');
 update public.profiles set share_rounds_with_club = false where id = '23700000-0000-0000-0000-0000000000a2';
 insert into public.groups(id, name, created_by) values ('23700000-0000-0000-0000-00000000c1b0', 'Club', '23700000-0000-0000-0000-0000000000a0');
-insert into public.group_members(group_id, user_id, role, status) values
-  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a0', 'member', 'active'),
-  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a1', 'member', 'active'),
-  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a2', 'member', 'active');
+insert into public.group_members(group_id, user_id, email, role, status) values
+  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a0', 'member@w.test', 'member', 'active'),
+  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a1', 'sharer@w.test', 'member', 'active'),
+  ('23700000-0000-0000-0000-00000000c1b0', '23700000-0000-0000-0000-0000000000a2', 'private@w.test', 'member', 'active');
 insert into public.rounds(id, user_id, course, group_id, status, played_at, course_par, course_handicap) values
   ('23701000-0000-0000-0000-000000000001', '23700000-0000-0000-0000-0000000000a1', 'Oak', null, 'final', '2026-06-01', 72, 10),
   ('23701000-0000-0000-0000-000000000002', '23700000-0000-0000-0000-0000000000a2', 'Oak', null, 'final', '2026-06-02', 72, 10),

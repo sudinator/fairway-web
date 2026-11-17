@@ -1,3 +1,26 @@
+## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
+
+Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."
+
+**Audit.** The app had no written standard for data rows; each table was built to its author's taste. On the Club tab: the stats rows 12px; the standings (212.119) 12px with 22px avatars; head-to-head cells 13px regular; the members list body-size names at 800 with 40px avatars and 12px meta. Avatar sizes across the app's lists run 20–48px.
+**Standard (DISPLAY_RULES "Data rows — one standard"):** outside a live game surface, every list or table of members, players or figures uses: names/labels 13px/700 cream (800 for the viewer's own row), captions and counts 11px sage, figures sans 14px/700, avatars 28px, an Eyebrow heading, 1px separators with 8px padding, pills at 4px 10px. Georgia numerals stay on game surfaces and hero tiles. (Weights are 500/700/800 only — a guard enforces it, and caught a 600 on the way.)
+**Applied to:** components/season-standings (names 13/700, avatars 28), components/club-engagement (format rows and scoring labels 13/700, counts 11), components/groups MEMBERS list (names 13/700, avatars 28, meta 11), components/head-to-head (names 13/700, figures 14/700). Admin tables (components/manage) and the game surfaces are untouched. Tests: standings (13), groups (10) pass; the full suite, the design-scale, weight and contrast guards pass.
+
+Deploy: code only.
+
+## 212.119.261117 — Season standings on the Club tab's idiom (the font and size mismatch)
+
+Owner (Nov 17, two staging screenshots): the standings card next to the club stats table — "completely lost the consistency".
+
+**Why.** The display rule "Georgia for numerals" is the GAME surfaces' idiom (leaderboards, recap, money, share card). The Club tab and the stats cards (components/club-engagement) use a compact idiom: Eyebrow headings, 12px rows, sans 14px/700 numerals with 11px captions, 22px avatars. The standings card was built in the first idiom beside a card in the second, so it read a size larger and in another face. The heading itself was already the shared Eyebrow.
+**Fix.** The card restyled to the Club tab's measurements: tabs and pills 11–12px on-scale paddings, rows 12px (cream 500, bold for the viewer), counts 11px sage, figures sans 14px/700 (sage when unranked), avatars 22px, the note 11px. DISPLAY_RULES gains "Which idiom, where": a new card takes its neighbour's idiom; Georgia numerals stay on game surfaces and hero tiles. Tests unchanged (13 screen checks pass); gallery 60/62 re-rendered; the design-scale and contrast guards pass.
+
+Deploy: code only (0237 from 212.117 still applies once).
+
+## 212.118.261117 — CI fix: the 0237 assertion test's fixture
+
+GitHub's database lane failed on 212.117 in ci/assert-club-round-standings.sql: the test inserted club memberships without group_members.email, which is NOT NULL. The migration (0237) applied cleanly and the function ran; only the test fixture was wrong. Fixed to insert the email, as ci/assert-club-isolation.sql does. No app change; migration 0237 is unchanged (apply it once, as for 212.117).
+
 ## 212.117.261117 — Season standings: the Rounds tab, the Profile switch, and the refinements from the real data
 
 Owner (Nov 17–18): "2 tabs — one for games and one for individual rounds"; aggregates and ranking only, no hole-by-hole; the switch in Profile, on by default; top 5 with the rest behind Show all; unranked figures shown; top-3s only with five or more finishers.

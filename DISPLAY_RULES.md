@@ -218,6 +218,15 @@ cover 81% of all text and read well. Ratcheted, not collapsed.
 
 **Face.** Georgia for numerals and screen titles. Sans for everything else.
 
+**Data rows — one standard (212.120).** Every list or table of members, players or figures OUTSIDE a live
+game surface (Club tab, stats and analytics cards, head-to-head, directories) uses the same row: name or label 13px/700
+in C.cream (800 for the viewer's own row), captions and counts 11px in C.sage, figures in the sans face at 14px/700,
+avatars 28px, an Eyebrow heading, rows separated by a 1px line with 8px padding, on-scale paddings for pills (4px 10px).
+Georgia numerals belong to the GAME surfaces — leaderboards, scorecards, recap, money, the share card — and to hero
+tiles (a 24px count in a tile). A new card takes its neighbour's standard; the Season standings card was first built in
+the leaderboard idiom beside the stats table and the members list, each of which had its own sizes — the owner saw
+three tables, three fonts.
+
 ### Padding — no prescribed scale
 
 161 distinct values across 679 uses, the most common covering only 5%. There is no dominant scale

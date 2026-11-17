@@ -62,8 +62,10 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
     return () => { live = false; };
   }, [tab, rounds, preloaded, groupId, year, supabase]);
 
-  const pill = (on: boolean): React.CSSProperties => ({ background: on ? C.gold : "none", color: on ? C.green : C.cream, border: `1px solid ${on ? C.gold : C.borderGreen}`, borderRadius: 999, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", font: "inherit" });
-  const tabStyle = (on: boolean): React.CSSProperties => ({ background: "none", border: "none", borderBottom: `2px solid ${on ? C.gold : "transparent"}`, color: on ? C.gold : C.sage, padding: "8px 12px", fontSize: 13, fontWeight: 800, cursor: "pointer", font: "inherit", marginBottom: -1 });
+  // 212.119: the CLUB TAB's compact idiom (components/club-engagement), not the leaderboard's — 13px rows, sans 14px/700
+  // numerals with 11px captions, Eyebrow headings. The owner saw the two tables side by side: "completely lost the consistency".
+  const pill = (on: boolean): React.CSSProperties => ({ background: on ? C.gold : "none", color: on ? C.green : C.cream, border: `1px solid ${on ? C.gold : C.borderGreen}`, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" });
+  const tabStyle = (on: boolean): React.CSSProperties => ({ background: "none", border: "none", borderBottom: `2px solid ${on ? C.gold : "transparent"}`, color: on ? C.gold : C.sage, padding: "4px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: -1 });
 
   // one shape for both tabs
   type Line = { id: string; name: string; avatarUrl: string | null; count: number; value: string; place: number | null; detail: [string, string][] };
@@ -86,13 +88,13 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
     <div data-season-standings style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 14, color: C.cream }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
         <Eyebrow style={{ marginTop: 0 }}>SEASON STANDINGS · {year}</Eyebrow>
-        <span style={{ color: C.sage, fontSize: 12, whiteSpace: "nowrap" }}>{tab === "games" ? (games ? `${games.games} game${games.games === 1 ? "" : "s"}` : "") : "members who share their rounds"}</span>
+        <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{tab === "games" ? (games ? `${games.games} game${games.games === 1 ? "" : "s"}` : "") : "members who share their rounds"}</span>
       </div>
       <div role="tablist" aria-label="Standings" style={{ display: "flex", marginTop: 12, borderBottom: `1px solid ${C.borderGreen}` }}>
         {(["games", "rounds"] as Tab[]).map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} data-standings-tab={t} onClick={() => { setTab(t); setOpen(null); setShowAll(false); }} style={tabStyle(tab === t)}>{t === "games" ? "Club games" : "Rounds"}</button>)}
       </div>
-      {err ? <div style={{ color: C.gold, fontSize: 13, marginTop: 8 }}>Couldn’t load the standings: {err}</div> : loading ? <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>Loading…</div> : !lines.length ? (
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball or trifecta games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
+      {err ? <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>Couldn’t load the standings: {err}</div> : loading ? <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading…</div> : !lines.length ? (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball or trifecta games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
       ) : (
         <>
           <div role="tablist" aria-label="Sort standings" style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
@@ -104,16 +106,16 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
               return (
                 <div key={l.id} data-standings-row={l.id} data-place={l.place ?? ""}>
                   <button type="button" onClick={() => setOpen(isOpen ? null : l.id)} aria-expanded={isOpen}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", paddingTop: 8, paddingBottom: 8, background: you ? "rgba(201,162,39,0.08)" : "none", border: "none", borderTop: `1px solid ${C.green}`, borderRadius: 6, color: C.cream, textAlign: "left", cursor: "pointer", font: "inherit" }}>
-                    <span style={{ color: l.place ? C.gold : C.sage, fontWeight: 800, width: 22, fontFamily: "Georgia, serif", fontSize: 16, flexShrink: 0 }}>{l.place ?? "·"}</span>
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", paddingTop: 8, paddingBottom: 8, background: you ? "rgba(201,162,39,0.08)" : "none", border: "none", borderTop: `1px solid ${C.green}`, borderRadius: 6, color: C.cream, textAlign: "left", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
+                    <span style={{ color: l.place ? C.gold : C.sage, fontWeight: 700, width: 18, fontSize: 13, flexShrink: 0 }}>{l.place ?? "·"}</span>
                     <Avatar src={l.avatarUrl} name={l.name} size={28} enlargeable={false} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: you ? 800 : 500 }}>{l.name}{you ? " (you)" : ""}</span>
-                    <span style={{ color: C.sage, fontSize: 11, width: 56, textAlign: "right", flexShrink: 0 }}>{l.count} {unit}{l.count === 1 ? "" : "s"}</span>
-                    <span data-standings-value style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: l.place ? 18 : 15, color: l.place ? C.cream : C.sage, minWidth: 44, textAlign: "right", flexShrink: 0 }}>{l.value}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, fontWeight: you ? 800 : 700 }}>{l.name}{you ? " (you)" : ""}</span>
+                    <span style={{ color: C.sage, fontSize: 11, width: 52, textAlign: "right", flexShrink: 0 }}>{l.count} {unit}{l.count === 1 ? "" : "s"}</span>
+                    <span data-standings-value style={{ fontWeight: 700, fontSize: 14, color: l.place ? C.cream : C.sage, minWidth: 40, textAlign: "right", flexShrink: 0 }}>{l.value}</span>
                   </button>
                   {isOpen ? (
                     <div data-standings-detail style={{ background: C.greenMid, borderRadius: 10, padding: "8px 12px", marginBottom: 6, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-                      {l.detail.map(([k, v]) => <div key={k}><div style={{ color: C.sage, fontSize: 11 }}>{k}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{v}</div></div>)}
+                      {l.detail.map(([k, v]) => <div key={k}><div style={{ color: C.sage, fontSize: 11 }}>{k}</div><div style={{ fontWeight: 700, fontSize: 14 }}>{v}</div></div>)}
                     </div>
                   ) : null}
                 </div>
@@ -121,11 +123,11 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
             })}
           </div>
           {hiddenCount > 0 || showAll ? (
-            <button type="button" data-standings-more onClick={() => setShowAll((v) => !v)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>
+            <button type="button" data-standings-more onClick={() => setShowAll((v) => !v)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 12 }}>
               {showAll ? "Show the top 5 only" : `Show all ${lines.length} (${rest.length} with fewer than ${tab === "games" ? STANDINGS_MIN_GAMES : ROUNDS_MIN} ${unit}s)`}
             </button>
           ) : null}
-          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+          <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, marginTop: 10 }}>
             {tab === "games"
               ? `Ended club games this year — Stableford, stroke play, best ball and trifecta. A win is a first place or a won match. At least ${STANDINGS_MIN_GAMES} games to be ranked; ties share the place. Tap a name for every number.`
               : `Every 18-hole round logged in BNN this year by members who share them (change in Profile). Scoring averages are to par. At least ${ROUNDS_MIN} rounds to be ranked; ties share the place. Members log unevenly — the count is on every row.`}
