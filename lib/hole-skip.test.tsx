@@ -4,6 +4,7 @@ import * as React from "react";
 import { act } from "react";
 import { expectedNextHole, holeSkip } from "@/lib/hole-skip";
 import { GroupScorecard } from "@/components/game/scorecard-views";
+import { ScoreEntryCard } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 
 const row = (...scored: number[]) => Array.from({ length: 18 }, (_, i) => (scored.includes(i + 1) ? 4 : null));
@@ -30,4 +31,17 @@ ok(!!t.el.querySelector("[data-hole-skip-ask]") && (t.el.textContent || "").incl
 t.click("Score hole 2");
 ok(!t.el.querySelector("[data-hole-skip-ask]") && (t.el.textContent || "").includes("Hole 2") && !!t.el.querySelector("[data-hole-editor]"), "'Score hole 2' opens hole 2 instead");
 t.unmount();
+// ── a PERSONAL round (212.114): the Rounds editor's entry card, the same rule
+const entryHoles = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1, yards: null, recv: 0, strokes: i === 0 ? 4 : null, putts: null, fairway: null, penalties: null, sand: null }));
+const pr = renderScreen(<ScoreEntryCard holes={entryHoles as never} hasHandicap onSet={() => {}} />);
+act(() => { (pr.el.querySelector("#sehole-2") as HTMLElement).click(); });
+ok(!!pr.el.querySelector("[data-hole-skip-ask]") && (pr.el.textContent || "").includes("Hole 2 hasn’t been scored yet"), "personal round: tapping hole 3 after hole 1 asks about hole 2");
+pr.click("Score hole 2");
+ok(!pr.el.querySelector("[data-hole-skip-ask]") && !!pr.el.querySelector("[data-hole-editor]") && (pr.el.querySelector("[data-hole-editor]")?.textContent || "").includes("Hole 2"), "personal round: 'Score hole 2' opens hole 2's editor");
+pr.unmount();
+const pr2 = renderScreen(<ScoreEntryCard holes={entryHoles as never} hasHandicap onSet={() => {}} />);
+act(() => { (pr2.el.querySelector("#sehole-2") as HTMLElement).click(); });
+pr2.click("Score hole 3");
+ok(!pr2.el.querySelector("[data-hole-skip-ask]") && (pr2.el.querySelector("[data-hole-editor]")?.textContent || "").includes("Hole 3"), "personal round: 'Score hole 3' continues on hole 3");
+pr2.unmount();
 report("hole skip");

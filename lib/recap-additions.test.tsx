@@ -64,4 +64,16 @@ ok(six.highlights.fieldNet != null && six.highlights.frontBackNet != null, `six 
 const fb = formatGames["fourball"];
 const one = buildRecap(fb.game, fb.players, []), two = buildRecap(fb.game, fb.players, [], { pointsPerMatch: 2 });
 ok(/1–1|1 – 1/.test(one.headline) && /2–2|2 – 2/.test(two.headline), `a Cup session at 2 points a match reads 2–2 on the recap, not 1–1 (got "${one.headline}" / "${two.headline}")`);
+// ── 212.114 (owner, Nov 15, option 1): the standouts heading names its basis
+const eight = buildRecap(game, players, []);   // 8 players with index + tee → the field basis
+let hs = renderScreen(<RecapBody game={game} recap={eight} mode="share" contests={[]} netBirdiesTop={3} />);
+ok((hs.el.textContent || "").includes("best against the field (8+ scored)"), "8+ scored: the heading says 'against the field'");
+hs.unmount();
+const sixScored = buildRecap(game, players.slice(0, 6), []);
+if (sixScored.highlights.standouts?.rows.length) {
+  hs = renderScreen(<RecapBody game={game} recap={sixScored} mode="share" contests={[]} netBirdiesTop={3} />);
+  ok((hs.el.textContent || "").includes("best against their own handicap (fewer than 8 scored"), "fewer than 8: the heading says 'against their own handicap'");
+  hs.unmount();
+}
+ok(recapEmailHtml(eight, null, []).includes("best against the field (8+ scored)"), "email: the field basis named");
 report("recap additions");

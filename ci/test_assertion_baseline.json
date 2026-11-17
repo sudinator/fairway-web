@@ -1,5 +1,5 @@
 {
-  "total": 447392,
+  "total": 447399,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -56,7 +56,7 @@
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
     "hole result consistency": 981,
-    "hole skip": 11,
+    "hole skip": 14,
     "insights": 28,
     "insights screens": 7,
     "late scores": 10,
@@ -82,7 +82,7 @@
     "personal bests": 16,
     "phone diagnostic export": 26,
     "player-scoring": 71,
-    "recap additions": 46,
+    "recap additions": 50,
     "recap stat contract": 59,
     "round stat completeness": 8,
     "save trace toggle": 3,

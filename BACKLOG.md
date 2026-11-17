@@ -15,14 +15,15 @@
 
 **Open (still needed):**
 - DROPPED (owner, Nov 15): smarter pairing suggestions — "this only makes sense once we have enough data in the system". Revisit when a season's worth of games exists.
-- [ ] Standouts — DECIDED (owner, Nov 15, option 1): keep the 8-player switch, and make the box's heading say which basis it used ("best against the field" with 8+ scored players; "best against their handicap" below). Not yet coded — waiting to batch with the next decisions.
+- DONE 212.114: standouts heading names its basis (option 1).
 - Season Wrapped — DONE (components/season-wrapped.tsx; dashboard and Rounds entries). Only the unapproved follow-up idea of a public per-golfer share link is unbuilt; the mid-December dry run is an event, not code.
 - [ ] Head-to-head excludes cancelled rounds (Ebrahim Basrai) — no handling of cancelled / voided games found in lib/match-outcomes.
 - Personal bests — DONE: the dashboard card lists every best, each opening its round (the separate "records list" page idea is unnecessary).
 - Balanced matchups within a Cup session — DONE: balancedTeamMatchups (lib/grouping, strongest v strongest across the sides) via Create's "Build balanced matchups"; sessions use the one-step Create flow since 212.68.
-- [ ] Parity job alert: the production migration-parity job has no failure notification (ci.yml production-migration-parity); the external-api-contracts workflow shows the issue-creating pattern to copy.
-- [ ] Admin → Users: Wipe button for admin_wipe_user (the club-wipe UI exists; the user-wipe does not).
-- [ ] Admin → Players: clubs panel for players outside the admin's own clubs (group_members_select_visible has no is_admin() clause).
+- DROPPED (owner, Nov 17): the parity-job alert — the owner checks that every job is green on each pull request, and GitHub emails a failed run; no extra alert needed.
+- DROPPED (owner, Nov 17): the Wipe button — "we dont need or want wipe - it has many follow through effects". Remove (account blocked, history kept) covers leaving, duplicates and bad actors; Merge covers duplicates. If a right-to-erasure request ever comes, build an ANONYMISE action then (other players' results must not change), never a delete.
+- DONE 212.114: the skipped-hole check in the Rounds editor's entry card too.
+- DONE already (confirmed Nov 17): Admin → Player admin shows every player's clubs to the app admin — migration 0202 added the is_admin() clause to group_members_select_visible; the October note predated it.
 - [ ] Physical-phone validation items from 212.87–212.100 (update rollout, installed-app checks, Vercel protection on staging, the 212.97 incident) — owner's phone, not code.
 - [ ] Repository housekeeping: the ~7.5 MB of root documents and historical verification records.
 

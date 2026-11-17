@@ -94,8 +94,8 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null, contests: EmailCo
   if (s.individualStats && h.standouts?.rows.length) {
     const st = h.standouts;
     const sub = st.basis === "field" && st.fieldGap != null
-      ? `best against their handicap, on a course that played ${Math.abs(Math.round(st.fieldGap - 3))} shot${Math.abs(Math.round(st.fieldGap - 3)) === 1 ? "" : "s"} ${st.fieldGap - 3 >= 0.5 ? "hard" : st.fieldGap - 3 <= -0.5 ? "easy" : "about normal"}`
-      : "best against their own handicap";
+      ? `best against the field (8+ scored), on a course that played ${Math.abs(Math.round(st.fieldGap - 3))} shot${Math.abs(Math.round(st.fieldGap - 3)) === 1 ? "" : "s"} ${st.fieldGap - 3 >= 0.5 ? "hard" : st.fieldGap - 3 <= -0.5 ? "easy" : "about normal"}`
+      : "best against their own handicap (fewer than 8 scored, so not against the field)";   // 212.114: the heading names the basis
     parts.push(H("STANDOUT ROUNDS", sub) + TABLE(st.rows.map((x, i) => ROW(esc(x.name) + (x.exceptional ? " · exceptional round" : ""), `${x.better.toFixed(1)} better${i === 0 && st.basis === "field" ? " than the field" : st.basis === "own" ? " than handicap" : ""}`)).join(""))
       + (st.basis === "field" && st.fieldGap != null ? `<div style="font-size:11px;color:#5d6f66;margin-top:4px">The field averaged ${st.fieldGap.toFixed(1)} over its handicaps (a normal day is about 3).</div>` : ""));
   }

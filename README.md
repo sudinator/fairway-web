@@ -1,3 +1,7 @@
+## 212.114.261116 — The skipped-hole check for personal rounds; the standouts heading names its basis; the safe dependency batch
+
+Owner (Nov 17): "do the code items and dependency batch in this next release".
+
 ## 212.113.261116 — Housekeeping: the root cleared of records and stale copies; history archived and kept out of the package
 
 Owner (Nov 17): "it feels like this app is carrying a lot of bloat which we should clean up from time to time"; chose archive-and-exclude over deleting.

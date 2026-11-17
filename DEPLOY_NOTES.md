@@ -1,3 +1,14 @@
+## 212.114.261116 — The skipped-hole check for personal rounds; the standouts heading names its basis; the safe dependency batch
+
+Owner (Nov 17): "do the code items and dependency batch in this next release".
+
+- **Skipped-hole check for PERSONAL rounds** (owner: "why wouldn't it fire for an individual round as well?"): the Rounds editor uses the shared entry card (ScoreEntryCard), which now runs the same rule as the group card (lib/hole-skip; here "the group" is just the card's holes). Tapping a still-unscored hole that isn't the next expected one asks "Hole 3? — Hole 2 hasn't been scored yet", with "Score hole 2" / "Score hole 3"; the editor's own Next never skips, so only a tap is checked. Tests: lib/hole-skip (14): the ask, the switch, the continue.
+- **Standouts heading names its basis** (owner, Nov 15, option 1): "STANDOUT ROUNDS · best against the field (8+ scored), on a course that played N shots hard" with eight or more scored; "· best against their own handicap (fewer than 8 scored, so not against the field)" below — card, share image and email. The 8-player switch stays, as decided. Tests in lib/recap-additions (25).
+- **Dependency batch (same-major updates, proven by CI):** Next 16.3.8 → 16.4.6, React / React DOM 19.2.8 → 19.3.1, supabase-js 2.108.1 → 2.119.0, Playwright 1.62.1 → 1.65.1, eslint-config-next 16.3.0 → 16.4.6, @types/react and @types/react-dom to 19.3.0, the testing-library packages. package.json minimums lifted to match; the lock file pins them. Everything ran on the new versions: types, lint, the suite (447,399 checks, 115 suites), the guards, the chart / analytics / diagnostics browser lanes, the build.
+Not taken (each its own decision and staged release): @supabase/ssr 0.5 → 0.12 (auth cookies), Node 22 → 24, TypeScript 5 → 7, ESLint 9 → 10, jsdom 25 → 31, web-push 3 → 4.
+
+Deploy: code only. No migration. GitHub's CI runs `npm ci`, so it installs exactly the lock file's versions.
+
 ## 212.113.261116 — Housekeeping: the root cleared of records and stale copies; history archived and kept out of the package
 
 Owner (Nov 17): "it feels like this app is carrying a lot of bloat which we should clean up from time to time"; chose archive-and-exclude over deleting.
