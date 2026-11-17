@@ -26,12 +26,12 @@ ROOTS = ("components", "app")
 
 # DISPLAY_RULES.md Part 5. Anything outside these is drift.
 ALLOWED_RADIUS = {999, 14, 12, 10, 8, 6}
-ALLOWED_PADDING = {"13px 16px", "11px 20px", "8px 12px", "4px 10px", "16px"}
-# Size is deliberately NOT prescribed — see DISPLAY_RULES. The app leans on 12px 543 times and
-# enforcing a theoretical scale would resize body text across 759 sites with no component test
-# harness to catch a layout break. Ratcheted at its current spread instead.
-ALLOWED_FONTSIZE = set(range(11, 47))
-DISPLAY_NUMERAL_MIN = 30
+# 212.123 (owner, Nov 17 — presentation C): eight values drawn from what the app actually uses (DISPLAY_RULES Part 5)
+ALLOWED_PADDING = {"4px 10px", "6px 12px", "8px 12px", "8px 0", "12px 14px", "13px 16px", "11px 20px", "16px"}
+# 212.123: a TYPE SCALE — seven text steps plus display numerals (24 and up). Ratcheted like padding: the existing
+# off-scale sizes (16, 17, 18, 19, 21) are frozen per file, nothing is resized; new code uses the scale.
+ALLOWED_FONTSIZE = {11, 12, 13, 14, 15, 20, 22}
+DISPLAY_NUMERAL_MIN = 24
 
 # Real corners on normal-sized cards, not clamped pills. Collapsing them to 12 is a genuine
 # visual change, so they are held out pending a per-site decision (DISPLAY_RULES Part 10).

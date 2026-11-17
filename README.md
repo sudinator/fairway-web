@@ -1,3 +1,11 @@
+## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
+
+Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".
+
+## 212.122.261117 — Presentation A: the app's own confirm sheet replaces the browser's pop-ups (member-facing screens)
+
+Owner (Nov 17): "how the app looks and presents is super high on the priority list" — start with A.
+
 ## 212.121.261117 — Lists across the app: two idioms, written down and applied
 
 Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."

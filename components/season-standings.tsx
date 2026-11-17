@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { C } from "@/lib/golf";
-import { Eyebrow, Avatar, btn } from "@/components/ui";
+import { Eyebrow, Avatar, btn, Segmented } from "@/components/ui";
 import { seasonStandings, rankBy, METRICS, STANDINGS_MIN_GAMES, type StandingRow, type StandingsMetric, type ContestWin } from "@/lib/season-standings";
 import { roundsStandings, rankRounds, ROUNDS_METRICS, ROUNDS_MIN, type RoundsStandingRow, type RoundsMetric, type RoundRow, type HoleRow } from "@/lib/season-rounds";
 import { contestLeaderboard, type Contest, type ContestEntry } from "@/lib/contests";
@@ -64,7 +64,6 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
 
   // 212.119: the CLUB TAB's compact idiom (components/club-engagement), not the leaderboard's — 13px rows, sans 14px/700
   // numerals with 11px captions, Eyebrow headings. The owner saw the two tables side by side: "completely lost the consistency".
-  const pill = (on: boolean): React.CSSProperties => ({ background: on ? C.gold : "none", color: on ? C.green : C.cream, border: `1px solid ${on ? C.gold : C.borderGreen}`, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" });
   const tabStyle = (on: boolean): React.CSSProperties => ({ background: "none", border: "none", borderBottom: `2px solid ${on ? C.gold : "transparent"}`, color: on ? C.gold : C.sage, padding: "4px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: -1 });
 
   // one shape for both tabs
@@ -97,8 +96,8 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball or trifecta games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
       ) : (
         <>
-          <div role="tablist" aria-label="Sort standings" style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-            {metrics.map((x) => <button key={x.key} type="button" role="tab" aria-selected={metric === x.key} data-standings-sort={x.key} onClick={() => setMetric(x.key)} style={pill(metric === x.key)}>{x.label}</button>)}
+          <div style={{ marginTop: 10 }}>
+            <Segmented ariaLabel="Sort standings" onCard attr="data-standings-sort" value={metric} onChange={setMetric} options={metrics.map((x) => ({ key: x.key, label: x.label }))} />
           </div>
           <div style={{ marginTop: 10 }}>
             {shown.map((l) => {

@@ -1,4 +1,6 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
+import { notifyError, notifyInfo } from "@/components/toast";
 
 import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -150,8 +152,8 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
   // The ONE gate before any money write: online, and the ledger on screen is complete (206.1).
   const requireOnline = () => {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) { alert("You're offline — connect to update the money ledger."); return false; }
-    if (loadError) { alert("The money ledger didn't refresh completely, so balances may be out of date. Pull to refresh, then try again."); void load(); return false; }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) { notifyError("You're offline — connect to update the money ledger."); return false; }
+    if (loadError) { notifyError("The money ledger didn't refresh completely, so balances may be out of date. Pull to refresh, then try again."); void load(); return false; }
     return true;
   };
 
@@ -175,18 +177,18 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     const { data, error } = await supabase.from("group_events")
       .insert({ group_id: gid, name: name.trim(), event_type: "manual", status: "open", created_by: user.id })
       .select("*").single();
-    if (error || !data) { alert("Couldn't create the Bucket — please try again."); return null; }
+    if (error || !data) { notifyError("Couldn't create the Bucket — please try again."); return null; }
     setEvents((e) => [data as EventRow, ...e]);
     await logActivity("event_created", "created Bucket " + name.trim(), { event_id: (data as any).id });
     return (data as any).id as string;
   };
   const setEventClosed = async (ev: EventRow, closed: boolean) => {
     if (!requireOnline()) return;
-    if (closed && !window.confirm(`Close "${ev.name}"? It will be sealed — no more expenses, and its expenses can't be edited. You (an admin) can reopen it later.`)) return;
+    if (closed && !(await askConfirm({ title: `Close “${ev.name}”?`, message: "It will be sealed — no more expenses, and its expenses can’t be edited. You (an admin) can reopen it later.", confirmLabel: "Close event" }))) return;
     setBusy(true);
     const { error } = await supabase.rpc("set_event_closed", { p_event: ev.id, p_closed: closed });
     setBusy(false);
-    if (error) { alert("Couldn't " + (closed ? "close" : "reopen") + " the event — " + error.message); return; }
+    if (error) { notifyError("Couldn't " + (closed ? "close" : "reopen") + " the event — " + error.message); return; }
     await load();
   };
   const moveExpenseEvent = async (expenseId: string, eventId: string | null) => {
@@ -201,12 +203,12 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       return allocations.some((a) => a.expense_id && inEv.has(a.expense_id) && confIds.has(a.settlement_id));
     };
     const srcEvent = expenses.find((e) => e.id === expenseId)?.event_id ?? null;
-    if (eventHasPayments(srcEvent)) { alert("This event has recorded payments, so its expenses can't be moved — the payments were settled against these expenses. Unmark them in the Settle tab first, then move."); return; }
-    if (eventHasPayments(eventId)) { alert("The event you're moving into has recorded payments. Unmark them in the Settle tab first, then move the expense in."); return; }
+    if (eventHasPayments(srcEvent)) { notifyError("This event has recorded payments, so its expenses can't be moved — the payments were settled against these expenses. Unmark them in the Settle tab first, then move."); return; }
+    if (eventHasPayments(eventId)) { notifyError("The event you're moving into has recorded payments. Unmark them in the Settle tab first, then move the expense in."); return; }
     setBusy(true);
     const { error } = await supabase.rpc("move_expense_event", { p_expense: expenseId, p_event: eventId });
     setBusy(false);
-    if (error) { alert(failureMessage("Couldn't move the expense", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't move the expense", error)); return; }
     await load();
   };
 
@@ -219,7 +221,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       const { data: upd, error: uErr } = await supabase.from("settlements").update({ status: "confirmed" }).in("id", ids).select("id");
       if (uErr || !upd || upd.length < ids.length) {
         setBusy(false);
-        alert("Couldn't confirm your payment — please try again. If it keeps happening, tell your admin.");
+        notifyError("Couldn't confirm your payment — please try again. If it keeps happening, tell your admin.");
         await load();
         return;
       }
@@ -262,8 +264,8 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     const { error } = await supabase.rpc("record_settlement", { p_group: gid, p_from: from, p_to: to, p_amount: amt, p_method: method, p_event: bucketId, p_status: "confirmed", p_dedup: settleKey(from, to, bucketId), p_allocs: allocs });
     if (error) {
       setBusy(false);
-      if ((error as any).code === "23505" || /duplicate|unique/i.test((error as any).message || "")) { alert("This was already marked settled — refreshing."); await load(); onChanged?.(); return; }
-      alert("Couldn't record the payment — please try again."); return;
+      if ((error as any).code === "23505" || /duplicate|unique/i.test((error as any).message || "")) { notifyInfo("This was already marked settled — refreshing."); await load(); onChanged?.(); return; }
+      notifyError("Couldn't record the payment — please try again."); return;
     }
     await logActivity("settlement_added", "marked " + fmtUSD(amt) + " paid: " + nameOf(from) + " → " + nameOf(to), { from, to, amount_cents: amt });
     setBusy(false);
@@ -276,7 +278,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!requireOnline()) return;
     setBusy(true);
     const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", d.id);
-    if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; }
+    if (error) { setBusy(false); notifyError("Couldn't void this expense — please try again."); return; }
     await logActivity("expense_deleted", "voided \u201C" + (d.description || "expense") + "\u201D \u2014 " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents });
     setBusy(false); await load();
   };
@@ -284,18 +286,18 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!requireOnline()) return;
     setBusy(true);
     const { error } = await supabase.from("expenses").update({ deleted_at: null }).eq("id", d.id);
-    if (error) { setBusy(false); alert("Couldn't restore this expense — please try again."); return; }
+    if (error) { setBusy(false); notifyError("Couldn't restore this expense — please try again."); return; }
     await logActivity("expense_restored", "restored \u201C" + (d.description || "expense") + "\u201D \u2014 " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents });
     setBusy(false); await load();
   };
   async function deleteSettlement(s2: SettlementRow) {
     if (!requireOnline()) return;
     const ev = s2.event_id ? events.find((e) => e.id === s2.event_id) : null;
-    if (ev && ev.status === "closed") { alert(`This payment is in a closed event ("${ev.name}"). Reopen the event first, then unmark it.`); return; }
-    if (!window.confirm("Unmark this payment? " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id) + " " + fmtUSD(s2.amount_cents) + ". Balances will recompute.")) return;
+    if (ev && ev.status === "closed") { notifyError(`This payment is in a closed event ("${ev.name}"). Reopen the event first, then unmark it.`); return; }
+    if (!(await askConfirm({ title: "Unmark this payment?", message: nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id) + " " + fmtUSD(s2.amount_cents) + ". Balances will recompute.", confirmLabel: "Unmark", danger: true }))) return;
     setBusy(true);
     const { error } = await supabase.from("settlements").delete().eq("id", s2.id);
-    if (error) { setBusy(false); alert(failureMessage("Couldn't unmark", error)); return; }
+    if (error) { setBusy(false); notifyError(failureMessage("Couldn't unmark", error)); return; }
     await logActivity("settlement_removed", "unmarked " + fmtUSD(s2.amount_cents) + " paid: " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id), { from: s2.from_user_id, to: s2.to_user_id, amount_cents: s2.amount_cents });
     setBusy(false);
     await load();
@@ -305,7 +307,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   function startZelle(t: { from: string; to: string; amt: number; bucketId: string }) {
     const payee = memberById[t.to];
     const handle = payee?.zelle_handle;
-    if (!handle) { alert(nameOf(t.to) + " hasn't added a Zelle contact yet."); return; }
+    if (!handle) { notifyInfo(nameOf(t.to) + " hasn't added a Zelle contact yet."); return; }
     setZelleInfo({ from: t.from, to: t.to, amt: t.amt, handle, bucketId: t.bucketId });
   }
   function startPay(kind: "venmo" | "paypal", t: { from: string; to: string; amt: number; bucketId: string }) {
@@ -323,7 +325,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!requireOnline()) return;
     setBusy(true);
     const { error } = await supabase.from("group_guests").update({ archived: true, became_member_id: becameMemberId }).eq("id", guestId);
-    if (error) { setBusy(false); alert("Couldn't retire the guest — please try again."); return; }
+    if (error) { setBusy(false); notifyError("Couldn't retire the guest — please try again."); return; }
     await logActivity("guest_retired", "retired guest " + (guestById[guestId]?.name || "") + (becameMemberId ? " (now a member: " + nameOf(becameMemberId) + ")" : ""), { guest_id: guestId });
     setBusy(false); await load();
   }
@@ -331,7 +333,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!requireOnline()) return;
     setBusy(true);
     const { error } = await supabase.from("group_guests").update({ archived: false, became_member_id: null }).eq("id", guestId);
-    if (error) { setBusy(false); alert("Couldn't restore the guest — please try again."); return; }
+    if (error) { setBusy(false); notifyError("Couldn't restore the guest — please try again."); return; }
     await logActivity("guest_restored", "restored guest " + (guestById[guestId]?.name || ""), { guest_id: guestId });
     setBusy(false); await load();
   }
@@ -384,11 +386,11 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent} defaultEventId={generalBucketId}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", d.id); if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; } await logActivity("expense_deleted", "voided “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", d.id); if (error) { setBusy(false); notifyError("Couldn't void this expense — please try again."); return; } await logActivity("expense_deleted", "voided “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name) => {
             if (!requireOnline()) return;
             const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, archived: false, created_by: user.id }).select("id, name, sponsor_user_id, group_id, archived, became_member_id").single();
-            if (error || !data) { alert("Couldn't add the guest — please try again."); return; }
+            if (error || !data) { notifyError("Couldn't add the guest — please try again."); return; }
             setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name, { guest_id: (data as any).id });
           }}
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
@@ -524,7 +526,7 @@ function GuestManager({ guests, members, busy, me, isAdmin, onRetire, onUnretire
   const nameOf = (uid: string) => members.find((m) => m.id === uid)?.display_name || "member";
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 12 }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Guests</div>
+      <Eyebrow style={{ marginTop: 0 }}>GUESTS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Retire a guest to stop offering them on new expenses. Past expenses stay untouched.</div>
       {active.length === 0 && <div style={{ color: C.sage, fontSize: 12, padding: "6px 2px" }}>No active guests. Add one from the Add screen.</div>}
       {active.map((g) => (
@@ -572,7 +574,7 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
   const coverage = guestCoverageBySponsor(shares, gById, payers); // memberId -> { guestId -> net cents }, per-expense sponsor (wins + losses)
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Aggregate Club-level Balances</div>
+      <Eyebrow style={{ marginTop: 0 }}>AGGREGATE CLUB-LEVEL BALANCES</Eyebrow>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everyone’s net across all Buckets · tap a name for the per-Bucket breakdown</div>
       {rows.map(({ m, v }) => {
         const owes = v < 0, owed = v > 0;
@@ -640,7 +642,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
     <div style={{ maxWidth: 860, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.borderGreen}`, borderRadius: 8, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
-        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Untangle payments</div>
+        <Eyebrow style={{ marginTop: 0 }}>UNTANGLE PAYMENTS</Eyebrow>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.borderGreen : "#8a3b34"}`, borderRadius: 12, padding: "9px 12px", marginBottom: 12 }}>
@@ -737,7 +739,7 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
   const anyOpen = groups.some((g) => g.transfers.length > 0);
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
+      <Eyebrow style={{ marginTop: 0 }}>SETTLE UP</Eyebrow>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 10 }}>Each Bucket squares on its own — fewest payments within it</div>
       {groups.length === 0 && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "22px 0" }}>✓ All square</div>}
       {groups.length > 0 && !anyOpen && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "16px 0 6px" }}>✓ Every Bucket is settled</div>}
@@ -948,7 +950,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
     });
     if (saveErr || !savedId) {
       setBusy(false);
-      alert("Couldn't save the expense. Nothing was changed — please try again.");
+      notifyError("Couldn't save the expense. Nothing was changed — please try again.");
       return;
     }
     const expId = String(savedId);
@@ -1265,7 +1267,7 @@ const ACT_ICON: Record<string, string> = { expense_created: "+", expense_edited:
 function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activity: any[]; memberById: Record<string, Member>; onOpenExpense?: (expenseId: string) => void; canOpen?: (expenseId: string) => boolean }) {
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Activity log</div>
+      <Eyebrow style={{ marginTop: 0 }}>ACTIVITY LOG</Eyebrow>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everything that's happened with the club's money · visible to all, cannot be edited</div>
       {activity.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>Nothing logged yet.</div>}
       {activity.map((a) => {

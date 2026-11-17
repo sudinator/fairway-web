@@ -73,6 +73,7 @@
     "lib/hole-skip.test.tsx",
     "lib/season-standings.test.ts",
     "lib/season-rounds.test.ts",
+    "lib/confirm-sheet.test.tsx",
     "lib/season-standings-screen.test.tsx",
     "lib/cup-roster-row.test.tsx",
     "lib/manual-handicap-clear.test.ts",

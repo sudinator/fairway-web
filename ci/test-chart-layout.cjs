@@ -28,10 +28,10 @@ const root=path.resolve(__dirname,'..');let checks=0;function ok(value,message){
  const firstDots = await form.locator('circle[data-round-value]').evaluateAll(es=>es.map(e=>[e.getAttribute('data-round-value'),e.getAttribute('fill')]));
  ok(firstDots.length===32,'scoring form preserves every eligible round');
  for(const [value,fill] of firstDots)ok(['#4ADE80','#FB7185'].includes(fill),'visible round marker '+value);
- await page.getByRole('button',{name:'Last 5',exact:true}).click();await page.waitForTimeout(120);
+ await page.getByRole('tab',{name:'Last 5',exact:true}).click();await page.waitForTimeout(120);
  ok(await form.locator('circle[data-round-value]').count()===5,'Last 5 updates chart points');
  ok(!(await form.textContent()).includes('Previous 5:'),'short range has no invented comparison');
- await page.getByRole('button',{name:'All',exact:true}).click();await page.waitForTimeout(120);
+ await page.getByRole('tab',{name:'All',exact:true}).click();await page.waitForTimeout(120);
  ok(await form.locator('[data-trend-latest]').textContent()===firstHeadline,'All -> Last 5 -> All headline');
  ok(JSON.stringify(await form.locator('circle[data-round-value]').evaluateAll(es=>es.map(e=>[e.getAttribute('data-round-value'),e.getAttribute('fill')])))===JSON.stringify(firstDots),'range round trip restores values and colours');
  ok((await form.textContent()).includes('Previous 5:'),'preceding-five comparison available');

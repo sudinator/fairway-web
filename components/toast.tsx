@@ -10,6 +10,7 @@ let seq = 1;
 
 function emit(msg: string, kind: "error" | "info") {
   const t = { id: seq++, msg, kind };
+  if (!listeners.length) { if (typeof window !== "undefined") window.alert(msg); return; }   // 212.122: never silent off-Home
   listeners.forEach((l) => l(t));
 }
 export function notifyError(msg: string) { emit(msg, "error"); }

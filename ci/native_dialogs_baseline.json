@@ -1,0 +1,22 @@
+{
+  "components/account-gate.tsx": 1,
+  "components/admin-club-requests.tsx": 1,
+  "components/admin-players.tsx": 10,
+  "components/club-pending-signups.tsx": 2,
+  "components/competitions.tsx": 4,
+  "components/contests-view.tsx": 1,
+  "components/course-change-picker.tsx": 2,
+  "components/course-history.tsx": 3,
+  "components/feedback.tsx": 1,
+  "components/game/scorecard-views.tsx": 2,
+  "components/game/scramble-settings.tsx": 1,
+  "components/groups.tsx": 2,
+  "components/manage.tsx": 31,
+  "components/manage/courses.tsx": 2,
+  "components/round-detail.tsx": 1,
+  "components/round-editor.tsx": 2,
+  "components/round-setup.tsx": 3,
+  "components/scoring-device.tsx": 2,
+  "components/tee-times.tsx": 2,
+  "components/tournaments.tsx": 56
+}

@@ -35,8 +35,8 @@ export function PersonalBestsCard({ rounds, onOpen, now }: { rounds: Round[]; on
       <div style={{ marginTop: 8 }}>
         {rest.map((b) => (
           <button key={b.key} onClick={() => open(b)} data-pb-row={b.key} style={rowBtn}>
-            <span style={{ color: C.sage, fontSize: 12, width: 124, flexShrink: 0 }}>{b.label}{b.matched ? <span style={{ color: C.sage, fontSize: 11 }}> · matched</span> : null}{b.isNew ? <NewTag /> : null}</span>
-            <span style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, width: 58, flexShrink: 0 }}>{b.display}</span>
+            <span style={{ color: C.cream, fontSize: 13, fontWeight: 700, width: 156, flexShrink: 0 }}>{b.label}{b.matched ? <span style={{ color: C.sage, fontSize: 11 }}> · matched</span> : null}{b.isNew ? <NewTag /> : null}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, width: 58, flexShrink: 0 }}>{b.display}</span>
             <span style={{ color: C.sage, fontSize: 11, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.detail} · {b.when}</span>
           </button>
         ))}

@@ -53,8 +53,9 @@ checks = [
     (policy, '| { type: "set_pairings" }', "matchup structure must be represented in the central policy"),
     (policy, '| { type: "set_foursomes" }', "foursome structure must be represented in the central policy"),
     (scoring, 'decideSetupChange({ game, players, action })', "legacy Match/Fourball setup writers must use the central policy"),
-    (scoring, 'if (!allowSetupMutation({ type: "set_pairings" })) return;', "matchup writes must be policy-gated"),
-    (scoring, 'if (!allowFoursomeMutation()) return;', "foursome and mirrored tee-group writes must be policy-gated"),
+    # 212.122: the gates are awaited (the confirmation became the app's own sheet, askConfirm) — still gated, still returning on "no"
+    (scoring, 'if (!(await allowSetupMutation({ type: "set_pairings" }))) return;', "matchup writes must be policy-gated"),
+    (scoring, 'if (!(await allowFoursomeMutation())) return;', "foursome and mirrored tee-group writes must be policy-gated"),
     (scoring, 'disabled={matchupsBlocked}', "matchup controls must visibly freeze after scoring"),
     (scoring, 'disabled={foursomesBlocked}', "foursome controls must visibly freeze after scoring"),
 ]

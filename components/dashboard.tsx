@@ -18,7 +18,7 @@ import {
   roundHoleCount, played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, hasHoleDetail,
   girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, handicapRounds, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, Segmented } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
 import { createClient } from "@/lib/supabase";
 import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
@@ -339,12 +339,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       {allDone.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 5 }}>
-            {(([["5", "Last 5"], ["20", "Last 20"], ["season", "Season"], ["all", "All"]] as [typeof win, string][]).map(([k, label]) => (
-              <button key={k} onClick={() => setWin(k)} style={{
-                flex: 1, textAlign: "center", fontSize: 11, borderRadius: 6, padding: "7px 0", border: "none", cursor: "pointer",
-                background: win === k ? C.gold : C.greenLight, color: win === k ? C.green : C.sage, fontWeight: win === k ? 700 : 400,
-              }}>{label}</button>
-            )))}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Segmented ariaLabel="Range" equal value={win} onChange={setWin}
+                options={([["5", "Last 5"], ["20", "Last 20"], ["season", "Season"], ["all", "All"]] as [typeof win, string][]).map(([key, label]) => ({ key, label }))} />
+            </div>
             <button type="button" data-analytics-filter-toggle aria-label="Filter by course and tee" aria-expanded={showFilters} aria-pressed={!!courseFilter}
               title={courseFilter ? `Filters applied: ${courseOptions.find(([k])=>k===courseFilter)?.[1] || courseFilter}${teeFilter ? ` · ${teeFilter}` : ""}` : "Filter by course and tee"}
               style={{ flex: "0 0 34px", minHeight: 34, textAlign: "center", fontSize: 18, borderRadius: 6, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: courseFilter ? C.gold : C.greenLight, color: courseFilter ? C.green : C.sage }}

@@ -1,3 +1,35 @@
+## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
+
+Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".
+
+**B.**
+- **Segmented** (components/ui) — the one control for choosing a view or a sort: square buttons (radius 6, 12px, 8px 12px), the chosen one gold with green 700 text, the rest sage on greenLight — or on greenMid when the control sits on a card (onCard), so unchosen buttons still read as buttons. Used for the dashboard range (Last 5 / Last 20 / Season / All — the model the owner liked), the Season standings sort (was rounded pills) and the admin friction tabs (was rounded pills). Semantics: a tablist of tabs; the analytics and chart browser tests now select them by role tab.
+- **Personal bests card (Home):** its rows were a table with Georgia figures — the standings mismatch. Rows now follow Data rows: labels 13/700 cream in a 156px column (no wrapping), figures sans 14/700; the hero "78" stays Georgia (a display numeral).
+- **Money headings:** five section titles in Georgia 17/800 (Guests, Aggregate Club-level Balances, Untangle payments, Settle up, Activity log) are now the Eyebrow every other section uses. The gold money totals stay Georgia (money is a game surface).
+
+**C.**
+- **Type scale** (DISPLAY_RULES Part 5, ci/check-design-scale.py): seven text steps 11 · 12 · 13 · 14 · 15 · 20 · 22, display numerals 24 and up. They already carried 92% of text; the in-between sizes (16, 17, 18, 19, 21) are frozen per file and retire as screens are touched. Nothing resized.
+- **Spacing scale:** eight paddings drawn from use — 4px 10px · 6px 12px · 8px 12px · 8px 0 · 12px 14px · 13px 16px · 11px 20px · 16px. The rest frozen per file; moved only when their screen is re-rendered, never in a bulk sweep.
+- Design-scale baseline now: 0 radius, 558 padding and 139 font-size uses off-scale, none new allowed.
+- **List idiom guard** (ci/check_list_idiom.py, in npm run guards): avatars only 22 (inline chip), 28 (data row), 32 (list card), 48/64 (profile hero), and no serif person names inside lists; 29 legacy sites frozen per file.
+
+Before/after rendered (Personal bests card, dashboard range, standings sort). Full suite, lint, all guards and both browser lanes pass.
+
+Deploy: code only.
+
+## 212.122.261117 — Presentation A: the app's own confirm sheet replaces the browser's pop-ups (member-facing screens)
+
+Owner (Nov 17): "how the app looks and presents is super high on the priority list" — start with A.
+
+**Why.** 171 native confirm()/alert()/prompt() calls. On a phone each is a grey system box headed with the web address ("birdienumnum.vercel.app says…") on every Delete, Remove, Discard and error — off-brand, and it reads like a fault.
+**Built.** components/confirm.tsx — askConfirm({ title, message, confirmLabel, danger }) returns Promise<boolean>, rendered by one ConfirmHost (mounted beside the Toaster in Home) as the standard BottomSheet: the question as the title, the detail beneath, Cancel and a confirm button (red text for destructive ones). A new question cancels an unanswered one. If no host is mounted it falls back to the native dialog, and the toast now does the same, so nothing is ever silently skipped.
+**Migrated (member-facing):** components/game/scoring-views (matchups start-over, the setup-policy confirmations — now awaited — remove foursome, errors), components/money (close event, unmark payment, every error and notice), components/home (delete a game round, discard unfinished rounds, delete an unfinished round, every error and notice). Errors to notifyError, notices to notifyInfo. 42 sites; 129 remain (tournaments, admin and other screens — release D).
+**Guard.** ci/check_native_dialogs.py (in npm run guards): the 129 legacy sites frozen per file in ci/native_dialogs_baseline.json; counts may only go down, a file at zero can never gain one. ci/check_game_setup_policy_contract.py updated to the awaited gates (still gated); ci/test-round-recovery.cjs sandbox given notifyError/askConfirm (58 assertions pass).
+**Tests:** lib/confirm-sheet (5: shows title and message, yes closes, no closes, a new question cancels an unanswered one). Gallery 78-confirm-sheet; before/after rendered. Full suite, lint and all guards pass.
+Owner preference recorded for release B: square buttons over rounded pills (the shared segmented control will be square, and the standings sort pills will follow).
+
+Deploy: code only.
+
 ## 212.121.261117 — Lists across the app: two idioms, written down and applied
 
 Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."

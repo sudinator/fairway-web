@@ -211,10 +211,11 @@ the green.
 Avoid intermediate weights such as 650 — valid CSS, but they only interpolate on a variable font
 and snap to 600 or 700 against a static face, so the tier is unpredictable across devices.
 
-**Size: no prescribed scale.** This file originally specified `{11, 13, 15, 17, 22, 30+}`, also
-written before measuring. The app leans on 12px 543 times; enforcing that scale would have changed
-759 sites, resizing body text with no component test harness to catch a layout break. 11, 12 and 13
-cover 81% of all text and read well. Ratcheted, not collapsed.
+**Size: a seven-step scale (212.123).** `11` caption · `12` meta · `13` row and body · `14` figure · `15` card
+title · `20` list-card headline figure · `22` sheet and screen title; display numerals `24` and up (hero tiles,
+scorecards, the share card). Drawn from use: 11–15, 20 and 22 already carried 92% of all text. The in-between sizes
+(16, 17, 18, 19, 21 — about 150 uses) were drift; they are frozen per file by the design-scale guard and retire as
+screens are touched. Nothing was resized to introduce the scale.
 
 **Face.** Georgia for numerals and screen titles. Sans for everything else.
 
@@ -223,7 +224,7 @@ game surface (Club tab, stats and analytics cards, head-to-head, directories) us
 in C.cream (800 for the viewer's own row), captions and counts 11px in C.sage, figures in the sans face at 14px/700,
 avatars 28px, an Eyebrow heading, rows separated by a 1px line with 8px padding, on-scale paddings for pills (4px 10px).
 Georgia numerals belong to the GAME surfaces — leaderboards, scorecards, recap, money, the share card — and to hero
-tiles (a 24px count in a tile). A new card takes its neighbour's standard; the Season standings card was first built in
+tiles (a display numeral, 24px and up). A new card takes its neighbour's standard; the Season standings card was first built in
 the leaderboard idiom beside the stats table and the members list, each of which had its own sizes — the owner saw
 three tables, three fonts.
 
@@ -233,11 +234,13 @@ courses, competitions and tournaments, the Players and club-members admin lists)
 a score in Georgia 20px/800 (the Rounds list), a result phrase or to-par in sans 14px/700. Rows INSIDE a card follow
 "Data rows" above. The two idioms are the whole vocabulary for lists; pick-control rows (the Cup roster) use data rows.
 
-### Padding — no prescribed scale
+### Padding — eight values (212.123)
 
-161 distinct values across 679 uses, the most common covering only 5%. There is no dominant scale
-to snap to. Unlike colour, changing padding MOVES things: a button can drop off-screen, a scorecard
-cell can wrap. Minimum 380 sites, highest risk, least visible benefit. Ratcheted, not collapsed.
+`4px 10px` chip · `6px 12px` compact control · `8px 12px` control and button · `8px 0` row · `12px 14px` compact
+card · `13px 16px` card · `11px 20px` primary button · `16px` sheet. Drawn from the 163 values in use: these eight are
+what the app reaches for most, and every other value is within a few pixels of one. Padding MOVES things (a button
+can drop off-screen, a cell can wrap), so the rest are frozen per file by the design-scale guard and move to the scale
+only when their screen is touched and re-rendered — never in a bulk sweep.
 
 ### Buttons — four roles, two sizes
 

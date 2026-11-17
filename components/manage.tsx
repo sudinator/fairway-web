@@ -33,7 +33,7 @@ import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
-import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet, Segmented } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
 import { PlayerCard, PeerCardModal, CardVisibilityToggle, ShareRoundsToggle } from "@/components/player-card";
@@ -2695,11 +2695,6 @@ function AdminFrictionReview() {
   };
   const runNow = async () => { setSweeping(true); try { await supabase.rpc("sweep_friction", { p_force: true }); } catch { /* ignore */ } setSweeping(false); load(); };
   const cur = groups[tab];
-  const tabBtn = (k: "open" | "needs_action" | "resolved", label: string) => (
-    <button onClick={() => setTab(k)} style={{ flex: 1, border: "none", borderRadius: 999, padding: "7px 6px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", background: tab === k ? C.gold : C.greenLight, color: tab === k ? C.green : C.cream }}>
-      {label} <span style={{ fontFamily: "Georgia, serif", fontWeight: 800 }}>{groups[k].length}</span>
-    </button>
-  );
 
   return (
     <div>
@@ -2712,8 +2707,9 @@ function AdminFrictionReview() {
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 10, lineHeight: 1.5 }}>
         States the app shouldn’t be able to produce. Swept daily; a flag is a to-do, not a mark against a player. Cleared items stay cleared; fixed ones auto-resolve.
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-        {tabBtn("open", "Open")}{tabBtn("needs_action", "Needs action")}{tabBtn("resolved", "Resolved")}
+      <div style={{ marginBottom: 10 }}>
+        <Segmented ariaLabel="Friction status" onCard equal value={tab} onChange={setTab}
+          options={([["open", "Open"], ["needs_action", "Needs action"], ["resolved", "Resolved"]] as ["open" | "needs_action" | "resolved", string][]).map(([key, label]) => ({ key, label: <>{label} <b>{groups[key].length}</b></> }))} />
       </div>
       {items === null ? (
         <div style={{ color: C.faint, fontSize: 12, padding: "16px 4px" }}>Loading…</div>

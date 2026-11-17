@@ -14,6 +14,10 @@
 - Summary filter on the display rules; line-up title's doubled date; a description for the live link — 212.110.
 
 **Open (still needed):**
+- DONE 212.123: **Presentation B** (owner, Nov 17): one segmented control with SQUARE buttons (owner prefers them to rounded pills; the dashboard's Last 5/20/Season/All is the model) for every view/sort choice incl. the standings sort; the Personal bests card onto data rows (keep the hero figure); money section titles to Eyebrow. Add money and profile to the gallery first for before/after.
+- DONE 212.123: **Presentation C**: a type scale (seven steps) and a realistic spacing scale (~8 values) with guards; a list-idiom guard.
+- [ ] **Presentation D**: the remaining 129 native dialogs (tournaments, admin, others); the ratchet tracks them.
+- DONE 212.122: **Presentation A**: the confirm sheet and the member-facing migrations (42 sites) with the ratchet guard.
 - DONE 212.116 / 212.117: **Season standings** — two tabs (Club games, Rounds), one sortable table each, top 5 with Show all, the Profile switch for sharing rounds (on by default); the quarterly report carries a snapshot from the games engine.
 - [ ] **Stale handicap index nudge** (owner, Nov 17): a database timestamp set whenever profiles.handicap_index changes (an admin's edit counts the same as the player's); a prompt on opening a game you're in when the index is older than N weeks; a "last updated" column on the organizer's line-up.
 - Parked: scorecard attestation after the game (non-blocking "Looks right / Query a hole" from the round email or a push; queries go to the organizer) — revisit for the Cup. Recurring guests → member invite: later.
