@@ -36,6 +36,7 @@ EXEMPT = {
     "components/tournaments.tsx": "owns the setup save paths that write the raw columns",
     "components/round-editor.tsx": "round setup: writes course_handicap and its source; scoring reads go through chBasis",
     "components/manage.tsx": "round list/editor: writes the raw columns; scoring reads go through roundCh -> chBasis",
+    "lib/season-rounds.ts": "212.117: the Rounds standings tab allocates strokes from a RECORDED round's stored course_handicap (the rounds table, not a live game player) — the same snapshot lib/round-prep.ts and the Rounds tab use",
     "lib/round-prep.ts": "POSTED-round preparation moved verbatim from components/home.tsx (205.0): allocates strokes from the round's stored course_handicap, exactly as the Dashboard always has; the Season Wrapped index was verified equal to the Dashboard's on real data. home.tsx left the baseline in the same release",
 }
 

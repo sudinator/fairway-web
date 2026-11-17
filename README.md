@@ -1,3 +1,11 @@
+## 212.117.261117 — Season standings: the Rounds tab, the Profile switch, and the refinements from the real data
+
+Owner (Nov 17–18): "2 tabs — one for games and one for individual rounds"; aggregates and ranking only, no hole-by-hole; the switch in Profile, on by default; top 5 with the rest behind Show all; unranked figures shown; top-3s only with five or more finishers.
+
+## 212.116.261117 — Season standings: the club's order of merit, one table sortable nine ways
+
+Owner (Nov 17): a season leaderboard, variant A after mock-ups ("there are so many ways to slice the club data"); only data that exists in the app ("this app might not be the primary app used by all club members") — nothing index- or personal-round-based.
+
 ## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
 
 Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.

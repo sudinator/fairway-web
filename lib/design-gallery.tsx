@@ -28,6 +28,10 @@ import { RecapBody } from "@/components/game/recap-body";
 import { mockups as recapMockups, formatMockups as recapFormatMockups } from "@/lib/recap-mockups";
 import { CupRosterRow } from "@/components/competitions";
 import { pbSampleRounds } from "@/lib/pb-mockups";
+import { SeasonStandings } from "@/components/season-standings";
+import { seasonStandings as computeStandings } from "@/lib/season-standings";
+import { realGames, realPlayersByGame } from "@/lib/standings-real-2026";
+import { game as sfGame, players as sfPlayers, formatGames as fmtGames } from "@/lib/recap-mockups";
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 import { TeamRoundsList } from "@/components/rounds-list";
@@ -225,6 +229,11 @@ for (const [name, node] of Object.entries(recapMockups())) add(name, node);
 for (const [name, node] of Object.entries(recapFormatMockups())) add(name, node);
 // personal bests — the dashboard card (variant C, chosen Oct 30), the real component
 add("53-pb-card-real", <PersonalBestsCard rounds={pbSampleRounds} onOpen={() => {}} now={new Date("2026-10-30T12:00:00Z")} />);
+// season standings mock-ups (owner, Nov 17)
+add("60-season-standings", (() => { const g = (id: string, b: any) => ({ ...b, id, status: "ended" }); const season = [...[1, 2, 3, 4, 5].map((i) => g(`s${i}`, sfGame)), g("fb", fmtGames["fourball"].game), g("tf", fmtGames["trifecta"].game)];
+  const pb = Object.fromEntries(season.map((x: any) => [x.id, x.game_type === "fourball" || x.game_type === "trifecta" ? fmtGames[x.game_type].players : sfPlayers]));
+  return <SeasonStandings groupId="club" userId="u4" preloaded={{ games: { rows: computeStandings(season as never, pb as never), games: 7 } }} />; })());
+add("62-season-standings-real", <SeasonStandings groupId="club" userId="66cccf4b-bc8e-4895-a4ca-a33e61d2a79b" preloaded={{ games: { rows: computeStandings(realGames, realPlayersByGame), games: 10 } }} />);   // the club's real 2026
 // 212.72 — the Ryder Cup roster selection, long team names: must never be wider than the phone (the overflow guard)
 add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
   {[["Christopher Alexander Reed", 12.4], ["Amit Sud", 14.7], ["Michael Van Der Meer", 27.1]].map(([n, hi], i) => (

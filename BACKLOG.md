@@ -14,6 +14,9 @@
 - Summary filter on the display rules; line-up title's doubled date; a description for the live link — 212.110.
 
 **Open (still needed):**
+- DONE 212.116 / 212.117: **Season standings** — two tabs (Club games, Rounds), one sortable table each, top 5 with Show all, the Profile switch for sharing rounds (on by default); the quarterly report carries a snapshot from the games engine.
+- [ ] **Stale handicap index nudge** (owner, Nov 17): a database timestamp set whenever profiles.handicap_index changes (an admin's edit counts the same as the player's); a prompt on opening a game you're in when the index is older than N weeks; a "last updated" column on the organizer's line-up.
+- Parked: scorecard attestation after the game (non-blocking "Looks right / Query a hole" from the round email or a push; queries go to the organizer) — revisit for the Cup. Recurring guests → member invite: later.
 - DROPPED (owner, Nov 15): smarter pairing suggestions — "this only makes sense once we have enough data in the system". Revisit when a season's worth of games exists.
 - DONE 212.114: standouts heading names its basis (option 1).
 - Season Wrapped — DONE (components/season-wrapped.tsx; dashboard and Rounds entries). Only the unapproved follow-up idea of a public per-golfer share link is unbuilt; the mid-December dry run is an event, not code.

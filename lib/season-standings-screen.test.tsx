@@ -1,0 +1,42 @@
+/** Season standings — the card: sorted by the chosen pill, the viewer's row marked, a tapped row shows every number. */
+import { renderScreen, ok, report } from "./screen-harness";
+import * as React from "react";
+import { SeasonStandings } from "@/components/season-standings";
+import { seasonStandings } from "@/lib/season-standings";
+import { game as stableford, players, formatGames } from "@/lib/recap-mockups";
+import type { Game, Player } from "@/lib/game-types";
+
+const g = (id: string, base: Game) => ({ ...base, id, status: "ended" }) as Game;
+const season = [...[1, 2, 3, 4, 5].map((i) => g(`s${i}`, stableford)), g("fb", formatGames["fourball"].game), g("tf", formatGames["trifecta"].game)];
+const pb: Record<string, Player[]> = Object.fromEntries(season.map((x) => [x.id, x.game_type === "fourball" || x.game_type === "trifecta" ? formatGames[x.game_type].players : players]));
+const rows = seasonStandings(season, pb);
+const t = renderScreen(<SeasonStandings groupId="club" userId="u4" preloaded={{ games: { rows, games: 7 } }} />);
+const names = () => [...t.el.querySelectorAll("[data-standings-row] button > span:nth-child(3)")].map((s) => s.textContent);
+ok(names()[0]?.startsWith("Probir Das"), `sorted by wins by default: Probir first (got ${names()[0]})`);
+ok(names().some((n) => n?.includes("Amit Sud (you)")), "the viewer's row is marked");
+t.click("Best gross");
+ok(names()[0]?.startsWith("Raj Mehta"), `Best gross pill: Raj first (got ${names()[0]})`);
+ok(t.el.querySelector("[data-standings-sort=bestGross]")?.getAttribute("aria-selected") === "true", "the chosen pill is selected");
+t.click("Raj Mehta");
+const detail = t.el.querySelector("[data-standings-detail]");
+ok(!!detail && (detail.textContent || "").includes("Match record") && (detail.textContent || "").includes("Best net") && (detail.textContent || "").includes("Standout rounds"), "a tapped row shows every number");
+ok([...t.el.querySelectorAll("[data-standings-row]")].every((r) => r.getAttribute("data-place") !== ""), "everyone with 5+ games is ranked");
+ok(t.el.querySelectorAll("[data-standings-row]").length === 5 && !!t.el.querySelector("[data-standings-more]"), "top 5 shown, with a Show all control");
+t.click("Show all 8 (0 with fewer than 5 games)");
+ok(t.el.querySelectorAll("[data-standings-row]").length === 8, "Show all opens the rest");
+t.unmount();
+const few = renderScreen(<SeasonStandings groupId="club" userId="u4" preloaded={{ games: { rows: seasonStandings(season.slice(0, 2), pb), games: 2 } }} />);
+ok([...few.el.querySelectorAll("[data-standings-row]")].every((r) => r.getAttribute("data-place") === "") && (few.el.textContent || "").includes("At least 5 games"), "below the floor: listed, unranked, the rule stated");
+ok([...few.el.querySelectorAll("[data-standings-value]")].every((v) => v.textContent !== "—" && v.textContent !== ""), "an unranked member's figure still shows (in sage), not a dash");
+few.unmount();
+// the Rounds tab
+import("@/lib/season-rounds").then(() => {});
+const rr = renderScreen(<SeasonStandings groupId="club" userId="u4" preloaded={{ games: { rows, games: 7 }, rounds: { rows: [{ userId: "u4", name: "Amit Sud", avatarUrl: null, rounds: 31, avgGross: 14.2, avgNet: 0.6, bestGross: 83, bestNet: 63, birdies: 12, eagles: 1, bestBirdies: 3, fewestPutts: 30, parStreak: 6, eligible: true }, { userId: "u2", name: "Probir Rao", avatarUrl: null, rounds: 9, avgGross: 5.1, avgNet: -0.2, bestGross: 77, bestNet: 69, birdies: 15, eagles: 0, bestBirdies: 4, fewestPutts: null, parStreak: 9, eligible: true }, { userId: "u9", name: "Alok Jha", avatarUrl: null, rounds: 3, avgGross: null, avgNet: null, bestGross: 86, bestNet: 69, birdies: 4, eagles: 0, bestBirdies: 2, fewestPutts: null, parStreak: 3, eligible: false }] } }} />);
+rr.click("Rounds");
+const rnames = () => [...rr.el.querySelectorAll("[data-standings-row] button > span:nth-child(3)")].map((s) => s.textContent);
+ok(rnames()[0] === "Probir Rao" && rnames()[1] === "Amit Sud (you)", `Rounds tab sorted by net scoring average, low first (got ${rnames().join(" | ")})`);
+ok((rr.el.textContent || "").includes("31 rounds") && (rr.el.textContent || "").includes("members who share their rounds"), "rounds-logged counts and the sharing note");
+rr.click("Fewest putts");
+ok(rnames()[0] === "Amit Sud (you)" && (rr.el.querySelector("[data-standings-row='u2']")?.getAttribute("data-place") ?? "") === "", `Fewest putts: a member without putts recorded is unranked (got ${rnames().join(" | ")}; u2 place '${rr.el.querySelector("[data-standings-row='u2']")?.getAttribute("data-place")}')`);
+rr.unmount();
+report("season standings screen");

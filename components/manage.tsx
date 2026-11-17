@@ -36,7 +36,7 @@ import { AdminFeedbackTab } from "@/components/feedback";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
-import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
+import { PlayerCard, PeerCardModal, CardVisibilityToggle, ShareRoundsToggle } from "@/components/player-card";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
@@ -509,6 +509,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
     <div style={{ maxWidth: 560 }}>
       <PlayerCard profile={profile} user={user} rounds={rounds} />
       <CardVisibilityToggle user={user} initial={profile?.show_card !== false} />
+      <ShareRoundsToggle user={user} initial={profile?.share_rounds_with_club !== false} />
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.borderGreen}` }}>

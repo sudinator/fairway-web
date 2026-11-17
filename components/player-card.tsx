@@ -8,7 +8,7 @@ import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
 import { computeCardStats } from "@/lib/card";
 import { BADGE_BY_KEY } from "@/lib/badges";
-import { Avatar, Eyebrow, backdropDismiss, inputStyle } from "@/components/ui";
+import { Avatar, Eyebrow, backdropDismiss, inputStyle, btn } from "@/components/ui";
 
 const supabase = createClient();
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
@@ -319,6 +319,31 @@ export function CardVisibilityToggle({ user, initial }: { user: any; initial: bo
         </div>
       </div>
       <button onClick={toggle} disabled={busy} style={{ flex: "none", background: on ? C.gold : "transparent", color: on ? "#1c1c15" : C.cream, border: `1px solid ${on ? C.gold : C.sage}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.62 : 1 }}>{on ? "On" : "Off"}</button>
+    </div>
+  );
+}
+
+
+/** 212.117 (owner, Nov 17): "Include my rounds in the club standings" — on by default; club games always count, this
+ *  covers rounds the member logs themselves. Sits in Profile beside the other "how the club sees me" controls. */
+export function ShareRoundsToggle({ user, initial }: { user: any; initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const toggle = async () => {
+    const next = !on; setOn(next); setBusy(true);
+    const { error } = await supabase.from("profiles").update({ share_rounds_with_club: next }).eq("id", user.id);
+    if (error) setOn(!next);
+    setBusy(false);
+  };
+  return (
+    <div data-share-rounds-toggle style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Include my rounds in the club standings {on ? "" : "· off"}</div>
+        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+          Your club games always count. This covers rounds you log yourself — their results, not the scorecards — on the Club tab’s Rounds standings.
+        </div>
+      </div>
+      <button onClick={toggle} disabled={busy} aria-pressed={on} style={{ ...btn(on), flex: "none", padding: "8px 12px", fontSize: 12 }}>{on ? "On" : "Off"}</button>
     </div>
   );
 }
