@@ -1,3 +1,7 @@
+## 212.113.261116 — Housekeeping: the root cleared of records and stale copies; history archived and kept out of the package
+
+Owner (Nov 17): "it feels like this app is carrying a lot of bloat which we should clean up from time to time"; chose archive-and-exclude over deleting.
+
 ## 212.112.261116 — The CI failure on 212.111: version-date drift between package.json and the stamped build
 
 GitHub's "application" lane failed on 212.111 in ci/test-phone-diagnostics-browser.cjs: the worker answered 212.111.261115, the test expected 212.111.261116.
