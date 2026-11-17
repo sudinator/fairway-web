@@ -1,5 +1,6 @@
 "use client";
 import { scrambleResults } from "@/lib/scramble-game";
+import { holeSkip } from "@/lib/hole-skip";
 import { sortByName, byName } from "@/lib/names";
 import { scrambleTeamsOf, cupSideNames } from "@/lib/scramble-teams";
 import { driveTally } from "@/lib/scramble";
@@ -67,6 +68,7 @@ import { saveActiveGame, loadActiveGame, saveActiveHole, clearActiveGame, saveGa
 import { changedCols, pickCols } from "@/lib/sync-cols";
 import {
   btn,
+  BottomSheet,
   inputStyle,
   Eyebrow,
   NumPicker,
@@ -107,6 +109,16 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   // Names shortened within the GROUP shown (lib/short-names): first name unless it collides here.
   const shortOf = shortNamer(players);
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number; alt?: { foursomeId: string; side: AltShotScoreSide } } | null>(null);
+  // 212.111: opening a hole that skips the group's next hole asks first ("Hole 2 hasn't been scored — score hole 2 instead?")
+  type EditTarget = { playerId: string; holeIdx: number; alt?: { foursomeId: string; side: AltShotScoreSide } };
+  const [skipAsk, setSkipAsk] = useState<{ target: EditTarget; expectedIdx: number } | null>(null);
+  const skipDismissed = useRef<Set<number>>(new Set());
+  const openForScoring = (target: EditTarget) => {
+    const rows = players.map((pl) => (pl.scores ?? []) as (number | null)[]);
+    const skip = skipDismissed.current.has(target.holeIdx) ? null : holeSkip(rows, (game.holes_meta ?? []).length, target.holeIdx);
+    if (skip) { setSkipAsk({ target, expectedIdx: skip.expectedIdx }); return; }
+    setEdit(target);
+  };
   useEffect(() => { if (readOnly) setEdit(null); }, [readOnly]);
   const paceNow = useNowTick();
   const allowance = game.allowance_pct ?? 100;
@@ -232,8 +244,11 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
     if ((gt === "fourball" || gt === "trifecta") && Array.isArray(game.foursomes)) {
       const f = game.foursomes.find((fr) => [...fr.a, ...fr.b].some((uid) => ps.some((p) => pkey(p) === uid)));
       if (f) {
-        const aSide = ps.filter((p) => f.a.includes(pkey(p)));
-        const bSide = ps.filter((p) => f.b.includes(pkey(p)));
+        // 212.111 (owner, Nov 16: two players on the same pair swapped columns mid-round): each side in the FOURSOME's
+        // stored order, never the order the player rows happened to arrive in (which changes as scores sync)
+        const inOrder = (ids: string[]) => ids.map((uid) => ps.find((p) => pkey(p) === uid)).filter((p): p is Player => !!p);
+        const aSide = inOrder(f.a);
+        const bSide = inOrder(f.b);
         const others = ps.filter((p) => !f.a.includes(pkey(p)) && !f.b.includes(pkey(p)));
         const out: Col[] = [];
         aSide.forEach((p) => out.push({ type: "player", p }));
@@ -243,7 +258,8 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
         return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
       }
     }
-    return ps.map((p) => ({ type: "player" as const, p }));
+    // 212.111: every other format alphabetical — a stable order, never the order the rows happened to arrive in
+    return [...ps].sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => ({ type: "player" as const, p }));
   })();
   const playerOrder = cols.filter((c): c is { type: "player"; p: Player } => c.type === "player").map((c) => c.p);
   // Yardage for the hole header: if every shown player is on the same tee, use that
@@ -399,7 +415,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                 const gross = c.p.scores?.[k] ?? null, recv = recvFor(c.p, m.si), drive = game.scramble_min_drives ? driveOf(c, k) : null;
                 const editable = canEdit(c);
                 return (
-                  <div key={c.p.id} data-scramble-cell onClick={editable ? () => { setEdit({ playerId: c.p.id, holeIdx: k, alt: { foursomeId: c.altSide!.foursomeId, side: c.altSide!.side } }); } : undefined}
+                  <div key={c.p.id} data-scramble-cell onClick={editable ? () => { openForScoring({ playerId: c.p.id, holeIdx: k, alt: { foursomeId: c.altSide!.foursomeId, side: c.altSide!.side } }); } : undefined}
                     style={{ position: "relative", background: C.cell, borderRadius: 8, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: editable ? "pointer" : "default" }}>
                     {cellSets(c.p, m.si).map((r) => (
                       <div key={r.key} style={{ position: "absolute", left: 5, top: 4, display: "flex", gap: 2 }}>
@@ -465,9 +481,9 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             return (
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
-                <div
+                <div data-hole-cell={`${i + 1}:${p.display_name}`}
                   style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: !readOnly && (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? "pointer" : "default", outline: readOnly ? "none" : isMarker ? "1px solid #E6E0CC" : ((c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id) ? "1px dashed #C9BF9B" : "none") }}
-                  onClick={!readOnly && (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { setEdit({ playerId: p.id, holeIdx: i, alt: c.altSide ? { foursomeId: c.altSide.foursomeId, side: c.altSide.side } : undefined }); } : undefined}>
+                  onClick={!readOnly && (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { openForScoring({ playerId: p.id, holeIdx: i, alt: c.altSide ? { foursomeId: c.altSide.foursomeId, side: c.altSide.side } : undefined }); } : undefined}>
                   {/* One row per stroke basis, from lib/game-shape.strokeSets — the same source and the
                       same colours as the personal card (185.0). Before this the second row used
                       C.indivDot, a colour tuned for dark grounds: 1.83:1 on these cream cells, so the
@@ -655,7 +671,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
             const p = c.p;
             const prevP = (cols.slice(0, ci).reverse().find((x) => x.type !== "divider") as { p?: Player } | undefined)?.p ?? null;   // 212.62
             return (
-              <div key={p.id} data-match-col={matchOf?.(p) ?? undefined} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}`,
+              <div key={p.id} data-match-col={matchOf?.(p) ?? undefined} data-card-col={p.display_name} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}`,
                   ...(matchOf && prevP && matchOf(p) !== matchOf(prevP) ? { borderLeft: `1px solid ${C.borderCard}`, marginLeft: 4 } : {}) }}>
                 {matchOf && (!prevP || matchOf(p) !== matchOf(prevP)) && matchOf(p) != null
                   ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 3 }}>MATCH {matchOf(p)}</div>
@@ -706,6 +722,18 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
       })()}
       </>)}
 
+      {!readOnly && skipAsk ? (
+        <BottomSheet dismissOnBackdrop={false} onClose={() => setSkipAsk(null)} maxWidth={440}
+          header={<div style={{ padding: 16, marginRight: 32, color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>Hole {skipAsk.target.holeIdx + 1}?</div>}>
+          <div data-hole-skip-ask style={{ color: C.cream, fontSize: 14, lineHeight: 1.5 }}>
+            Hole {skipAsk.expectedIdx + 1} hasn’t been scored yet. You’re probably on hole {skipAsk.expectedIdx + 1}.
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button type="button" data-hole-skip-anyway onClick={() => { skipDismissed.current.add(skipAsk.target.holeIdx); setEdit(skipAsk.target); setSkipAsk(null); }} style={{ ...btn(false), flex: 1 }}>Score hole {skipAsk.target.holeIdx + 1}</button>
+            <button type="button" data-hole-skip-switch onClick={() => { setEdit({ ...skipAsk.target, holeIdx: skipAsk.expectedIdx }); setSkipAsk(null); }} style={{ ...btn(true), flex: 1 }}>Score hole {skipAsk.expectedIdx + 1}</button>
+          </div>
+        </BottomSheet>
+      ) : null}
       {!readOnly && edit && (() => {
         const p = players.find((x) => x.id === edit.playerId);
         const m = meta[edit.holeIdx];

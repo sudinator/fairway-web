@@ -240,7 +240,10 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
       ) : null}
       {s.individualStats && h.standouts && h.standouts.rows.length ? (
         <div data-recap-standouts style={{ ...S.box, border: `1px solid ${C.gold}` }}>
-          <div style={S.th}>STANDOUT ROUNDS{h.standouts.basis === "field" && h.standouts.fieldGap != null ? <span style={{ color: C.sage, fontWeight: 500, letterSpacing: 0 }}> · best against their handicap, on a course that played {Math.abs(Math.round(h.standouts.fieldGap - 3))} shot{Math.abs(Math.round(h.standouts.fieldGap - 3)) === 1 ? "" : "s"} {h.standouts.fieldGap - 3 >= 0.5 ? "hard" : h.standouts.fieldGap - 3 <= -0.5 ? "easy" : "about normal"}</span> : <span style={{ color: C.sage, fontWeight: 500, letterSpacing: 0 }}> · best against their own handicap</span>}</div>
+          {/* 212.114 (owner, Nov 15, option 1): the heading names the basis — the field with 8+ scored, otherwise their own handicap */}
+          <div style={S.th}>STANDOUT ROUNDS<span style={{ color: C.sage, fontWeight: 500, letterSpacing: 0 }}>{h.standouts.basis === "field" && h.standouts.fieldGap != null
+            ? ` · best against the field (8+ scored), on a course that played ${Math.abs(Math.round(h.standouts.fieldGap - 3))} shot${Math.abs(Math.round(h.standouts.fieldGap - 3)) === 1 ? "" : "s"} ${h.standouts.fieldGap - 3 >= 0.5 ? "hard" : h.standouts.fieldGap - 3 <= -0.5 ? "easy" : "about normal"}`
+            : " · best against their own handicap (fewer than 8 scored, so not against the field)"}</span></div>
           {h.standouts.rows.map((r, i) => (
             <div key={r.name} style={S.row}><span style={S.name}>{r.name}{r.exceptional ? " · exceptional round" : ""}</span>
               <span style={{ color: C.gold, fontWeight: 800, whiteSpace: "nowrap" }}>{r.better.toFixed(1)} better{i === 0 && h.standouts!.basis === "field" ? " than the field" : h.standouts!.basis === "own" ? " than handicap" : ""}</span></div>

@@ -1,4 +1,5 @@
 "use client";
+import { holeSkip } from "@/lib/hole-skip";
 
 import type { StrokeBasisKey } from "@/lib/game-shape";
 import React, { useState } from "react";
@@ -537,7 +538,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   const picks = Array.from(new Set([par - 1, par, par + 1, par + 2].filter((v) => v >= 1 && v <= netDouble)));
   const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
   return (
-    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+    <div data-hole-editor {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 300, maxWidth: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto", background: C.card, borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{title}</div>
@@ -688,8 +689,18 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
   const [hydrated, setHydrated] = React.useState(false);
   const [edit, setEdit] = React.useState<number | null>(null); // hole index whose editor popup is open
   React.useEffect(() => { if (readOnly) setEdit(null); }, [readOnly]);
-  const openEdit = (i: number) => { if (readOnly) return; setEdit(i); onActiveHole?.(i); };
-  const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEdit(ni); else setEdit(null); };
+  // 212.114 (owner, Nov 17): the skipped-hole check for PERSONAL rounds too — the same rule as the group card (lib/hole-skip);
+  // here "the group" is just this card's holes. "Next hole" from the editor never skips, so only a tap is checked.
+  const [skipAsk, setSkipAsk] = React.useState<{ openedIdx: number; expectedIdx: number } | null>(null);
+  const skipDismissed = React.useRef<Set<number>>(new Set());
+  const openEditNow = (i: number) => { if (readOnly) return; setEdit(i); onActiveHole?.(i); };
+  const openEdit = (i: number) => {
+    if (readOnly) return;
+    const skip = skipDismissed.current.has(i) ? null : holeSkip([holes.map((h) => h.strokes)], holes.length, i);
+    if (skip) { setSkipAsk({ openedIdx: i, expectedIdx: skip.expectedIdx }); return; }
+    openEditNow(i);
+  };
+  const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEditNow(ni); else setEdit(null); };
   const restoredRef = React.useRef(false);
   React.useEffect(() => {
     if (restoredRef.current || resumeHole == null || resumeHole <= 0 || !holes.length) return;
@@ -766,6 +777,18 @@ export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, sa
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300, border: `1px solid ${C.borderCard}` }}>
+      {skipAsk ? (
+        <BottomSheet dismissOnBackdrop={false} onClose={() => setSkipAsk(null)} maxWidth={440}
+          header={<div style={{ padding: 16, marginRight: 32, color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>Hole {skipAsk.openedIdx + 1}?</div>}>
+          <div data-hole-skip-ask style={{ color: C.cream, fontSize: 14, lineHeight: 1.5 }}>
+            Hole {skipAsk.expectedIdx + 1} hasn’t been scored yet. You’re probably on hole {skipAsk.expectedIdx + 1}.
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button type="button" data-hole-skip-anyway onClick={() => { skipDismissed.current.add(skipAsk.openedIdx); openEditNow(skipAsk.openedIdx); setSkipAsk(null); }} style={{ ...btn(false), flex: 1 }}>Score hole {skipAsk.openedIdx + 1}</button>
+            <button type="button" data-hole-skip-switch onClick={() => { openEditNow(skipAsk.expectedIdx); setSkipAsk(null); }} style={{ ...btn(true), flex: 1 }}>Score hole {skipAsk.expectedIdx + 1}</button>
+          </div>
+        </BottomSheet>
+      ) : null}
         <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.green, margin: "-11px -11px 4px -11px" }}>
         <div style={{ background: C.card, padding: "10px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.borderCard}`, borderLeft: `1px solid ${C.borderCard}`, borderRight: `1px solid ${C.borderCard}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>

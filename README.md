@@ -1,3 +1,23 @@
+## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
+
+Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.
+
+## 212.114.261116 — The skipped-hole check for personal rounds; the standouts heading names its basis; the safe dependency batch
+
+Owner (Nov 17): "do the code items and dependency batch in this next release".
+
+## 212.113.261116 — Housekeeping: the root cleared of records and stale copies; history archived and kept out of the package
+
+Owner (Nov 17): "it feels like this app is carrying a lot of bloat which we should clean up from time to time"; chose archive-and-exclude over deleting.
+
+## 212.112.261116 — The CI failure on 212.111: version-date drift between package.json and the stamped build
+
+GitHub's "application" lane failed on 212.111 in ci/test-phone-diagnostics-browser.cjs: the worker answered 212.111.261115, the test expected 212.111.261116.
+
+## 212.111.261116 — Group card columns in the foursome's order (the trifecta swap); a skipped hole asks before scoring
+
+Owner (Nov 16): "while scoring the trifecta game today the order of players in the scorecard swapped the position between Probir and me in the group card"; "put in a check / warning to prevent a score being entered when a hole is being skipped".
+
 ## 212.110.261114 — The Summary filter (dropdowns in the app's field style, Reset / Apply / X); the line-up title's doubled date; a description for the live link
 
 Owner (Nov 14): "look at the filter in the main screen and how it chooses the courses and tees — make it conform to the display rules at BNN. there should be a clear way to reset the filters and dismiss the popup"; "fixing the line up description which includes the date twice"; the live link description.

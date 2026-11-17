@@ -1,3 +1,32 @@
+## Backlog review — Nov 15, 2026 (owner: "most of these have been addressed"; checked against the code)
+
+**Done — verified in the code base (212.110):**
+- Personal bests: the dashboard card (variant C) and the "new personal best" celebration in the recap and round email — 212.73.
+- Game recap: segments, side contests in the email, stats and streaks, standouts on the share image, no money anywhere — 212.71; field line, trifecta results, Cup points on the recap — 212.72–212.76.
+- Standouts include players with a MANUAL course handicap and no index (gameComparisonIndex: the equivalent index from the manual figure) — the Nov 1 case (PJ, Rajat). The 8-player field / own-index switch is still in place — see Open.
+- Test clubs out of every stat (head-to-head, Season Wrapped, club reports) — 0231 / 212.70.
+- A name change reaches every game row (0232), and 0233 keeps the original names on existing game records — 212.76 / 212.77.
+- One source for a live player's course handicap, with a CI guard and a round-trip test; the handicap-source rules written down (APP_RULES "Handicap figures") — 212.76.
+- Agreed audit fixes (212.77, migration 0233): settlement submissions need active target-club membership; participant edits rejected and clearing completed on ended games; manual course-handicap authority in the public game / Cup feeds; reporting identities consolidated by user id. Ticked below.
+- Organizer-chosen team colours — the compact team card in Create (212.44) and Manage Game let the organizer set names and colours.
+- Courses → Add a course manually — present in Round setup (round-setup.tsx: "＋ Add a course manually").
+- Ryder Cup sessions in the one-step Create flow, v1.0 parity for all 32 scenarios — 212.68–212.69.
+- Summary filter on the display rules; line-up title's doubled date; a description for the live link — 212.110.
+
+**Open (still needed):**
+- DROPPED (owner, Nov 15): smarter pairing suggestions — "this only makes sense once we have enough data in the system". Revisit when a season's worth of games exists.
+- DONE 212.114: standouts heading names its basis (option 1).
+- Season Wrapped — DONE (components/season-wrapped.tsx; dashboard and Rounds entries). Only the unapproved follow-up idea of a public per-golfer share link is unbuilt; the mid-December dry run is an event, not code.
+- [ ] Head-to-head excludes cancelled rounds (Ebrahim Basrai) — no handling of cancelled / voided games found in lib/match-outcomes.
+- Personal bests — DONE: the dashboard card lists every best, each opening its round (the separate "records list" page idea is unnecessary).
+- Balanced matchups within a Cup session — DONE: balancedTeamMatchups (lib/grouping, strongest v strongest across the sides) via Create's "Build balanced matchups"; sessions use the one-step Create flow since 212.68.
+- DROPPED (owner, Nov 17): the parity-job alert — the owner checks that every job is green on each pull request, and GitHub emails a failed run; no extra alert needed.
+- DROPPED (owner, Nov 17): the Wipe button — "we dont need or want wipe - it has many follow through effects". Remove (account blocked, history kept) covers leaving, duplicates and bad actors; Merge covers duplicates. If a right-to-erasure request ever comes, build an ANONYMISE action then (other players' results must not change), never a delete.
+- DONE 212.114: the skipped-hole check in the Rounds editor's entry card too.
+- DONE already (confirmed Nov 17): Admin → Player admin shows every player's clubs to the app admin — migration 0202 added the is_admin() clause to group_members_select_visible; the October note predated it.
+- [ ] Physical-phone validation items from 212.87–212.100 (update rollout, installed-app checks, Vercel protection on staging, the 212.97 incident) — owner's phone, not code.
+- [ ] Repository housekeeping: the ~7.5 MB of root documents and historical verification records.
+
 ## 212.108 analytics follow-ups
 
 Implemented: owner-approved inline descending-line filter icon + course/dependent-tee popup; qualified partnership results rate; minimum recorded-opportunity floors; explicit penalty confirmation with legacy unknowns, snapshot protection and edit invalidation. Preserve all earlier backlog items below. Before production: native 212.108 CI/Vercel staging and required feature checks, statistics data-profile review, actual 0234–0236 ledger reconciliation against reported production 212.101, staging-to-main verify and Production Ready/safe smoke check. No native result is inferred from local checks.
@@ -92,10 +121,10 @@ Corrected in candidate: stale-game assertions repeat the documented 208.4 revoke
 
 User confirmed production 212.77. In-app manual handicap, organizer correction and settlements passed staging; manual name test was skipped and public-link testing deferred. The records below describe the shipped scope:
 
-- [ ] Target-club active membership required for settlement submissions; preserve legitimate historical counterparties and separate club/bucket balances.
-- [ ] Reject participant edits and complete clearing on ended games; preserve organizer corrections/resets and reset fencing.
-- [ ] Retain manual course-handicap authority in public game/Cup feeds and scoring adapters; clarify hole count and separate allowance.
-- [ ] Consolidate registered reporting identities by user ID and display current readable profile names; retain historical game names and existing published reports. Guests are never merged by name. Unavailable profiles retain the saved name; query failures stop generation.
+- [x] Target-club active membership required for settlement submissions; preserve legitimate historical counterparties and separate club/bucket balances.
+- [x] Reject participant edits and complete clearing on ended games; preserve organizer corrections/resets and reset fencing.
+- [x] Retain manual course-handicap authority in public game/Cup feeds and scoring adapters; clarify hole count and separate allowance.
+- [x] Consolidate registered reporting identities by user ID and display current readable profile names; retain historical game names and existing published reports. Guests are never merged by name. Unavailable profiles retain the saved name; query failures stop generation.
 
 See RELEASE_VERIFICATION_212.77.md for the original candidate evidence; the user subsequently confirmed CI and production. Other review findings remain deferred.
 

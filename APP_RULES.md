@@ -105,6 +105,18 @@ their number; the running index exists to converge with it over time.
   freshness check reports differences for an admin to apply to the course; it never touches game rows, so a
   correction reaches an open game only when the organizer re-sets the tee — exactly as a posted round behaves.
 
+## Housekeeping (212.113, owner, Nov 17)
+
+- **Per-release records** (RELEASE_VERIFICATION_*, RELEASE_CONTENTS_*, PRODUCTION_HANDOFF_*, the release-verification/
+  folder) live in docs/history/releases/, never at the root. **DEPLOY_NOTES.md keeps the current major (212.x)**; older
+  entries are archived to docs/history/DEPLOY_NOTES_through_<last>.md when a major rolls over.
+- **docs/history/ never ships**: it is excluded from the deploy (.vercelignore) and from the hand-off package. It stays in
+  the repository for reference; GitHub's history has everything regardless.
+- **No copies of real files at the root.** The real ci scripts are in ci/, the real service worker and version manifest in
+  public/. A stale duplicate at the root is the kind of file someone edits by mistake (four were deleted in 212.113).
+- A check in ci/ tied to a closed incident stays only while something runs it (package.json, a workflow, a ci script);
+  an orphan is retired with a note in the release.
+
 ## Data safety
 8. **Never blank a screen on a query error.** A failed/empty query must not delete data or drop the user
    onto a blank/new screen. Degrade gracefully (keep prior state, show a message). — manual
