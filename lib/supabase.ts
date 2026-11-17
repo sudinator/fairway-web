@@ -3,6 +3,7 @@
 import { scoringDeviceToken, markScoringDeviceRevoked } from "./scoring-device";
 
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * The browser Supabase client, constructed LAZILY on first use.
@@ -21,7 +22,8 @@ import { createBrowserClient } from "@supabase/ssr";
  * message is about the actual call rather than about a page being prerendered.
  */
 export function createClient() {
-  type Client = ReturnType<typeof createBrowserClient>;
+  // 212.115: name the client type directly — with @supabase/ssr 0.12 ReturnType<typeof createBrowserClient> collapses to any
+  type Client = SupabaseClient;
   let real: Client | null = null;
   const client = (): Client =>
     (real ??= createBrowserClient(

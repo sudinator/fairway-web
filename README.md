@@ -1,3 +1,7 @@
+## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
+
+Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.
+
 ## 212.114.261116 — The skipped-hole check for personal rounds; the standouts heading names its basis; the safe dependency batch
 
 Owner (Nov 17): "do the code items and dependency batch in this next release".

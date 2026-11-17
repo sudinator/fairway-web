@@ -1,3 +1,13 @@
+## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
+
+Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.
+
+**What the library does:** stores the signed-in session in browser cookies and reads it back; BNN uses it in three places — the browser client (the app), a read-only server client in API routes (reads the session, never writes cookies), and the sign-in callback route. **What changed between 0.5 and 0.12** (its release notes): cookie-chunk encoding reworked in 0.6 and later reverted after breaking loosely wired server-side integrations; a cookies.encode option (0.8); a token-refresh race fixed (0.8.1); the 0.12 line is cookie-handling bug fixes (deduplicated server writes, domain-scoped deletion, PKCE verifier flushing). BNN's server side only writes cookies at sign-in, so its exposure to the 0.6-era breakage is small — but verified, not assumed (below).
+**One code change:** lib/supabase.ts typed the client as ReturnType<typeof createBrowserClient>, which with 0.12 collapses to `any` (8 implicit-any errors in the pages that subscribe to auth state); the client is now typed directly as SupabaseClient. No behaviour change.
+**Verified on the new version:** types, lint, the suite (447,399 checks, 115 suites), the guards (security posture included), the chart / analytics / diagnostics lanes, the build.
+
+**Deploy: on its own, after 212.114 is in production** (so a sign-in problem, if any, points at one change). **Staging pass, sign-in focused:** sign in on 212.114 → deploy 212.115 → reopen WITHOUT signing in: the session must carry over; then sign out and in again; fully close and reopen the installed app and confirm you stay signed in; open the line-up and live links signed out; send a push to yourself. Worst case for a member if a stored session can't be read: one sign-in prompt; nothing else is affected.
+
 ## 212.114.261116 — The skipped-hole check for personal rounds; the standouts heading names its basis; the safe dependency batch
 
 Owner (Nov 17): "do the code items and dependency batch in this next release".

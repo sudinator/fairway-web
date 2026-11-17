@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "212.114.261116",
+  "version": "212.115.261116",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/check-vapid-key.mjs && node scripts/write-version.mjs",
@@ -28,7 +28,7 @@
     "test:diagnostics": "node ci/test-phone-diagnostics.cjs && node ci/test-diagnostics-differential.cjs && node ci/test-phone-diagnostics-browser.cjs && node ci/test-update-outcome.cjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.5.2",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
     "html-to-image": "^1.11.13",
     "next": "^16.4.6",
