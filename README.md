@@ -1,3 +1,7 @@
+## 212.111.261116 — Group card columns in the foursome's order (the trifecta swap); a skipped hole asks before scoring
+
+Owner (Nov 16): "while scoring the trifecta game today the order of players in the scorecard swapped the position between Probir and me in the group card"; "put in a check / warning to prevent a score being entered when a hole is being skipped".
+
 ## 212.110.261114 — The Summary filter (dropdowns in the app's field style, Reset / Apply / X); the line-up title's doubled date; a description for the live link
 
 Owner (Nov 14): "look at the filter in the main screen and how it chooses the courses and tees — make it conform to the display rules at BNN. there should be a clear way to reset the filters and dismiss the popup"; "fixing the line up description which includes the date twice"; the live link description.

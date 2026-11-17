@@ -1,5 +1,5 @@
 {
-  "total": 447378,
+  "total": 447392,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -17,6 +17,7 @@
     "badges": 75,
     "bucket-model": 34,
     "card": 12,
+    "card column order": 3,
     "chart-helpers": 10,
     "chart-trend": 5514,
     "club activity periods and scores": 151,
@@ -55,6 +56,7 @@
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
     "hole result consistency": 981,
+    "hole skip": 11,
     "insights": 28,
     "insights screens": 7,
     "late scores": 10,

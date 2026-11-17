@@ -1,3 +1,12 @@
+## 212.111.261116 — Group card columns in the foursome's order (the trifecta swap); a skipped hole asks before scoring
+
+Owner (Nov 16): "while scoring the trifecta game today the order of players in the scorecard swapped the position between Probir and me in the group card"; "put in a check / warning to prevent a score being entered when a hole is being skipped".
+
+- **Column order (components/game/scorecard-views):** for four-ball and trifecta the card put pair A then pair B, but within a pair it kept whatever order the player rows arrived in — and the rows are reloaded as scores sync, with no ordering asked of the database, so two players on the same pair could swap columns mid-round. Each side now follows the FOURSOME's stored order (set by the organizer, fixed for the round). Every format without its own rule (stroke play, skins) is now alphabetical instead of row order, for the same reason. Test: lib/card-column-order (3): trifecta and four-ball columns identical whatever order the rows arrive in; stroke play alphabetical. Negative-tested.
+- **A skipped hole asks first (lib/hole-skip, the card):** the expected next hole is the one after the group's last scored hole, wrapping 18 → 1 (a shotgun start on 10 works). Opening a still-unscored hole that isn't the expected one, while the expected hole has no score from anyone in the group, shows "Hole 3? — Hole 2 hasn't been scored yet. You're probably on hole 2." with "Score hole 2" (opens hole 2 instead) and "Score hole 3" (continues; not asked again for that hole). No warning when nothing is scored yet, when the opened hole is already scored (an edit), or when anyone in the group has scored the expected hole. Test: lib/hole-skip (11): the rule including shotgun and wrapped runs, and the screen (tap hole 3 after hole 1 → the ask; "Score hole 2" opens hole 2). Negative-tested.
+
+Deploy: code only. No migration.
+
 ## 212.110.261114 — The Summary filter (dropdowns in the app's field style, Reset / Apply / X); the line-up title's doubled date; a description for the live link
 
 Owner (Nov 14): "look at the filter in the main screen and how it chooses the courses and tees — make it conform to the display rules at BNN. there should be a clear way to reset the filters and dismiss the popup"; "fixing the line up description which includes the date twice"; the live link description.
