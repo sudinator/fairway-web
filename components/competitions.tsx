@@ -60,8 +60,8 @@ export function CupRosterRow({ p, t, playing, teamA, teamB, onIn, onOut, onAssig
   // 212.74 (owner, Oct 30): the avatar shows; the name keeps at least 10 characters before it truncates; the team
   // buttons carry a SHORT label (shortTeamLabel) so a long team name never squeezes the name
   return <div style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, minWidth: 0, maxWidth: "100%" }} data-cup-roster-row>
-    <Avatar src={p.avatar_url ?? null} name={p.display_name} size={30} enlargeable={false} />
-    <div style={{ minWidth: "10ch", flex: 1 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} data-cup-roster-name>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index != null ? `HI ${p.handicap_index}` : "no index"}</div></div>
+    <Avatar src={p.avatar_url ?? null} name={p.display_name} size={28} enlargeable={false} />
+    <div style={{ minWidth: "10ch", flex: 1 }}><div style={{ color: C.cream, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} data-cup-roster-name>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index != null ? `HI ${p.handicap_index}` : "no index"}</div></div>
     {playing ? (
       <button onClick={onOut} aria-pressed title="Playing — tap to leave out" style={{ ...btn(false), background: C.gold, color: C.green, border: `1px solid ${C.gold}`, padding: "8px 12px", fontSize: 12, minWidth: 44, flexShrink: 0 }}>✓ In</button>
     ) : (
@@ -243,7 +243,7 @@ export function Competitions({
       <Eyebrow>YOUR RYDER CUPS</Eyebrow>
       {competitions === null ? <div style={{ color: C.sage }}>Loading…</div> : competitions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 22, color: C.sage, textAlign: "center" }}>No Ryder Cups yet.</div> : competitions.map((c) => (
         <button key={c.id} onClick={() => onSelected(c.id)} style={{ width: "100%", textAlign: "left", background: C.greenLight, border: "none", borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
-          <div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>{c.name}</div>
+          <div style={{ color: C.cream, fontSize: 15, fontWeight: 700 }}>{c.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{formatDate(c.start_date)}{c.location ? ` · ${c.location}` : ""} · {c.team_a_name} vs {c.team_b_name}</div>
         </button>
       ))}

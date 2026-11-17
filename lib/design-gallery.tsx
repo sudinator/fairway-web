@@ -34,7 +34,7 @@ import { realGames, realPlayersByGame } from "@/lib/standings-real-2026";
 import { game as sfGame, players as sfPlayers, formatGames as fmtGames } from "@/lib/recap-mockups";
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
-import { TeamRoundsList } from "@/components/rounds-list";
+import { TeamRoundsList, RoundsList } from "@/components/rounds-list";
 import { SeasonCardView } from "@/components/season-story";
 import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
@@ -202,6 +202,7 @@ const seasonRounds = Array.from({ length: 16 }, (_, k) => mkRound(`r${k}`, `2026
 add("15-insights-card", <InsightsCard rounds={seasonRounds} />);
 add("16-insights-card-new", <InsightsCard rounds={seasonRounds.slice(0, 3)} />);
 add("17-insights-screen", <InsightsScreen ins={computeInsights(seasonRounds)} onClose={noop} />);
+add("13-rounds-list", <RoundsList rounds={pbSampleRounds.slice(0, 4)} onOpen={() => {}} />);   // the Rounds tab list (212.121)
 add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () => null} />);
 const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;
 add("19-course-detail", <div style={{ background: "#1B5A46", borderRadius: 12, paddingTop: 12 }}><CourseDetail c={oakRec} loadField={async () => null}

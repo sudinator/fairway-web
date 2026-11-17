@@ -1195,7 +1195,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
                 onClick={() => setTeeIdx(i)}
                 style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
               >
-                <div style={{ fontWeight: 800 }}>{t.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</div>
                 <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
               </button>
               );

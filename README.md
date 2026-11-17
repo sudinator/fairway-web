@@ -1,3 +1,7 @@
+## 212.121.261117 — Lists across the app: two idioms, written down and applied
+
+Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."
+
 ## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
 
 Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."

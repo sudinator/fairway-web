@@ -634,9 +634,9 @@ function StatDrawerHost() {
              const tc = u.tag ? tagColor(u.tag) : null;
              return (
                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
-                 <Avatar src={u.avatar_url} name={u.name || "?"} size={34} />
+                 <Avatar src={u.avatar_url} name={u.name || "?"} size={28} />
                  <div style={{ minWidth: 0 }}>
-                   <div style={{ fontSize: 14, fontWeight: 500, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
+                   <div style={{ fontSize: 13, fontWeight: 700, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
                  {tc ? <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
@@ -1723,10 +1723,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
-        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
+        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={32} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}
               {p.account_status && p.account_status !== "active" ? (
                 <span data-account-status={p.account_status} style={{ marginLeft: 8, background: p.account_status === "suspended" ? C.gold : p.account_status === "pending" || p.account_status === "new" ? C.greenMid : C.overRedDark,
                   color: p.account_status === "suspended" ? C.green : p.account_status === "pending" || p.account_status === "new" ? C.sage : C.cream, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>{p.account_status}</span>
@@ -2328,7 +2328,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged, direc
                 title={row.user_id ? "View player card" : undefined}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 150, background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: row.user_id ? "pointer" : "default" }}
               >
-                <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
+                <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={32} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
                   <div style={{ color: C.sage, fontSize: 12 }}>

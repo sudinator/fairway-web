@@ -1,3 +1,13 @@
+## 212.121.261117 — Lists across the app: two idioms, written down and applied
+
+Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."
+
+**Found.** Lists come in two shapes, and the inconsistencies sat within each: (1) ROWS INSIDE A CARD — admin analytics users (34px avatars, 14/500 names), the Cup roster pick rows (30px, 14/800); (2) LIST CARDS, one card per item — the Players admin (40px avatar, body-size name, 12px 16px padding), club-members admin (48px avatar), competition names 15/800, tournament names body-size/800, the Rounds list's to-par at body size beside a 20px score, team-round results 14/800. The Rounds list, team rounds and Your courses otherwise already followed the card idiom.
+**Rule (DISPLAY_RULES "List cards — one card per item", beside "Data rows"):** title 15/700 cream, meta 12 sage, padding 13px 16px, 32px avatar for a person, at most one headline figure on the right (a score Georgia 20/800; a result phrase or to-par sans 14/700). Rows inside a card follow Data rows (13/700, 11 sage, figures 14/700, 28px avatars). Pick-control rows use Data rows.
+**Applied:** components/manage (analytics users → data rows; Players admin and club-members admin → list cards, 32px avatars, 13px 16px padding), components/competitions (Cup roster names 13/700, 28px avatars; competition titles 15/700), components/tournaments (tournament titles 15/700), components/rounds-list (to-par 14/700; team results 14/700). The design gallery gains 13-rounds-list. Before/after rendered for the Rounds list, team rounds, Cup roster and Your courses (unchanged). One off-scale padding retired (the design-scale baseline lowered). Full suite and all guards pass.
+
+Deploy: code only.
+
 ## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
 
 Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."

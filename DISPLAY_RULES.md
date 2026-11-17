@@ -227,6 +227,12 @@ tiles (a 24px count in a tile). A new card takes its neighbour's standard; the S
 the leaderboard idiom beside the stats table and the members list, each of which had its own sizes — the owner saw
 three tables, three fonts.
 
+**List cards — one card per item (212.121).** Where each item is its own card (the Rounds list, team rounds, Your
+courses, competitions and tournaments, the Players and club-members admin lists): title 15px/700 cream, a meta line
+12px sage, padding 13px 16px, a 32px avatar when the item is a person, and at most ONE headline figure on the right —
+a score in Georgia 20px/800 (the Rounds list), a result phrase or to-par in sans 14px/700. Rows INSIDE a card follow
+"Data rows" above. The two idioms are the whole vocabulary for lists; pick-control rows (the Cup roster) use data rows.
+
 ### Padding — no prescribed scale
 
 161 distinct values across 679 uses, the most common covering only 5%. There is no dominant scale
