@@ -89,7 +89,9 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   b("Agreed handicaps").click();
   ok(JSON.stringify(calls[0]) === JSON.stringify([{ scramble_handicap: "agreed" }, false]), `handicaps: saved, teams kept (got ${JSON.stringify(calls[0])})`);
   b("Captains only").click();
-  ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_team_size: 1, scramble_handicap: "agreed" }, true]), `captains only: agreed handicaps, teams cleared (got ${JSON.stringify(calls[1])})`);
+  // 212.124: the "clears the teams" question is the app's own sheet now (askConfirm, awaited) — the save lands a tick
+  // after the click, so this check runs once pending work has settled (report() is deferred to match)
+  setTimeout(() => ok(JSON.stringify(calls[1]) === JSON.stringify([{ scramble_team_size: 1, scramble_handicap: "agreed" }, true]), `captains only: agreed handicaps, teams cleared (got ${JSON.stringify(calls[1])})`), 0);
   ok(!Array.from(t.el.querySelectorAll("button")).some((x) => x.textContent === "Gross" || x.textContent === "Gross only"), "gross is no longer offered");
   t.unmount();
   const l = renderScreen(<ScrambleSettings game={game()} locked onSave={() => { calls.push("locked"); }} />);
@@ -186,4 +188,4 @@ ok(m.matches.length === 1 && /^Team (1|2) (won|\\d+ UP)|All square|Halved/.test(
   ok(after.length > before && /Hole\s*5/.test(after), `tapping a cell opens the score editor for that hole (${after.slice(-200)})`);
   sc.unmount();
 }
-report("scramble screens");
+setTimeout(() => report("scramble screens"), 5);

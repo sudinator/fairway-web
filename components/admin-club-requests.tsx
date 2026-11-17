@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 // Admin → Club requests (210.8). System admins see EVERY pending club request (admin_club_requests — the old list
 // read clubs directly, and a club is visible only to its members and creator, so it was always empty) and
 // approve or decline it (decide_club_request — the requester is notified). Success is reported only when the
@@ -26,7 +27,7 @@ export function AdminClubRequests({ user, onCount }: { user: { id: string; email
   useEffect(() => { void load(); }, [load]);
 
   const decide = async (r: Req, approve: boolean) => {
-    if (!approve && !confirm(`Decline the club request "${r.name}"?`)) return;
+    if (!approve && !(await askConfirm(`Decline the club request "${r.name}"?`))) return;
     setBusy(r.id); setErr(null); setDone(null);
     const { error } = await supabase.rpc("decide_club_request", { p_group: r.id, p_approve: approve });
     setBusy(null);

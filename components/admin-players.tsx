@@ -1,4 +1,6 @@
 "use client";
+import { notifyError } from "@/components/toast";
+import { askConfirm, askText } from "@/components/confirm";
 // Admin → Players (208.0), from the approved mock. One Google account per member. The rule:
 //   duplicate → MERGE into the member's real account, then it's taken out (never just deleted)
 //   stranger  → REJECT (from the sign-up queue)
@@ -47,7 +49,7 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
       rpcAll(supabase, "admin_list_users", undefined, "id"), rpcAll(supabase, "admin_pending_signups", undefined, "id"),
       supabase.from("groups").select("id, name").eq("status", "active").order("name"),
     ]);
-    if (uErr) { alert(`Couldn't load players: ${uErr.message}`); return; }
+    if (uErr) { notifyError(`Couldn't load players: ${uErr.message}`); return; }
     setRows((u || []) as Player[]); setPending((p || []) as Pending[]); setClubs((g || []) as { id: string; name: string }[]);
   };
   useEffect(() => { void load(); }, []);
@@ -57,30 +59,30 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
     setBusy(id);
     try {
       const { error } = await run();
-      if (error) { alert(`${label}: ${error.message}`); return; }
+      if (error) { notifyError(`${label}: ${error.message}`); return; }
       await load();
     } finally { setBusy(null); }
   };
   const admit = (p: Pending) => {
     const club = admitClub[p.id] || p.club_id;
-    if (!club) { alert("Choose a club to admit them to."); return; }
+    if (!club) { notifyError("Choose a club to admit them to."); return; }
     return act(p.id, "Couldn't admit", () => supabase.rpc("admit_signup", { p_user: p.id, p_group: club }));
   };
-  const reject = (p: Pending) => {
-    if (!confirm(`Reject ${p.display_name || p.email}? Their email will be blocked from signing in.`)) return;
+  const reject = async (p: Pending) => {
+    if (!(await askConfirm(`Reject ${p.display_name || p.email}? Their email will be blocked from signing in.`))) return;
     return act(p.id, "Couldn't reject", () => supabase.rpc("reject_signup", { p_user: p.id, p_reason: "Sign-up rejected" }));
   };
-  const suspend = (u: Player, on: boolean) => {
-    const reason = on ? prompt(`Suspend ${u.display_name || u.email}? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):`, "Left the club") : null;
+  const suspend = async (u: Player, on: boolean) => {
+    const reason = on ? (await askText(`Suspend ${u.display_name || u.email}? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):`, "Left the club")) : null;
     if (on && reason === null) return;
     return act(u.id, on ? "Couldn't suspend" : "Couldn't restore", () => supabase.rpc("set_account_suspended", { p_user: u.id, p_suspended: on, p_reason: reason }));
   };
-  const restore = (u: Player) => {
-    if (!confirm(`Restore ${u.display_name || u.email}? Their email is unblocked and they can sign in again.`)) return;
+  const restore = async (u: Player) => {
+    if (!(await askConfirm(`Restore ${u.display_name || u.email}? Their email is unblocked and they can sign in again.`))) return;
     return act(u.id, "Couldn't restore", () => supabase.rpc("restore_account", { p_user: u.id }));
   };
-  const remove = (u: Player) => {
-    const reason = prompt(`Remove ${u.display_name || u.email}?\n\nOnly an account with no rounds, games or money can be removed. A duplicate is merged instead; a member with history is suspended. The server will tell you if either applies.\n\nReason (shown in Admin):`, "Test account");
+  const remove = async (u: Player) => {
+    const reason = (await askText(`Remove ${u.display_name || u.email}?\n\nOnly an account with no rounds, games or money can be removed. A duplicate is merged instead; a member with history is suspended. The server will tell you if either applies.\n\nReason (shown in Admin):`, "Test account"));
     if (reason === null) return;
     return act(u.id, "Not removed", () => supabase.rpc("remove_account", { p_user: u.id, p_reason: reason }));
   };
@@ -93,13 +95,13 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
   const runMerge = async () => {
     if (!merge?.preview?.ok) return;
     const keepName = merge.preview.keep?.name || "the kept account";
-    if (!confirm(`Merge ${merge.remove.email} into ${keepName}?\n\nEverything moves to ${keepName}; ${merge.remove.email} is then blocked from signing in. This can't be undone with one tap.`)) return;
+    if (!(await askConfirm(`Merge ${merge.remove.email} into ${keepName}?\n\nEverything moves to ${keepName}; ${merge.remove.email} is then blocked from signing in. This can't be undone with one tap.`))) return;
     setBusy(merge.remove.id);
     try {
       const res = await fetch("/api/admin/merge-accounts", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ keep: merge.keep, remove: merge.remove.id, reason: `Duplicate of ${keepName}` }) });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) { alert(`Not merged: ${j.error || res.statusText}`); return; }
+      if (!res.ok) { notifyError(`Not merged: ${j.error || res.statusText}`); return; }
       setMerge(null); await load();
     } finally { setBusy(null); }
   };
@@ -216,10 +218,10 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
               {u.account_status === "removed" ? <button type="button" disabled={busy === u.id} style={{ ...btn(false), fontSize: 12 }} onClick={() => restore(u)}>Restore</button> : null}
               {isOwner && !u.is_owner && !isSelf && u.account_status === "active" ? (
                 <button type="button" disabled={busy === u.id} style={{ ...btn(false), fontSize: 12 }}
-                  onClick={() => {
-                    if (!confirm(u.is_admin
+                  onClick={async () => {
+                    if (!(await askConfirm(u.is_admin
                       ? `Remove system admin from ${u.display_name || u.email || "this user"}? They'll lose all system-admin access.`
-                      : `Make ${u.display_name || u.email || "this user"} a system admin? They'll get full system-admin access across the app.`)) return;
+                      : `Make ${u.display_name || u.email || "this user"} a system admin? They'll get full system-admin access across the app.`))) return;
                     void act(u.id, "Couldn't update", () => supabase.rpc("admin_set_system_admin", { p_user: u.id, p_make: !u.is_admin }));
                   }}>
                   {u.is_admin ? "Remove system admin" : "Make system admin"}

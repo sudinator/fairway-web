@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
@@ -356,11 +357,11 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   };
 
   // Backdating a round is deliberate but easy to fumble — confirm when the play date is before today.
-  const confirmPastDate = (): boolean => {
+  const confirmPastDate = async (): Promise<boolean> => {
     const today = todayLocal();
     if (!playDate || playDate >= today) return true;
     const days = Math.round((+new Date(today + "T00:00:00") - +new Date(playDate + "T00:00:00")) / 86400000);
-    return confirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`);
+    return (await askConfirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`));
   };
 
   const start = async () => {
@@ -394,7 +395,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
             let entered = 0;
             for (let i = 0; i < n; i++) { const v = scores[String(i)]; if (v != null && v !== "" && Number(v) > 0) entered++; }
             if (entered < n) {
-              const ok = confirm(`You're in the game "${match.name}" at ${match.course} and it's still being scored (${entered}/${n} holes in). Your scores there post to your Rounds automatically — and you can add your own putts, fairways, sand and penalties right on that game's scorecard. Log a SEPARATE round here anyway? This usually creates a duplicate.`);
+              const ok = (await askConfirm(`You're in the game "${match.name}" at ${match.course} and it's still being scored (${entered}/${n} holes in). Your scores there post to your Rounds automatically — and you can add your own putts, fairways, sand and penalties right on that game's scorecard. Log a SEPARATE round here anyway? This usually creates a duplicate.`));
               if (!ok) return;
             }
           }
@@ -404,7 +405,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       // Never block starting a round if this check fails.
     }
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
-    if (!confirmPastDate()) return;
+    if (!(await confirmPastDate())) return;
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const alloc = allocateStrokes(picked.holes.map((h) => ({ hole_number: h.n, stroke_index: h.si })), realCH);
     const holes: Hole[] = picked.holes.map((h, i) => ({
@@ -431,7 +432,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     const g = parseInt(grossStr, 10);
     if (!g || g < 18 || g > 200) { setGrossErr("Enter a valid total score (e.g. 86)."); return; }
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
-    if (!confirmPastDate()) return;
+    if (!(await confirmPastDate())) return;
     setGrossSaving(true); setGrossErr(null);
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const { data: u } = await supabase.auth.getUser();
@@ -468,7 +469,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                     {f.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {f.location}</span> : null}
                   </button>
                   <button title="Remove from favorites"
-                    onClick={() => { if (confirm(`Remove "${f.name}" from favorites?`)) deleteFavorite(f.id); }}
+                    onClick={async () => { if ((await askConfirm(`Remove "${f.name}" from favorites?`))) deleteFavorite(f.id); }}
                     style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "6px 16px" }}>
                     ✕
                   </button>

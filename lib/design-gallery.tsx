@@ -35,7 +35,7 @@ import { game as sfGame, players as sfPlayers, formatGames as fmtGames } from "@
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 import { TeamRoundsList, RoundsList } from "@/components/rounds-list";
-import { ConfirmSheet } from "@/components/confirm";
+import { ConfirmSheet, TextSheet, questionFrom } from "@/components/confirm";
 import { SeasonCardView } from "@/components/season-story";
 import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
@@ -204,6 +204,8 @@ add("15-insights-card", <InsightsCard rounds={seasonRounds} />);
 add("16-insights-card-new", <InsightsCard rounds={seasonRounds.slice(0, 3)} />);
 add("17-insights-screen", <InsightsScreen ins={computeInsights(seasonRounds)} onClose={noop} />);
 add("78-confirm-sheet", <ConfirmSheet ask={{ title: "Delete it from your history?", message: "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money.", confirmLabel: "Delete", danger: true }} onDone={() => {}} />);
+add("79-confirm-manage-game", <ConfirmSheet ask={questionFrom('Reset "Sunday Stableford"? This clears every player\'s scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept.')} onDone={() => {}} />);
+add("80-text-admin-suspend", <TextSheet ask={{ ...questionFrom("Suspend Sam Lee? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):"), placeholder: "Reason" }} onDone={() => {}} />);
 add("13-rounds-list", <RoundsList rounds={pbSampleRounds.slice(0, 4)} onOpen={() => {}} />);   // the Rounds tab list (212.121)
 add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () => null} />);
 const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;

@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 // A scramble's own settings in Setup → Format (211.7): team size, how teams compete, handicaps, the drive requirement
 // — the choices offered at creation, editable until scoring starts. Changing the team size or how teams compete
 // clears the teams (they no longer fit); handicaps and drives keep them. A scramble isn't switched to another format
@@ -23,7 +24,7 @@ export function ScrambleSettings({ game, locked, onSave }: { game: Game; locked:
   const hasTeams = Array.isArray(game.foursomes) && game.foursomes.length > 0;
   const save = async (patch: ScramblePatch, clears: boolean) => {
     if (locked || busy) return;
-    if (clears && hasTeams && typeof window !== "undefined" && !window.confirm("This clears the teams — you'll make them again in Setup → Teams. Continue?")) return;
+    if (clears && hasTeams && typeof window !== "undefined" && !(await askConfirm("This clears the teams — you'll make them again in Setup → Teams. Continue?"))) return;
     setBusy(true); try { await onSave(patch, clears && hasTeams); } finally { setBusy(false); }
   };
   const label: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 };

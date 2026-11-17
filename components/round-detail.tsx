@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { HScroll } from "@/components/hscroll";
 import {
@@ -60,7 +61,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
         <button style={{ ...btn(false), fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
           onClick={onEdit}>Edit round</button>
         <button style={{ ...btn(false), background: C.danger, fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
-          onClick={() => { if (confirm("Delete this round? This can't be undone.")) onDelete(); }}>Delete</button>
+          onClick={async () => { if ((await askConfirm("Delete this round? This can't be undone."))) onDelete(); }}>Delete</button>
       </div>
 
 

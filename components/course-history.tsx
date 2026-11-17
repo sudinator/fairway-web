@@ -1,4 +1,6 @@
 "use client";
+import { notifyError } from "@/components/toast";
+import { askConfirm } from "@/components/confirm";
 // Course history and restore (207.0). Every version of a shared course (course_versions, 0186), newest
 // first, each summarised by the SAME comparison the review screen uses (buildFreshnessDiff), so a
 // change reads identically everywhere. Restore: site admins, a reason required, a confirmation that
@@ -47,12 +49,12 @@ export function CourseHistory({ courseId, clubs, canRestore, onRestored }: { cou
   if (!rows) return <div style={{ color: C.sage, fontSize: 12.5 }}>Loading history…</div>;
   const current = rows[0]?.version;
   const restore = async (v: Version) => {
-    if (reason.trim().length < 3) { alert("Please give a reason for restoring this version."); return; }
-    if (!confirm(`Restore version ${v.version} of this course?\n\nUsed by: ${clubs || "no club"}.\nThis becomes the current course for every club using it, as a new version — nothing in the history is removed. Rounds already played keep their own course details.`)) return;
+    if (reason.trim().length < 3) { notifyError("Please give a reason for restoring this version."); return; }
+    if (!(await askConfirm(`Restore version ${v.version} of this course?\n\nUsed by: ${clubs || "no club"}.\nThis becomes the current course for every club using it, as a new version — nothing in the history is removed. Rounds already played keep their own course details.`))) return;
     setBusy(true);
     const { error } = await supabase.rpc("restore_course_version", { p_course_id: courseId, p_version: v.version, p_reason: reason.trim() });
     setBusy(false);
-    if (error) { alert(`Couldn't restore: ${error.message}`); return; }
+    if (error) { notifyError(`Couldn't restore: ${error.message}`); return; }
     setReason(""); setOpenV(null); await load(); onRestored?.();
   };
   return (

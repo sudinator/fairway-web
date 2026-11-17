@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import { ClubPendingSignups } from "@/components/club-pending-signups";
 import { ClubLatestReport } from "@/components/club-latest-report";
 import React, { useCallback, useEffect, useState } from "react";
@@ -177,7 +178,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this club. Remove them first.`);
       return;
     }
-    if (!confirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
+    if (!(await askConfirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`))) return;
     setBusy(true); setMsg(null);
     try {
       const { error } = await supabase.rpc("delete_group_safely", { p_group: active.id });
@@ -381,7 +382,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                   {isAdmin && !self && m.status !== "removed" && (
                     <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
-                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
+                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={async () => { if ((await askConfirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`))) updateMember(m, { status: "removed" }); }}>Remove</button>
                     </div>
                   )}
                 </div>

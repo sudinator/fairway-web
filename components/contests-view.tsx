@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 import React, { useEffect, useMemo, useState } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -79,7 +80,7 @@ export function ContestsSection({
   };
 
   const removeContest = async (c: Contest) => {
-    if (!confirm(`Remove "${c.label}"? Its entries are deleted too.`)) return;
+    if (!(await askConfirm(`Remove "${c.label}"? Its entries are deleted too.`))) return;
     const { error } = await supabase.rpc("delete_game_contest", { p_contest: c.id });
     if (error) { setErr(failureMessage("Couldn't remove contest", error)); return; }
     await load();

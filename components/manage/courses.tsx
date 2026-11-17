@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import { fetchAll, rpcAll } from "@/lib/fetch-all";
 import React, { useEffect, useState, useCallback } from "react";
 import { failureMessage } from "@/lib/errors";
@@ -373,7 +374,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
   const rejectAndRemoveCourseEdit = async (req: CourseEditRequest) => {
     if (!isAdmin) return;
-    if (!confirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe club will revert to the current global course data.`)) return;
+    if (!(await askConfirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe club will revert to the current global course data.`))) return;
     setBusyId(req.id); setMsg(null);
     try {
       const { error } = await supabase.rpc("review_course_correction", { p_request: req.id, p_action: "rejected_removed" });
@@ -416,7 +417,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         </button>
         {source === "group" ? (
           <button title="Remove from club library"
-            onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
+            onClick={async () => { if ((await askConfirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`))) remove(c.id, courseCardTitle(c)); }}
             style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "6px 16px" }}>✕</button>
         ) : inGroup ? (
           <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.borderCard}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>

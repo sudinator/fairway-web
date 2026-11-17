@@ -1,3 +1,7 @@
+## 212.124.261117 — Presentation D1 + D2: no native pop-ups left anywhere in the app
+
+Owner (Nov 17): "do both D1 and D2 show me before and after".
+
 ## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
 
 Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".

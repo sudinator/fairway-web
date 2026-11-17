@@ -1,3 +1,15 @@
+## 212.124.261117 — Presentation D1 + D2: no native pop-ups left anywhere in the app
+
+Owner (Nov 17): "do both D1 and D2 show me before and after".
+
+**Built.** askText (components/confirm) — the app's own replacement for prompt(): a sheet with the question, the detail, a text field and Cancel / the action; resolves the text, or null on Cancel, exactly as prompt() did. questionFrom turns a plain-sentence question into title + detail (the first sentence is the title; a blank line or further sentences become the detail, paragraph breaks kept) and names the button after a leading destructive verb (Reset, Remove, Suspend, Delete …, in red); askConfirm and askText use it for every string question.
+**Migrated (129 sites, 20 files).** D1 — Manage Game and setup (components/tournaments: 16 questions, 41 errors), scorecard take-over, round editor and round setup, scoring device, side contests, tee times, round detail, course history, groups, competitions, feedback, the course picker, scramble settings. D2 — admin (components/manage 31, admin-players 10, pending sign-ups, club requests, account gate, admin courses). Questions → askConfirm, typed inputs → askText, errors → notifyError, notices → notifyInfo.
+**Safety.** Every function that became async was audited against 212.123: the two whose results are used — the Manage Game setup guard allowSetupChange and confirmPastDate (round editor, round setup) — now return Promise<boolean> and all 32 of their call sites await them (the compiler does not flag an un-awaited `if (!guard())`, so each was checked). Contract and sandbox tests updated to the awaited forms: check_game_setup_policy_contract (31 links), check_setup_rules_server_parity (14 rules), test-game-reset, test-game-tee-options (161 assertions), scramble screens (51).
+**Guard.** ci/check_native_dialogs.py reached zero and now BANS confirm()/alert()/prompt() in the app (the two host fallbacks excepted).
+**Tests:** lib/confirm-sheet (11: question sheet, sentence splitting, destructive-verb button, typed input returns text / null, initial value). Gallery 79 (Manage Game reset) and 80 (admin suspend with a typed reason); before/after rendered. Full suite, lint, all guards and the browser lanes pass.
+
+Deploy: code only.
+
 ## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
 
 Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".

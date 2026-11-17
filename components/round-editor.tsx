@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback } from "react";
@@ -73,11 +74,11 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
     return null;
   })();
   // Backdating is deliberate but easy to fumble — confirm when the play date is before today.
-  const confirmPastDate = (): boolean => {
+  const confirmPastDate = async (): Promise<boolean> => {
     const today = todayLocal();
     if (!playDate || playDate >= today) return true;
     const days = Math.round((+new Date(today + "T00:00:00") - +new Date(playDate + "T00:00:00")) / 86400000);
-    return confirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`);
+    return (await askConfirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`));
   };
   // Single source of truth = `holes` state. A ref mirrors it for the lock/flush
   // handler to read synchronously; written only inside setHole.
@@ -355,7 +356,7 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
     if (savingRef.current || !isPrimaryScoringDevice()) return;
     if (manualCh != null && !Number.isFinite(manualCh)) { setErr("Enter a valid course handicap."); return; }
     if (ratingSlopeEdited && ratingSlopeError) { setErr(ratingSlopeError); return; }
-    if (!confirmPastDate()) return;
+    if (!(await confirmPastDate())) return;
     setSaving(true); setErr(null);
     try {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -399,7 +400,7 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
 
   const cancel = async () => {
     if (savingRef.current || !isPrimaryScoringDevice()) return;
-    if (!isRecordedFinal && draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
+    if (!isRecordedFinal && draftHasScores({ ...round, holes }) && !(await askConfirm("Discard this in-progress round? Your entered scores will be cleared."))) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (isRecordedFinal) {
       discardedRef.current = true;

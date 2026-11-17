@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native browser dialogs ratchet (212.122). confirm()/alert()/prompt() show a grey system box headed with the web
+"""Native browser dialogs — BANNED since 212.124 (ratchet reached zero; introduced 212.122). confirm()/alert()/prompt() show a grey system box headed with the web
 address on a phone — off-brand. Use askConfirm() (components/confirm) and notifyError/notifyInfo (components/toast).
 The remaining sites are frozen per file in ci/native_dialogs_baseline.json and may only go DOWN; a file at zero may
 never gain one. The two fallbacks (confirm.tsx, toast.tsx — used only when no host is mounted) are exempt.

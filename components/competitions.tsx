@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm, askText } from "@/components/confirm";
 import { fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 
@@ -361,14 +362,14 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   };
 
   const lockSchedule = async () => {
-    if (!confirm(`Lock ${sessions?.length || 0} sessions worth ${fmtCompetitionPoints(schedule.totalPoints)} total points? Session scoring cannot change unless the schedule is explicitly reopened.`)) return;
+    if (!(await askConfirm(`Lock ${sessions?.length || 0} sessions worth ${fmtCompetitionPoints(schedule.totalPoints)} total points? Session scoring cannot change unless the schedule is explicitly reopened.`))) return;
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.rpc("lock_competition_schedule", { p_competition: competition.id });
     setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
   };
 
   const reopenSchedule = async () => {
-    const reason = prompt("Why is the locked Ryder Cup schedule being changed?")?.trim();
+    const reason = (await askText("Why is the locked Ryder Cup schedule being changed?"))?.trim();
     if (!reason) return;
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.rpc("reopen_competition_schedule", { p_competition: competition.id, p_reason: reason });
@@ -394,7 +395,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   };
 
   const renameCompetition = async () => {
-    const nextName = prompt("Rename this Ryder Cup", competition.name)?.trim();
+    const nextName = (await askText("Rename this Ryder Cup", competition.name))?.trim();
     if (!nextName || nextName === competition.name) return;
     if (nextName.length > 120) { setErr("Ryder Cup title must be 120 characters or fewer."); return; }
     setLifecycleBusy(true); setErr(null);
@@ -417,7 +418,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       altShot ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores." : "",
       "The Ryder Cup, sessions, games and match scores cannot be recovered.",
     ].filter(Boolean).join("\n\n");
-    if (!confirm(message)) return;
+    if (!(await askConfirm(message))) return;
 
     setLifecycleBusy(true); setErr(null);
     // bounded: returns the one deleted Cup's summary

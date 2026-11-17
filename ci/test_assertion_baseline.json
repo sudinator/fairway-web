@@ -1,5 +1,5 @@
 {
-  "total": 447442,
+  "total": 447448,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -29,7 +29,7 @@
     "compact team editor": 12,
     "competition": 16,
     "component render": 17,
-    "confirm sheet": 5,
+    "confirm sheet": 11,
     "contests": 26,
     "course handicap one source": 6,
     "course history": 6,

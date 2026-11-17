@@ -1,4 +1,6 @@
 "use client";
+import { notifyError } from "@/components/toast";
+import { askConfirm } from "@/components/confirm";
 // "1 sign-up waiting" for a club's admins (208.0). Only possible duplicates who came through THIS club's
 // invite are shown here — sign-ups with no invite go to system admins only. Club admins may admit or reject;
 // merging a duplicate is a system-admin action.
@@ -22,13 +24,13 @@ export function ClubPendingSignups({ groupId, groupName }: { groupId: string; gr
   useEffect(() => { void load(); }, [load]);
   if (!rows.length) return null;
   const decide = async (r: Held, admit: boolean) => {
-    if (!admit && !confirm(`Reject ${r.display_name || r.email}? Their email will be blocked from signing in.`)) return;
+    if (!admit && !(await askConfirm(`Reject ${r.display_name || r.email}? Their email will be blocked from signing in.`))) return;
     setBusy(r.id);
     const { error } = admit
       ? await supabase.rpc("admit_signup", { p_user: r.id, p_group: groupId })
       : await supabase.rpc("reject_signup", { p_user: r.id, p_reason: `Rejected by a ${groupName} admin` });
     setBusy(null);
-    if (error) { alert(`${admit ? "Couldn't admit" : "Couldn't reject"}: ${error.message}`); return; }
+    if (error) { notifyError(`${admit ? "Couldn't admit" : "Couldn't reject"}: ${error.message}`); return; }
     await load();
   };
   return (

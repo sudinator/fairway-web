@@ -1,4 +1,5 @@
 "use client";
+import { notifyError } from "@/components/toast";
 // The screens a new or held account sees before the app (208.0) — from the approved mock.
 //   * "Is this you?"         a first sign-in whose name matches a member (masked email shown)
 //   * "Waiting for approval" no invite, or held as a possible duplicate
@@ -26,7 +27,7 @@ export function IsThisYou({ gate, onNotMe }: { gate: Extract<AccountGateState, {
     setBusy(true);
     const { error } = await supabase.rpc("acknowledge_not_duplicate");
     setBusy(false);
-    if (error) { alert(`Couldn't send that: ${error.message}`); return; }
+    if (error) { notifyError(`Couldn't send that: ${error.message}`); return; }
     onNotMe();
   };
   return (

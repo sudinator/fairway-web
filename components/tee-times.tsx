@@ -1,4 +1,6 @@
 "use client";
+import { notifyError } from "@/components/toast";
+import { askConfirm } from "@/components/confirm";
 import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { shortNamer } from "@/lib/short-names";
 
@@ -168,7 +170,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const { error } = await supabase.rpc("upsert_tee_time_rsvp", {
       p_tee_time: tt.id, p_user: user.id, p_choice: choice, p_guest_names: choice === "in" ? guestNames : [],
     });
-    if (error) { setBusy(false); if (typeof window !== "undefined") window.alert("Couldn't save your RSVP — please try again."); return; }
+    if (error) { setBusy(false); if (typeof window !== "undefined") notifyError("Couldn't save your RSVP — please try again."); return; }
     const gtxt = choice === "in" && guestNames.length ? ` (+${guestNames.length} guest${guestNames.length > 1 ? "s" : ""})` : "";
     await logTee("tt_rsvp", `responded ${CHOICE[choice].label}${gtxt} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, guests: choice === "in" ? guestNames.length : 0 });
     setBusy(false); setRsvpOpen(false); await load();
@@ -216,7 +218,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     if (!r || !r.guest_names || guestIdx < 0 || guestIdx >= r.guest_names.length) return;
     const gname = r.guest_names[guestIdx] || "Guest";
     const hostName = memberOf(memberId)?.display_name || "a member";
-    if (typeof window !== "undefined" && !window.confirm(`Remove guest "${gname}" from ${hostName}'s signup? This frees a spot for the waitlist.`)) return;
+    if (typeof window !== "undefined" && !(await askConfirm(`Remove guest "${gname}" from ${hostName}'s signup? This frees a spot for the waitlist.`))) return;
     const next = r.guest_names.filter((_, i) => i !== guestIdx);
     setBusy(true); setActionErr(null);
     const { error } = await supabase.from("tee_time_rsvps").update({ guest_names: next }).eq("tee_time_id", tt.id).eq("user_id", memberId);

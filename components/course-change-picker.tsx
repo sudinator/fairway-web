@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm, askText } from "@/components/confirm";
 // Choose which provider changes to apply (209.1), from the approved mock. Items come from lib/course-merge —
 // the same code the server uses to merge — so what's ticked here is exactly what gets applied.
 import React, { useEffect, useMemo, useState } from "react";
@@ -49,14 +50,14 @@ export function CourseChangePicker({ courseId, courseName, onDone }: {
   };
   const apply = async () => {
     if (!selected.length) return;
-    if (!confirm(`Apply ${selected.length} selected change${selected.length === 1 ? "" : "s"} to "${courseName}" for everyone? Unticked changes are kept as they are and won't be asked about again unless the provider changes them.`)) return;
+    if (!(await askConfirm(`Apply ${selected.length} selected change${selected.length === 1 ? "" : "s"} to "${courseName}" for everyone? Unticked changes are kept as they are and won't be asked about again unless the provider changes them.`))) return;
     setBusy(true); setErr(null);
     try { await post({ selected }); onDone({ kind: "applied", count: selected.length, message: `"${courseName}": applied ${selected.length} change${selected.length === 1 ? "" : "s"}.` }); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
   const keep = async () => {
-    const reason = window.prompt("Keep the current data. Reason (optional):", "");
+    const reason = (await askText("Keep the current data. Reason (optional):", ""));
     if (reason === null) return;
     setBusy(true); setErr(null);
     try {
