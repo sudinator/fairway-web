@@ -10,7 +10,11 @@ import type { Game, Player } from "@/lib/game-types";
 
 export type Side = { key: string; userId: string | null; name: string }[];
 /** kind "singles" = one against one (head-to-head); "pairs" = two against two (partners). winner "a" | "b" | "halved". */
-export type MatchOutcome = { gameId: string; date: string; format: string; kind: "singles" | "pairs"; a: Side; b: Side; winner: "a" | "b" | "halved" };
+export type MatchOutcome = { gameId: string; date: string; format: string; kind: "singles" | "pairs"; a: Side; b: Side; winner: "a" | "b" | "halved";
+  /** 212.127: the margin as the scorecard states it, compact — "3&2", "2 up"; "" when halved */
+  margin: string };
+/** "3 & 2" → "3&2", "2 UP" → "2 up", "Halved" → "" (the scoring functions' wording, compacted for a list) */
+export const compactMargin = (r: string | null | undefined) => !r || /halved/i.test(r) ? "" : r.replace(/\s*&\s*/, "&").replace(/\s*UP$/i, " up").trim();
 
 export function matchOutcomes(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = []): MatchOutcome[] {
   const out: MatchOutcome[] = [];
@@ -19,15 +23,15 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
   const ch = (p: Player) => chBasis(p, game.course_par, holes);
   const side = (keys: string[]): Side => keys.map((k) => { const p = playerOf(k); return { key: k, userId: (p as { user_id?: string | null } | null)?.user_id ?? null, name: p?.display_name ?? "?" }; });
   const base = { gameId: game.id, date: String((game as { played_at?: string }).played_at || "").slice(0, 10), format: game.game_type };
-  const add = (kind: "singles" | "pairs", a: string[], b: string[], lead: number) =>
-    out.push({ ...base, kind, a: side(a), b: side(b), winner: lead > 0 ? "a" : lead < 0 ? "b" : "halved" });
+  const add = (kind: "singles" | "pairs", a: string[], b: string[], lead: number, result?: string) =>
+    out.push({ ...base, kind, a: side(a), b: side(b), winner: lead > 0 ? "a" : lead < 0 ? "b" : "halved", margin: lead === 0 ? "" : compactMargin(result) });
 
   if (game.game_type === "match") {
     for (const pr of game.pairings || []) {
       const pa = playerOf(pr.a), pb = playerOf(pr.b); if (!pa || !pb) continue;
       const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], ch(pa), ch(pb), game.allowance_pct ?? 100);
       if (!st.result) continue;                                  // as the recap: only matches with a result
-      add("singles", [pkey(pa)], [pkey(pb)], st.lead);
+      add("singles", [pkey(pa)], [pkey(pb)], st.lead, st.result);
     }
   } else if (game.game_type === "fourball" || game.game_type === "alt_shot") {
     for (const f of game.foursomes || []) {
@@ -36,12 +40,12 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
         const alt = altShotInputsFor(game, players, altShotScores, f); if (!alt) continue;
         const st = altShotStatus(game.holes_meta, alt.a as never, alt.b as never);
         if (!(st.thru === holes || Math.abs(st.lead) > holes - st.thru)) continue;
-        add("pairs", f.a, f.b, st.lead);
+        add("pairs", f.a, f.b, st.lead, (st as { result?: string }).result);
       } else {
         const mode = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
         const st = fourballStatus(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, mode);
         if (!(st.thru === holes || Math.abs(st.lead) > holes - st.thru)) continue;   // the recap's decided rule
-        add("pairs", f.a, f.b, st.lead);
+        add("pairs", f.a, f.b, st.lead, (st as { result?: string }).result);
       }
     }
   } else if (game.game_type === "trifecta") {
@@ -49,9 +53,9 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
       if (!f.a?.length || !f.b?.length) continue;
       const mode = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
       const r = computeTrifecta(game.holes_meta, membersOf(game, players, f), f.a, f.b, game.allowance_pct ?? 100, mode, !!f.swap);
-      for (const c of r.contests as { kind: "single" | "team"; aIds: string[]; bIds: string[]; lead: number; settled: boolean }[]) {
+      for (const c of r.contests as { kind: "single" | "team"; aIds: string[]; bIds: string[]; lead: number; settled: boolean; result?: string }[]) {
         if (!c.settled) continue;
-        add(c.kind === "single" ? "singles" : "pairs", c.aIds, c.bIds, c.lead);
+        add(c.kind === "single" ? "singles" : "pairs", c.aIds, c.bIds, c.lead, c.result);
       }
     }
   }

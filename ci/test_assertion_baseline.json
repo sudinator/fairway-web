@@ -1,5 +1,5 @@
 {
-  "total": 447461,
+  "total": 447476,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -47,7 +47,7 @@
     "format picker": 25,
     "format rules": 34,
     "game comparison handicap": 90,
-    "game list summary": 13,
+    "game list summary": 28,
     "game type coverage": 102,
     "game-create": 64,
     "game-utils": 21,

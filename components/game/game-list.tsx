@@ -299,24 +299,48 @@ export function GameList({
  *  the before/after only. */
 export function GameRow({ g, summary, onOpen, legacy = false }: { g: Game; summary?: GameRowSummary; onOpen: (id: string) => void; legacy?: boolean }) {
   const s = legacy ? undefined : summary;
+  const metaText = legacy ? g.course : s ? s.meta : g.course;
+  const title = (
+    <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
+      {g.name}{isDraftGame(g) ? <span data-draft-badge style={{ marginLeft: 8, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>DRAFT</span> : null}
+      {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
+    </div>
+  );
+  const meta = (
+    <div data-game-meta style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
+      {metaText}{metaText ? " · " : ""}code <b style={{ color: C.cream }}>{g.code}</b>
+    </div>
+  );
+  // 212.128 (owner: "results shown for complete games on the right with a dedicated margin"): a finished game is a
+  // two-column grid — description on the left, a fixed RESULTS column on the right; the headline sits at the top and
+  // each match's own result sits level with its line.
+  const hasResults = !!s && g.status === "ended" && (!!s.result || s.lines.some((l) => l.value));
   return (
-    <div
-      onClick={() => onOpen(g.id)}
-      data-game-row={g.id}
-      style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}
-    >
-      {/* list-card idiom — title, one headline result on the right, meta lines beneath */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 15 }}>
-          {g.name}{isDraftGame(g) ? <span data-draft-badge style={{ marginLeft: 8, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>DRAFT</span> : null}
-          {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
+    <div onClick={() => onOpen(g.id)} data-game-row={g.id}
+      style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
+      {hasResults ? (
+        <div data-game-grid style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 96px", columnGap: 12, rowGap: 2, alignItems: "baseline" }}>
+          <div>{title}{meta}</div>
+          <div data-game-result style={{ textAlign: "right", alignSelf: "start" }}>
+            {s!.caption ? <div data-game-result-caption style={{ color: C.sage, fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>{s!.caption}</div> : null}
+            {s!.result ? <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{s!.result}</div> : null}
+          </div>
+          {s!.lines.map((l, i) => l.value ? (
+            <React.Fragment key={i}>
+              <div data-game-line style={{ color: C.sage, fontSize: 12 }}>{l.text}</div>
+              <div data-game-line-value style={{ color: C.cream, fontSize: 12, fontWeight: 700, textAlign: "right" }}>{l.value}</div>
+            </React.Fragment>
+          ) : (
+            // a line with no result of its own (your gross line, the opponents) runs the full width
+            <div key={i} data-game-line style={{ gridColumn: "1 / -1", color: C.sage, fontSize: 12 }}>{l.text}</div>
+          ))}
         </div>
-        {s?.result ? <span data-game-result style={{ color: C.cream, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>{s.result}</span> : null}
-      </div>
-      <div data-game-meta style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-        {s?.meta ?? g.course}{legacy || g.status !== "ended" ? <> · code <b style={{ color: C.cream }}>{g.code}</b></> : null}
-      </div>
-      {s?.stats ? <div data-game-stats style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{s.stats}</div> : null}
+      ) : (
+        <>
+          {title}{meta}
+          {s?.lines.map((l, i) => <div key={i} data-game-line style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{l.text}{l.value ? ` — ${l.value}` : ""}</div>)}
+        </>
+      )}
     </div>
   );
 }

@@ -1,3 +1,11 @@
+## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
+
+Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).
+
+## 212.127.261117 — Games list cleanup: no repeats, match margins, a readable trifecta record, a code and result on every game
+
+Owner (Nov 18), on 212.126: titles that already say the format, course and date shouldn't repeat them; trifecta "W-L-H and the result underneath … what did I win and what did I lose?"; "a final game with no game code or result — why not?"; "Won 3&2 or Lost 2up instead of Won / Lost".
+
 ## 212.126.261117 — Games list: a richer row for every game
 
 Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".

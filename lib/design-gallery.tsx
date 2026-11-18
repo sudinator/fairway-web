@@ -209,19 +209,25 @@ add("78-confirm-sheet", <ConfirmSheet ask={{ title: "Delete it from your history
 add("79-confirm-manage-game", <ConfirmSheet ask={questionFrom('Reset "Sunday Stableford"? This clears every player\'s scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept.')} onDone={() => {}} />);
 add("80-text-admin-suspend", <TextSheet ask={{ ...questionFrom("Suspend Sam Lee? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):"), placeholder: "Reason" }} onDone={() => {}} />);
 {
-  // 212.126: the Games list — a finished Stableford (the viewer's place and own line), a finished best ball, an open game
-  const sg = { ...sfGame, id: "gl1", name: "Sunday Stableford", code: "481207", status: "ended", played_at: "2026-11-15" } as any;
-  const fbG = { ...fmtGames["fourball"].game, id: "gl2", name: "Saturday Best Ball", code: "552190", status: "ended", played_at: "2026-11-08" } as any;
-  const open = { ...sfGame, id: "gl3", name: "Thanksgiving Scramble", code: "903114", status: "active", game_type: "scramble" } as any;
-  const viewer = sfPlayers.find((p: any) => p.user_id)!;
+  // 212.126/127: the Games list — an auto-named Stableford (title says format/course/date), a custom-named trifecta,
+  // match play, skins, an open game. Sample games; the viewer is the first member in each.
+  const crs = sfGame.course || "Oak Hollow";
+  const sg = { ...sfGame, id: "gl1", name: `Stableford / ${crs} / Nov 15, 2026`, code: "481207", status: "ended", played_at: "2026-11-15" } as any;
+  const tfG = { ...fmtGames["trifecta"].game, id: "gl2", name: "Saturday Game", code: "552190", status: "ended", played_at: "2026-11-08" } as any;
+  const mpG = { ...fmtGames["match"].game, id: "gl3", name: "Match Play Nov 1", code: "330871", status: "ended", played_at: "2026-11-01" } as any;
+  const skG = { ...fmtGames["skins"].game, id: "gl4", name: "Wednesday Skins", code: "774402", status: "ended", played_at: "2026-10-29" } as any;
+  const open = { ...sfGame, id: "gl5", name: "Thanksgiving Scramble", code: "903114", status: "active", game_type: "scramble" } as any;
+  const first = (ps: any[]) => ps.find((p) => p.user_id).user_id as string;
   const holes = Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, stroke_index: i + 1, strokes: i % 6 === 0 ? 3 : i % 3 === 0 ? 5 : 4, putts: 2 }));
-  const myRound = { id: "r1", course: sg.course, course_par: 72, course_handicap: 12, rating: 71.4, slope: 129, holes, played_at: "2026-11-15" } as any;
+  const myRound = { id: "r1", course: crs, course_par: 72, course_handicap: 12, rating: 71.4, slope: 129, holes, played_at: "2026-11-15" } as any;
   const rows = [
-    { g: sg, s: gameRowSummary(sg, sfPlayers as any, viewer.user_id!, myRound, null) },
-    { g: fbG, s: gameRowSummary(fbG, fmtGames["fourball"].players as any, (fmtGames["fourball"].players as any[]).find((p) => p.user_id).user_id, null, null) },
-    { g: open, s: gameRowSummary(open, sfPlayers as any, viewer.user_id!, null, null) },
+    { g: sg, s: gameRowSummary(sg, sfPlayers as any, first(sfPlayers as any), myRound, null) },
+    { g: tfG, s: gameRowSummary(tfG, fmtGames["trifecta"].players as any, first(fmtGames["trifecta"].players as any), null, null) },
+    { g: mpG, s: gameRowSummary(mpG, fmtGames["match"].players as any, first(fmtGames["match"].players as any), null, null) },
+    { g: skG, s: gameRowSummary(skG, fmtGames["skins"].players as any, first(fmtGames["skins"].players as any), null, null) },
+    { g: open, s: gameRowSummary(open, sfPlayers as any, first(sfPlayers as any), null, null) },
   ];
-  add("81-games-list-before", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} onOpen={() => {}} legacy />)}</div>);
+add("81-games-list-before", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} onOpen={() => {}} legacy />)}</div>);
   add("81-games-list-after", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} summary={r.s} onOpen={() => {}} />)}</div>);
 }
 add("13-rounds-list", <RoundsList rounds={pbSampleRounds.slice(0, 4)} onOpen={() => {}} />);   // the Rounds tab list (212.121)

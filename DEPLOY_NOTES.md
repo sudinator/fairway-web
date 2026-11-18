@@ -1,3 +1,36 @@
+## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
+
+Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).
+
+**Layout.** A finished game is a two-column grid: the description on the left, a fixed 96px RESULTS column on the right. The headline (place, margin, or "W-L-H" over the record) sits at the top; each match's own result sits level with its line; lines with no result of their own (your gross line, the opponents) run the full width.
+
+**Every format, its final result:**
+- Stableford / stroke play (gross or net): your place among finishers ("T2nd of 8"); a no-show says so; an incomplete card says why there's no place.
+- Match play, singles: "Won 3&2" / "Lost 2 up" / "Halved", v the opponent. Team match play (two teams): plus "Team · Reds  Won 3½–1½".
+- Best ball (best-ball or Shootout): your match with margin, v the opponents · with your partner; with two teams, the team score too.
+- Trifecta: "W-L-H" over the record, one line per match (Singles / Four-ball v …, its result in the column), and the team score.
+- Skins: your skins (holes won, never money); team skins (1-v-1 and 2-v-2): the team's total, your share in the column.
+- Scramble and alternate shot (shared ball): the team result and your team — never a personal score (shared-ball rule).
+- Open games: no result; draft badge as before. Every game shows its code.
+- New in lib/game-list-summary: teamResultLine (the same team standings the game screen shows — lib/game-results singlesTeamStandings, foursomeTeamStandings, trifectaResults); no-show handling. Not shown by choice: segment (sixes/nines) winners and side contests — available if wanted.
+
+Tests: lib/game-list-summary (28 — adds the two-team score for best ball and trifecta, and the no-show). Gallery 81 re-rendered. Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
+## 212.127.261117 — Games list cleanup: no repeats, match margins, a readable trifecta record, a code and result on every game
+
+Owner (Nov 18), on 212.126: titles that already say the format, course and date shouldn't repeat them; trifecta "W-L-H and the result underneath … what did I win and what did I lose?"; "a final game with no game code or result — why not?"; "Won 3&2 or Lost 2up instead of Won / Lost".
+
+- **No repeats.** The meta line adds the format, course and date only when the title doesn't already say them (titleMentions): format synonyms (best ball / four-ball, stroke play / medal, alternate shot …), course names with or without "Golf Course / Country Club / GC / CC", dates as "Nov 15", "November 15", "11/15" or "11-15". An auto-named game ("Stableford / Course / Date") shows just the player count; a custom name ("Saturday Game") gets all three.
+- **Match margins.** Every match outcome carries its margin from the scoring functions (lib/match-outcomes: matchStatus / fourballStatus / altShotStatus / computeTrifecta "result", compacted: "3&2", "2 up"). One match reads "Won 3&2", "Lost 2 up" or "Halved", with a line naming the opponents (and your partner in best ball).
+- **Trifecta.** "W-L-H" captioned over the record ("2-0-0"), and one line per match: "Singles: Won 2&1 v Amit Sud", "Four-ball: Won 2&1 v Amit Sud & Vikram Rao · with Nihar Shah".
+- **Every finished game has its code and a result.** 212.126 hid the code on finished games (my choice) and showed no result for formats without a single place — skins and undecided matches — which is the game the owner saw. The code is back on every row; skins show your skins (a count of holes won, never money; team skins as the team's total with yours beneath); an incomplete card says "Your card wasn't completed, so there's no place"; an undecided match says "No match was decided".
+
+Tests: lib/game-list-summary (23 — redundancy for auto, custom and partial names; course suffixes and format synonyms; places; best ball and match play margins with opponents and partner; trifecta caption, record and one line per match; skins; incomplete card; open game; scramble; your line last; margin compaction; no money). Gallery 81 re-rendered with an auto-named Stableford, a custom-named trifecta, match play, skins and an open game. Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
 ## 212.126.261117 — Games list: a richer row for every game
 
 Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".
