@@ -26,10 +26,16 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
   const puttNudge = completeness.shouldNudgePutts;
   const fwNudge = completeness.shouldNudgeFairways;
   const hasNudge = puttNudge || fwNudge;
+  // 212.129 (owner: "show the score 90 +19 on the right and then the stableford points below it, so we have more room
+  // for the round description on the left"): the same two-column grid as the Games list — the description on the
+  // left, a fixed results column on the right (score and to-par, then the points beneath); the stats nudge runs the
+  // full width underneath.
+  const partial = !isGrossOnly(r) && played(r).length > 0 && played(r).length < 18;
   return (
-    <div onClick={() => onOpen(r)}
-      style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", alignItems: "center", cursor: "pointer", gap: 10, flexWrap: "wrap" }}>
-      <div style={{ flex: 1, minWidth: 200 }}>
+    <div onClick={() => onOpen(r)} data-round-row={r.id}
+      style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer",
+        display: "grid", gridTemplateColumns: "minmax(0, 1fr) 96px", columnGap: 12, rowGap: 6, alignItems: "start" }}>
+      <div style={{ minWidth: 0 }}>
         <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
           {r.course}{r.tee_name ? ` · ${r.tee_name}` : ""}
           {r.game_id ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "2px 7px", borderRadius: 6, marginLeft: 8, verticalAlign: "middle" }}>🏆 GAME</span> : null}
@@ -37,21 +43,25 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
         <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
           {r.group_name ? `${r.group_name} · ` : ""}{fmtDate(r.played_at)}{r.rating != null && r.slope != null ? ` · ${r.rating}/${r.slope}` : ""} · {played(r).length}/{r.holes.length} holes{(() => { const i = partialHandicapInfo(r); return i ? ` · ${i.filled} net par for hcp` : ""; })()} · GIR {pct(girStats([r]))} · FW {pct(firStats([r]))} · {puttsOf(r)} putts{pensOf(r) ? ` · ${pensOf(r)} pen` : ""}
         </div>
+      </div>
+      <div data-round-result style={{ textAlign: "right" }}>
+        <div style={{ whiteSpace: "nowrap" }}>
+          <span style={{ color: C.cream, fontSize: 20, fontWeight: 800, fontFamily: "Georgia, serif" }}>{strokesOf(r)}</span>
+          <span style={{ color: C.cream, fontSize: 14, fontWeight: 700, marginLeft: 6 }}>{toParStr(diffOf(r))}</span>
+        </div>
+        {partial ? <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>thru {played(r).length}</div> : null}
+        <div style={{ marginTop: 6 }}>
+          <span data-round-points style={{ display: "inline-block", background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 12 }}>{stablefordDisplay(r)}</span>
+        </div>
+      </div>
         {hasNudge && (
-          <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 7, lineHeight: 1.45 }}>
+          <div style={{ gridColumn: "1 / -1", color: C.gold, fontSize: 12, fontWeight: 700, lineHeight: 1.45 }}>
             {puttNudge && <>Putts not recorded on {completeness.missingPutts.length === 1 ? "hole" : "holes"} {statHoleList(completeness.missingPutts)}. </>}
             {fwNudge && <>Fairways not recorded on {completeness.missingFairways.length === 1 ? "hole" : "holes"} {statHoleList(completeness.missingFairways)}. </>}
             {puttNudge && <>Complete these stats so this round can be included in your Putts / round dashboard trend.</>}
             {!puttNudge && fwNudge && <>Complete the missing stats while the round is still fresh.</>}
           </div>
         )}
-      </div>
-      <div style={{ textAlign: "right" }}>
-        <span style={{ color: C.cream, fontSize: 20, fontWeight: 800, fontFamily: "Georgia, serif" }}>{strokesOf(r)}</span>
-        {!isGrossOnly(r) && played(r).length > 0 && played(r).length < 18 && <span style={{ color: C.sage, fontSize: 11, fontWeight: 700, marginLeft: 5 }}>thru {played(r).length}</span>}
-        <span style={{ color: C.cream, fontSize: 14, fontWeight: 700, marginLeft: 8 }}>{toParStr(diffOf(r))}</span>
-      </div>
-      <div style={{ background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 13 }}>{stablefordDisplay(r)}</div>
     </div>
   );
 }

@@ -1,3 +1,7 @@
+## 212.129.261117 — Rounds list: the score and points in a results column
+
+Owner (Nov 18): "the better way would be to show the score 90 +19 on the right and then the stableford points below it, so we have more room for the round description on the left".
+
 ## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
 
 Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).

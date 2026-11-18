@@ -1,3 +1,14 @@
+## 212.129.261117 — Rounds list: the score and points in a results column
+
+Owner (Nov 18): "the better way would be to show the score 90 +19 on the right and then the stableford points below it, so we have more room for the round description on the left".
+
+- components/rounds-list RoundRow is now the same two-column grid as the Games list (212.128): the description (course · tee, GAME badge, date, rating/slope, holes, GIR / FW / putts) on the left with the full width it needs; a fixed 96px results column on the right with the gross score (Georgia 20/800, the list-card headline figure) and to-par (14/700), "thru N" beneath for a partial round, and the Stableford points chip beneath that. The stats nudge runs the full width underneath.
+- Content unchanged: the screens test (67 checks — every round shows its gross, readable contrast) passes as before. Gallery 13-rounds-list re-rendered; before/after attached.
+
+Full suite, lint, all guards, the application lane, and the diagnostics and chart lanes pass (the known machine-only redirect test aside; the chart lane's intermittent tooltip wait recurred once under load and passed when rerun alone).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
 ## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
 
 Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).
