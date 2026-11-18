@@ -74,6 +74,7 @@
     "lib/season-standings.test.ts",
     "lib/season-rounds.test.ts",
     "lib/confirm-sheet.test.tsx",
+    "lib/game-list-summary.test.ts",
     "lib/season-standings-screen.test.tsx",
     "lib/cup-roster-row.test.tsx",
     "lib/manual-handicap-clear.test.ts",

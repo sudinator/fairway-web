@@ -1,3 +1,18 @@
+## 212.126.261117 — Games list: a richer row for every game
+
+Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".
+
+- **Every game:** format · number of players · course, and the date once FINAL (an open game keeps its join code).
+- **Once FINAL, on the right:** your result — your place among the finishers in Stableford and stroke play ("2nd of 8", "T2nd of 8" for a tie), your match outcome in best ball and singles match play (Won / Lost / Halved), your record across a trifecta's matches (W-L-H 1-1-0). Skins show no single place.
+- **Once FINAL, beneath:** your own line from your posted round for that game — gross (to par) · Stableford points · differential · net birdies — the Rounds tab's figures (lib/golf strokesOf, diffOf, stablefordDisplay, roundDifferential; net birdies off the round's stroke allocation).
+- Rules honoured: no money anywhere in the row; scramble and alternate shot show the team result and your team, never a personal score or differential; the list only shows games you play in. List-card idiom (title 15/700, one headline result 14/700, meta 12 sage, 13px 16px padding — one off-scale padding retired).
+- **Built on what exists:** lib/game-list-summary (pure; places from the player-scoring ranking, outcomes from lib/match-outcomes, team results from lib/team-rounds); components/game/game-list loads players, your posted rounds and their holes once after the games arrive, and a failure there leaves the plain row. GameRow is its own component (rendered by the design gallery: 81-games-list-before / -after, sample games).
+- Guards: the recorded-round course-handicap read is registered (as for the Rounds standings); the rounds read is declared bounded (your own round, at most one per game shown).
+
+Tests: lib/game-list-summary (13 — meta line, places and ties, best-ball outcome, trifecta record, skins none, open game, scramble team result only, your line's gross / points / differential / net birdies, no money). Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
 ## 212.125.261117 — CI fix: the confirm-sheet fallback calls the global dialog functions
 
 GitHub's application lane failed on 212.124 in ci/test-personal-round-editor.cjs: "Not implemented: window.confirm", then the save didn't happen.

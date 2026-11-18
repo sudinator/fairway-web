@@ -1,3 +1,7 @@
+## 212.126.261117 — Games list: a richer row for every game
+
+Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".
+
 ## 212.125.261117 — CI fix: the confirm-sheet fallback calls the global dialog functions
 
 GitHub's application lane failed on 212.124 in ci/test-personal-round-editor.cjs: "Not implemented: window.confirm", then the save didn't happen.

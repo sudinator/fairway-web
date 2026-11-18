@@ -36,6 +36,8 @@ import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
 import { TeamRoundsList, RoundsList } from "@/components/rounds-list";
 import { ConfirmSheet, TextSheet, questionFrom } from "@/components/confirm";
+import { GameRow } from "@/components/game/game-list";
+import { gameRowSummary } from "@/lib/game-list-summary";
 import { SeasonCardView } from "@/components/season-story";
 import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
@@ -206,6 +208,22 @@ add("17-insights-screen", <InsightsScreen ins={computeInsights(seasonRounds)} on
 add("78-confirm-sheet", <ConfirmSheet ask={{ title: "Delete it from your history?", message: "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money.", confirmLabel: "Delete", danger: true }} onDone={() => {}} />);
 add("79-confirm-manage-game", <ConfirmSheet ask={questionFrom('Reset "Sunday Stableford"? This clears every player\'s scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept.')} onDone={() => {}} />);
 add("80-text-admin-suspend", <TextSheet ask={{ ...questionFrom("Suspend Sam Lee? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):"), placeholder: "Reason" }} onDone={() => {}} />);
+{
+  // 212.126: the Games list — a finished Stableford (the viewer's place and own line), a finished best ball, an open game
+  const sg = { ...sfGame, id: "gl1", name: "Sunday Stableford", code: "481207", status: "ended", played_at: "2026-11-15" } as any;
+  const fbG = { ...fmtGames["fourball"].game, id: "gl2", name: "Saturday Best Ball", code: "552190", status: "ended", played_at: "2026-11-08" } as any;
+  const open = { ...sfGame, id: "gl3", name: "Thanksgiving Scramble", code: "903114", status: "active", game_type: "scramble" } as any;
+  const viewer = sfPlayers.find((p: any) => p.user_id)!;
+  const holes = Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, stroke_index: i + 1, strokes: i % 6 === 0 ? 3 : i % 3 === 0 ? 5 : 4, putts: 2 }));
+  const myRound = { id: "r1", course: sg.course, course_par: 72, course_handicap: 12, rating: 71.4, slope: 129, holes, played_at: "2026-11-15" } as any;
+  const rows = [
+    { g: sg, s: gameRowSummary(sg, sfPlayers as any, viewer.user_id!, myRound, null) },
+    { g: fbG, s: gameRowSummary(fbG, fmtGames["fourball"].players as any, (fmtGames["fourball"].players as any[]).find((p) => p.user_id).user_id, null, null) },
+    { g: open, s: gameRowSummary(open, sfPlayers as any, viewer.user_id!, null, null) },
+  ];
+  add("81-games-list-before", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} onOpen={() => {}} legacy />)}</div>);
+  add("81-games-list-after", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} summary={r.s} onOpen={() => {}} />)}</div>);
+}
 add("13-rounds-list", <RoundsList rounds={pbSampleRounds.slice(0, 4)} onOpen={() => {}} />);   // the Rounds tab list (212.121)
 add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () => null} />);
 const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;

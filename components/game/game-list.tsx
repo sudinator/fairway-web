@@ -1,6 +1,10 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase";
+import { gameRowSummary, type GameRowSummary } from "@/lib/game-list-summary";
+import { loadTeamRounds } from "@/lib/team-rounds";
+import { prepareRound } from "@/lib/round-prep";
+import { dedupeHoles, type Round } from "@/lib/golf";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
 import type { BetNet, BetPost } from "@/lib/money";
@@ -116,6 +120,38 @@ export function GameList({
   useEffect(() => {
     load();
   }, [load]);
+
+  // 212.126: the richer row — players, and for a FINAL game your result and your line (lib/game-list-summary). A
+  // failure here leaves the plain row; it never blocks the list.
+  const [summary, setSummary] = useState<Record<string, GameRowSummary>>({});
+  useEffect(() => {
+    if (!games?.length) return;
+    let live = true;
+    (async () => {
+      try {
+        const me = (await supabase.auth.getUser()).data.user?.id;
+        if (!me) return;
+        const { fetchAllIn } = await import("@/lib/fetch-all");
+        const ids = games.map((g) => g.id);
+        const players = await fetchAllIn<Player>(supabase, "game_players", "game_id", ids);
+        const ended = games.filter((g) => g.status === "ended");
+        let mine: Round[] = [];
+        if (ended.length) {
+          const { data: rs } = await supabase.from("rounds").select("*").eq("user_id", me).in("game_id", ended.map((g) => g.id)).is("deleted_at", null);   // bounded: the viewer's own posted round, at most one per game shown
+          const rows = (rs || []) as any[];
+          const hs = rows.length ? await fetchAllIn<any>(supabase, "holes", "round_id", rows.map((r) => r.id)) : [];
+          mine = rows.map((r) => prepareRound({ ...r, holes: dedupeHoles(hs.filter((h) => h.round_id === r.id)) }) as Round);
+        }
+        const team = ended.some((g) => g.game_type === "scramble" || g.game_type === "alt_shot") ? await loadTeamRounds(supabase, me) : [];
+        const out: Record<string, GameRowSummary> = {};
+        for (const g of games) {
+          out[g.id] = gameRowSummary(g, players.filter((p) => p.game_id === g.id), me, mine.find((r) => (r as { game_id?: string }).game_id === g.id) ?? null, team.find((t) => t.gameId === g.id) ?? null);
+        }
+        if (live) setSummary(out);
+      } catch { /* the plain row stands */ }
+    })();
+    return () => { live = false; };
+  }, [games]);
 
   const join = async () => {
     const c = code.trim();
@@ -254,27 +290,33 @@ export function GameList({
           No games yet. Use <b style={{ color: C.cream }}>Start a game</b> above to create one, or <b style={{ color: C.cream }}>Join with a code</b> if a friend shared one.
         </div>
       )}
-      {games?.map((g) => (
-        <div
-          key={g.id}
-          onClick={() => onOpen(g.id)}
-          style={{
-            background: C.greenLight,
-            borderRadius: 12,
-            padding: "14px 16px",
-            marginTop: 10,
-            cursor: "pointer",
-          }}
-        >
-          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
-            {g.name}{isDraftGame(g) ? <span data-draft-badge style={{ marginLeft: 8, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>DRAFT</span> : null}
-            {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
-          </div>
-          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-            {g.course} · code <b style={{ color: C.cream }}>{g.code}</b>
-          </div>
+      {games?.map((g) => <GameRow key={g.id} g={g} summary={summary[g.id]} onOpen={onOpen} />)}
+    </div>
+  );
+}
+
+/** One game in the list (212.126). Also rendered by the design gallery; `legacy` reproduces the pre-212.126 row for
+ *  the before/after only. */
+export function GameRow({ g, summary, onOpen, legacy = false }: { g: Game; summary?: GameRowSummary; onOpen: (id: string) => void; legacy?: boolean }) {
+  const s = legacy ? undefined : summary;
+  return (
+    <div
+      onClick={() => onOpen(g.id)}
+      data-game-row={g.id}
+      style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}
+    >
+      {/* list-card idiom — title, one headline result on the right, meta lines beneath */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 15 }}>
+          {g.name}{isDraftGame(g) ? <span data-draft-badge style={{ marginLeft: 8, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>DRAFT</span> : null}
+          {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
         </div>
-      ))}
+        {s?.result ? <span data-game-result style={{ color: C.cream, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>{s.result}</span> : null}
+      </div>
+      <div data-game-meta style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
+        {s?.meta ?? g.course}{legacy || g.status !== "ended" ? <> · code <b style={{ color: C.cream }}>{g.code}</b></> : null}
+      </div>
+      {s?.stats ? <div data-game-stats style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{s.stats}</div> : null}
     </div>
   );
 }
