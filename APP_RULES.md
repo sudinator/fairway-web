@@ -389,3 +389,12 @@ When shipping a member-facing feature, review lib/capabilities.json and the rele
 Use the shared chart-axis policy and Recharts automatic axis width. Keep text at least 11px. Labels must fit their chart and must not overlap labels from either axis; the browser regression requires at least 8px between opposite-axis label bounds. Keep a separate label row and preserve plotting height rather than shrinking text. Keep each point/round and its original statistics; date labels never aggregate the data. ci/test-chart-layout.cjs checks the actual components with modelled reads.
 
 <!-- 212.102: Organizer tee options and saving share the same validated source; no global rule changes. -->
+
+
+## Pre-release run (212.125)
+
+Before packaging, run every lane GitHub runs (.github/workflows/ci.yml), in this order: `npm test`, then `npm run guards`
+(after the suite has FINISHED — the assertion guard reads its report), `npm run ci:app` (the application lane — longer
+than a 5-minute shell limit, so run it in the background and wait), `npm run test:charts`, `npm run test:diagnostics`,
+`npm run build`. The database lane (ci/test_fresh_db_rebuild.sh) needs Postgres and runs only on GitHub — for a release
+with a migration or SQL test, say so in the hand-off. 212.124 shipped after skipping ci:app and failed there.

@@ -18,7 +18,7 @@ files = {
 checks = {
     "Format renders shared hole picker": "<MatchLengthPicker" in files["components/game/organizer-panel.tsx"],
     "UI exposes scoring lock reason": "The number of holes is locked once scoring begins." in files["lib/game-setup-policy.ts"],
-    "writer enforces shared policy": '!allowSetupChange({ type: "set_match_length", length: next })' in files["components/tournaments.tsx"],
+    "writer enforces shared policy": '!(await allowSetupChange({ type: "set_match_length", length: next }))' in files["components/tournaments.tsx"],
     "client uses atomic RPC": 'supabase.rpc("change_game_match_length_before_scoring"' in files["components/tournaments.tsx"],
     "RPC locks authoritative state": "for update;" in files["migrations/0149_change_game_match_length.sql"],
     "RPC checks ordinary scores": "jsonb_array_elements(coalesce(gp.scores" in files["migrations/0149_change_game_match_length.sql"],

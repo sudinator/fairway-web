@@ -31,7 +31,8 @@ export function questionFrom(text: string): ConfirmOptions {
 
 export function askConfirm(opts: ConfirmOptions | string): Promise<boolean> {
   const o: ConfirmOptions = typeof opts === "string" ? questionFrom(opts) : opts;
-  if (!host) return Promise.resolve(typeof window !== "undefined" ? window.confirm(o.message ? `${o.title}\n\n${o.message}` : o.title) : false);
+  // fallback when no host is mounted: the GLOBAL confirm (identical to window.confirm in a browser; tests stub the global)
+  if (!host) { const c = (globalThis as { confirm?: (m: string) => boolean }).confirm; return Promise.resolve(c ? !!c(o.message ? `${o.title}\n\n${o.message}` : o.title) : false); }
   return new Promise((resolve) => host!({ ...o, resolve }));
 }
 
@@ -44,7 +45,7 @@ export function askText(title: string, initialOrOpts?: string | Omit<TextOptions
   const extra = typeof initialOrOpts === "string" ? { initial: initialOrOpts } : (initialOrOpts ?? {});
   const q = questionFrom(title);
   const o: TextOptions = { title: q.title, message: q.message, ...extra };
-  if (!textHost) return Promise.resolve(typeof window !== "undefined" ? window.prompt(o.message ? `${o.title}\n\n${o.message}` : o.title, o.initial ?? "") : null);
+  if (!textHost) { const pr = (globalThis as { prompt?: (m: string, d?: string) => string | null }).prompt; return Promise.resolve(pr ? pr(o.message ? `${o.title}\n\n${o.message}` : o.title, o.initial ?? "") : null); }
   return new Promise((resolve) => textHost!({ ...o, resolve }));
 }
 

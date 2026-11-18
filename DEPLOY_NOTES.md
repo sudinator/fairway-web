@@ -1,3 +1,12 @@
+## 212.125.261117 — CI fix: the confirm-sheet fallback calls the global dialog functions
+
+GitHub's application lane failed on 212.124 in ci/test-personal-round-editor.cjs: "Not implemented: window.confirm", then the save didn't happen.
+**Cause.** When no sheet host is mounted, askConfirm / askText (and the toast) fall back to the native dialog. 212.122/124 wrote that as window.confirm / window.prompt / window.alert. The round-editor test runs in jsdom, which does not implement window.confirm, and supplies its answer through the global confirm — which the old code (a bare confirm()) used. In a real browser the two are the same function, so members were not affected; the fallback now calls the global (globalThis.confirm / prompt / alert), identical in the browser.
+**Also fixed:** ci/check_match_length_management_182_0.py quoted the un-awaited setup guard; updated to the awaited form (the gate is unchanged).
+**Why it slipped:** the release checks run locally were the suite, the guards and the chart/diagnostics lanes — not the application lane (npm run ci:app). Every lane in .github/workflows/ci.yml is now part of the pre-release run (database aside, which needs Postgres and runs only on GitHub). ci:app passes in full here except the known environment-only redirect test.
+
+Deploy: code only.
+
 ## 212.124.261117 — Presentation D1 + D2: no native pop-ups left anywhere in the app
 
 Owner (Nov 17): "do both D1 and D2 show me before and after".
