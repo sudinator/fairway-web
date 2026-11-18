@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm, askText } from "@/components/confirm";
 import { fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 
@@ -60,8 +61,8 @@ export function CupRosterRow({ p, t, playing, teamA, teamB, onIn, onOut, onAssig
   // 212.74 (owner, Oct 30): the avatar shows; the name keeps at least 10 characters before it truncates; the team
   // buttons carry a SHORT label (shortTeamLabel) so a long team name never squeezes the name
   return <div style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, minWidth: 0, maxWidth: "100%" }} data-cup-roster-row>
-    <Avatar src={p.avatar_url ?? null} name={p.display_name} size={30} enlargeable={false} />
-    <div style={{ minWidth: "10ch", flex: 1 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} data-cup-roster-name>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index != null ? `HI ${p.handicap_index}` : "no index"}</div></div>
+    <Avatar src={p.avatar_url ?? null} name={p.display_name} size={28} enlargeable={false} />
+    <div style={{ minWidth: "10ch", flex: 1 }}><div style={{ color: C.cream, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} data-cup-roster-name>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index != null ? `HI ${p.handicap_index}` : "no index"}</div></div>
     {playing ? (
       <button onClick={onOut} aria-pressed title="Playing — tap to leave out" style={{ ...btn(false), background: C.gold, color: C.green, border: `1px solid ${C.gold}`, padding: "8px 12px", fontSize: 12, minWidth: 44, flexShrink: 0 }}>✓ In</button>
     ) : (
@@ -243,7 +244,7 @@ export function Competitions({
       <Eyebrow>YOUR RYDER CUPS</Eyebrow>
       {competitions === null ? <div style={{ color: C.sage }}>Loading…</div> : competitions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 22, color: C.sage, textAlign: "center" }}>No Ryder Cups yet.</div> : competitions.map((c) => (
         <button key={c.id} onClick={() => onSelected(c.id)} style={{ width: "100%", textAlign: "left", background: C.greenLight, border: "none", borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
-          <div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>{c.name}</div>
+          <div style={{ color: C.cream, fontSize: 15, fontWeight: 700 }}>{c.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{formatDate(c.start_date)}{c.location ? ` · ${c.location}` : ""} · {c.team_a_name} vs {c.team_b_name}</div>
         </button>
       ))}
@@ -361,14 +362,14 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   };
 
   const lockSchedule = async () => {
-    if (!confirm(`Lock ${sessions?.length || 0} sessions worth ${fmtCompetitionPoints(schedule.totalPoints)} total points? Session scoring cannot change unless the schedule is explicitly reopened.`)) return;
+    if (!(await askConfirm(`Lock ${sessions?.length || 0} sessions worth ${fmtCompetitionPoints(schedule.totalPoints)} total points? Session scoring cannot change unless the schedule is explicitly reopened.`))) return;
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.rpc("lock_competition_schedule", { p_competition: competition.id });
     setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
   };
 
   const reopenSchedule = async () => {
-    const reason = prompt("Why is the locked Ryder Cup schedule being changed?")?.trim();
+    const reason = (await askText("Why is the locked Ryder Cup schedule being changed?"))?.trim();
     if (!reason) return;
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.rpc("reopen_competition_schedule", { p_competition: competition.id, p_reason: reason });
@@ -394,7 +395,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   };
 
   const renameCompetition = async () => {
-    const nextName = prompt("Rename this Ryder Cup", competition.name)?.trim();
+    const nextName = (await askText("Rename this Ryder Cup", competition.name))?.trim();
     if (!nextName || nextName === competition.name) return;
     if (nextName.length > 120) { setErr("Ryder Cup title must be 120 characters or fewer."); return; }
     setLifecycleBusy(true); setErr(null);
@@ -417,7 +418,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       altShot ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores." : "",
       "The Ryder Cup, sessions, games and match scores cannot be recovered.",
     ].filter(Boolean).join("\n\n");
-    if (!confirm(message)) return;
+    if (!(await askConfirm(message))) return;
 
     setLifecycleBusy(true); setErr(null);
     // bounded: returns the one deleted Cup's summary

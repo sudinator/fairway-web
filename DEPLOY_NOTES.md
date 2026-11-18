@@ -1,3 +1,171 @@
+## 212.129.261117 — Rounds list: the score and points in a results column
+
+Owner (Nov 18): "the better way would be to show the score 90 +19 on the right and then the stableford points below it, so we have more room for the round description on the left".
+
+- components/rounds-list RoundRow is now the same two-column grid as the Games list (212.128): the description (course · tee, GAME badge, date, rating/slope, holes, GIR / FW / putts) on the left with the full width it needs; a fixed 96px results column on the right with the gross score (Georgia 20/800, the list-card headline figure) and to-par (14/700), "thru N" beneath for a partial round, and the Stableford points chip beneath that. The stats nudge runs the full width underneath.
+- Content unchanged: the screens test (67 checks — every round shows its gross, readable contrast) passes as before. Gallery 13-rounds-list re-rendered; before/after attached.
+
+Full suite, lint, all guards, the application lane, and the diagnostics and chart lanes pass (the known machine-only redirect test aside; the chart lane's intermittent tooltip wait recurred once under load and passed when rerun alone).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
+## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
+
+Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).
+
+**Layout.** A finished game is a two-column grid: the description on the left, a fixed 96px RESULTS column on the right. The headline (place, margin, or "W-L-H" over the record) sits at the top; each match's own result sits level with its line; lines with no result of their own (your gross line, the opponents) run the full width.
+
+**Every format, its final result:**
+- Stableford / stroke play (gross or net): your place among finishers ("T2nd of 8"); a no-show says so; an incomplete card says why there's no place.
+- Match play, singles: "Won 3&2" / "Lost 2 up" / "Halved", v the opponent. Team match play (two teams): plus "Team · Reds  Won 3½–1½".
+- Best ball (best-ball or Shootout): your match with margin, v the opponents · with your partner; with two teams, the team score too.
+- Trifecta: "W-L-H" over the record, one line per match (Singles / Four-ball v …, its result in the column), and the team score.
+- Skins: your skins (holes won, never money); team skins (1-v-1 and 2-v-2): the team's total, your share in the column.
+- Scramble and alternate shot (shared ball): the team result and your team — never a personal score (shared-ball rule).
+- Open games: no result; draft badge as before. Every game shows its code.
+- New in lib/game-list-summary: teamResultLine (the same team standings the game screen shows — lib/game-results singlesTeamStandings, foursomeTeamStandings, trifectaResults); no-show handling. Not shown by choice: segment (sixes/nines) winners and side contests — available if wanted.
+
+Tests: lib/game-list-summary (28 — adds the two-team score for best ball and trifecta, and the no-show). Gallery 81 re-rendered. Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
+## 212.127.261117 — Games list cleanup: no repeats, match margins, a readable trifecta record, a code and result on every game
+
+Owner (Nov 18), on 212.126: titles that already say the format, course and date shouldn't repeat them; trifecta "W-L-H and the result underneath … what did I win and what did I lose?"; "a final game with no game code or result — why not?"; "Won 3&2 or Lost 2up instead of Won / Lost".
+
+- **No repeats.** The meta line adds the format, course and date only when the title doesn't already say them (titleMentions): format synonyms (best ball / four-ball, stroke play / medal, alternate shot …), course names with or without "Golf Course / Country Club / GC / CC", dates as "Nov 15", "November 15", "11/15" or "11-15". An auto-named game ("Stableford / Course / Date") shows just the player count; a custom name ("Saturday Game") gets all three.
+- **Match margins.** Every match outcome carries its margin from the scoring functions (lib/match-outcomes: matchStatus / fourballStatus / altShotStatus / computeTrifecta "result", compacted: "3&2", "2 up"). One match reads "Won 3&2", "Lost 2 up" or "Halved", with a line naming the opponents (and your partner in best ball).
+- **Trifecta.** "W-L-H" captioned over the record ("2-0-0"), and one line per match: "Singles: Won 2&1 v Amit Sud", "Four-ball: Won 2&1 v Amit Sud & Vikram Rao · with Nihar Shah".
+- **Every finished game has its code and a result.** 212.126 hid the code on finished games (my choice) and showed no result for formats without a single place — skins and undecided matches — which is the game the owner saw. The code is back on every row; skins show your skins (a count of holes won, never money; team skins as the team's total with yours beneath); an incomplete card says "Your card wasn't completed, so there's no place"; an undecided match says "No match was decided".
+
+Tests: lib/game-list-summary (23 — redundancy for auto, custom and partial names; course suffixes and format synonyms; places; best ball and match play margins with opponents and partner; trifecta caption, record and one line per match; skins; incomplete card; open game; scramble; your line last; margin compaction; no money). Gallery 81 re-rendered with an auto-named Stableford, a custom-named trifecta, match play, skins and an open game. Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
+## 212.126.261117 — Games list: a richer row for every game
+
+Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".
+
+- **Every game:** format · number of players · course, and the date once FINAL (an open game keeps its join code).
+- **Once FINAL, on the right:** your result — your place among the finishers in Stableford and stroke play ("2nd of 8", "T2nd of 8" for a tie), your match outcome in best ball and singles match play (Won / Lost / Halved), your record across a trifecta's matches (W-L-H 1-1-0). Skins show no single place.
+- **Once FINAL, beneath:** your own line from your posted round for that game — gross (to par) · Stableford points · differential · net birdies — the Rounds tab's figures (lib/golf strokesOf, diffOf, stablefordDisplay, roundDifferential; net birdies off the round's stroke allocation).
+- Rules honoured: no money anywhere in the row; scramble and alternate shot show the team result and your team, never a personal score or differential; the list only shows games you play in. List-card idiom (title 15/700, one headline result 14/700, meta 12 sage, 13px 16px padding — one off-scale padding retired).
+- **Built on what exists:** lib/game-list-summary (pure; places from the player-scoring ranking, outcomes from lib/match-outcomes, team results from lib/team-rounds); components/game/game-list loads players, your posted rounds and their holes once after the games arrive, and a failure there leaves the plain row. GameRow is its own component (rendered by the design gallery: 81-games-list-before / -after, sample games).
+- Guards: the recorded-round course-handicap read is registered (as for the Rounds standings); the rounds read is declared bounded (your own round, at most one per game shown).
+
+Tests: lib/game-list-summary (13 — meta line, places and ties, best-ball outcome, trifecta record, skins none, open game, scramble team result only, your line's gross / points / differential / net birdies, no money). Full suite, lint, all guards, the application lane, and the chart and diagnostics lanes pass (the known machine-only redirect test aside).
+
+Deploy: code only. (0237 from 212.117 still applies once, before this code, on production.)
+
+## 212.125.261117 — CI fix: the confirm-sheet fallback calls the global dialog functions
+
+GitHub's application lane failed on 212.124 in ci/test-personal-round-editor.cjs: "Not implemented: window.confirm", then the save didn't happen.
+**Cause.** When no sheet host is mounted, askConfirm / askText (and the toast) fall back to the native dialog. 212.122/124 wrote that as window.confirm / window.prompt / window.alert. The round-editor test runs in jsdom, which does not implement window.confirm, and supplies its answer through the global confirm — which the old code (a bare confirm()) used. In a real browser the two are the same function, so members were not affected; the fallback now calls the global (globalThis.confirm / prompt / alert), identical in the browser.
+**Also fixed:** ci/check_match_length_management_182_0.py quoted the un-awaited setup guard; updated to the awaited form (the gate is unchanged).
+**Why it slipped:** the release checks run locally were the suite, the guards and the chart/diagnostics lanes — not the application lane (npm run ci:app). Every lane in .github/workflows/ci.yml is now part of the pre-release run (database aside, which needs Postgres and runs only on GitHub). ci:app passes in full here except the known environment-only redirect test.
+
+Deploy: code only.
+
+## 212.124.261117 — Presentation D1 + D2: no native pop-ups left anywhere in the app
+
+Owner (Nov 17): "do both D1 and D2 show me before and after".
+
+**Built.** askText (components/confirm) — the app's own replacement for prompt(): a sheet with the question, the detail, a text field and Cancel / the action; resolves the text, or null on Cancel, exactly as prompt() did. questionFrom turns a plain-sentence question into title + detail (the first sentence is the title; a blank line or further sentences become the detail, paragraph breaks kept) and names the button after a leading destructive verb (Reset, Remove, Suspend, Delete …, in red); askConfirm and askText use it for every string question.
+**Migrated (129 sites, 20 files).** D1 — Manage Game and setup (components/tournaments: 16 questions, 41 errors), scorecard take-over, round editor and round setup, scoring device, side contests, tee times, round detail, course history, groups, competitions, feedback, the course picker, scramble settings. D2 — admin (components/manage 31, admin-players 10, pending sign-ups, club requests, account gate, admin courses). Questions → askConfirm, typed inputs → askText, errors → notifyError, notices → notifyInfo.
+**Safety.** Every function that became async was audited against 212.123: the two whose results are used — the Manage Game setup guard allowSetupChange and confirmPastDate (round editor, round setup) — now return Promise<boolean> and all 32 of their call sites await them (the compiler does not flag an un-awaited `if (!guard())`, so each was checked). Contract and sandbox tests updated to the awaited forms: check_game_setup_policy_contract (31 links), check_setup_rules_server_parity (14 rules), test-game-reset, test-game-tee-options (161 assertions), scramble screens (51).
+**Guard.** ci/check_native_dialogs.py reached zero and now BANS confirm()/alert()/prompt() in the app (the two host fallbacks excepted).
+**Tests:** lib/confirm-sheet (11: question sheet, sentence splitting, destructive-verb button, typed input returns text / null, initial value). Gallery 79 (Manage Game reset) and 80 (admin suspend with a typed reason); before/after rendered. Full suite, lint, all guards and the browser lanes pass.
+
+Deploy: code only.
+
+## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
+
+Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".
+
+**B.**
+- **Segmented** (components/ui) — the one control for choosing a view or a sort: square buttons (radius 6, 12px, 8px 12px), the chosen one gold with green 700 text, the rest sage on greenLight — or on greenMid when the control sits on a card (onCard), so unchosen buttons still read as buttons. Used for the dashboard range (Last 5 / Last 20 / Season / All — the model the owner liked), the Season standings sort (was rounded pills) and the admin friction tabs (was rounded pills). Semantics: a tablist of tabs; the analytics and chart browser tests now select them by role tab.
+- **Personal bests card (Home):** its rows were a table with Georgia figures — the standings mismatch. Rows now follow Data rows: labels 13/700 cream in a 156px column (no wrapping), figures sans 14/700; the hero "78" stays Georgia (a display numeral).
+- **Money headings:** five section titles in Georgia 17/800 (Guests, Aggregate Club-level Balances, Untangle payments, Settle up, Activity log) are now the Eyebrow every other section uses. The gold money totals stay Georgia (money is a game surface).
+
+**C.**
+- **Type scale** (DISPLAY_RULES Part 5, ci/check-design-scale.py): seven text steps 11 · 12 · 13 · 14 · 15 · 20 · 22, display numerals 24 and up. They already carried 92% of text; the in-between sizes (16, 17, 18, 19, 21) are frozen per file and retire as screens are touched. Nothing resized.
+- **Spacing scale:** eight paddings drawn from use — 4px 10px · 6px 12px · 8px 12px · 8px 0 · 12px 14px · 13px 16px · 11px 20px · 16px. The rest frozen per file; moved only when their screen is re-rendered, never in a bulk sweep.
+- Design-scale baseline now: 0 radius, 558 padding and 139 font-size uses off-scale, none new allowed.
+- **List idiom guard** (ci/check_list_idiom.py, in npm run guards): avatars only 22 (inline chip), 28 (data row), 32 (list card), 48/64 (profile hero), and no serif person names inside lists; 29 legacy sites frozen per file.
+
+Before/after rendered (Personal bests card, dashboard range, standings sort). Full suite, lint, all guards and both browser lanes pass.
+
+Deploy: code only.
+
+## 212.122.261117 — Presentation A: the app's own confirm sheet replaces the browser's pop-ups (member-facing screens)
+
+Owner (Nov 17): "how the app looks and presents is super high on the priority list" — start with A.
+
+**Why.** 171 native confirm()/alert()/prompt() calls. On a phone each is a grey system box headed with the web address ("birdienumnum.vercel.app says…") on every Delete, Remove, Discard and error — off-brand, and it reads like a fault.
+**Built.** components/confirm.tsx — askConfirm({ title, message, confirmLabel, danger }) returns Promise<boolean>, rendered by one ConfirmHost (mounted beside the Toaster in Home) as the standard BottomSheet: the question as the title, the detail beneath, Cancel and a confirm button (red text for destructive ones). A new question cancels an unanswered one. If no host is mounted it falls back to the native dialog, and the toast now does the same, so nothing is ever silently skipped.
+**Migrated (member-facing):** components/game/scoring-views (matchups start-over, the setup-policy confirmations — now awaited — remove foursome, errors), components/money (close event, unmark payment, every error and notice), components/home (delete a game round, discard unfinished rounds, delete an unfinished round, every error and notice). Errors to notifyError, notices to notifyInfo. 42 sites; 129 remain (tournaments, admin and other screens — release D).
+**Guard.** ci/check_native_dialogs.py (in npm run guards): the 129 legacy sites frozen per file in ci/native_dialogs_baseline.json; counts may only go down, a file at zero can never gain one. ci/check_game_setup_policy_contract.py updated to the awaited gates (still gated); ci/test-round-recovery.cjs sandbox given notifyError/askConfirm (58 assertions pass).
+**Tests:** lib/confirm-sheet (5: shows title and message, yes closes, no closes, a new question cancels an unanswered one). Gallery 78-confirm-sheet; before/after rendered. Full suite, lint and all guards pass.
+Owner preference recorded for release B: square buttons over rounded pills (the shared segmented control will be square, and the standings sort pills will follow).
+
+Deploy: code only.
+
+## 212.121.261117 — Lists across the app: two idioms, written down and applied
+
+Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."
+
+**Found.** Lists come in two shapes, and the inconsistencies sat within each: (1) ROWS INSIDE A CARD — admin analytics users (34px avatars, 14/500 names), the Cup roster pick rows (30px, 14/800); (2) LIST CARDS, one card per item — the Players admin (40px avatar, body-size name, 12px 16px padding), club-members admin (48px avatar), competition names 15/800, tournament names body-size/800, the Rounds list's to-par at body size beside a 20px score, team-round results 14/800. The Rounds list, team rounds and Your courses otherwise already followed the card idiom.
+**Rule (DISPLAY_RULES "List cards — one card per item", beside "Data rows"):** title 15/700 cream, meta 12 sage, padding 13px 16px, 32px avatar for a person, at most one headline figure on the right (a score Georgia 20/800; a result phrase or to-par sans 14/700). Rows inside a card follow Data rows (13/700, 11 sage, figures 14/700, 28px avatars). Pick-control rows use Data rows.
+**Applied:** components/manage (analytics users → data rows; Players admin and club-members admin → list cards, 32px avatars, 13px 16px padding), components/competitions (Cup roster names 13/700, 28px avatars; competition titles 15/700), components/tournaments (tournament titles 15/700), components/rounds-list (to-par 14/700; team results 14/700). The design gallery gains 13-rounds-list. Before/after rendered for the Rounds list, team rounds, Cup roster and Your courses (unchanged). One off-scale padding retired (the design-scale baseline lowered). Full suite and all guards pass.
+
+Deploy: code only.
+
+## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
+
+Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."
+
+**Audit.** The app had no written standard for data rows; each table was built to its author's taste. On the Club tab: the stats rows 12px; the standings (212.119) 12px with 22px avatars; head-to-head cells 13px regular; the members list body-size names at 800 with 40px avatars and 12px meta. Avatar sizes across the app's lists run 20–48px.
+**Standard (DISPLAY_RULES "Data rows — one standard"):** outside a live game surface, every list or table of members, players or figures uses: names/labels 13px/700 cream (800 for the viewer's own row), captions and counts 11px sage, figures sans 14px/700, avatars 28px, an Eyebrow heading, 1px separators with 8px padding, pills at 4px 10px. Georgia numerals stay on game surfaces and hero tiles. (Weights are 500/700/800 only — a guard enforces it, and caught a 600 on the way.)
+**Applied to:** components/season-standings (names 13/700, avatars 28), components/club-engagement (format rows and scoring labels 13/700, counts 11), components/groups MEMBERS list (names 13/700, avatars 28, meta 11), components/head-to-head (names 13/700, figures 14/700). Admin tables (components/manage) and the game surfaces are untouched. Tests: standings (13), groups (10) pass; the full suite, the design-scale, weight and contrast guards pass.
+
+Deploy: code only.
+
+## 212.119.261117 — Season standings on the Club tab's idiom (the font and size mismatch)
+
+Owner (Nov 17, two staging screenshots): the standings card next to the club stats table — "completely lost the consistency".
+
+**Why.** The display rule "Georgia for numerals" is the GAME surfaces' idiom (leaderboards, recap, money, share card). The Club tab and the stats cards (components/club-engagement) use a compact idiom: Eyebrow headings, 12px rows, sans 14px/700 numerals with 11px captions, 22px avatars. The standings card was built in the first idiom beside a card in the second, so it read a size larger and in another face. The heading itself was already the shared Eyebrow.
+**Fix.** The card restyled to the Club tab's measurements: tabs and pills 11–12px on-scale paddings, rows 12px (cream 500, bold for the viewer), counts 11px sage, figures sans 14px/700 (sage when unranked), avatars 22px, the note 11px. DISPLAY_RULES gains "Which idiom, where": a new card takes its neighbour's idiom; Georgia numerals stay on game surfaces and hero tiles. Tests unchanged (13 screen checks pass); gallery 60/62 re-rendered; the design-scale and contrast guards pass.
+
+Deploy: code only (0237 from 212.117 still applies once).
+
+## 212.118.261117 — CI fix: the 0237 assertion test's fixture
+
+GitHub's database lane failed on 212.117 in ci/assert-club-round-standings.sql: the test inserted club memberships without group_members.email, which is NOT NULL. The migration (0237) applied cleanly and the function ran; only the test fixture was wrong. Fixed to insert the email, as ci/assert-club-isolation.sql does. No app change; migration 0237 is unchanged (apply it once, as for 212.117).
+
+## 212.117.261117 — Season standings: the Rounds tab, the Profile switch, and the refinements from the real data
+
+Owner (Nov 17–18): "2 tabs — one for games and one for individual rounds"; aggregates and ranking only, no hole-by-hole; the switch in Profile, on by default; top 5 with the rest behind Show all; unranked figures shown; top-3s only with five or more finishers.
+
+- **Migration 0237_club_round_standings.sql:** profiles.share_rounds_with_club (default true) and club_round_standings_data(group, year) — SECURITY DEFINER, since holes are otherwise readable only by their owner: returns sharing members' FINAL rounds of the year with their holes, only to a member of that club, nothing for a test club, 42501 to an outsider. Registered in the security contract, the applied-check (0185–0237), the migration ledger and MIGRATIONS.md. Test: ci/assert-club-round-standings.sql (the sharer's round is returned with its hole; a non-sharer's is not; last year's and an in-progress round are not; an outsider is refused; flipping the switch makes a round appear) — in both fresh-database runs.
+- **Rounds engine (lib/season-rounds):** from the club's real 2026 export — 18-hole rounds only; a member's rounds on the same course and day collapse to one (three such duplicates in the data); putts rank only members whose counted rounds all have 18 putts; five rounds to be ranked; ties share the place. Scoring averages to par (gross, and net off the round's recorded course handicap); net birdies and eagles off the round's stroke allocation (lib/golf allocateStrokes, as the Rounds tab); best gross / net; most birdies in a round; longest run at gross par or better; rounds logged. The reads guards record the recorded-round exemption (ci/check_course_handicap_reads.py ROUND_FILES, ci/check_handicap_single_source.py). Test: lib/season-rounds (10).
+- **The card (components/season-standings):** tabs Club games / Rounds (the Rounds data loads on first open, one RPC); TOP 5 for the chosen metric with the viewer's row if outside, "Show all N (M with fewer than 5 games/rounds)" opens the rest; an unranked member's figure shows in sage with no place; a tapped row shows every number; the Rounds note says who it covers and where the switch is. Games engine: a top-3 counts only with five or more finishers. Tests: lib/season-standings-screen (13).
+- **Profile → "Include my rounds in the club standings"** (components/player-card ShareRoundsToggle, beside the card-visibility control; standard btn() so the contrast guard passes): club games always count; this covers rounds the member logs — results, not scorecards.
+Real-data note (from the export): the Rounds tab will rank eight members this year (Amit 31 rounds, Karan 13, Ashutosh 11, Probir 9, Jigar 8, Gaurav 6, Nihar 6, A Masud 5); most members' logged rounds are their club games — which is why the count is on every row.
+
+Deploy: apply migration 0237, then the package. Staging check: Club tab → Rounds tab shows the eight ranked members with those counts; Profile → the switch off → your rounds leave the tab; back on → they return.
+
+## 212.116.261117 — Season standings: the club's order of merit, one table sortable nine ways
+
+Owner (Nov 17): a season leaderboard, variant A after mock-ups ("there are so many ways to slice the club data"); only data that exists in the app ("this app might not be the primary app used by all club members") — nothing index- or personal-round-based.
+
+- **Engine (lib/season-standings):** ENDED club games in the four own-ball formats — Stableford, stroke play, best ball (four-ball) and trifecta; skins, scramble, alternate shot and the Cup excluded; members only; test clubs never reach it. Per player: games; **wins** (an individual first place OR a won best-ball / trifecta match — aggregated, the owner's rule); top-3s; match record W–L–H; **average Stableford points computed from the hole scores for every own-ball game** (one yardstick across formats); best gross and best net; net birdies and eagles; segments won; side contests won; standout features. **Five games to be ranked; ties share the place** (1, 1, 3); below the floor a player is listed, unranked, with no average. Every figure comes from the helpers the game screens use (positions, points, match outcomes, segments, standouts, the course-handicap accessor — the reads guard caught a direct read during the build).
+- **The card (components/season-standings) on the Club tab** above the latest report: pills to sort by wins, average points, best gross, net birdies, match record, top-3s, games, segments won, contests won; the viewer's row highlighted; a tapped row shows every number. Loads the club's year with paged reads and one batched contests query.
+- **The quarterly report** carries a standings snapshot for its period from the same engine (top five by wins), with a line in the email pointing to the full table — one source for the numbers the two share. Its own awards are unchanged.
+Tests: lib/season-standings (15: which games count, wins aggregated, three matches a head across best ball + trifecta, gross from hole scores, contests credited, segments, standouts, birdies, ties 1,1,3, the floor, low-first sorting); lib/season-standings-screen (7: default sort, the viewer's row, re-sorting by pill, the detail on tap, ranked vs unranked). The design gallery renders the real card (60); the overflow guard passes.
+
+Deploy: code only. No migration.
+
 ## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
 
 Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.

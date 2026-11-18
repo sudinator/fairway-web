@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 import { trace } from "@/lib/save-trace";
 import { SaveTraceView, useSaveTraceOn } from "@/components/save-trace-view";
 import { scrambleFinishGaps } from "@/lib/scramble-game";
@@ -1195,7 +1196,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
                 onClick={() => setTeeIdx(i)}
                 style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
               >
-                <div style={{ fontWeight: 800 }}>{t.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</div>
                 <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
               </button>
               );
@@ -1969,7 +1970,7 @@ function GameRoom({
   }, []);
   const requireOnline = (msg?: string): boolean => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      alert(msg || "You're offline. This needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.");
+      notifyError(msg || "You're offline. This needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.");
       return false;
     }
     return true;
@@ -2089,7 +2090,7 @@ function GameRoom({
     : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
   const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup && !organizerHolds(viewGroup);
   const claimGroupMarker = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setCardView(true);
@@ -2099,7 +2100,7 @@ function GameRoom({
     load();
   };
   const releaseGroupMarker = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setPlayers((ps) => ps.map((p) => (p.id === myRow.id ? { ...p, is_marker: false } : p))); // optimistic
@@ -2126,20 +2127,20 @@ function GameRoom({
   };
 
   const finishMyGroup = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game || !myRow?.tee_group) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     // Push everything entered offline BEFORE recording the round, so the round is
     // never written from pre-sync server state (which would drop the last holes).
     await drainOutbox();
     const left = countPending();
-    if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
+    if (left > 0) { recomputePending(); notifyError(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
     const altDrafts = game.game_type === "alt_shot" ? loadAltShotDrafts(game.id).length : 0;
-    if (altDrafts > 0) { alert(`${altDrafts} Alternate Shot score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before finishing.`); return; }
+    if (altDrafts > 0) { notifyError(`${altDrafts} Alternate Shot score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before finishing.`); return; }
     const conflicts = altShotConflictHoles(myRow.tee_group);
-    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before finishing the group.`); return; }
+    if (conflicts.length) { notifyError(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before finishing the group.`); return; }
     const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
-    if (error) { alert(failureMessage("Couldn't finish this group", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't finish this group", error)); return; }
     await load();
   };
   // Non-organizers only ever see the scorecard.
@@ -2302,7 +2303,7 @@ function GameRoom({
       await scoreWriterRef.current?.idle();
       if (alive) {
         await load();
-        alert("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
+        notifyError("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
       }
     };
     // 212.49: the game ended before this phone's scores reached the server (BN164). Unlike a reset, they are KEPT on
@@ -2313,7 +2314,7 @@ function GameRoom({
       endedSaid = true;
       const holes = countPending() + (gameRef.current && keepsSideScores(gameRef.current.game_type) ? loadAltShotDrafts(gameRef.current.id).length : 0);
       await load();
-      alert(lateScoreNotice(holes));
+      notifyError(lateScoreNotice(holes));
     };
     window.addEventListener("bnn-game-ended-rejected", endedNotice);
     const dropMem = () => clearMemBackups();   // 212.29: a reset made elsewhere — pre-reset entries are void
@@ -2478,7 +2479,7 @@ function GameRoom({
   }, [game?.status, drainOutbox]);
   const syncNow = async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      alert("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
+      notifyError("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
       return;
     }
     setSyncing(true);
@@ -2802,7 +2803,7 @@ function GameRoom({
     // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
   // RPC so only a group member can claim, and only the marker can release.
   const takeOverScoring = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: user.id }); // optimistic
@@ -2810,7 +2811,7 @@ function GameRoom({
     await supabase.rpc("claim_marker", { p_game_id: game.id });
   };
   const releaseScoring = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: null });
@@ -2825,7 +2826,7 @@ function GameRoom({
   // until that final release, so individual cards stay hidden the whole time and
   // no two devices ever write the same row (the no-dupe-write invariant).
   const everyoneScoresOwn = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) { setCardView(false); return; }
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     // Disband group scoring: clear BOTH marker mechanisms (a game can carry a
@@ -2893,16 +2894,16 @@ function GameRoom({
     if (ok) notifyInfo(ok);
     return true;
   };
-  const allowSetupChange = (action: SetupAction): boolean => {
+  const allowSetupChange = async (action: SetupAction): Promise<boolean> => {
     const d = setupDecision(action);
-    if (d.decision === "block") { alert(d.reason); return false; }
-    if (d.decision === "confirm") return confirm(`${d.title}\n\n${d.message}`);
+    if (d.decision === "block") { notifyError(d.reason); return false; }
+    if (d.decision === "confirm") return (await askConfirm(`${d.title}\n\n${d.message}`));
     return true;
   };
 
   // Organizer: override any player's handicap index for this game (recomputes course handicap).
   const overridePlayerHandicap = async (p: Player, idxVal: number | null) => {
-    if (!game || !allowSetupChange({ type: "set_handicap", player: p })) return;
+    if (!game || !(await allowSetupChange({ type: "set_handicap", player: p }))) return;
     // Handicap overrides must use THIS player's selected tee snapshot. Never borrow
     // another player's rating/slope: that can produce a valid-looking but wrong CH.
     const rating = p.rating ?? null;
@@ -2945,7 +2946,7 @@ function GameRoom({
 
   const setAltShotFirstDriver = async (foursomeId: string, side: "a" | "b", playerKey: string) => {
     if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return;
-    if (!allowSetupChange({ type: "set_foursomes" })) return;
+    if (!(await allowSetupChange({ type: "set_foursomes" }))) return;
     const next = SO.altShotFirstDriverFoursomes(game.foursomes, foursomeId, side, playerKey);   // 212.39: lib/structure-ops
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the starting player — please try again."); return; }
@@ -2954,7 +2955,7 @@ function GameRoom({
 
   const setTrifectaPairing = async (foursomeId: string, cross: boolean) => {
     if (!game || game.game_type !== "trifecta" || !Array.isArray(game.foursomes)) return;
-    if (!allowSetupChange({ type: "set_foursomes" })) return;
+    if (!(await allowSetupChange({ type: "set_foursomes" }))) return;
     const next = SO.trifectaSwapFoursomes(game.foursomes, foursomeId, cross);   // 212.39: lib/structure-ops
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the Singles matchups — please try again."); return; }
@@ -2984,7 +2985,7 @@ function GameRoom({
   // from it in ONE transaction (apply_game_structure, 0184) — the same path as the balance buttons.
   // Before, a failed team write was ignored and the foursomes were saved as if it had succeeded.
   const setPlayerTeam = async (p: Player, team: string | null) => {
-    if (!game || !allowSetupChange({ type: "set_team", player: p, team })) return;
+    if (!game || !(await allowSetupChange({ type: "set_team", player: p, team }))) return;
     const nextPlayers = players.map((x) => x.id === p.id ? { ...x, team } : x);
     // 212.39: the payload is built by lib/structure-ops (moved verbatim)
     const { error } = await supabase.rpc("apply_game_structure", SO.teamMoveArgs(game.id, game, nextPlayers, [{ player: p.id, team }]));
@@ -3006,7 +3007,7 @@ function GameRoom({
     // force the organizer to redo the whole exercise once it was set (203.1).
     if (r.unrated.length) return { changed: 0, summary: "", unrated: r.unrated };
     if (!r.assignments.length) return { changed: 0, summary: balanceSummary(r), unrated: [] };
-    if (!confirm(`Balance teams by playing handicap?\n\n${balanceSummary(r)}\n\n${r.assignments.length} player${r.assignments.length === 1 ? "" : "s"} will move${locked.size ? `; ${locked.size} with scores stay put` : ""}.`)) return null;
+    if (!(await askConfirm(`Balance teams by playing handicap?\n\n${balanceSummary(r)}\n\n${r.assignments.length} player${r.assignments.length === 1 ? "" : "s"} will move${locked.size ? `; ${locked.size} with scores stay put` : ""}.`))) return null;
     // 206.1 (review finding 4): teams AND the foursomes built from them are saved in ONE transaction
     // (apply_game_structure, 0184) — never player by player with failures ignored.
     const nextPlayers = players.map((x) => { const a = r.assignments.find((y) => y.id === x.id); return a ? { ...x, team: a.team } : x; });
@@ -3026,7 +3027,7 @@ function GameRoom({
   // panel only offers it when html[data-env]="staging".
   const autoScoreThrough = async (through: number): Promise<string> => {
     if (!game || !isStagingClient()) return "Not available here.";
-    if (!allowSetupChange({ type: "set_handicap", player: players[0] })) return "Blocked.";
+    if (!(await allowSetupChange({ type: "set_handicap", player: players[0] }))) return "Blocked.";
     const holes = (game.holes_meta || []).map((h) => ({ par: h.par }));
     let n = 0;
     // 212.4: one-ball formats (scramble, alternate shot) score the TEAM / SIDE, not the players — random scores
@@ -3066,7 +3067,7 @@ function GameRoom({
   // 212.61: a unit (a matchup, a foursome) moves in ONE server call — set_tee_groups — never half of it
   const setUnitTeeGroup = async (members: Player[], group: number | null) => {
     if (!game) return;
-    for (const p of members) { if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return; }
+    for (const p of members) { if (!(await allowSetupChange({ type: "set_tee_group", player: p, group }))) return; }
     const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: members.map((p) => ({ player: p.id, group })) });
     if (!saved(error, "move that group")) return;
     const ids = new Set(members.map((m) => m.id));
@@ -3076,7 +3077,7 @@ function GameRoom({
     await load();
   };
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
-    if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return;
+    if (!(await allowSetupChange({ type: "set_tee_group", player: p, group }))) return;
     const { error } = await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
     if (error) { notifyError("Couldn't update that player's group — please try again."); return; }
     const nextPlayers = players.map((x) => x.id === p.id ? { ...x, tee_group: group } : x);
@@ -3120,7 +3121,7 @@ function GameRoom({
       ...(next ? [{ player: next, group }] : []),
     ];
     for (const change of changes) {
-      if (!allowSetupChange({ type: "set_tee_group", player: change.player, group: change.group })) return;
+      if (!(await allowSetupChange({ type: "set_tee_group", player: change.player, group: change.group }))) return;
     }
     const payload = changes.map((change) => ({ player: change.player.id, group: change.group }));
     const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
@@ -3144,7 +3145,7 @@ function GameRoom({
   // save groups + matches in one transaction, as the other Cup team formats do.
   const buildCupScrambleGroups = async () => {
     if (!game || game.game_type !== "scramble" || !Array.isArray(game.teams) || game.teams.length !== 2) return;
-    if (!canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
+    if (!canRandomize || !(await allowSetupChange({ type: "randomize_groups" }))) return;
     const size = (Number(game.scramble_team_size) || 2) as 2 | 3 | 4;
     const live = players.filter((p) => !p.no_show);
     const side = (k: string) => live.filter((p) => p.team === k).map((p) => ({ key: p.id, ch: Number(chBasis(p, game.course_par, game.holes_meta?.length) ?? 0) }));
@@ -3172,7 +3173,7 @@ function GameRoom({
 
   const randomizeGroups = async () => {
     if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
-    if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
+    if (!game || !canRandomize || !(await allowSetupChange({ type: "randomize_groups" }))) return;
     const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     let assignments: { playerId: string; group: number }[];
     let overflowGuestIds: string[];
@@ -3229,7 +3230,7 @@ function GameRoom({
     if (d.decision === "block") { notifyError((d as { reason?: string }).reason ?? "The groups can't be cleared now."); return; }
     const grouped = players.filter((p) => p.tee_group != null);
     if (!grouped.length) return;
-    if (!confirm(`Clear all ${grouped.length} players' groups and start over?`)) return;
+    if (!(await askConfirm(`Clear all ${grouped.length} players' groups and start over?`))) return;
     const nextPlayers = players.map((p) => ({ ...p, tee_group: null }));
     const foursomes = SO.teamPlayFoursomesAfter(game, nextPlayers);
     const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [], p_groups: grouped.map((p) => ({ player: p.id, group: null })), p_foursomes: foursomes });
@@ -3240,7 +3241,7 @@ function GameRoom({
 
   const balanceMatchups = async () => {
     if (game?.game_type === "scramble" && Array.isArray(game.teams) && game.teams.length === 2) return buildCupScrambleGroups();
-    if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
+    if (!game || !canRandomize || !(await allowSetupChange({ type: "randomize_groups" }))) return;
     const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     if (!teamFormat) return;
     const missing = players.filter((p) => !p.no_show && !hasCourseHandicap(p, game.course_par)).map((p) => p.display_name);
@@ -3299,7 +3300,7 @@ function GameRoom({
   const refTee = () => GU.refTee(players);
   const blankCard = () => GU.blankCard(game);
   const addGuestToGame = async (name: string, idx: number, sponsor: string) => {
-    if (!game || !name.trim() || Number.isNaN(idx) || !allowSetupChange({ type: "add_player", guest: true })) return;
+    if (!game || !name.trim() || Number.isNaN(idx) || !(await allowSetupChange({ type: "add_player", guest: true }))) return;
     const t = refTee();
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
@@ -3314,7 +3315,7 @@ function GameRoom({
     await load();
   };
   const addMemberToGame = async (m: { id: string; display_name: string; handicap_index: number | null }) => {
-    if (!game || !allowSetupChange({ type: "add_player" })) return;
+    if (!game || !(await allowSetupChange({ type: "add_player" }))) return;
     const t = refTee();
     const ch = (m.handicap_index != null && t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(m.handicap_index, t.slope, t.rating, game.course_par) : null;
@@ -3338,7 +3339,7 @@ function GameRoom({
   const setManualHandicap = async (p: Player, value: number | null) => {
     if (!game) return;
     const holes = game.holes_meta?.length === 9 ? 9 : 18;
-    if (!allowSetupChange({ type: "set_manual_handicap", playerName: p.display_name, value, holes })) return;
+    if (!(await allowSetupChange({ type: "set_manual_handicap", playerName: p.display_name, value, holes }))) return;
     // 212.75 (owner, Oct 30, game 947286): clearing an override puts the DERIVED figure back in the row (lib/manual-handicap)
     const patch = manualHandicapPatch(p, game.course_par, value, user?.id ?? null);
     const { error: manErr } = await supabase.from("game_players").update(patch).eq("id", p.id);
@@ -3347,10 +3348,10 @@ function GameRoom({
   };
 
   const setPlayerTee = async (p: Player, teeName: string) => {
-    if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
+    if (!game || !(await allowSetupChange({ type: "set_tee", player: p, teeName }))) return;
     const tee = gameTeeOptions(courseTees, players, game.course_par).find((t) => t.name === teeName);
     if (!tee) {
-      alert("This tee is no longer available. Select another tee, or reload the app to refresh course data.");
+      notifyError("This tee is no longer available. Select another tee, or reload the app to refresh course data.");
       return;
     }
     const ch =
@@ -3402,14 +3403,14 @@ function GameRoom({
   const toggleNoShow = async (p: Player) => {
     if (!game) return;
     const next = !p.no_show;
-    if (!allowSetupChange({ type: "toggle_no_show", player: p, next })) return;
+    if (!(await allowSetupChange({ type: "toggle_no_show", player: p, next }))) return;
     const { error: nsErr } = await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
     saved(nsErr, next ? `mark ${p.display_name} out` : `return ${p.display_name} to play`);
     await load();
   };
 
   const removePlayer = async (p: Player) => {
-    if (!game || p.user_id === game.created_by || !allowSetupChange({ type: "remove_player", player: p })) return;
+    if (!game || p.user_id === game.created_by || !(await allowSetupChange({ type: "remove_player", player: p }))) return;
     const removedKey = pkey(p);
     const updates: Partial<Game> = {};
     const nextPairings = (game.pairings || []).filter((pr) => pr.a !== removedKey && pr.b !== removedKey);
@@ -3442,7 +3443,7 @@ function GameRoom({
 
   // Organizer: rename the game.
   const renameGame = async (newName: string) => {
-    if (!game || !newName.trim() || !allowSetupChange({ type: "rename_game" })) return;
+    if (!game || !newName.trim() || !(await allowSetupChange({ type: "rename_game" }))) return;
     const { error: nameErr } = await supabase
       .from("games")
       .update({ name: newName.trim() })
@@ -3454,15 +3455,15 @@ function GameRoom({
   // Organizer corrects a whole game's date; all players' rounds move together (server RPC).
   const changeGameCourse = async (course: Course) => {
     if (!game || !course?.name || !Array.isArray(course.holes) || !course.holes.length) return;
-    if (!allowSetupChange({ type: "change_course" })) return;
+    if (!(await allowSetupChange({ type: "change_course" }))) return;
     const par = course.holes.reduce((sum, h) => sum + Number(h.par || 0), 0);
     const holesMeta = course.holes.map((h) => ({ n: h.n, par: h.par, si: h.si ?? null }));
-    const ok = confirm(`Change this game's course to "${courseLabel(course)}"?\n\nPlayer tee selections will be cleared because tees, ratings and slopes belong to the previous course. No scores have been entered, so no played golf will be changed.`);
+    const ok = (await askConfirm(`Change this game's course to "${courseLabel(course)}"?\n\nPlayer tee selections will be cleared because tees, ratings and slopes belong to the previous course. No scores have been entered, so no played golf will be changed.`));
     if (!ok) return;
     const { error } = await supabase.rpc("change_game_course_before_scoring", {
       p_game: game.id, p_course: course.name, p_course_par: par, p_holes_meta: holesMeta,
     });
-    if (error) { alert(failureMessage("Couldn't change the course", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the course", error)); return; }
     clearAllGameScores(game.id); clearMemBackups();
     setCourseTees(Array.isArray(course.tees) ? course.tees : []);
     // 208.5: an automatic "Format / Course / Date" name follows the new course (a typed name is kept).
@@ -3472,14 +3473,14 @@ function GameRoom({
   };
 
   const setGameDate = async (newDate: string) => {
-    if (!game || !newDate || !allowSetupChange({ type: "set_game_date" })) return;
+    if (!game || !newDate || !(await allowSetupChange({ type: "set_game_date" }))) return;
     const today = todayLocalStr();
     if (newDate < today) {
       const days = Math.round((+new Date(today + "T00:00:00") - +new Date(newDate + "T00:00:00")) / 86400000);
-      if (!confirm(`This game is dated ${newDate} — ${days} day${days === 1 ? "" : "s"} in the past. Move all players' rounds to that date?`)) return;
+      if (!(await askConfirm(`This game is dated ${newDate} — ${days} day${days === 1 ? "" : "s"} in the past. Move all players' rounds to that date?`))) return;
     }
     const { error } = await supabase.rpc("set_game_played_date", { p_game: game.id, p_date: newDate });
-    if (error) { alert(failureMessage("Couldn't change the date", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the date", error)); return; }
     // 208.5: an automatic "Format / Course / Date" name follows the new date (a typed name is kept).
     const nextName = GC.refreshedAutoName(game as any, { date: newDate });
     if (nextName) { const { error: renErr } = await supabase.from("games").update({ name: nextName }).eq("id", game.id); saved(renErr, "update the game's name to the new date"); }
@@ -3491,7 +3492,7 @@ function GameRoom({
   const setAllowance = async (pct: number) => {
     if (!game) return;
     const v = Math.max(0, Math.min(100, Math.round(pct)));
-    if ((game.allowance_pct ?? 100) === v || !allowSetupChange({ type: "set_allowance", pct: v })) return;
+    if ((game.allowance_pct ?? 100) === v || !(await allowSetupChange({ type: "set_allowance", pct: v }))) return;
     const { error: allowErr } = await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
     saved(allowErr, "change the handicap allowance", `Handicap allowance set to ${v}%.`);
     await load();
@@ -3503,7 +3504,7 @@ function GameRoom({
   // common-practice number but the organizer can override after.
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game?.alt_shot_scoring_started_at;
   const setFormat = async (next: GameType) => {
-    if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
+    if (!game || next === game.game_type || !(await allowSetupChange({ type: "set_format", target: next }))) return;
     const patch = buildFormatPatch(game, next);
     // 212.23: an automatic name follows the format (the line-up / live links, recap and emails read the name)
     const nextName = GC.refreshedAutoName(game as any, { gameType: next });
@@ -3513,12 +3514,12 @@ function GameRoom({
     // formats that don't use a given structure simply ignore it (see the
     // game_type guards in StrokesSummary and the setup tab steps).
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't change the format", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the format", error)); return; }
     await load();
   };
 
   const setMatchLength = async (next: MatchLength) => {
-    if (!game || courseHoles.length < 18 || !allowSetupChange({ type: "set_match_length", length: next })) return;
+    if (!game || courseHoles.length < 18 || !(await allowSetupChange({ type: "set_match_length", length: next }))) return;
     const current = matchLengthFromHoles(courseHoles, game.holes_meta);
     if (current === next) return;
     const nextHoles = holesForLength(courseHoles, next).map((h) => ({ n: h.n, par: h.par, si: h.si ?? null }));
@@ -3526,73 +3527,73 @@ function GameRoom({
       p_game: game.id,
       p_holes_meta: nextHoles,
     });
-    if (error) { alert(failureMessage("Couldn't change the number of holes", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the number of holes", error)); return; }
     clearAllGameScores(game.id); clearMemBackups();
     await load();
   };
 
   const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
-    if (!game || (game.team_score_mode ?? "best_ball") === mode || !allowSetupChange({ type: "set_team_score_mode", mode })) return;
+    if (!game || (game.team_score_mode ?? "best_ball") === mode || !(await allowSetupChange({ type: "set_team_score_mode", mode }))) return;
     const { error } = await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't change the team scoring", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the team scoring", error)); return; }
     await load();
   };
 
   const setLegConfig = async (cfg: LegConfig) => {
-    if (!game || !allowSetupChange({ type: "set_leg_config" })) return;
+    if (!game || !(await allowSetupChange({ type: "set_leg_config" }))) return;
     const { error } = await supabase.from("games").update({ leg_config: cfg }).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't save the leg settings", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't save the leg settings", error)); return; }
     await load();
   };
   const updateSkinsMode = async (mode: "carryover" | "split") => {
-    if (!game || (game.skins_mode ?? "carryover") === mode || !allowSetupChange({ type: "set_skins_mode", mode })) return;
+    if (!game || (game.skins_mode ?? "carryover") === mode || !(await allowSetupChange({ type: "set_skins_mode", mode }))) return;
     const { error } = await supabase.from("games").update({ skins_mode: mode }).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't change the tie handling", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the tie handling", error)); return; }
     await load();
   };
   // Convert a skins game between individual / 1:1 team / 2v2 best-ball mid-round.
   // Scores are never touched — only the team structure changes, and the skins
   // recompute. Team styles leave the side assignment to the Matchups step.
   const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
-    if (!game || (shapeOf(game).skinsStyle ?? "individual") === style || !allowSetupChange({ type: "set_skins_style", style })) return;
+    if (!game || (shapeOf(game).skinsStyle ?? "individual") === style || !(await allowSetupChange({ type: "set_skins_style", style }))) return;
     const { patch, flippedSplit } = buildSkinsStylePatch(
       game,
       players.filter((p) => !p.no_show).length,
       style,
     );
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't change the skins style", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the skins style", error)); return; }
     await load();
-    if (flippedSplit) alert("Halved (split) skins is best for up to 4 players — with a bigger field, individual skins is set to carry over instead.");
+    if (flippedSplit) notifyError("Halved (split) skins is best for up to 4 players — with a bigger field, individual skins is set to carry over instead.");
   };
   // Singles match <-> team match (e.g. 4 v 4). Only flips the team structure;
   // pairings are assigned in Matchups. Scores untouched.
   const setMatchTeam = async (on: boolean) => {
-    if (!game || shapeOf(game).usesTeams === on || !allowSetupChange({ type: "set_match_team", on })) return;
+    if (!game || shapeOf(game).usesTeams === on || !(await allowSetupChange({ type: "set_match_team", on }))) return;
     const patch = buildMatchTeamPatch(game, on);
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert(failureMessage("Couldn't change the match type", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't change the match type", error)); return; }
     await load();
   };
 
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     // Drain offline holes before ending, so every player's recorded round is complete.
     await drainOutbox();
     const left = countPending();
-    if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
+    if (left > 0) { recomputePending(); notifyError(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
     // 212.11: a scramble's team scores use the same offline store as alternate shot's side scores
     const altDrafts = game.game_type === "alt_shot" || game.game_type === "scramble" ? loadAltShotDrafts(game.id).length : 0;
-    if (altDrafts > 0) { alert(`${altDrafts} ${game.game_type === "scramble" ? "team" : "Alternate Shot"} score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before ending the game.`); return; }
+    if (altDrafts > 0) { notifyError(`${altDrafts} ${game.game_type === "scramble" ? "team" : "Alternate Shot"} score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before ending the game.`); return; }
     const conflicts = altShotConflictHoles();
-    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
+    if (conflicts.length) { notifyError(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
     // One database transaction: end the game, post every player's round, and freeze running clocks.
     // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
     const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
-    if (finErr) { alert(failureMessage("Couldn't end the game", finErr)); return; }
+    if (finErr) { notifyError(failureMessage("Couldn't end the game", finErr)); return; }
     // 207.2: announce the result (built on the server from the shared results functions). Best effort:
     // the game is ended either way; a failed announcement can be retried by ending again.
     try { await fetch(`/api/games/${game.id}/completed`, { method: "POST" }); } catch { /* announcement only */ }
@@ -3629,12 +3630,12 @@ function GameRoom({
     return gaps;
   };
   const requestEndGame = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) return;
     setFinishPrompt({ kind: "game", gaps: computeFinishGaps(players) });
   };
   const requestFinishGroup = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game || myRow?.tee_group == null) return;
     const scope = players.filter((pl) => pl.tee_group === myRow.tee_group);
     setFinishPrompt({ kind: "group", teeGroup: myRow.tee_group ?? undefined, gaps: computeFinishGaps(scope) });
@@ -3653,7 +3654,7 @@ function GameRoom({
   // (revoke it). Goes through an organizer-gated SECURITY DEFINER function so the
   // games table itself stays private.
   const setShare = async (on: boolean) => {
-    if (!game || !allowSetupChange({ type: "share_live" })) return;
+    if (!game || !(await allowSetupChange({ type: "share_live" }))) return;
     const { data, error } = await supabase.rpc("set_game_share", { p_game: game.id, p_on: on });
     if (error) return;
     // The slug (0177) is minted server-side with the token; read it back so the line-up link control
@@ -3670,13 +3671,13 @@ function GameRoom({
   // touch any rounds already posted to players' history (if the game was ended
   // and scores recorded, remove those from each player's Rounds tab separately).
   const resetScores = async () => {
-    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
+    if (!isPrimaryScoringDevice()) { notifyError("Make this device primary to manage scoring."); return; }
     if (!game) return;
     // Suppress the background flush BEFORE confirm() — in a standalone PWA the
     // confirm dialog can fire visibilitychange/blur, which would otherwise flush
     // the old scores right back over the reset.
     resettingRef.current = true;
-    const ok = confirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`);
+    const ok = (await askConfirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`));
     if (!ok) { resettingRef.current = false; return; }
     await scoreWriterRef.current?.idle();
     scoreRevisionRef.current++;
@@ -3706,7 +3707,7 @@ function GameRoom({
       clearAllAltShotDrafts(game.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
     } catch (e) {
-      alert("Couldn't reset the game — make sure you're the organizer. If this keeps happening, the reset_game_scores database function may not be installed yet.");
+      notifyError("Couldn't reset the game — make sure you're the organizer. If this keeps happening, the reset_game_scores database function may not be installed yet.");
     } finally {
       resettingRef.current = false;
       // Failed resets retain the card and local drafts; confirmed resets reload the new version.
@@ -3728,12 +3729,12 @@ function GameRoom({
       : sameDay
       ? `Delete "${game.name}"? It was created today, so any scorecards already posted to players' Rounds tabs will ALSO be deleted. This can't be undone.`
       : `Delete "${game.name}"? It's removed for everyone, but each player's posted round stays in their own Rounds history. This can't be undone.`;
-    if (!confirm(msg)) return;
+    if (!(await askConfirm(msg))) return;
     const result = competitionLink
       ? await supabase.rpc("delete_competition_session_game", { p_game: game.id })
       : await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
     if (result.error) {
-      alert(`Could not delete the game: ${result.error.message}`);
+      notifyError(`Could not delete the game: ${result.error.message}`);
       return;
     }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${competitionLink ? " from its Ryder Cup session" : sameDay ? " (and its posted rounds)" : ""}` });
@@ -3760,21 +3761,21 @@ function GameRoom({
   const adminLog = async (summary: string) =>
     logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "admin_game_repair", group_id: (game as any)?.group_id || null, summary });
   const adminEndGame = async () => {
-    if (!game || !confirm(`Force-end "${game.name}" as system admin?`)) return;
+    if (!game || !(await askConfirm(`Force-end "${game.name}" as system admin?`))) return;
     const { error } = await supabase.rpc("admin_end_game", { p_game: game.id });
-    if (error) { alert(failureMessage("Couldn't end that", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't end that", error)); return; }
     await adminLog(`System admin force-ended game "${game.name}"`); await load();
   };
   const adminReopenGame = async () => {
-    if (!game || !confirm(`Reopen "${game.name}" as system admin?`)) return;
+    if (!game || !(await askConfirm(`Reopen "${game.name}" as system admin?`))) return;
     const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
-    if (error) { alert(failureMessage("Couldn't reopen", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't reopen", error)); return; }
     await adminLog(`System admin reopened game "${game.name}"`); await load();
   };
   const adminResetGame = async () => {
-    if (!game || !confirm(`Reset ALL scores in "${game.name}" as system admin? This can't be undone.`)) return;
+    if (!game || !(await askConfirm(`Reset ALL scores in "${game.name}" as system admin? This can't be undone.`))) return;
     const { error } = await supabase.rpc("admin_reset_game", { p_game: game.id });
-    if (error) { alert(failureMessage("Couldn't reset", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't reset", error)); return; }
     await adminLog(`System admin reset scores in game "${game.name}"`); await load();
   };
   const adminDeleteGame = async () => {
@@ -3782,17 +3783,17 @@ function GameRoom({
     const roundRule = game.game_type === "alt_shot"
       ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores."
       : "Rounds already posted to players' history will be kept.";
-    if (!confirm(`Delete "${game.name}" as system admin? ${roundRule} This can't be undone.`)) return;
+    if (!(await askConfirm(`Delete "${game.name}" as system admin? ${roundRule} This can't be undone.`))) return;
     const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
-    if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't delete that", error)); return; }
     onBack();
   };
   const adminReassignOrganizer = async () => {
     if (!game || !reassignTo) return;
     const who = players.find((p) => p.user_id === reassignTo);
-    if (!confirm(`As system admin, make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
+    if (!(await askConfirm(`As system admin, make ${who?.display_name || "this player"} the organizer of "${game.name}"?`))) return;
     const { error } = await supabase.rpc("admin_reassign_organizer", { p_game: game.id, p_user: reassignTo });
-    if (error) { alert(failureMessage("Couldn't reassign that", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't reassign that", error)); return; }
     await adminLog(`System admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
     setReassignTo(""); await load();
   };
@@ -4080,7 +4081,7 @@ function GameRoom({
             The players' posted rounds still show the old scores. Re-post them so everyone's rounds and stats match the corrected card.
           </div>
           <button onClick={async () => {
-            if (!confirm("Re-post every player's round for this game from the corrected scores?")) return;
+            if (!(await askConfirm("Re-post every player's round for this game from the corrected scores?"))) return;
             const { error } = await supabase.rpc("repost_game_rounds", { p_game: game.id });
             saved(error, "re-post the rounds", "Rounds re-posted from the corrected scores.");
             await load();
@@ -4402,7 +4403,7 @@ function GameRoom({
                 <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>You're keeping score for {matchesLabel(viewGroup)}</div>
                 <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>The group's players can still enter their own stats. Hand it back when you're done — anyone in the group can then keep score.</div>
                 <button disabled={!primary || offline} onClick={async () => {
-                  if (!confirm(`Hand back scoring for ${matchesLabel(viewGroup!)}? Its players will be told they can keep score again.`)) return;
+                  if (!(await askConfirm(`Hand back scoring for ${matchesLabel(viewGroup!)}? Its players will be told they can keep score again.`))) return;
                   const { error } = await supabase.rpc("organizer_release_group_scoring", { p_game: game.id, p_group: viewGroup });
                   saved(error, `hand back ${matchesLabel(viewGroup!)}'s scoring`, `${matchesLabel(viewGroup!)} can choose a new scorer.`);
                   await load();
@@ -4411,7 +4412,7 @@ function GameRoom({
             ) : (myRow?.tee_group !== viewGroup || !iAmViewedMarker) ? (
               <button data-organizer-take-over disabled={!primary || offline} onClick={async () => {
                 const who = viewedMarkerPlayer?.display_name;
-                if (!confirm(`Take over scoring for ${matchesLabel(viewGroup!)}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`)) return;
+                if (!(await askConfirm(`Take over scoring for ${matchesLabel(viewGroup!)}?${who ? ` ${who} is keeping score now — they'll be told, no permission needed.` : ""}`))) return;
                 const { error } = await supabase.rpc("organizer_take_group_scoring", { p_game: game.id, p_group: viewGroup });
                 saved(error, `take over ${matchesLabel(viewGroup!)}'s scoring`, `You're keeping score for ${matchesLabel(viewGroup!)}.`);
                 await load();

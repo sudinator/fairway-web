@@ -7,6 +7,7 @@ import { PlayersTab } from "@/components/manage";
 import { GroupsPanel } from "@/components/groups";
 import { ClubEngagement } from "@/components/club-engagement";
 import { ClubLatestReport } from "@/components/club-latest-report";
+import { SeasonStandings } from "@/components/season-standings";
 import { ClubPendingSignups } from "@/components/club-pending-signups";
 import { useNowTick } from "@/lib/use-now-tick";
 import { Eyebrow } from "@/components/ui";
@@ -42,6 +43,7 @@ function ClubHubContent({ user, groups, activeGroupId, onGroupsChanged, onActive
       {([["members", "Members"], ["settings", "Club settings"]] as const).map(([id, text]) => <button key={id} type="button" role="tab" aria-selected={pane === id} onClick={() => setPane(id)} style={{ background: "none", border: "none", borderBottom: `2px solid ${pane === id ? C.gold : "transparent"}`, color: pane === id ? C.gold : C.sage, padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>{text}</button>)}
     </div>
     <div hidden={pane !== "members"} style={{ display: pane === "members" ? "block" : "none" }}>
+      <SeasonStandings key={`standings:${active.id}`} groupId={active.id} userId={user.id} />   {/* the season's order of merit (Nov 2026) */}
       <ClubLatestReport key={`report:${active.id}`} groupId={active.id} showEmpty />
       <PlayersTab user={user} activeGroupId={active.id} isGroupAdmin={admin} onChanged={onGroupsChanged} directoryTools onSummary={receiveSummary} summaryNow={now} />
     </div>

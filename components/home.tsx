@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm, ConfirmHost } from "@/components/confirm";
 import { useScoreCorrectionNavigation } from "@/components/score-correction-navigation";
 import { parseScoreCorrection } from "@/lib/score-correction-links";
 import { parseAppLink } from "@/lib/app-links";
@@ -16,7 +17,7 @@ import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_
 import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { write } from "@/lib/db-write";
-import { Toaster, notifyInfo } from "@/components/toast";
+import { Toaster, notifyInfo, notifyError } from "@/components/toast";
 import { loadDraft, clearDraft, sameDraftRound, personalRoundFingerprint, personalDraftIsPending, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
@@ -628,9 +629,7 @@ export function Home({ session }: { session: any }) {
     // (those live on the game, not the round). Make that explicit so nobody
     // panics that they've broken the money.
     if (r?.game_id && typeof window !== "undefined") {
-      const ok = window.confirm(
-        "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money. Delete it from your history?",
-      );
+      const ok = await askConfirm({ title: "Delete it from your history?", message: "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money.", confirmLabel: "Delete", danger: true });
       if (!ok) return;
     }
     // Soft-delete every round (not just game-linked ones). A hard DELETE that RLS
@@ -638,8 +637,8 @@ export function Home({ session }: { session: any }) {
     // deleted_at reliably removes the round from all stats/handicap. It also survives
     // any re-post (recordMyGameRound finds the hidden row and updates it in place).
     const { data: deleted, error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
-    if (error) { alert(failureMessage("Couldn't delete that round", error)); return; }
-    if (!deleted?.some((row: { id: string }) => row.id === id)) { alert("That round was not deleted. Your local scores are still saved. Reload and try again."); return; }
+    if (error) { notifyError(failureMessage("Couldn't delete that round", error)); return; }
+    if (!deleted?.some((row: { id: string }) => row.id === id)) { notifyError("That round was not deleted. Your local scores are still saved. Reload and try again."); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
     clearRecoveredDraft(id, draftAtStart);
     await loadRounds();
@@ -653,8 +652,8 @@ export function Home({ session }: { session: any }) {
     const { data: completed, error } = await supabase.from("rounds")
       .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString(), finished_by: user.id, finished_at: new Date().toISOString() })
       .eq("id", r.id).select("id");
-    if (error) { alert(failureMessage("Couldn't mark that round complete", error)); return; }
-    if (!completed?.some((row: { id: string }) => row.id === r.id)) { alert("That round was not completed. Your local scores are still saved. Reload and try again."); return; }
+    if (error) { notifyError(failureMessage("Couldn't mark that round complete", error)); return; }
+    if (!completed?.some((row: { id: string }) => row.id === r.id)) { notifyError("That round was not completed. Your local scores are still saved. Reload and try again."); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
     clearRecoveredDraft(r.id, draftAtStart);
     await loadRounds();
@@ -665,12 +664,10 @@ export function Home({ session }: { session: any }) {
   // clutter. Soft-delete (deleted_at) so it's recoverable server-side if ever needed.
   const discardAllInProgress = async () => {
     const draftAtStart = loadDraft()?.round ?? null;
-    if (typeof window !== "undefined" && !window.confirm(
-      `Discard ${inProgressCount > 1 ? `all ${inProgressCount} unfinished rounds` : "this unfinished round"}? They were never completed, so this doesn't touch your stats or handicap.`
-    )) return;
+    if (!(await askConfirm({ title: `Discard ${inProgressCount > 1 ? `all ${inProgressCount} unfinished rounds` : "this unfinished round"}?`, message: "They were never completed, so this doesn’t touch your stats or handicap.", confirmLabel: "Discard", danger: true }))) return;
     const { data: discarded, error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() })
       .eq("user_id", user.id).eq("status", "in_progress").is("deleted_at", null).select("id");
-    if (error) { alert(failureMessage("Couldn't discard that", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't discard that", error)); return; }
     const local = loadDraft()?.round;
     if (local?.id && discarded?.some((r: { id: string }) => r.id === local.id)) clearRecoveredDraft(local.id, draftAtStart);
     refreshDraft();
@@ -700,14 +697,14 @@ export function Home({ session }: { session: any }) {
   // only the support row (never a real membership).
   const enterSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
-    if (error) { alert(failureMessage("Couldn't enter the Club", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't enter the Club", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered Club "${g.name}" (support session)` });
     await loadGroups(g.group_id);
     setStage(null); setViewing(null); setMoreOpen(false); setTab("dashboard");
   };
   const exitSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_exit_group", { p_group: g.group_id });
-    if (error) { alert(failureMessage("Couldn't exit the Club", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't exit the Club", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_exited_group", group_id: g.group_id, summary: `Master admin exited group "${g.name}" (support session)` });
     await loadGroups();
   };
@@ -842,6 +839,7 @@ export function Home({ session }: { session: any }) {
   return (
     <div data-diag="shell" className="app-shell">
       <Toaster />
+      <ConfirmHost />
       <ViewportDiag />
       {testMode && (
         <div aria-hidden="true" style={{ position: "fixed", top: "env(safe-area-inset-top, 0px)", left: 0, right: 0, bottom: 0, border: "3px solid #DC2626", pointerEvents: "none", zIndex: 9999 }}>
@@ -872,7 +870,7 @@ export function Home({ session }: { session: any }) {
         <NotificationBell user={user} onNavigate={navigateFromNotif} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
         {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.62 }} disabled={!activeGroup} onClick={() => {
           if (dbInProgress) {
-            if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
+            if (typeof window !== "undefined") notifyInfo(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
             setStage(null); setViewing(null); setTab("dashboard");
             return;
           }
@@ -884,7 +882,7 @@ export function Home({ session }: { session: any }) {
         <RoundRecovery draft={draftRound} server={dbInProgress} count={inProgressCount}
           onResume={resumePersonalRound}
           onComplete={completeRecoveredRound}
-          onDelete={(r) => { if (window.confirm(`Delete this unfinished round at ${r.course || "this course"}, including any scores saved on this device?`)) void deleteRound(r.id); }}
+          onDelete={async (r) => { if (await askConfirm({ title: "Delete this unfinished round?", message: `At ${r.course || "this course"}, including any scores saved on this device.`, confirmLabel: "Delete", danger: true })) void deleteRound(r.id); }}
           onDiscardAll={discardAllInProgress} />
       )}
 

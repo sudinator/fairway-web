@@ -14,6 +14,16 @@
 - Summary filter on the display rules; line-up title's doubled date; a description for the live link — 212.110.
 
 **Open (still needed):**
+- DONE 212.126: **Games list: richer rows** — format, players, date; once FINAL your place or match result and your own line (gross, points, differential, net birdies); team result for shared-ball formats; no money.
+- [ ] **Node 22 → 26** (owner, Nov 17: "we should migrate to Node 26"; revisit early December). Node 26 is the Active LTS (from 2026-10-28, security support to 2029-04-30); Node 24 is already in maintenance (EOL 2028-04-30); Node 22 security support ends 2027-04-30. First step in December: confirm Vercel supports Node 26 (fall back to 24 only if not). One coordinated release: .nvmrc / package.json engines, the GitHub workflows, the Vercel project's Node setting; with it ESLint 10, jsdom 31, web-push 4.
+- [ ] **Stale-index nudge** (owner, Nov 17): flag when the profile index is unchanged for 4 weeks AND the member has completed 2+ 18-hole rounds in the app since it last changed. Games: no member prompt — the organizer's line-up shows the flag (organizers manage game handicaps). Single rounds: round setup ASKS first (Update / Not now; "Not now" holds until another round is played). An admin's edit counts as an update; existing members start at the migration date.
+- DONE 212.123: **Presentation B** (owner, Nov 17): one segmented control with SQUARE buttons (owner prefers them to rounded pills; the dashboard's Last 5/20/Season/All is the model) for every view/sort choice incl. the standings sort; the Personal bests card onto data rows (keep the hero figure); money section titles to Eyebrow. Add money and profile to the gallery first for before/after.
+- DONE 212.123: **Presentation C**: a type scale (seven steps) and a realistic spacing scale (~8 values) with guards; a list-idiom guard.
+- DONE 212.124: **Presentation D** — all 129 remaining native pop-ups replaced (D1 member/organizer, D2 admin); the guard now bans them.
+- DONE 212.122: **Presentation A**: the confirm sheet and the member-facing migrations (42 sites) with the ratchet guard.
+- DONE 212.116 / 212.117: **Season standings** — two tabs (Club games, Rounds), one sortable table each, top 5 with Show all, the Profile switch for sharing rounds (on by default); the quarterly report carries a snapshot from the games engine.
+- [ ] **Stale handicap index nudge** (owner, Nov 17): a database timestamp set whenever profiles.handicap_index changes (an admin's edit counts the same as the player's); a prompt on opening a game you're in when the index is older than N weeks; a "last updated" column on the organizer's line-up.
+- Parked: scorecard attestation after the game (non-blocking "Looks right / Query a hole" from the round email or a push; queries go to the organizer) — revisit for the Cup. Recurring guests → member invite: later.
 - DROPPED (owner, Nov 15): smarter pairing suggestions — "this only makes sense once we have enough data in the system". Revisit when a season's worth of games exists.
 - DONE 212.114: standouts heading names its basis (option 1).
 - Season Wrapped — DONE (components/season-wrapped.tsx; dashboard and Rounds entries). Only the unapproved follow-up idea of a public per-golfer share link is unbuilt; the mid-December dry run is an event, not code.

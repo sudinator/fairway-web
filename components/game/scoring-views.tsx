@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 import { shortNamer } from "@/lib/short-names";
 import { sortByName } from "@/lib/names";
 import { foursomeTeeGroupUpdates } from "@/lib/structure-ops";
@@ -456,7 +457,7 @@ export function MatchSetupBuilder({ game, players, teams, blocked, blockedReason
 
       <button onClick={buildBalanced} disabled={blocked || busy} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 13, opacity: blocked || busy ? .58 : 1 }}>{busy ? "Saving…" : "🎲 Build balanced matches"}</button>
       {onStartOver && readyCount > 0 ? (
-        <button data-matchups-start-over disabled={blocked || busy} onClick={() => { if (confirm("Clear every matchup and start over?")) void onStartOver(); }}
+        <button data-matchups-start-over disabled={blocked || busy} onClick={async () => { if (await askConfirm({ title: "Start the matchups over?", message: "This clears every matchup.", confirmLabel: "Clear matchups", danger: true })) void onStartOver(); }}
           style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>Start over</button>
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: C.sage, fontSize: 11, marginTop: 12 }}><b style={{ color: C.cream }}>{readyCount} of {desiredRows} matches ready</b><span>{activePlayers.length} players</span></div>
@@ -518,15 +519,15 @@ export function MatchView({
   const setupPolicy = (action: SetupAction) => decideSetupChange({ game, players, action });
   const matchupDecision = setupPolicy({ type: "set_pairings" });
   const matchupsBlocked = matchupDecision.decision === "block";
-  const allowSetupMutation = (action: SetupAction) => {
+  const allowSetupMutation = async (action: SetupAction): Promise<boolean> => {
     const decision = setupPolicy(action);
-    if (decision.decision === "block") { alert(decision.reason); return false; }
-    if (decision.decision === "confirm") return confirm(`${decision.title}\n\n${decision.message}`);
+    if (decision.decision === "block") { notifyError(decision.reason); return false; }
+    if (decision.decision === "confirm") return askConfirm({ title: decision.title, message: decision.message });
     return true;
   };
 
   const addPairing = async () => {
-    if (!allowSetupMutation({ type: "set_pairings" })) return;
+    if (!(await allowSetupMutation({ type: "set_pairings" }))) return;
     if (!aSel || !bSel || aSel === bSel) return;
     const pairings = nextPairingAdd(game.pairings, aSel, bSel);
     if (pairings === game.pairings) return; // invalid or exact match already exists
@@ -538,7 +539,7 @@ export function MatchView({
     onChanged();
   };
   const removePairing = async (idx: number) => {
-    if (!allowSetupMutation({ type: "set_pairings" })) return;
+    if (!(await allowSetupMutation({ type: "set_pairings" }))) return;
     const pairings = nextPairingRemove(game.pairings, idx);
     await supabase.from("games").update({ pairings }).eq("id", game.id);
     onChanged();
@@ -560,7 +561,7 @@ export function MatchView({
       blocked={!isCreator || matchupsBlocked}
       blockedReason={matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
       onSave={async (pairings) => {
-        if (!allowSetupMutation({ type: "set_pairings" })) return;
+        if (!(await allowSetupMutation({ type: "set_pairings" }))) return;
         const { error } = await supabase.from("games").update({ pairings }).eq("id", game.id);
         if (error) { notifyError("Couldn't save those matchups — please try again."); return; }
         onChanged();
@@ -569,7 +570,7 @@ export function MatchView({
   }
 
   const assignTeam = async (p: Player, key: string | null) => {
-    if (!allowSetupMutation({ type: "set_team", player: p, team: key })) return;
+    if (!(await allowSetupMutation({ type: "set_team", player: p, team: key }))) return;
     await supabase.from("game_players").update({ team: key }).eq("id", p.id);
     onChanged();
   };
@@ -1073,10 +1074,10 @@ export function FourballView({
   const setupPolicy = (action: SetupAction) => decideSetupChange({ game, players, action });
   const foursomeDecision = setupPolicy({ type: "set_foursomes" });
   const foursomesBlocked = foursomeDecision.decision === "block";
-  const allowFoursomeMutation = () => {
+  const allowFoursomeMutation = async (): Promise<boolean> => {
     const decision = setupPolicy({ type: "set_foursomes" });
-    if (decision.decision === "block") { alert(decision.reason); return false; }
-    if (decision.decision === "confirm") return confirm(`${decision.title}\n\n${decision.message}`);
+    if (decision.decision === "block") { notifyError(decision.reason); return false; }
+    if (decision.decision === "confirm") return askConfirm({ title: decision.title, message: decision.message });
     return true;
   };
 
@@ -1118,10 +1119,10 @@ export function FourballView({
   };
 
   const saveFoursomes = async (next: typeof foursomes) => {
-    if (!allowFoursomeMutation()) return;
+    if (!(await allowFoursomeMutation())) return;
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) {
-      alert(`Couldn't save the foursomes: ${error.message}`);
+      notifyError(`Couldn't save the foursomes: ${error.message}`);
       return;
     }
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
@@ -1136,8 +1137,8 @@ export function FourballView({
     const next = nextFoursomeAdd(foursomes, Math.random().toString(36).slice(2, 8));
     saveFoursomes(next);
   };
-  const removeFoursome = (id: string) => {
-    if (!confirm("Remove this foursome?")) return;
+  const removeFoursome = async (id: string) => {
+    if (!(await askConfirm({ title: "Remove this foursome?", confirmLabel: "Remove", danger: true }))) return;
     saveFoursomes(nextFoursomeRemove(foursomes, id));
   };
   const renameFoursome = (id: string, name: string) => {

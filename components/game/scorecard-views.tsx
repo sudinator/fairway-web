@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 import { scrambleResults } from "@/lib/scramble-game";
 import { holeSkip } from "@/lib/hole-skip";
 import { sortByName, byName } from "@/lib/names";
@@ -573,7 +574,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
             <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
             <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>{groupLabel} · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
-            {canClaim && onClaimGroup && <button onClick={() => { if (confirm(`Take over scoring for ${groupLabel} from ${markerName}?`)) onClaimGroup(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>}
+            {canClaim && onClaimGroup && <button onClick={async () => { if ((await askConfirm(`Take over scoring for ${groupLabel} from ${markerName}?`))) onClaimGroup(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>}
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
@@ -593,7 +594,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
           <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
           <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>Live · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
-          <button onClick={() => { if (confirm(`Take over scoring from ${markerName}?`)) onTakeOver(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>
+          <button onClick={async () => { if ((await askConfirm(`Take over scoring from ${markerName}?`))) onTakeOver(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>

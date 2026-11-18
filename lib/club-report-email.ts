@@ -25,6 +25,7 @@ export function clubReportEmail(r: ClubReport, o: { appUrl: string; unsubscribeU
     r.closestRivalry ? L(`Closest rivalry: <b>${esc(r.closestRivalry.a)} v ${esc(r.closestRivalry.b)}</b> — ${r.closestRivalry.aWins}–${r.closestRivalry.bWins}${r.closestRivalry.halved ? `, ${r.closestRivalry.halved} halved` : ""}${basis.rivalry(r) ? ` <span style="color:#5d6f66">· ${esc(basis.rivalry(r))}</span>` : ""}`) : "",
     rivalryWaiting(r) ? L(`<span style="color:#5d6f66">${esc(rivalryWaiting(r))}</span>`) : "",
     r.longestStreak ? L(`Longest streak: <b>${esc(r.longestStreak.name)}</b> — ${r.longestStreak.weeks} weeks in a row`) : "",
+    r.standings?.length ? L(`Standings this period (wins): ${r.standings.map((x, i) => `${i + 1}. <b>${esc(x.name)}</b> ${x.wins}`).join(" · ")} — the full table is on the Club tab`) : "",
   ].join("");
   const subject = `${r.club} — your club report for ${r.period.label}`;
   const html = `<!doctype html><html><body style="margin:0;background:#e9ede9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2b24">

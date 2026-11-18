@@ -28,9 +28,16 @@ import { RecapBody } from "@/components/game/recap-body";
 import { mockups as recapMockups, formatMockups as recapFormatMockups } from "@/lib/recap-mockups";
 import { CupRosterRow } from "@/components/competitions";
 import { pbSampleRounds } from "@/lib/pb-mockups";
+import { SeasonStandings } from "@/components/season-standings";
+import { seasonStandings as computeStandings } from "@/lib/season-standings";
+import { realGames, realPlayersByGame } from "@/lib/standings-real-2026";
+import { game as sfGame, players as sfPlayers, formatGames as fmtGames } from "@/lib/recap-mockups";
 import { PersonalBestsCard } from "@/components/personal-bests-card";
 import { ScrambleLineupCard } from "@/components/game/scramble-lineup";
-import { TeamRoundsList } from "@/components/rounds-list";
+import { TeamRoundsList, RoundsList } from "@/components/rounds-list";
+import { ConfirmSheet, TextSheet, questionFrom } from "@/components/confirm";
+import { GameRow } from "@/components/game/game-list";
+import { gameRowSummary } from "@/lib/game-list-summary";
 import { SeasonCardView } from "@/components/season-story";
 import { buildRecap } from "@/lib/game-recap";
 import { teamRoundEmail } from "@/lib/team-round-email";
@@ -198,6 +205,32 @@ const seasonRounds = Array.from({ length: 16 }, (_, k) => mkRound(`r${k}`, `2026
 add("15-insights-card", <InsightsCard rounds={seasonRounds} />);
 add("16-insights-card-new", <InsightsCard rounds={seasonRounds.slice(0, 3)} />);
 add("17-insights-screen", <InsightsScreen ins={computeInsights(seasonRounds)} onClose={noop} />);
+add("78-confirm-sheet", <ConfirmSheet ask={{ title: "Delete it from your history?", message: "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money.", confirmLabel: "Delete", danger: true }} onDone={() => {}} />);
+add("79-confirm-manage-game", <ConfirmSheet ask={questionFrom('Reset "Sunday Stableford"? This clears every player\'s scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept.')} onDone={() => {}} />);
+add("80-text-admin-suspend", <TextSheet ask={{ ...questionFrom("Suspend Sam Lee? They can't sign in until restored; their history stays.\n\nReason (shown in Admin):"), placeholder: "Reason" }} onDone={() => {}} />);
+{
+  // 212.126/127: the Games list — an auto-named Stableford (title says format/course/date), a custom-named trifecta,
+  // match play, skins, an open game. Sample games; the viewer is the first member in each.
+  const crs = sfGame.course || "Oak Hollow";
+  const sg = { ...sfGame, id: "gl1", name: `Stableford / ${crs} / Nov 15, 2026`, code: "481207", status: "ended", played_at: "2026-11-15" } as any;
+  const tfG = { ...fmtGames["trifecta"].game, id: "gl2", name: "Saturday Game", code: "552190", status: "ended", played_at: "2026-11-08" } as any;
+  const mpG = { ...fmtGames["match"].game, id: "gl3", name: "Match Play Nov 1", code: "330871", status: "ended", played_at: "2026-11-01" } as any;
+  const skG = { ...fmtGames["skins"].game, id: "gl4", name: "Wednesday Skins", code: "774402", status: "ended", played_at: "2026-10-29" } as any;
+  const open = { ...sfGame, id: "gl5", name: "Thanksgiving Scramble", code: "903114", status: "active", game_type: "scramble" } as any;
+  const first = (ps: any[]) => ps.find((p) => p.user_id).user_id as string;
+  const holes = Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, stroke_index: i + 1, strokes: i % 6 === 0 ? 3 : i % 3 === 0 ? 5 : 4, putts: 2 }));
+  const myRound = { id: "r1", course: crs, course_par: 72, course_handicap: 12, rating: 71.4, slope: 129, holes, played_at: "2026-11-15" } as any;
+  const rows = [
+    { g: sg, s: gameRowSummary(sg, sfPlayers as any, first(sfPlayers as any), myRound, null) },
+    { g: tfG, s: gameRowSummary(tfG, fmtGames["trifecta"].players as any, first(fmtGames["trifecta"].players as any), null, null) },
+    { g: mpG, s: gameRowSummary(mpG, fmtGames["match"].players as any, first(fmtGames["match"].players as any), null, null) },
+    { g: skG, s: gameRowSummary(skG, fmtGames["skins"].players as any, first(fmtGames["skins"].players as any), null, null) },
+    { g: open, s: gameRowSummary(open, sfPlayers as any, first(sfPlayers as any), null, null) },
+  ];
+add("81-games-list-before", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} onOpen={() => {}} legacy />)}</div>);
+  add("81-games-list-after", <div>{rows.map((r) => <GameRow key={r.g.id} g={r.g} summary={r.s} onOpen={() => {}} />)}</div>);
+}
+add("13-rounds-list", <RoundsList rounds={pbSampleRounds.slice(0, 4)} onOpen={() => {}} />);   // the Rounds tab list (212.121)
 add("18-your-courses", <YourCourses rounds={seasonRounds} loadField={async () => null} />);
 const oakRec = yourCourses(seasonRounds).find((c) => c.key === "oak hollow")!;
 add("19-course-detail", <div style={{ background: "#1B5A46", borderRadius: 12, paddingTop: 12 }}><CourseDetail c={oakRec} loadField={async () => null}
@@ -225,6 +258,11 @@ for (const [name, node] of Object.entries(recapMockups())) add(name, node);
 for (const [name, node] of Object.entries(recapFormatMockups())) add(name, node);
 // personal bests — the dashboard card (variant C, chosen Oct 30), the real component
 add("53-pb-card-real", <PersonalBestsCard rounds={pbSampleRounds} onOpen={() => {}} now={new Date("2026-10-30T12:00:00Z")} />);
+// season standings mock-ups (owner, Nov 17)
+add("60-season-standings", (() => { const g = (id: string, b: any) => ({ ...b, id, status: "ended" }); const season = [...[1, 2, 3, 4, 5].map((i) => g(`s${i}`, sfGame)), g("fb", fmtGames["fourball"].game), g("tf", fmtGames["trifecta"].game)];
+  const pb = Object.fromEntries(season.map((x: any) => [x.id, x.game_type === "fourball" || x.game_type === "trifecta" ? fmtGames[x.game_type].players : sfPlayers]));
+  return <SeasonStandings groupId="club" userId="u4" preloaded={{ games: { rows: computeStandings(season as never, pb as never), games: 7 } }} />; })());
+add("62-season-standings-real", <SeasonStandings groupId="club" userId="66cccf4b-bc8e-4895-a4ca-a33e61d2a79b" preloaded={{ games: { rows: computeStandings(realGames, realPlayersByGame), games: 10 } }} />);   // the club's real 2026
 // 212.72 — the Ryder Cup roster selection, long team names: must never be wider than the phone (the overflow guard)
 add("42-cup-roster-long-names", <div style={{ display: "grid", gap: 8 }}>
   {[["Christopher Alexander Reed", 12.4], ["Amit Sud", 14.7], ["Michael Van Der Meer", 27.1]].map(([n, hi], i) => (

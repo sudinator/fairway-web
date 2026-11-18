@@ -1250,3 +1250,29 @@ export function Wordmark({ width = 280 }: { width?: number }) {
     </svg>
   );
 }
+
+
+/**
+ * Segmented — the ONE control for choosing a view or a sort (212.123, owner, Nov 17: "i think i like square buttons
+ * better than rounded pills"). Square buttons, modelled on the dashboard's Last 5 / Last 20 / Season / All: radius 6,
+ * 12px, the chosen one gold with green 700 text, the rest greenLight with sage text. equal: options share the row
+ * (few options); otherwise they wrap at their natural width (many options, e.g. the standings sort).
+ */
+export function Segmented<K extends string>({ options, value, onChange, ariaLabel, equal = false, attr, onCard = false }: {
+  options: { key: K; label: React.ReactNode }[]; value: K; onChange: (k: K) => void; ariaLabel: string; equal?: boolean; attr?: string;
+  /** true when the control sits ON a card (greenLight) — the unchosen buttons then take the darker greenMid so they still read as buttons */
+  onCard?: boolean;
+}) {
+  return (
+    <div role="tablist" aria-label={ariaLabel} data-segmented style={{ display: "flex", gap: 6, flexWrap: equal ? "nowrap" : "wrap" }}>
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <button key={o.key} type="button" role="tab" aria-selected={on} {...(attr ? { [attr]: o.key } : {})} onClick={() => onChange(o.key)}
+            style={{ flex: equal ? 1 : "none", textAlign: "center", fontSize: 12, borderRadius: 6, padding: "8px 12px", border: "none", cursor: "pointer", fontFamily: "inherit",
+              background: on ? C.gold : onCard ? C.greenMid : C.greenLight, color: on ? C.green : C.sage, fontWeight: on ? 700 : 500 }}>{o.label}</button>
+        );
+      })}
+    </div>
+  );
+}

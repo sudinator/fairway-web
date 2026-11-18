@@ -22,8 +22,8 @@ async function fixture({local=round('a',6),server=round('a',5),pending=true,fail
  function Host(){
  const [draftRound,setDraftRound]=useState(local),[dbInProgress,setDbInProgress]=useState(server),[stage,setStage]=useState(null);
  const refreshDraft=()=>setDraftRound(draft.loadDraft()?.round||null),loadRounds=async()=>setDbInProgress(db);
- const create=Function('React','RoundRecovery','draftRound','dbInProgress','inProgressCount','supabase','rounds','user','displayName','logActivity','clearDraft','refreshDraft','loadRounds','loadDraft','sameDraftRound','personalRoundFingerprint','personalDraftIsPending','notifyInfo','failureMessage','alert','setStage','setViewing','setTab',js+'return Panel;');
- const Panel=create(React,RoundRecovery,draftRound,dbInProgress,count,supabase,[],{id:'owner'},'Owner',async()=>{},draft.clearDraft,refreshDraft,loadRounds,draft.loadDraft,draft.sameDraftRound,draft.personalRoundFingerprint,draft.personalDraftIsPending,m=>notes.push(m),(_,e)=>e.message,m=>alerts.push(m),v=>{stageValue=v;setStage(v)},()=>{},()=>{});
+ const create=Function('React','RoundRecovery','draftRound','dbInProgress','inProgressCount','supabase','rounds','user','displayName','logActivity','clearDraft','refreshDraft','loadRounds','loadDraft','sameDraftRound','personalRoundFingerprint','personalDraftIsPending','notifyInfo','failureMessage','alert','notifyError','askConfirm','setStage','setViewing','setTab',js+'return Panel;');
+ const Panel=create(React,RoundRecovery,draftRound,dbInProgress,count,supabase,[],{id:'owner'},'Owner',async()=>{},draft.clearDraft,refreshDraft,loadRounds,draft.loadDraft,draft.sameDraftRound,draft.personalRoundFingerprint,draft.personalDraftIsPending,m=>notes.push(m),(_,e)=>e.message,m=>alerts.push(m),m=>alerts.push(m),async()=>confirm,v=>{stageValue=v;setStage(v)},()=>{},()=>{});
  back=()=>setStage(null);return stage?React.createElement('div',{'data-editor':true},stage.round.holes[0].strokes):React.createElement(Panel);
  }
  await act(async()=>renderer.render(React.createElement(Host)));

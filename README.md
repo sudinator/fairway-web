@@ -1,3 +1,62 @@
+## 212.129.261117 — Rounds list: the score and points in a results column
+
+Owner (Nov 18): "the better way would be to show the score 90 +19 on the right and then the stableford points below it, so we have more room for the round description on the left".
+
+## 212.128.261117 — Games list: a dedicated results column, and every format's final result checked
+
+Owner (Nov 18): "much cleaner and neater if the results are shown for complete games on the right with a dedicated margin"; "have you gone through all game formats to come up with the desired final result?" — not systematically before this release; now done (matrix below).
+
+## 212.127.261117 — Games list cleanup: no repeats, match margins, a readable trifecta record, a code and result on every game
+
+Owner (Nov 18), on 212.126: titles that already say the format, course and date shouldn't repeat them; trifecta "W-L-H and the result underneath … what did I win and what did I lose?"; "a final game with no game code or result — why not?"; "Won 3&2 or Lost 2up instead of Won / Lost".
+
+## 212.126.261117 — Games list: a richer row for every game
+
+Owner (Nov 18): "under Games — right now we just list the game name and the club played — we should add some more description like how many players, once the game is FINAL, the person score and stableford points, differential, perhaps some summary stats".
+
+## 212.125.261117 — CI fix: the confirm-sheet fallback calls the global dialog functions
+
+GitHub's application lane failed on 212.124 in ci/test-personal-round-editor.cjs: "Not implemented: window.confirm", then the save didn't happen.
+**Cause.** When no sheet host is mounted, askConfirm / askText (and the toast) fall back to the native dialog. 212.122/124 wrote that as window.confirm / window.prompt / window.alert. The round-editor test runs in jsdom, which does not implement window.confirm, and supplies its answer through the global confirm — which the old code (a bare confirm()) used. In a real browser the two are the same function, so members were not affected; the fallback now calls the global (globalThis.confirm / prompt / alert), identical in the browser.
+**Also fixed:** ci/check_match_length_management_182_0.py quoted the un-awaited setup guard; updated to the awaited form (the gate is unchanged).
+**Why it slipped:** the release checks run locally were the suite, the guards and the chart/diagnostics lanes — not the application lane (npm run ci:app). Every lane in .github/workflows/ci.yml is now part of the pre-release run (database aside, which needs Postgres and runs only on GitHub). ci:app passes in full here except the known environment-only redirect test.
+
+## 212.124.261117 — Presentation D1 + D2: no native pop-ups left anywhere in the app
+
+Owner (Nov 17): "do both D1 and D2 show me before and after".
+
+## 212.123.261117 — Presentation B and C: one square control for choosing a view, the Personal bests and Money fixes, and the type, spacing and list scales
+
+Owner (Nov 17): "i think i like square buttons better than rounded pills"; "keep going on B … do this and C together".
+
+## 212.122.261117 — Presentation A: the app's own confirm sheet replaces the browser's pop-ups (member-facing screens)
+
+Owner (Nov 17): "how the app looks and presents is super high on the priority list" — start with A.
+
+## 212.121.261117 — Lists across the app: two idioms, written down and applied
+
+Owner (Nov 17): "do it now, consistency is important and ultimately what users see — show me what you find, before and after mockups."
+
+## 212.120.261117 — One standard for data rows: the Club tab's tables brought into line
+
+Owner (Nov 17): "this is basic display stuff … there needs to be consistency. Look at the font for the members table below as well. Audit it now and fix it."
+
+## 212.119.261117 — Season standings on the Club tab's idiom (the font and size mismatch)
+
+Owner (Nov 17, two staging screenshots): the standings card next to the club stats table — "completely lost the consistency".
+
+## 212.118.261117 — CI fix: the 0237 assertion test's fixture
+
+GitHub's database lane failed on 212.117 in ci/assert-club-round-standings.sql: the test inserted club memberships without group_members.email, which is NOT NULL. The migration (0237) applied cleanly and the function ran; only the test fixture was wrong. Fixed to insert the email, as ci/assert-club-isolation.sql does. No app change; migration 0237 is unchanged (apply it once, as for 212.117).
+
+## 212.117.261117 — Season standings: the Rounds tab, the Profile switch, and the refinements from the real data
+
+Owner (Nov 17–18): "2 tabs — one for games and one for individual rounds"; aggregates and ranking only, no hole-by-hole; the switch in Profile, on by default; top 5 with the rest behind Show all; unranked figures shown; top-3s only with five or more finishers.
+
+## 212.116.261117 — Season standings: the club's order of merit, one table sortable nine ways
+
+Owner (Nov 17): a season leaderboard, variant A after mock-ups ("there are so many ways to slice the club data"); only data that exists in the app ("this app might not be the primary app used by all club members") — nothing index- or personal-round-based.
+
 ## 212.115.261116 — @supabase/ssr 0.5.2 → 0.12.7 (the auth-cookie library), on its own
 
 Owner (Nov 17): "make sure the current version of supabase and vercel (both free versions) support the upgrade and then proceed". Confirmed from the package: 0.12.7 needs only supabase-js ≥ 2.114 (we run 2.119) and cookie 1.x (Node ≥ 18; we run 22). Vercel's free plan runs Node 22; Supabase's free plan is the hosted auth service every version of the library talks to over the same API. Nothing blocks it.

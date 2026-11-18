@@ -1,5 +1,5 @@
 {
-  "total": 447399,
+  "total": 447476,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -29,6 +29,7 @@
     "compact team editor": 12,
     "competition": 16,
     "component render": 17,
+    "confirm sheet": 11,
     "contests": 26,
     "course handicap one source": 6,
     "course history": 6,
@@ -46,6 +47,7 @@
     "format picker": 25,
     "format rules": 34,
     "game comparison handicap": 90,
+    "game list summary": 28,
     "game type coverage": 102,
     "game-create": 64,
     "game-utils": 21,
@@ -95,6 +97,9 @@
     "scramble simulation": 1,
     "screen render": 67,
     "season entry": 6,
+    "season rounds": 10,
+    "season standings": 15,
+    "season standings screen": 13,
     "season wrapped": 12,
     "segment schemes": 8,
     "segments": 20,

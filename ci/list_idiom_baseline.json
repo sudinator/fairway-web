@@ -1,0 +1,19 @@
+{
+  "app/live/[token]/page.tsx": 1,
+  "app/live/cup/[token]/page.tsx": 1,
+  "components/club-hub.tsx": 1,
+  "components/competitions.tsx": 1,
+  "components/game/organizer-panel.tsx": 1,
+  "components/game/scorecard-views.tsx": 1,
+  "components/game/scoring-views.tsx": 7,
+  "components/game/segment-views.tsx": 1,
+  "components/game/setup/game-setup-workspace.tsx": 1,
+  "components/groups.tsx": 1,
+  "components/manage.tsx": 1,
+  "components/money.tsx": 5,
+  "components/organizer.tsx": 1,
+  "components/player-card.tsx": 1,
+  "components/season-share-card.tsx": 1,
+  "components/tee-times.tsx": 3,
+  "components/tournaments.tsx": 1
+}

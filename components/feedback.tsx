@@ -1,4 +1,5 @@
 "use client";
+import { askConfirm } from "@/components/confirm";
 import { fetchAll } from "@/lib/fetch-all";
 import React, { useState, useEffect, useCallback } from "react";
 import { failureMessage } from "@/lib/errors";
@@ -156,7 +157,7 @@ export function AdminFeedbackTab() {
     await supabase.from("feedback").update({ status }).eq("id", id);
   };
   const remove = async (id: string) => {
-    if (!confirm("Delete this feedback item?")) return;
+    if (!(await askConfirm("Delete this feedback item?"))) return;
     setRows((rs) => rs.filter((r) => r.id !== id));
     const supabase = createClient();
     await supabase.from("feedback").delete().eq("id", id);

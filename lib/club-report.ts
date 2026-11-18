@@ -12,6 +12,7 @@ import { clubIndividualHandicap } from "./club-net-scoring";
 import { pkey } from "@/lib/game-shape";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { buildHighlights } from "@/lib/game-highlights";
+import { seasonStandings, rankBy } from "@/lib/season-standings";
 import { matchOutcomes } from "@/lib/match-outcomes";
 import { isValidRound, isFull18 as isFull18Card, isFullCard, handicapReading, countsForIndividualStats, holeScore } from "@/lib/round-rules";
 
@@ -36,6 +37,9 @@ export type ClubReport = {
   /** 210.6 (owner): valid rounds that stopped early — counted as rounds, never toward best scores or standouts. */
   shortenedRounds: number;
   longestStreak: (Who & { weeks: number }) | null;
+  /** Nov 2026 (owner): the period's standings snapshot from the ONE standings engine (lib/season-standings) — top five by
+   *  wins with their record, so the report and the live table never disagree. Only players with 5+ games in the period. */
+  standings?: { name: string; wins: number; games: number; avgPts: number | null; matchRecord: string }[];
 };
 
 /** The two report periods (owner): January–June (sent July 1) and July–September (sent October 1). */
@@ -184,6 +188,8 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
     closestRivalry: rivalry ? { a: rivalry.a, b: rivalry.b, aWins: rivalry.aWins, bWins: rivalry.bWins, halved: rivalry.halved, matches: rivalry.played } : null,
     waiting: { rivalry: !rivalry && pairs.length > 0, improved: !improved && improvers.length > 0, toughest: !toughest && courseGaps.size > 0 },
     longestStreak: streak,
+    standings: rankBy(seasonStandings(input.map((x) => x.game), Object.fromEntries(input.map((x) => [x.game.id, x.players]))), "wins")
+      .filter((x) => x.place != null).slice(0, 5).map(({ row }) => ({ name: row.name, wins: row.wins, games: row.games, avgPts: row.avgPts, matchRecord: `${row.matchW}–${row.matchL}–${row.matchH}` })),
   };
 }
 

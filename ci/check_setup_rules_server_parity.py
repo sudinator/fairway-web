@@ -39,7 +39,7 @@ for needle, what in [('if (isLateScoreRefusal(error)) { endedRejectedRef.current
                      ('endedRejectedRef.current && "game ended"', "the queue holds while the game is ended"),
                      ('window.addEventListener("bnn-game-ended-rejected", endedNotice);', "the player is told once"),
                      ('lateScoreHold({ refused: endedRejectedRef.current, status: game.status }).resume', "reopening the game resumes sending"),
-                     ('alert(lateScoreNotice(holes));', "the message comes from lib/late-scores")]:
+                     ('notifyError(lateScoreNotice(holes));', "the message comes from lib/late-scores")]:   # 212.124: the app's toast, not alert()
     if needle not in t: bad.append(f"late scores: {what} (components/tournaments.tsx)")
 if t.count('if (isLateScoreRefusal(error))') < 3: bad.append("late scores: player scores AND both team-score routes (scramble, alternate shot) must handle the refusal")
 # 212.52 (owner, Oct 26: "Organizer + system admins only (match the app)") — WHO: the app shows Manage Game to the game's
@@ -52,7 +52,7 @@ if "BNN_ALLOWED" not in (R / "ci/assert-game-permissions.sql").read_text(encodin
 for needle, what in [('const correctingScores = gameEnded && game?.created_by === user.id && correcting;', "only the organizer, only after the end, can switch on correcting"),
                      ('if (correctingRef.current) return false;   // 212.54', "while correcting, the organizer may save any row"),
                      ('groupLocked={correctingScores ? false : (viewedGroupLocked || gameEnded)}', "the Group Card unlocks only while correcting"),
-                     ('if (!confirm("Re-post every player\'s round for this game from the corrected scores?")) return;', "the re-post asks the organizer to confirm"),
+                     ('if (!(await askConfirm("Re-post every player\'s round for this game from the corrected scores?"))) return;', "the re-post asks the organizer to confirm"),
                      ('supabase.rpc("repost_game_rounds", { p_game: game.id })', "the re-post goes through repost_game_rounds")]:
     if needle not in t: bad.append(f"organizer corrections: {what} (components/tournaments.tsx)")
 # 212.55 (owner, Oct 27): the organizer takes over any group's scoring, and hands it back (0226)

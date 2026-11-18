@@ -1,4 +1,6 @@
 "use client";
+import { notifyError, notifyInfo } from "@/components/toast";
+import { askConfirm, askText } from "@/components/confirm";
 import { useAnalyticsRpc, AnalyticsReadStatus } from "@/components/analytics-read";
 
 import { PhoneDiagnosticsPanel } from "@/components/phone-diagnostics";
@@ -33,10 +35,10 @@ import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
-import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet, Segmented } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
-import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
+import { PlayerCard, PeerCardModal, CardVisibilityToggle, ShareRoundsToggle } from "@/components/player-card";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
@@ -132,7 +134,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
     setEmailBusy(true);
     const { error } = await supabase.from("profiles").update({ club_report_emails: next }).eq("id", user.id);
     setEmailBusy(false);
-    if (error) { alert(`Couldn't save: ${error.message}`); return; }
+    if (error) { notifyError(`Couldn't save: ${error.message}`); return; }
     setClubEmails(next);
   };
   const toggleRoundEmails = async () => {
@@ -140,7 +142,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
     setEmailBusy(true);
     const { error } = await supabase.from("profiles").update({ round_emails: next }).eq("id", user.id);
     setEmailBusy(false);
-    if (error) { alert(`Couldn't save: ${error.message}`); return; }
+    if (error) { notifyError(`Couldn't save: ${error.message}`); return; }
     setRoundEmails(next);
   };
   const [gate, setGate] = useState<ReturnType<typeof pushGate> | null>(null);
@@ -509,6 +511,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
     <div style={{ maxWidth: 560 }}>
       <PlayerCard profile={profile} user={user} rounds={rounds} />
       <CardVisibilityToggle user={user} initial={profile?.show_card !== false} />
+      <ShareRoundsToggle user={user} initial={profile?.share_rounds_with_club !== false} />
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.borderGreen}` }}>
@@ -633,9 +636,9 @@ function StatDrawerHost() {
              const tc = u.tag ? tagColor(u.tag) : null;
              return (
                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
-                 <Avatar src={u.avatar_url} name={u.name || "?"} size={34} />
+                 <Avatar src={u.avatar_url} name={u.name || "?"} size={28} />
                  <div style={{ minWidth: 0 }}>
-                   <div style={{ fontSize: 14, fontWeight: 500, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
+                   <div style={{ fontSize: 13, fontWeight: 700, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
                  {tc ? <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
@@ -1010,14 +1013,14 @@ export function OpsMetrics() {
 
   const delStale = async (g: any) => {
     if (g.rounds_posted > 0 || delId) return;
-    if (!confirm(`Delete "${g.name}"? This removes the game and its ${g.players} player row${g.players === 1 ? "" : "s"} app-wide. It can't be undone.`)) return;
+    if (!(await askConfirm(`Delete "${g.name}"? This removes the game and its ${g.players} player row${g.players === 1 ? "" : "s"} app-wide. It can't be undone.`))) return;
     setDelId(g.game_id);
     const { data } = await supabase.rpc("admin_delete_stale_game", { p_game: g.game_id });
     setDelId(null);
     if (data === "deleted") setSg((prev) => (prev || []).filter((x) => x.game_id !== g.game_id));
-    else if (data === "has_rounds") alert("Skipped — this game has posted rounds, so it wasn't deleted (avoids orphaning player rounds).");
-    else if (data === "not_stale") alert("Skipped — this game is already completed.");
-    else alert("Couldn't delete (permission or already gone).");
+    else if (data === "has_rounds") notifyError("Skipped — this game has posted rounds, so it wasn't deleted (avoids orphaning player rounds).");
+    else if (data === "not_stale") notifyError("Skipped — this game is already completed.");
+    else notifyError("Couldn't delete (permission or already gone).");
   };
 
   const ctr = (c: number, s: number) => (s ? `${Math.round((100 * c) / s)}% click-through` : "no impressions yet");
@@ -1259,10 +1262,10 @@ function RoundSaveDiag() {
   const toggleRepro = () => { const v = !repro; setReproduceBug(v); setRepro(v); };
   const copyAll = async () => {
     const text = getDiagLog().map((e) => `${new Date(e.t).toISOString()} [${e.sid}] ${e.ev}${e.d ? " " + JSON.stringify(e.d) : ""}`).join("\n");
-    try { await navigator.clipboard.writeText(text); alert(`Copied ${getDiagLog().length} events to clipboard.`); }
-    catch { alert("Couldn't access the clipboard — select the text below and copy manually."); }
+    try { await navigator.clipboard.writeText(text); notifyInfo(`Copied ${getDiagLog().length} events to clipboard.`); }
+    catch { notifyError("Couldn't access the clipboard — select the text below and copy manually."); }
   };
-  const clear = () => { if (confirm("Clear the diagnostics log?")) { clearDiagLog(); refresh(); } };
+  const clear = async () => { if ((await askConfirm("Clear the diagnostics log?"))) { clearDiagLog(); refresh(); } };
 
   const insertCount = getDiagLog().filter((e) => e.ev === "ensure" && /insert/.test(e.d?.outcome || "")).length;
   const evColor = (e: any) => {
@@ -1381,7 +1384,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
     setOpen((o) => ({ ...o, [r.course_id]: { diff: cf?.has_changes && (cf?.diff as any)?.hasChanges ? (cf.diff as FreshnessDiff) : null, log: (log || []) as CheckLogRow[], revision: (cf as any)?.revision ?? null } }));
   };
   const apply = async (r: AdminCourseRow) => {
-    if (!confirm(`Update "${r.course_name}" with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections; updating replaces the whole stored record with the provider's version." : ""}`)) return;
+    if (!(await askConfirm(`Update "${r.course_name}" with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections; updating replaces the whole stored record with the provider's version." : ""}`))) return;
     setBusy(r.course_id);
     const revision = (open[r.course_id] as any)?.revision;
     if (revision == null) { setBusy(null); say(r.course_id, "Open the details and review the changes before applying."); return; }
@@ -1394,7 +1397,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
     // 207.1: keep current data for the revision on screen, with an optional reason (0187).
     const rev = (open[r.course_id] as any)?.revision ?? r.freshness_revision;
     if (rev == null) { setBusy(null); say(r.course_id, "Open the details and review the changes first."); return; }
-    const reason = window.prompt("Keep the current data. Reason (optional) — e.g. \"provider's slope is wrong\":", "") ;
+    const reason = (await askText("Keep the current data. Reason (optional) — e.g. \"provider's slope is wrong\":", "")) ;
     if (reason === null) { setBusy(null); return; }
     const { error } = await supabase.rpc("dismiss_course_freshness", { p_course_id: r.course_id, p_revision: rev, p_reason: reason || null });
     say(r.course_id, error ? `Couldn't dismiss: ${error.message}` : "Kept the stored data; you'll be told if the provider changes it again.");
@@ -1594,7 +1597,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   };
 
   const removeFromGroup = async (p: any, m: any, groupName: string) => {
-    if (!confirm(`Remove ${p.display_name || p.email} from "${groupName}"?`)) return;
+    if (!(await askConfirm(`Remove ${p.display_name || p.email} from "${groupName}"?`))) return;
     await supabase.from("group_members").update({ status: "removed" }).eq("id", m.id);
     await notify(p.id, `${await myLabel(user)} removed you from ${groupName}.`, null, m.group_id);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_removed", group_id: m.group_id, target_user_id: p.id, summary: `Removed ${p.display_name || p.email} from "${groupName}"` });
@@ -1603,7 +1606,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
   // Deactivate: remove from all groups + block access, but keep their data.
   const deactivatePlayer = async (p: any) => {
-    if (!confirm(`Deactivate ${p.display_name || p.email}?\n\nThey'll be removed from all clubs and blocked from using the app, but their rounds and history are kept. You can reactivate them later.`)) return;
+    if (!(await askConfirm(`Deactivate ${p.display_name || p.email}?\n\nThey'll be removed from all clubs and blocked from using the app, but their rounds and history are kept. You can reactivate them later.`))) return;
     await supabase.from("group_members").update({ status: "removed" }).eq("user_id", p.id);
     await supabase.from("profiles").update({ deactivated: true }).eq("id", p.id);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deactivated", target_user_id: p.id, summary: `Deactivated ${p.display_name || p.email}` });
@@ -1620,7 +1623,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   const toggleTestPlayer = async (p: any) => {
     const next = !p.is_test;
     const { error } = await supabase.rpc("admin_set_test", { p_user: p.id, p_is_test: next });
-    if (error) { alert(failureMessage("Couldn't update test mode", error)); return; }
+    if (error) { notifyError(failureMessage("Couldn't update test mode", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: next ? "player_test_on" : "player_test_off", target_user_id: p.id, summary: `${next ? "Marked" : "Unmarked"} ${p.display_name || p.email} as a test account` });
     await load();
   };
@@ -1722,10 +1725,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
-        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
+        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={32} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}
               {p.account_status && p.account_status !== "active" ? (
                 <span data-account-status={p.account_status} style={{ marginLeft: 8, background: p.account_status === "suspended" ? C.gold : p.account_status === "pending" || p.account_status === "new" ? C.greenMid : C.overRedDark,
                   color: p.account_status === "suspended" ? C.green : p.account_status === "pending" || p.account_status === "new" ? C.sage : C.cream, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>{p.account_status}</span>
@@ -2286,7 +2289,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged, direc
   // Group admin: remove a member from THIS group (does not delete their account or other groups).
   const removeFromGroup = async (row: any) => {
     if (!isGroupAdmin || row.user_id === user.id) return;
-    if (!confirm(`Remove ${row.profiles?.display_name || row.email} from this club?\n\nThis only affects this club — their account and other clubs are untouched.`)) return;
+    if (!(await askConfirm(`Remove ${row.profiles?.display_name || row.email} from this club?\n\nThis only affects this club — their account and other clubs are untouched.`))) return;
     setBusyId(row.id); setMsg(null);
     const { error } = await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
     if (error) { setMsg(failureMessage("Couldn't remove this member", error)); setBusyId(null); return; }
@@ -2327,7 +2330,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged, direc
                 title={row.user_id ? "View player card" : undefined}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 150, background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: row.user_id ? "pointer" : "default" }}
               >
-                <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
+                <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={32} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
                   <div style={{ color: C.sage, fontSize: 12 }}>
@@ -2694,11 +2697,6 @@ function AdminFrictionReview() {
   };
   const runNow = async () => { setSweeping(true); try { await supabase.rpc("sweep_friction", { p_force: true }); } catch { /* ignore */ } setSweeping(false); load(); };
   const cur = groups[tab];
-  const tabBtn = (k: "open" | "needs_action" | "resolved", label: string) => (
-    <button onClick={() => setTab(k)} style={{ flex: 1, border: "none", borderRadius: 999, padding: "7px 6px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", background: tab === k ? C.gold : C.greenLight, color: tab === k ? C.green : C.cream }}>
-      {label} <span style={{ fontFamily: "Georgia, serif", fontWeight: 800 }}>{groups[k].length}</span>
-    </button>
-  );
 
   return (
     <div>
@@ -2711,8 +2709,9 @@ function AdminFrictionReview() {
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 10, lineHeight: 1.5 }}>
         States the app shouldn’t be able to produce. Swept daily; a flag is a to-do, not a mark against a player. Cleared items stay cleared; fixed ones auto-resolve.
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-        {tabBtn("open", "Open")}{tabBtn("needs_action", "Needs action")}{tabBtn("resolved", "Resolved")}
+      <div style={{ marginBottom: 10 }}>
+        <Segmented ariaLabel="Friction status" onCard equal value={tab} onChange={setTab}
+          options={([["open", "Open"], ["needs_action", "Needs action"], ["resolved", "Resolved"]] as ["open" | "needs_action" | "resolved", string][]).map(([key, label]) => ({ key, label: <>{label} <b>{groups[key].length}</b></> }))} />
       </div>
       {items === null ? (
         <div style={{ color: C.faint, fontSize: 12, padding: "16px 4px" }}>Loading…</div>
@@ -2958,11 +2957,11 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
 
   const setStatus = async (g: any, next: "active" | "archived") => {
     const verb = next === "archived" ? "Archive" : "Restore";
-    if (!confirm(`${verb} the club "${g.name}"?${next === "archived" ? " It disappears from members' club pickers — nothing is deleted, and you can restore it." : ""}`)) return;
+    if (!(await askConfirm(`${verb} the club "${g.name}"?${next === "archived" ? " It disappears from members' club pickers — nothing is deleted, and you can restore it." : ""}`))) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_group_status", { p_group: g.group_id, p_status: next });
-      if (error) { alert(failureMessage("Couldn't update", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't update", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: next === "archived" ? "group_archived" : "group_restored", group_id: g.group_id, summary: `${next === "archived" ? "Archived" : "Restored"} group "${g.name}"` });
       await load();
     } finally { setBusy(null); }
@@ -2973,11 +2972,11 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     const msg = hasData
       ? `Delete "${g.name}"? This removes the club for everyone. Its ${g.games_count} game(s) will be deleted; ${g.rounds_count} posted round(s) stay in players' history but lose the club tag. This can't be undone.`
       : `Delete "${g.name}"? It has no rounds or games. This removes it for everyone and can't be undone.`;
-    if (!confirm(msg)) return;
+    if (!(await askConfirm(msg))) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_delete_group", { p_group: g.group_id });
-      if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't delete that", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_deleted", group_id: null, summary: `Deleted group "${g.name}" (admin)` });
       await load();
       if (onGroupsChanged) await onGroupsChanged();
@@ -2985,40 +2984,40 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   };
 
   const setDefault = async (g: any) => {
-    if (!confirm(`Make "${g.name}" the app's default club? New or stranded users (and their untagged rounds) will land here. This replaces any current default.`)) return;
+    if (!(await askConfirm(`Make "${g.name}" the app's default club? New or stranded users (and their untagged rounds) will land here. This replaces any current default.`))) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_default_group", { p_group: g.group_id });
-      if (error) { alert(failureMessage("Couldn't set default", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't set default", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_set_default", group_id: g.group_id, summary: `Set "${g.name}" as the default group` });
       await load();
     } finally { setBusy(null); }
   };
 
   const wipeGroup = async (g: any) => {
-    const typed = prompt(`Wipe ALL data in test club "${g.name}"? This deletes its games, rounds and money ledger but KEEPS the club and its members. Type the club name to confirm:`);
+    const typed = (await askText(`Wipe ALL data in test club "${g.name}"? This deletes its games, rounds and money ledger but KEEPS the club and its members. Type the club name to confirm:`));
     if (typed == null) return;
-    if (typed.trim() !== g.name) { alert("Name didn't match — nothing was wiped."); return; }
+    if (typed.trim() !== g.name) { notifyError("Name didn't match — nothing was wiped."); return; }
     setBusy(g.group_id);
     try {
       const { data, error } = await supabase.rpc("admin_wipe_group", { p_group: g.group_id });
-      if (error) { alert(failureMessage("Couldn't wipe", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't wipe", error)); return; }
       if (data === "wiped") {
         await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_wiped", group_id: g.group_id, summary: `Wiped test club "${g.name}" data` });
-        alert(`Wiped all data in "${g.name}".`);
+        notifyError(`Wiped all data in "${g.name}".`);
         await load();
         if (onGroupsChanged) await onGroupsChanged();
-      } else if (data === "not_test") alert("Refused — this isn't a test club.");
-      else alert("Couldn't wipe (permission or not found).");
+      } else if (data === "not_test") notifyError("Refused — this isn't a test club.");
+      else notifyError("Couldn't wipe (permission or not found).");
     } finally { setBusy(null); }
   };
 
   const revokeInvites = async (g: any) => {
-    if (!confirm(`Revoke all outstanding invite links for "${g.name}"? Existing members stay; only unused links stop working.`)) return;
+    if (!(await askConfirm(`Revoke all outstanding invite links for "${g.name}"? Existing members stay; only unused links stop working.`))) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_revoke_group_invites", { p_group: g.group_id });
-      if (error) { alert(failureMessage("Couldn't revoke", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't revoke", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_invites_revoked", group_id: g.group_id, summary: `Revoked invite links for "${g.name}"` });
     } finally { setBusy(null); }
   };
@@ -3026,11 +3025,11 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   const doMerge = async (src: any) => {
     const target = (rows || []).find((r) => r.group_id === mergeTo);
     if (!target) return;
-    if (!confirm(`Merge "${src.name}" INTO "${target.name}"? All of "${src.name}"'s members, rounds and games move into "${target.name}", then "${src.name}" is deleted. This can't be undone.`)) return;
+    if (!(await askConfirm(`Merge "${src.name}" INTO "${target.name}"? All of "${src.name}"'s members, rounds and games move into "${target.name}", then "${src.name}" is deleted. This can't be undone.`))) return;
     setBusy(src.group_id);
     try {
       const { error } = await supabase.rpc("admin_merge_group", { p_source: src.group_id, p_target: mergeTo });
-      if (error) { alert(failureMessage("Couldn't merge those", error)); return; }
+      if (error) { notifyError(failureMessage("Couldn't merge those", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_merged", group_id: mergeTo, summary: `Merged "${src.name}" into "${target.name}"` });
       setMergeSrc(null); setMergeTo("");
       await load();

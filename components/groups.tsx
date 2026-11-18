@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/components/confirm";
 import { ClubPendingSignups } from "@/components/club-pending-signups";
 import { ClubLatestReport } from "@/components/club-latest-report";
 import React, { useCallback, useEffect, useState } from "react";
@@ -177,7 +178,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this club. Remove them first.`);
       return;
     }
-    if (!confirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
+    if (!(await askConfirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`))) return;
     setBusy(true); setMsg(null);
     try {
       const { error } = await supabase.rpc("delete_group_safely", { p_group: active.id });
@@ -373,15 +374,15 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 <div key={m.id} style={{ background: C.greenMid, border: `1px solid ${C.borderGreen}`,
                   borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex",
                   alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
+                  <Avatar src={m.profiles?.avatar_url} name={name} size={28} />
                   <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ color: C.cream, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
-                    <div style={{ color: C.sage, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
+                    <div style={{ color: C.cream, fontSize: 13, fontWeight: self ? 800 : 700 }}>{name}{self ? " (you)" : ""}</div>
+                    <div style={{ color: C.sage, fontSize: 11 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
                     <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
-                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
+                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={async () => { if ((await askConfirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`))) updateMember(m, { status: "removed" }); }}>Remove</button>
                     </div>
                   )}
                 </div>
