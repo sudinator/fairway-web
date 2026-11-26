@@ -1,4 +1,4 @@
-import { diagnosticError, recordPhoneDiagnostic, resetPhoneDiagnostics } from "./phone-diagnostics";
+import { diagnosticError, recordPhoneDiagnostic } from "./phone-diagnostics";
 import { scoringStorage, tidyScoringStorage, noteStorageWriteFailure, registerStorageTidy } from "./scoring-device";
 // In-progress round draft, stored in the browser's localStorage.
 // localStorage writes are SYNCHRONOUS — they complete before the phone can lock
@@ -410,21 +410,9 @@ export function rowPendingHoles(
   return c;
 }
 
-// Clear ALL locally persisted app state (drafts, caches, resume markers) — called at sign-out so
-// nothing about the previous user's session lingers in browser storage on a shared device.
-// Sweeps by prefix so keys added later (bnn_edit_*, bnn_course_draft:*) are covered automatically.
-export function clearAllLocalState(): void {
-  resetPhoneDiagnostics();
-  try {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage;
-    const keys = Array.from({ length: raw.length }, (_, i) => raw.key(i)!);
-    for (const key of keys) if (key.startsWith("bnn_") || key.startsWith("bnn-") || key.startsWith("bnn:")) raw.removeItem(key);
-    const session = window.sessionStorage;
-    const sessionKeys = Array.from({ length: session.length }, (_, i) => session.key(i)!);
-    for (const key of sessionKeys) if (key.startsWith("bnn_primary_")) session.removeItem(key);
-  } catch {}
-}
+// clearAllLocalState (sign-out's sweep of every bnn_* key) was RETIRED in 212.130: it removed other identities' unsynced
+// scores and the recovery archive, before the sign-out was known to have succeeded. Sign out goes through lib/sign-out
+// (an awaited sign-out, then a cleanup scoped to that identity); ci/check_sign_out_contract.py keeps it there.
 
 // A confirmed backup is a display cache, not unsynced work. Only actual edits may
 // outrank a later server read on the same primary device.

@@ -15,6 +15,8 @@ function emit(msg: string, kind: "error" | "info") {
 }
 export function notifyError(msg: string) { emit(msg, "error"); }
 export function notifyInfo(msg: string) { emit(msg, "info"); }
+/** True while a <Toaster/> is mounted (Home). A notice that is only worth showing in the app, never as a native alert on a public page, checks this first. */
+export function toasterMounted() { return listeners.length > 0; }
 
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);

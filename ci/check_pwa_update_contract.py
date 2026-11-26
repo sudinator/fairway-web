@@ -9,6 +9,7 @@ checks = {
     'open documents are not claimed or reloaded': 'await self.clients.claim()' not in sw and 'location.reload(' not in flow and 'controllerchange' not in reg,
     'navigation checks network before offline cache': 'req.mode === "navigate"' in sw and 'fetch(req, { cache: "no-store" })' in sw,
     'fresh page survives a cache quota failure': 'cache quota cannot block a fresh page' in sw,
+    'fresh script/stylesheet survives a cache quota failure (212.130)': 'cache quota cannot block a fresh asset' in sw and 'await (await caches.open(CACHE)).put(req, fresh.clone())' not in sw,
     'API/auth/live/version traffic bypasses cache': all(x in sw for x in ['/api/', '/auth/', '/live/', '/lineup/', '/app-version.json']),
     'activation does not inspect scores or require other tabs': 'safeActivation' not in sw and 'bnn-update-check' not in sw,
     'update registration never reads score blockers': all(x not in flow + reg + manage for x in ['updatesBlocked(', 'updateBlockers(', 'reconcileUpdateGames(', 'applyAppUpdate(', '<SavedScoreReview']),

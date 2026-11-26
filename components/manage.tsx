@@ -43,7 +43,8 @@ import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
-import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit, clearAllLocalState } from "@/lib/draft";
+import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit } from "@/lib/draft";
+import { SignOutRow } from "@/components/sign-out-row";
 import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
@@ -584,9 +585,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <PushToggle user={user} profile={profile} />
 
-      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
-        <button style={{ ...btn(false), fontSize: 13 }} onClick={() => { clearAllLocalState(); supabase.auth.signOut(); }}>Sign out</button>
-      </div>
+      <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} />
     </div>
   );
 }

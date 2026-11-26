@@ -1,5 +1,5 @@
 {
-  "total": 447476,
+  "total": 447502,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -106,6 +106,7 @@
     "setup draft lifecycle": 10,
     "setup summary": 31,
     "share links form": 2,
+    "sign-out": 26,
     "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,

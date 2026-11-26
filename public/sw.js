@@ -1,7 +1,7 @@
 // Birdie Num Num: background download, explicit activation, fresh online navigation.
 // No clients.claim(): do not take over uncontrolled documents. Activation can
 // change a controlled page’s controller; the new app never reloads on that event.
-const SW_VERSION = "212.129.261117";
+const SW_VERSION = "212.130.261125";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 // Best-effort metadata only. Reporting must not change install/cache outcomes.
 function noteWorkerFailure(phase, status = 0, errorName = "Error") {
@@ -89,7 +89,10 @@ self.addEventListener("fetch", event => {
     const saved = await caches.match(req);
     if (saved) return saved;
     const fresh = await fetch(req);
-    if (fresh.ok && fresh.type === "basic") await (await caches.open(CACHE)).put(req, fresh.clone());
+    // 212.130: the copy is saved in the background, as the navigation path above does. Awaiting cache.put here meant a
+    // full phone (QuotaExceededError) rejected a script or stylesheet the server had just delivered, and an ONLINE
+    // restart failed to load. The offline shell is cacheShell's job (install and every navigation), not this line's.
+    if (fresh.ok && fresh.type === "basic") { const copy = fresh.clone(); event.waitUntil(caches.open(CACHE).then(cache => cache.put(req, copy)).catch(error => { noteWorkerFailure("cache", 0, error?.name); /* cache quota cannot block a fresh asset */ })); }
     return fresh;
   })());
 });

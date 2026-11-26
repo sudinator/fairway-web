@@ -5,6 +5,7 @@ import { C } from '@/lib/golf';
 import { btn, inputStyle } from '@/components/ui';
 import { buildPhoneDiagnosticReport, diagnosticError, installPhoneDiagnostics, phoneDiagnosticRevision, phoneDiagnosticStatus, recordPhoneDiagnostic, serverPhoneDiagnosticRevision, subscribePhoneDiagnostics, workerSnapshot } from '@/lib/phone-diagnostics';
 import { scoringDeviceState, storageWriteFailed, subscribeScoringDevice } from '@/lib/scoring-device';
+import { notifyInfo, toasterMounted } from '@/components/toast';
 import { APP_VERSION } from '@/lib/app-version';
 import { automaticUpdateState, serverAutomaticUpdateState, subscribeAutomaticUpdates, checkAutomaticVersion, updateOutcomeMessage } from '@/lib/automatic-updates';
 
@@ -18,7 +19,17 @@ export function PhoneDiagnosticsRecorder() {
       if (!failed && storageWriteFailed()) { failed = true; recordPhoneDiagnostic('storage.failed'); }
     };
     observe(); const unsubscribe = subscribeScoringDevice(observe);
-    return () => { unsubscribe(); stop(); };
+    // 212.130: a full phone — the worker could not keep a copy of a file it had just delivered (public/sw.js reports it as
+    // a 'cache' failure). Said once per session, in the app only (never a native alert on a public page); the app keeps
+    // working online, and the diagnostics log records the event either way.
+    let storageFullTold = false;
+    const storageFull = (e: MessageEvent) => {
+      if (e.data?.kind !== 'bnn-diagnostic-event' || e.data.phase !== 'cache' || e.data.errorName !== 'QuotaExceededError' || storageFullTold || !toasterMounted()) return;
+      storageFullTold = true;
+      notifyInfo('Your phone is nearly out of storage, so BNN may not open without a connection until some space is freed. Saved scores are not affected.');
+    };
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', storageFull);
+    return () => { unsubscribe(); stop(); if ('serviceWorker' in navigator) navigator.serviceWorker.removeEventListener('message', storageFull); };
   }, []);
   return null;
 }

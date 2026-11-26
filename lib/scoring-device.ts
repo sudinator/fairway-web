@@ -15,6 +15,8 @@ let request: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const OWNER_KEY = "bnn_primary_scoring_owner_v1";
 const ARCHIVE_KEY = "bnn_scoring_recovery_v1";
+// 212.130: named for lib/sign-out, which must keep the archive and other identities' outboxes when clearing local state.
+export const SCORING_OWNER_KEY = OWNER_KEY, SCORING_ARCHIVE_KEY = ARCHIVE_KEY;
 export const subscribeScoringDevice = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const scoringDeviceState = () => state;
 export const scoringDeviceToken = () => token;
@@ -61,16 +63,17 @@ function resumeBackups(oldToken: string | null) {
     storage.removeItem(key);
   }
 }
-export function archiveScoringBackups(clear = false) {
-  // Saving the archive must succeed before removing any working backup.
+export function archiveScoringBackups(clear = false, uid: string = userId) {
+  // Saving the archive must succeed before removing any working backup. `uid` (212.130): sign-out archives the
+  // signed-out member's outbox even on a screen where the scoring-device check never ran (the paused-account page).
   const storage = window.localStorage, data: Record<string, string> = {};
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i)!;
-    if (scoreKey(key) || key.startsWith(`${PREFIX}${userId}:`)) data[key] = storage.getItem(key)!;
+    if (scoreKey(key) || key.startsWith(`${PREFIX}${uid}:`)) data[key] = storage.getItem(key)!;
   }
   if (Object.keys(data).length) {
     const archives = trimArchives(JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"));
-    archives.push({ user: userId, at: new Date().toISOString(), data });
+    archives.push({ user: uid, at: new Date().toISOString(), data });
     storage.setItem(ARCHIVE_KEY, JSON.stringify(trimArchives(archives)));
     if (clear) Object.keys(data).filter(k => !k.startsWith(PREFIX) || k.startsWith(`${PREFIX}${userId}:${token}:`)).forEach(k => storage.removeItem(k));
     // 212.26: other identities' backups are NOT removed here — another tab or a phone that scored offline may resume
