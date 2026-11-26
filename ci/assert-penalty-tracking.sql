@@ -51,6 +51,20 @@ do $$declare r uuid:='23600000-0000-0000-0000-000000000010'; s jsonb; denied boo
  perform public.set_round_penalties_tracked(r,true,pg_temp.pen_snapshot(r));
  perform public.set_round_penalties_tracked(r,false,null);
  if (select penalties_tracked from rounds where id=r) then raise exception 'FAIL: remove confirmation failed'; end if;
+ -- 0240 (212.131): the flag changes only inside the RPC — a direct write by the owner is refused, whichever way it goes
+ denied:=false;
+ begin update rounds set penalties_tracked=true where id=r; exception when insufficient_privilege then denied:=true; end;
+ if not denied or (select penalties_tracked from rounds where id=r) then raise exception 'FAIL: a direct write confirmed penalties without the review'; end if;
+ perform public.set_round_penalties_tracked(r,true,pg_temp.pen_snapshot(r));
+ denied:=false;
+ begin update rounds set penalties_tracked=false where id=r; exception when insufficient_privilege then denied:=true; end;
+ if not denied or not(select penalties_tracked from rounds where id=r) then raise exception 'FAIL: a direct write removed the confirmation'; end if;
+ update rounds set ai_analysis='fine' where id=r;   -- an unrelated own-round write with the flag unchanged still works
+ if not(select penalties_tracked from rounds where id=r) then raise exception 'FAIL: an unrelated write disturbed the confirmation'; end if;
+ denied:=false;
+ begin insert into rounds(user_id,course,status,played_at,penalties_tracked) values(auth.uid(),'Pre-confirmed','final',current_date,true); exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: a round was inserted already confirmed'; end if;
+ perform public.set_round_penalties_tracked(r,false,null);
  perform set_config('request.headers','{}',true);denied:=false;
  begin perform public.set_round_penalties_tracked(r,true,pg_temp.pen_snapshot(r)); exception when others then denied:=sqlerrm like 'Scoring is active on another device%'; end;
  if not denied or (select penalties_tracked from rounds where id=r) then raise exception 'FAIL: device refusal failed or changed metadata'; end if;
@@ -58,7 +72,7 @@ do $$declare r uuid:='23600000-0000-0000-0000-000000000010'; s jsonb; denied boo
  begin perform public.set_round_penalties_tracked(r,false,null); exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'FAIL: another member changed penalty confirmation'; end if;
  if has_function_privilege('anon','public.set_round_penalties_tracked(uuid,boolean,jsonb)','execute') or has_function_privilege('authenticated','public.invalidate_penalty_confirmation()','execute') then raise exception 'FAIL: penalty confirmation ACL widened'; end if;
- raise notice 'PENALTY_TRACKING_PASS explicit zero, legacy unknown, snapshot concurrency, normal/retry/remove, incomplete/9H/18H, change invalidation, unrelated stats preserved, owner/device isolation and failure rollback';
+ raise notice 'PENALTY_TRACKING_PASS explicit zero, legacy unknown, snapshot concurrency, normal/retry/remove, incomplete/9H/18H, change invalidation, unrelated stats preserved, owner/device isolation and failure rollback, direct writes of the flag refused (0240)';
 end $$;
 reset role;
 select set_config('request.jwt.claim.sub','',true);

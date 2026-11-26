@@ -120,4 +120,4 @@ ok(lum(C.underDark) > 0.4, "C.underDark is light (a score colour, not a success 
   unmount();
 }
 
-report("backdrop dismiss");
+report("release check");

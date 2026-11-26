@@ -30,7 +30,7 @@ do $$
 declare org uuid := '22300000-0000-0000-0000-0000000000a0'; pl uuid := '22300000-0000-0000-0000-0000000000a1'; cadm uuid := '22300000-0000-0000-0000-0000000000a2';
   g uuid := '22301000-0000-0000-0000-000000000001'; orow uuid := '22302000-0000-0000-0000-000000000001'; prow uuid := '22302000-0000-0000-0000-000000000002';
   holes jsonb := (select jsonb_agg(jsonb_build_object('n', i, 'par', 4, 'si', i)) from generate_series(1, 18) i);
-  posted uuid; personal uuid; hole uuid; got boolean; bad text := ''; c record; before int;
+  posted uuid; personal uuid; personal2 uuid; hole uuid; hole2 uuid; got boolean; bad text := ''; c record; before int;
 begin
   perform pg_temp.as_user(org);
   perform public.create_game_complete(jsonb_build_object('id', g, 'code', '228001', 'name', 'G', 'course', 'C', 'holes_meta', holes, 'course_par', 72, 'game_type', 'stableford', 'group_id', '22300000-0000-0000-0000-00000000c1b0'),
@@ -44,9 +44,12 @@ begin
   if posted is null then raise exception 'no round was posted for the player'; end if;
   select id into hole from public.holes where round_id = posted order by hole_number limit 1;
   if hole is null then raise exception 'the posted round has no holes'; end if;
+  select id into hole2 from public.holes where round_id = posted and hole_number = 2;
   -- a personal round the player logged themselves
   perform pg_temp.as_user(pl);
   insert into public.rounds(user_id, group_id, course, course_par, played_at, gross_score) values (pl, '22300000-0000-0000-0000-00000000c1b0', 'C', 72, current_date, 90) returning id into personal;
+  insert into public.holes(round_id, hole_number, par, stroke_index, strokes) values (personal, 1, 4, 1, 5);
+  insert into public.rounds(user_id, group_id, course, course_par, played_at, gross_score) values (pl, '22300000-0000-0000-0000-00000000c1b0', 'C', 72, current_date - 1, 91) returning id into personal2;
   perform pg_temp.as_maintenance();
 
   for c in select * from (values
@@ -59,6 +62,10 @@ begin
     ('player changes a posted hole score',              pl,   format('update public.holes set strokes = 2 where id = %L', hole),                               false),
     ('player adds a hole to the posted round',          pl,   format('insert into public.holes(round_id, hole_number, par, stroke_index, strokes) values (%L, 19, 4, 19, 3)', posted), false),
     ('player deletes a posted hole',                    pl,   format('delete from public.holes where id = %L', hole),                                           false),
+    -- 0240 (212.131): moving a hole OUT of the posted round (the guard once checked only the destination parent)
+    ('player moves a posted hole to their personal round', pl, format('update public.holes set round_id = %L where id = %L', personal, hole2),                   false),
+    ('player moves a personal hole into the posted round', pl, format('update public.holes set round_id = %L where id = (select id from public.holes where round_id = %L limit 1)', posted, personal), false),
+    ('player re-parents a hole between two personal rounds', pl, format('update public.holes set round_id = %L where id = (select id from public.holes where round_id = %L limit 1)', personal2, personal), false),
     ('player changes their personal round''s total',    pl,   format('update public.rounds set gross_score = 88 where id = %L', personal),                     true),
     ('player deletes their personal round',             pl,   format('delete from public.rounds where id = %L', personal),                                      true),
     ('club admin edits the member''s posted round',     cadm, format('update public.rounds set course_handicap = 12, course_handicap_source = ''manual'' where id = %L', posted), true),
@@ -71,6 +78,8 @@ begin
   end loop;
   if bad is distinct from '' then raise exception 'POSTED ROUNDS mismatch:%', bad; end if;
 
+  -- 0240: after every refused attempt the posted card still has all its holes
+  if (select count(*) from public.holes where round_id = posted) <> 18 then raise exception 'the posted card lost holes (% left)', (select count(*) from public.holes where round_id = posted); end if;
   -- the server path still works: the organizer corrects a score (0225) and re-posts; the player's round updates
   before := (select gross_score from public.rounds where id = posted);
   perform pg_temp.as_user(org);

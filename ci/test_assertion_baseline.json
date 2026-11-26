@@ -1,5 +1,5 @@
 {
-  "total": 447502,
+  "total": 447541,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -86,6 +86,7 @@
     "player-scoring": 71,
     "recap additions": 50,
     "recap stat contract": 59,
+    "release check": 22,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "saved score verification": 36,
@@ -99,7 +100,7 @@
     "season entry": 6,
     "season rounds": 10,
     "season standings": 15,
-    "season standings screen": 13,
+    "season standings screen": 18,
     "season wrapped": 12,
     "segment schemes": 8,
     "segments": 20,
@@ -121,6 +122,7 @@
     "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20,
+    "unsubscribe route": 12,
     "update safety": 38
   }
 }

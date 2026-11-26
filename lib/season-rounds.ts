@@ -37,33 +37,49 @@ export const ROUNDS_METRICS: { key: RoundsMetric; label: string; lowerIsBetter?:
   { key: "rounds", label: "Rounds logged", value: (r) => r.rounds, show: (r) => String(r.rounds) },
 ];
 
-export function roundsStandings(rounds: RoundRow[], holes: HoleRow[]): RoundsStandingRow[] {
-  const byRound = new Map<string, HoleRow[]>();
-  for (const h of holes) { const a = byRound.get(h.round_id) ?? []; a.push(h); byRound.set(h.round_id, a); }
+/**
+ * One round, summarised — the ONLY shape the Rounds tab receives from the server since 212.131 (migration 0239: the
+ * owner's contract is "aggregates and ranking only, no hole-by-hole", and 0237 returned the holes). The database
+ * computes this per round in SQL; summarizeRound() is the same arithmetic in TypeScript, kept as the oracle:
+ * ci/assert-club-round-standings.sql checks the SQL against fixtures whose expected figures lib/season-rounds.test.ts
+ * checks against this function, and the stroke-allocation table in that assertion is generated from allocateStrokes
+ * (ci/check_rounds_summary_parity.py keeps it current). Only complete 18-hole rounds are summarised; anything else is null.
+ */
+export type RoundSummary = {
+  id: string; user_id: string; display_name: string; avatar_url?: string | null; played_at: string; course: string | null; course_handicap: number | null;
+  par: number; gross: number; putts: number | null; net_birdies: number; net_eagles: number; par_streak: number;
+};
+export function summarizeRound(r: RoundRow, holes: HoleRow[]): RoundSummary | null {
+  const hs = holes.filter((h) => h.round_id === r.id).slice().sort((a, b) => a.hole_number - b.hole_number);
+  if (hs.length !== 18 || hs.some((h) => h.strokes == null || h.strokes <= 0 || h.par == null)) return null;
+  const par = hs.reduce((t, h) => t + (h.par || 0), 0);
+  const gross = hs.reduce((t, h) => t + (h.strokes || 0), 0);
+  const ch = Math.round(Number(r.course_handicap ?? 0));
+  const alloc = allocateStrokes(hs.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), ch);
+  let birdies = 0, eagles = 0, streak = 0, best = 0;
+  for (const h of hs) {
+    const netDiff = (h.strokes || 0) - (alloc[h.hole_number] || 0) - (h.par || 0);
+    if (netDiff === -1) birdies++; else if (netDiff <= -2) eagles++;
+    if ((h.strokes || 0) <= (h.par || 0)) { streak++; best = Math.max(best, streak); } else streak = 0;
+  }
+  const putts = hs.every((h) => h.putts != null) ? hs.reduce((t, h) => t + (h.putts || 0), 0) : null;
+  return { id: r.id, user_id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url ?? null, played_at: r.played_at, course: r.course, course_handicap: r.course_handicap, par, gross, putts, net_birdies: birdies, net_eagles: eagles, par_streak: best };
+}
+
+/** The standings from per-round summaries (the server's shape). */
+export function roundsStandings(summaries: RoundSummary[]): RoundsStandingRow[] {
   // same member, same course, same day → one round (the first by id, deterministic)
   const seen = new Set<string>();
-  const kept = [...rounds].sort((a, b) => a.id.localeCompare(b.id)).filter((r) => { const k = `${r.user_id}|${(r.course || "").toLowerCase()}|${r.played_at}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  const kept = [...summaries].sort((a, b) => a.id.localeCompare(b.id)).filter((r) => { const k = `${r.user_id}|${(r.course || "").toLowerCase()}|${String(r.played_at).slice(0, 10)}`; if (seen.has(k)) return false; seen.add(k); return true; });
   const rows = new Map<string, RoundsStandingRow & { gross: number[]; net: number[]; putts: (number | null)[] }>();
   for (const r of kept) {
-    const hs = (byRound.get(r.id) ?? []).slice().sort((a, b) => a.hole_number - b.hole_number);
-    if (hs.length !== 18 || hs.some((h) => h.strokes == null || h.strokes <= 0 || h.par == null)) continue;
-    const par = hs.reduce((t, h) => t + (h.par || 0), 0);
-    const gross = hs.reduce((t, h) => t + (h.strokes || 0), 0);
     const ch = Math.round(Number(r.course_handicap ?? 0));
-    const alloc = allocateStrokes(hs.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), ch);
-    let birdies = 0, eagles = 0, streak = 0, best = 0;
-    for (const h of hs) {
-      const netDiff = (h.strokes || 0) - (alloc[h.hole_number] || 0) - (h.par || 0);
-      if (netDiff === -1) birdies++; else if (netDiff <= -2) eagles++;
-      if ((h.strokes || 0) <= (h.par || 0)) { streak++; best = Math.max(best, streak); } else streak = 0;
-    }
-    const putts = hs.every((h) => h.putts != null) ? hs.reduce((t, h) => t + (h.putts || 0), 0) : null;
     let row = rows.get(r.user_id);
     if (!row) { row = { userId: r.user_id, name: r.display_name, avatarUrl: r.avatar_url ?? null, rounds: 0, avgGross: null, avgNet: null, bestGross: null, bestNet: null, birdies: 0, eagles: 0, bestBirdies: 0, fewestPutts: null, parStreak: 0, eligible: false, gross: [], net: [], putts: [] }; rows.set(r.user_id, row); }
-    row.rounds++; row.gross.push(gross - par); row.net.push(gross - ch - par); row.putts.push(putts);
-    row.bestGross = row.bestGross == null ? gross : Math.min(row.bestGross, gross);
-    row.bestNet = row.bestNet == null ? gross - ch : Math.min(row.bestNet, gross - ch);
-    row.birdies += birdies; row.eagles += eagles; row.bestBirdies = Math.max(row.bestBirdies, birdies); row.parStreak = Math.max(row.parStreak, best);
+    row.rounds++; row.gross.push(r.gross - r.par); row.net.push(r.gross - ch - r.par); row.putts.push(r.putts);
+    row.bestGross = row.bestGross == null ? r.gross : Math.min(row.bestGross, r.gross);
+    row.bestNet = row.bestNet == null ? r.gross - ch : Math.min(row.bestNet, r.gross - ch);
+    row.birdies += r.net_birdies; row.eagles += r.net_eagles; row.bestBirdies = Math.max(row.bestBirdies, r.net_birdies); row.parStreak = Math.max(row.parStreak, r.par_streak);
   }
   return [...rows.values()].map(({ gross, net, putts, ...row }) => {
     row.eligible = row.rounds >= ROUNDS_MIN;
@@ -74,6 +90,10 @@ export function roundsStandings(rounds: RoundRow[], holes: HoleRow[]): RoundsSta
     }
     return row;
   });
+}
+/** The standings from rounds with their holes (tests and the oracle; the app no longer receives holes). */
+export function roundsStandingsFromHoles(rounds: RoundRow[], holes: HoleRow[]): RoundsStandingRow[] {
+  return roundsStandings(rounds.map((r) => summarizeRound(r, holes)).filter((x): x is RoundSummary => x != null));
 }
 
 /** Sort by a metric; ties share the place; below the floor listed after, unranked. */
