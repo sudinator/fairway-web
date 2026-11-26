@@ -43,7 +43,7 @@ export const ROUNDS_METRICS: { key: RoundsMetric; label: string; lowerIsBetter?:
  * computes this per round in SQL; summarizeRound() is the same arithmetic in TypeScript, kept as the oracle:
  * ci/assert-club-round-standings.sql checks the SQL against fixtures whose expected figures lib/season-rounds.test.ts
  * checks against this function, and the stroke-allocation table in that assertion is generated from allocateStrokes
- * (ci/check_rounds_summary_parity.py keeps it current). Only complete 18-hole rounds are summarised; anything else is null.
+ * (ci/test-rounds-summary-parity.cjs keeps it current). Only complete 18-hole rounds are summarised; anything else is null.
  */
 export type RoundSummary = {
   id: string; user_id: string; display_name: string; avatar_url?: string | null; played_at: string; course: string | null; course_handicap: number | null;

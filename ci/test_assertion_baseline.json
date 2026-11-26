@@ -1,5 +1,5 @@
 {
-  "total": 447541,
+  "total": 447564,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -57,6 +57,7 @@
     "groups unit move": 4,
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
+    "held notice": 5,
     "hole result consistency": 981,
     "hole skip": 14,
     "insights": 28,
@@ -107,7 +108,7 @@
     "setup draft lifecycle": 10,
     "setup summary": 31,
     "share links form": 2,
-    "sign-out": 26,
+    "sign-out": 44,
     "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,

@@ -16,7 +16,7 @@ import { downloadScoringRecovery } from "@/lib/scoring-device";
 export function SignOutRow({ userId, onSignOut }: { userId: string; onSignOut: () => Promise<{ error: { message?: string } | null }> }) {
   const [pending, setPending] = useState<UnsyncedItem[]>([]);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { try { setPending(unsyncedWork()); } catch { setPending([]); } }, []);
+  useEffect(() => { try { setPending(unsyncedWork(undefined, userId).filter((p) => p.owner === userId)); } catch { setPending([]); } }, [userId]);   // this member's own items; another account's are kept regardless
   return (
     <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
       {pending.length > 0 && (

@@ -19,6 +19,7 @@ checks = {
     'followed login is never cached as app shell': 'if (!response.ok || response.redirected)' in sw,
     'redirect browser regressions remain in CI': 'node ci/test-update-redirect-browser.cjs' in (root / 'package.json').read_text(),
     'only marked app HTML becomes offline Home': 'data-bnn-app-shell=\"v1\"' in sw and 'data-bnn-app-shell=\"v1\"' in (root / 'app/layout.tsx').read_text(),
+    'iOS status bar is default, not translucent (212.132: iOS 26 blurs page content under a translucent bar)': 'statusBarStyle: "default"' in (root / 'app/layout.tsx').read_text() and 'black-translucent' not in (root / 'app/layout.tsx').read_text().replace('"black-translucent". Translucent', ''),
     'push support retained': 'self.addEventListener("push"' in sw and 'self.addEventListener("notificationclick"' in sw,
     'explicit action and verified feedback': all(x in reg + flow + manage for x in ['requestAppUpdate', 'clearConfirmedUpdateNotice', 'bnnUpdate', 'Updated successfully', 'Update did not complete', 'did not restart']),
     'pending banner has no dismissal path': 'bnn-update-dismissed' not in flow and 'dismissed' not in flow and 'dismissUpdateNotice' not in reg and '>Later<' not in reg and '>Dismiss<' not in reg,

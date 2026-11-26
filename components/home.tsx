@@ -826,6 +826,10 @@ export function Home({ session }: { session: any }) {
           An administrator has deactivated your account. Your history is saved. If you think this is a mistake, please reach out to your group admin.
         </div>
         <button style={{ ...btn(false), marginTop: 20 }} onClick={() => { void signOutSafely(user.id, { signOut: () => supabase.auth.signOut(), confirm: askConfirm, notify: notifyError }); }}>Sign out</button>
+        {/* 212.132: the paused screen renders before Home's hosts, so the sign-out sheet and any error went to the browser's own
+            dialogs (the one thing components/confirm exists to avoid). The hosts are mounted here too. */}
+        <Toaster />
+        <ConfirmHost />
       </div>
     );
   }

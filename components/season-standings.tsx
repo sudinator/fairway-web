@@ -34,6 +34,8 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
   const setErr = (t: Tab, e: unknown) => setErrs((v) => ({ ...v, [t]: e instanceof Error ? e.message : String(e) }));
   const retry = (t: Tab) => { setErrs((v) => ({ ...v, [t]: null })); setAttempt((v) => ({ ...v, [t]: v[t] + 1 })); };
   const loadersRef = useRef(loaders); loadersRef.current = loaders;   // a seam, not a dependency: an inline object must not re-run the loads
+  // A different club is a different instance: components/club-hub keys this component by group id, and `year` is never
+  // changed on a mounted instance — so the loads below run once per instance and on Retry (212.132 review: one mechanism).
   const [gMetric, setGMetric] = useState<StandingsMetric>("wins");
   const [rMetric, setRMetric] = useState<RoundsMetric>("avgNet");
   const [open, setOpen] = useState<string | null>(null);

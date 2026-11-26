@@ -29,6 +29,8 @@ export function markScoringDeviceRevoked() { publish("viewer"); }
 export function isDeviceRejection(error: { message?: string } | null | undefined) {
   return !!error?.message?.includes("Scoring is active on another device");
 }
+/** A score key (a draft, a backup, a watermark, an edit) — the keys the outboxes scope and the archive keeps. */
+export const isScoreKey = (key: string) => scoreKey(key);
 function scoreKey(key: string) {
   return key === "bnn_round_draft_v1" || key === "bnn_round_sync_v1" || key === "bnn_draft_hole_v1" ||
     key.startsWith("bnn_edit_round:") || key.startsWith("bnn_game_scores_") || key.startsWith("bnn_game_wm_") ||
@@ -72,7 +74,9 @@ export function archiveScoringBackups(clear = false, uid: string = userId) {
     if (scoreKey(key) || key.startsWith(`${PREFIX}${uid}:`)) data[key] = storage.getItem(key)!;
   }
   if (Object.keys(data).length) {
-    const archives = trimArchives(JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"));
+    let existing: ArchiveEntry[] = [];
+    try { existing = JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"); } catch { existing = []; }   // a corrupt archive is replaced, not a reason to fail
+    const archives = trimArchives(existing);
     archives.push({ user: uid, at: new Date().toISOString(), data });
     storage.setItem(ARCHIVE_KEY, JSON.stringify(trimArchives(archives)));
     if (clear) Object.keys(data).filter(k => !k.startsWith(PREFIX) || k.startsWith(`${PREFIX}${userId}:${token}:`)).forEach(k => storage.removeItem(k));
@@ -81,8 +85,14 @@ export function archiveScoringBackups(clear = false, uid: string = userId) {
   }
 }
 export function downloadScoringRecovery() {
-  archiveScoringBackups();
-  const blob = new Blob([window.localStorage.getItem(ARCHIVE_KEY) || "[]"], { type: "application/json" });
+  // 212.132: the download is built from the LIVE keys plus the archive, and never depends on writing the archive first —
+  // on a full phone that write throws, and the one button meant to get scores off the phone did nothing.
+  const storage = window.localStorage, data: Record<string, string> = {};
+  for (let i = 0; i < storage.length; i++) { const key = storage.key(i)!; if (scoreKey(key) || key.startsWith(PREFIX)) data[key] = storage.getItem(key)!; }
+  let archives: unknown = [];
+  try { archives = JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"); } catch { archives = []; }
+  try { archiveScoringBackups(); } catch { /* the download below does not need it */ }
+  const blob = new Blob([JSON.stringify({ savedAt: new Date().toISOString(), live: data, archives }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob), a = document.createElement("a");
   a.href = url; a.download = "BNN-saved-scores.json"; a.click(); URL.revokeObjectURL(url);
 }
@@ -158,7 +168,12 @@ export async function checkScoringDevice(client: Client, uid: string, takeover =
       if (!wasInitialized && !takeover && !superseded) resumeBackups(previous);
       // A successful takeover starts from the current server scores. Old pending work
       // remains downloadable, but can never become an automatic stale outbox.
-      if (takeover || superseded || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) archiveScoringBackups(true);
+      if (takeover || superseded || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) {
+        // 212.132: on a full phone the archive write throws. That must not abort the claim (the device then sat in
+        // "checking" on every launch): the old outbox is simply left where it is — scoped to its own token, downloadable
+        // from Profile — and the claim completes.
+        try { archiveScoringBackups(true); } catch { noteStorageWriteFailure(); }
+      }
       // Explicitly resuming this same installation's still-current server token
       // recovers its own pending mobile work. A transfer from a different device
       // never replays the old local outbox.

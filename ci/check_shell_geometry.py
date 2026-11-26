@@ -33,6 +33,7 @@ PROFILES = [
     ("iPhone 13 mini",            375, 748, 50, 34),
     ("iPhone 15",                 393, 852, 59, 34),
     ("iPhone 15 Pro Max",         430, 894, 62, 34),   # the device this bug was found on
+    ("iPhone 15 Pro Max, 212.132", 430, 894,  0, 34),   # status bar "default": the web view starts below the bar, top inset 0
     ("iPad mini (installed)",     744, 1080, 24, 20),
     ("landscape phone",           852, 393, 0,  21),   # short viewport — the tightest case
 ]
