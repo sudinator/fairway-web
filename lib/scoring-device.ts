@@ -15,6 +15,8 @@ let request: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const OWNER_KEY = "bnn_primary_scoring_owner_v1";
 const ARCHIVE_KEY = "bnn_scoring_recovery_v1";
+// 212.130: named for lib/sign-out, which must keep the archive and other identities' outboxes when clearing local state.
+export const SCORING_OWNER_KEY = OWNER_KEY, SCORING_ARCHIVE_KEY = ARCHIVE_KEY;
 export const subscribeScoringDevice = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const scoringDeviceState = () => state;
 export const scoringDeviceToken = () => token;
@@ -27,6 +29,8 @@ export function markScoringDeviceRevoked() { publish("viewer"); }
 export function isDeviceRejection(error: { message?: string } | null | undefined) {
   return !!error?.message?.includes("Scoring is active on another device");
 }
+/** A score key (a draft, a backup, a watermark, an edit) — the keys the outboxes scope and the archive keeps. */
+export const isScoreKey = (key: string) => scoreKey(key);
 function scoreKey(key: string) {
   return key === "bnn_round_draft_v1" || key === "bnn_round_sync_v1" || key === "bnn_draft_hole_v1" ||
     key.startsWith("bnn_edit_round:") || key.startsWith("bnn_game_scores_") || key.startsWith("bnn_game_wm_") ||
@@ -61,16 +65,19 @@ function resumeBackups(oldToken: string | null) {
     storage.removeItem(key);
   }
 }
-export function archiveScoringBackups(clear = false) {
-  // Saving the archive must succeed before removing any working backup.
+export function archiveScoringBackups(clear = false, uid: string = userId) {
+  // Saving the archive must succeed before removing any working backup. `uid` (212.130): sign-out archives the
+  // signed-out member's outbox even on a screen where the scoring-device check never ran (the paused-account page).
   const storage = window.localStorage, data: Record<string, string> = {};
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i)!;
-    if (scoreKey(key) || key.startsWith(`${PREFIX}${userId}:`)) data[key] = storage.getItem(key)!;
+    if (scoreKey(key) || key.startsWith(`${PREFIX}${uid}:`)) data[key] = storage.getItem(key)!;
   }
   if (Object.keys(data).length) {
-    const archives = trimArchives(JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"));
-    archives.push({ user: userId, at: new Date().toISOString(), data });
+    let existing: ArchiveEntry[] = [];
+    try { existing = JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"); } catch { existing = []; }   // a corrupt archive is replaced, not a reason to fail
+    const archives = trimArchives(existing);
+    archives.push({ user: uid, at: new Date().toISOString(), data });
     storage.setItem(ARCHIVE_KEY, JSON.stringify(trimArchives(archives)));
     if (clear) Object.keys(data).filter(k => !k.startsWith(PREFIX) || k.startsWith(`${PREFIX}${userId}:${token}:`)).forEach(k => storage.removeItem(k));
     // 212.26: other identities' backups are NOT removed here — another tab or a phone that scored offline may resume
@@ -78,8 +85,14 @@ export function archiveScoringBackups(clear = false) {
   }
 }
 export function downloadScoringRecovery() {
-  archiveScoringBackups();
-  const blob = new Blob([window.localStorage.getItem(ARCHIVE_KEY) || "[]"], { type: "application/json" });
+  // 212.132: the download is built from the LIVE keys plus the archive, and never depends on writing the archive first —
+  // on a full phone that write throws, and the one button meant to get scores off the phone did nothing.
+  const storage = window.localStorage, data: Record<string, string> = {};
+  for (let i = 0; i < storage.length; i++) { const key = storage.key(i)!; if (scoreKey(key) || key.startsWith(PREFIX)) data[key] = storage.getItem(key)!; }
+  let archives: unknown = [];
+  try { archives = JSON.parse(storage.getItem(ARCHIVE_KEY) || "[]"); } catch { archives = []; }
+  try { archiveScoringBackups(); } catch { /* the download below does not need it */ }
+  const blob = new Blob([JSON.stringify({ savedAt: new Date().toISOString(), live: data, archives }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob), a = document.createElement("a");
   a.href = url; a.download = "BNN-saved-scores.json"; a.click(); URL.revokeObjectURL(url);
 }
@@ -155,7 +168,12 @@ export async function checkScoringDevice(client: Client, uid: string, takeover =
       if (!wasInitialized && !takeover && !superseded) resumeBackups(previous);
       // A successful takeover starts from the current server scores. Old pending work
       // remains downloadable, but can never become an automatic stale outbox.
-      if (takeover || superseded || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) archiveScoringBackups(true);
+      if (takeover || superseded || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) {
+        // 212.132: on a full phone the archive write throws. That must not abort the claim (the device then sat in
+        // "checking" on every launch): the old outbox is simply left where it is — scoped to its own token, downloadable
+        // from Profile — and the claim completes.
+        try { archiveScoringBackups(true); } catch { noteStorageWriteFailure(); }
+      }
       // Explicitly resuming this same installation's still-current server token
       // recovers its own pending mobile work. A transfer from a different device
       // never replays the old local outbox.

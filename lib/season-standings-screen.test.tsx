@@ -39,4 +39,24 @@ ok((rr.el.textContent || "").includes("31 rounds") && (rr.el.textContent || "").
 rr.click("Fewest putts");
 ok(rnames()[0] === "Amit Sud (you)" && (rr.el.querySelector("[data-standings-row='u2']")?.getAttribute("data-place") ?? "") === "", `Fewest putts: a member without putts recorded is unranked (got ${rnames().join(" | ")}; u2 place '${rr.el.querySelector("[data-standings-row='u2']")?.getAttribute("data-place")}')`);
 rr.unmount();
-report("season standings screen");
+// 212.131: one error per tab. Club games load; the first Rounds load fails; back on Club games the standings are still
+// there; Try again on Rounds clears the error and loads. (Before: one shared error hid both tabs until remount.)
+import { act } from "react";
+(async () => {
+  let roundsCalls = 0;
+  const loaders = { games: async () => ({ rows, games: 7 }), rounds: async () => { roundsCalls++; if (roundsCalls === 1) throw new Error("network down"); return { rounds: [] }; } };
+  const er = renderScreen(<SeasonStandings groupId="club" userId="u4" loaders={loaders} />);
+  const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
+  await settle();
+  ok(er.el.querySelectorAll("[data-standings-row]").length >= 5, "club games loaded through the seam");
+  er.click("Rounds"); await settle();
+  ok(!!er.el.querySelector("[data-standings-error]") && (er.el.textContent || "").includes("network down"), "the failed Rounds load shows its error on the Rounds tab");
+  er.click("Club games"); await settle();
+  ok(!er.el.querySelector("[data-standings-error]") && er.el.querySelectorAll("[data-standings-row]").length >= 5, "back on Club games: no error, the loaded standings are still shown");
+  er.click("Rounds"); await settle();
+  ok(!!er.el.querySelector("[data-standings-retry]"), "the Rounds tab still shows its error with Try again");
+  er.click("Try again"); await settle();
+  ok(roundsCalls === 2 && !er.el.querySelector("[data-standings-error]") && (er.el.textContent || "").includes("No 18-hole rounds logged"), `Try again clears the error and loads (calls ${roundsCalls})`);
+  er.unmount();
+  report("season standings screen");
+})().catch((e) => { console.error(e); process.exit(1); });

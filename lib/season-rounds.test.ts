@@ -1,7 +1,7 @@
 /** The Rounds tab engine (212.117): 18-hole rounds only, same-day duplicates collapsed, putts only where recorded,
  *  the 5-round floor, ties shared. */
 import { ok, report } from "./screen-harness";
-import { roundsStandings, rankRounds, ROUNDS_METRICS } from "@/lib/season-rounds";
+import { roundsStandingsFromHoles as roundsStandings, rankRounds, ROUNDS_METRICS } from "@/lib/season-rounds";
 import type { RoundRow, HoleRow } from "@/lib/season-rounds";
 
 const course = Array.from({ length: 18 }, (_, i) => ({ par: i % 3 === 2 ? 3 : i % 5 === 4 ? 5 : 4, si: i + 1 }));

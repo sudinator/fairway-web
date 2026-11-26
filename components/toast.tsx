@@ -15,6 +15,12 @@ function emit(msg: string, kind: "error" | "info") {
 }
 export function notifyError(msg: string) { emit(msg, "error"); }
 export function notifyInfo(msg: string) { emit(msg, "info"); }
+/** True while a <Toaster/> is mounted (Home). A notice that is only worth showing in the app, never as a native alert on a public page, checks this first. */
+export function toasterMounted() { return listeners.length > 0; }
+/** An in-app notice that must never become a native alert: shown now if the Toaster is mounted, else held until it mounts
+ *  (212.132 — the "phone nearly full" notice arrives while the page's own files are still loading, before Home exists). */
+let held: string[] = [];
+export function notifyInfoInApp(msg: string) { if (listeners.length) emit(msg, "info"); else if (!held.includes(msg)) held.push(msg); }
 
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -24,6 +30,7 @@ export function Toaster() {
       setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== t.id)), 6000);
     };
     listeners.push(on);
+    for (const msg of held.splice(0)) emit(msg, "info");   // notices that arrived before the app mounted
     return () => { listeners = listeners.filter((l) => l !== on); };
   }, []);
   if (!toasts.length) return null;

@@ -27,7 +27,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 import { CourseChangePicker } from "@/components/course-change-picker";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
-import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit, clearAllLocalState } from "@/lib/draft";
+import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit } from "@/lib/draft";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
 const supabase = createClient();

@@ -11,7 +11,15 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     title: "Birdie Num Num",
-    statusBarStyle: "black-translucent",
+    // 212.132: "default", not "black-translucent". Translucent put the page UNDER the status bar, and since iOS 26 the
+    // system fills that strip (and ~45–60pt below it) with its Liquid Glass scroll-edge blur, which smeared the top of
+    // the Home header in the installed app (owner, Nov 26, staging and production screenshots). With "default" the web
+    // view starts below the status bar, iOS paints the bar itself from theme-color (#0E3B2E, the app's green), and no
+    // page pixels sit under the glass. env(safe-area-inset-top) is then 0 when installed; the shell and the viewport
+    // rule (lib/viewport-height.ts: installed → innerHeight) are unchanged by that. viewport-fit=cover stays for the
+    // home-indicator inset. iOS caches this value when the icon is added to the Home Screen: an existing install keeps
+    // the old behaviour until the icon is removed and re-added. Nothing in CSS can switch the system effect off.
+    statusBarStyle: "default",
   },
   icons: {
     icon: [

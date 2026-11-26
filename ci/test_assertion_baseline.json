@@ -1,5 +1,5 @@
 {
-  "total": 447476,
+  "total": 447564,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -57,6 +57,7 @@
     "groups unit move": 4,
     "half-stroke simulation": 168914,
     "head-to-head errors": 3,
+    "held notice": 5,
     "hole result consistency": 981,
     "hole skip": 14,
     "insights": 28,
@@ -86,6 +87,7 @@
     "player-scoring": 71,
     "recap additions": 50,
     "recap stat contract": 59,
+    "release check": 22,
     "round stat completeness": 8,
     "save trace toggle": 3,
     "saved score verification": 36,
@@ -99,13 +101,14 @@
     "season entry": 6,
     "season rounds": 10,
     "season standings": 15,
-    "season standings screen": 13,
+    "season standings screen": 18,
     "season wrapped": 12,
     "segment schemes": 8,
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,
     "share links form": 2,
+    "sign-out": 44,
     "skins format": 13,
     "skins ties": 13,
     "storage tidy": 18,
@@ -120,6 +123,7 @@
     "test clubs": 2,
     "trifecta card render": 8,
     "trifecta results row": 20,
+    "unsubscribe route": 12,
     "update safety": 38
   }
 }

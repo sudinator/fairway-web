@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       const fp = crypto.createHash("sha256").update(e.fingerprint).digest("hex");
       if (d.ever_sent && fp === d.last_fingerprint) { unchanged++; await db.rpc("record_round_email", { p_round: d.round_id, p_user: d.user_id, p_fingerprint: fp, p_kind: "update", p_status: "sent", p_error: "unchanged — not resent" }); continue; }
       await mail.sendMail({ from: `Birdie Num Num <${user}>`, to: d.email, subject: e.subject, html: e.html, text: e.text,
-        headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
+        headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
       await db.rpc("record_round_email", { p_round: d.round_id, p_user: d.user_id, p_fingerprint: fp, p_kind: d.ever_sent ? "update" : "summary", p_status: "sent" });
       sent++;
     } catch (err) {
@@ -125,7 +125,7 @@ async function sendClubReportEmails(db: SupabaseClient, mail: ReturnType<typeof 
       if (!r?.snapshot) continue;
       const unsubscribeUrl = `${appUrl}/api/round-emails/unsubscribe?k=club&u=${d.user_id}&t=${unsubscribeToken(d.user_id, "club")}`;
       const e = clubReportEmail(r.snapshot as ClubReport, { appUrl: `${appUrl}/`, unsubscribeUrl });
-      await mail.sendMail({ from: `Birdie Num Num <${from}>`, to: d.email, subject: e.subject, html: e.html, text: e.text, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
+      await mail.sendMail({ from: `Birdie Num Num <${from}>`, to: d.email, subject: e.subject, html: e.html, text: e.text, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
       await db.rpc("record_club_report_email", { p_report: d.report_id, p_user: d.user_id, p_status: "sent" });
       sent++;
     } catch (err) {
@@ -154,7 +154,7 @@ async function sendTeamRoundEmails(db: SupabaseClient, mail: ReturnType<typeof n
       const unsubscribeUrl = `${appUrl}/api/round-emails/unsubscribe?u=${d.user_id}&t=${unsubscribeToken(d.user_id)}`;
       const e = teamRoundEmail({ format: (game as any).game_type, course: (game as any).course || "", recap, personalLine: me ? recap.personal[me.user_id ?? me.id] ?? null : null,
         firstName: (d.display_name || "").split(" ")[0] || null, gameUrl: `${appUrl}/?tab=games&game=${(game as any).code}`, unsubscribeUrl });   // the game's 6-digit code (lib/app-links)
-      await mail.sendMail({ from: `Birdie Num Num <${from}>`, to: d.email, subject: e.subject, html: e.html, text: e.text, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
+      await mail.sendMail({ from: `Birdie Num Num <${from}>`, to: d.email, subject: e.subject, html: e.html, text: e.text, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
       await db.rpc("record_team_round_email", { p_game: d.game_id, p_user: d.user_id, p_status: "sent" });
       sent++;
     } catch (err) {

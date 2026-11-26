@@ -2,38 +2,51 @@
 /**
  * Season standings — the club's order of merit (owner, Nov 17–18, 2026). TWO TABS: Club games (lib/season-standings — ended
  * own-ball games) and Rounds (lib/season-rounds — every round logged this year by members who share them; the switch is in
- * Profile). One table per tab, sortable by the pills; the TOP 5 shown with the viewer's row if outside; "Show all" opens
+ * Profile; since 212.131 the server sends one summary row per round, never holes). One table per tab, sortable by the pills; the TOP 5 shown with the viewer's row if outside; "Show all" opens
  * the rest; an unranked member's figure shows in sage (no place) so a 4-game, 4-win season is still visible; a tapped row
  * shows every number. Nothing index- or personal-round-based on the games tab; the rounds tab says who it covers.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { C } from "@/lib/golf";
 import { Eyebrow, Avatar, btn, Segmented } from "@/components/ui";
 import { seasonStandings, rankBy, METRICS, STANDINGS_MIN_GAMES, type StandingRow, type StandingsMetric, type ContestWin } from "@/lib/season-standings";
-import { roundsStandings, rankRounds, ROUNDS_METRICS, ROUNDS_MIN, type RoundsStandingRow, type RoundsMetric, type RoundRow, type HoleRow } from "@/lib/season-rounds";
+import { roundsStandings, rankRounds, ROUNDS_METRICS, ROUNDS_MIN, type RoundsStandingRow, type RoundsMetric, type RoundSummary } from "@/lib/season-rounds";
 import { contestLeaderboard, type Contest, type ContestEntry } from "@/lib/contests";
 import type { Game, Player } from "@/lib/game-types";
 
 type Tab = "games" | "rounds";
 export type Preloaded = { games?: { rows: StandingRow[]; games: number }; rounds?: { rows: RoundsStandingRow[] } };
+/** Test seam: the two loads, in place of the database (ci: lib/season-standings-screen). */
+export type Loaders = { games?: () => Promise<{ rows: StandingRow[]; games: number }>; rounds?: () => Promise<{ rounds: RoundSummary[] }> };
 
-export function SeasonStandings({ groupId, userId, year = new Date().getFullYear(), preloaded }: { groupId: string; userId: string; year?: number; preloaded?: Preloaded }) {
+export function SeasonStandings({ groupId, userId, year = new Date().getFullYear(), preloaded, loaders }: { groupId: string; userId: string; year?: number; preloaded?: Preloaded; loaders?: Loaders }) {
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<Tab>("games");
   const [games, setGames] = useState<{ rows: StandingRow[]; games: number } | null>(preloaded?.games ?? null);
   const [rounds, setRounds] = useState<{ rows: RoundsStandingRow[] } | null>(preloaded?.rounds ?? null);
-  const [err, setErr] = useState<string | null>(null);
+  // 212.131: one error PER TAB (was one shared `err`): a failed Rounds load no longer hides the Club games that already
+  // loaded, and Retry clears that tab's error and loads again. The review's case: Club games loaded, Rounds failed, back
+  // to Club games → the shared error hid the loaded standings, and even a successful retry left it set.
+  const [errs, setErrs] = useState<{ games: string | null; rounds: string | null }>({ games: null, rounds: null });
+  const [attempt, setAttempt] = useState<{ games: number; rounds: number }>({ games: 0, rounds: 0 });
+  const setErr = (t: Tab, e: unknown) => setErrs((v) => ({ ...v, [t]: e instanceof Error ? e.message : String(e) }));
+  const retry = (t: Tab) => { setErrs((v) => ({ ...v, [t]: null })); setAttempt((v) => ({ ...v, [t]: v[t] + 1 })); };
+  const loadersRef = useRef(loaders); loadersRef.current = loaders;   // a seam, not a dependency: an inline object must not re-run the loads
+  // A different club is a different instance: components/club-hub keys this component by group id, and `year` is never
+  // changed on a mounted instance — so the loads below run once per instance and on Retry (212.132 review: one mechanism).
   const [gMetric, setGMetric] = useState<StandingsMetric>("wins");
   const [rMetric, setRMetric] = useState<RoundsMetric>("avgNet");
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   useEffect(() => {
-    if (preloaded?.games) return;
+    if (preloaded?.games || games) return;
     let live = true;
     (async () => {
       try {
+        const seam = loadersRef.current;
+        if (seam?.games) { const g = await seam.games(); if (live) setGames(g); return; }
         const gs = await fetchAll<Game>((from, to) => supabase.from("games").select("*").eq("group_id", groupId).eq("status", "ended")
           .gte("played_at", `${year}-01-01`).lte("played_at", `${year}-12-31`).order("played_at", { ascending: false }).range(from, to));
         const ids = gs.map((g) => g.id);
@@ -44,23 +57,29 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
         const wins: ContestWin[] = [];
         contests.forEach((c) => contestLeaderboard(c, entries.filter((e) => e.contest_id === c.id && !e.voided)).forEach((w) => { if (w.best) wins.push({ gameId: c.game_id, userId: w.best.player_id, name: w.best.player_name }); }));
         if (live) setGames({ rows: seasonStandings(gs, byGame, wins), games: gs.filter((g) => ["stableford", "stroke", "fourball", "trifecta"].includes(g.game_type)).length });
-      } catch (e) { if (live) setErr(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { if (live) setErr("games", e); }
     })();
     return () => { live = false; };
-  }, [groupId, year, preloaded, supabase]);
+  }, [groupId, year, preloaded, supabase, games, attempt.games]);
   useEffect(() => {
     if (tab !== "rounds" || rounds || preloaded?.rounds) return;
     let live = true;
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("club_round_standings_data", { p_group: groupId, p_year: year });
-        if (error) throw error;
-        const d = (data ?? { rounds: [], holes: [] }) as { rounds: RoundRow[]; holes: HoleRow[] };
-        if (live) setRounds({ rows: roundsStandings(d.rounds ?? [], d.holes ?? []) });
-      } catch (e) { if (live) setErr(e instanceof Error ? e.message : String(e)); }
+        let d: { rounds: RoundSummary[] };
+        const seam = loadersRef.current;
+        if (seam?.rounds) d = await seam.rounds();
+        else {
+          // 212.131 (0239): per-round summaries only — never holes (the owner's "aggregates and ranking only")
+          const { data, error } = await supabase.rpc("club_round_standings_data", { p_group: groupId, p_year: year });
+          if (error) throw error;
+          d = (data ?? { rounds: [] }) as { rounds: RoundSummary[] };
+        }
+        if (live) setRounds({ rows: roundsStandings(d.rounds ?? []) });
+      } catch (e) { if (live) setErr("rounds", e); }
     })();
     return () => { live = false; };
-  }, [tab, rounds, preloaded, groupId, year, supabase]);
+  }, [tab, rounds, preloaded, groupId, year, supabase, attempt.rounds]);
 
   // 212.119: the CLUB TAB's compact idiom (components/club-engagement), not the leaderboard's — 13px rows, sans 14px/700
   // numerals with 11px captions, Eyebrow headings. The owner saw the two tables side by side: "completely lost the consistency".
@@ -92,7 +111,11 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
       <div role="tablist" aria-label="Standings" style={{ display: "flex", marginTop: 12, borderBottom: `1px solid ${C.borderGreen}` }}>
         {(["games", "rounds"] as Tab[]).map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} data-standings-tab={t} onClick={() => { setTab(t); setOpen(null); setShowAll(false); }} style={tabStyle(tab === t)}>{t === "games" ? "Club games" : "Rounds"}</button>)}
       </div>
-      {err ? <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>Couldn’t load the standings: {err}</div> : loading ? <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading…</div> : !lines.length ? (
+      {errs[tab] ? (
+        <div data-standings-error style={{ color: C.gold, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>Couldn’t load the {tab === "games" ? "club games" : "rounds"} standings: {errs[tab]}
+          <div><button type="button" data-standings-retry onClick={() => retry(tab)} style={{ ...btn(false), marginTop: 8, fontSize: 12 }}>Try again</button></div>
+        </div>
+      ) : loading ? <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading…</div> : !lines.length ? (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball or trifecta games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
       ) : (
         <>
