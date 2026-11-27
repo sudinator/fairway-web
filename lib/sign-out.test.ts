@@ -2,7 +2,7 @@
 // pending personal round, another identity's pending game score and the recovery archive, before the sign-out result
 // was known. Each of those is a case here, run against the REAL helpers and storage.
 import { ok, report } from "./screen-harness";
-import { unsyncedWork, clearLocalStateForSignOut, signOutSafely } from "./sign-out";
+import { unsyncedWork, clearLocalStateForSignOut, signOutSafely, splitRetired, retireItems, retireUnsyncable, retiredSummary } from "./sign-out";
 import { rowPendingHoles, personalRoundFingerprint } from "./draft";
 import { SCORING_ARCHIVE_KEY, SCORING_OWNER_KEY } from "./scoring-device";
 import { RECOVERY_PREFIX } from "./saved-score-verification";
@@ -43,6 +43,7 @@ async function main() {
   ok(items.length === 4, `four unsynced items found (got ${items.length}: ${items.map((i) => i.label).join(" | ")})`);
   ok(items.filter((i) => i.owner === ME).length === 2 && items.some((i) => i.owner === OTHER) && items.some((i) => i.owner === ""), "each item carries its outbox identity (mine, another's, unknown)");
   ok(items.some((i) => i.label.includes("Saturday Stableford · #481207 · Amit: 1 hole not yet synced")), "a pending game score is named by game, code and player");
+  ok(items.some((i) => i.gameId === "g1" && i.holes?.join() === "1"), "a pending game score names its game and the holes that differ (212.134)");
   ok(items.some((i) => i.label.includes("Round at Oak Hollow · 2026-11-20: scores not yet saved")), "a personal round with scores and no server ack is pending");
   ok(items.some((i) => i.key.startsWith(`bnn_device_scores:${OTHER}:`)), "another identity's pending score counts too");
   ok(!items.some((i) => i.key.includes("g2")), "a synced backup (watermark matches) is not pending");
@@ -116,6 +117,42 @@ async function main() {
   ok(ls.getItem(SCORING_OWNER_KEY) !== null, "and the device-owner marker stays with it, so the next sign-in resumes it");
   ok(ls.getItem("bnn_app_boot_v1") === null && ls.getItem("bnn_game_snap_g1") === null, "the caches are still cleared");
   ok(notes.length === 0, "nothing is toasted after the sign-out (the screen is gone by then) — the member was told before");
+  // 6. (212.135, owner) entries for games the server has deleted or ended can never sync: they are archived, cleared,
+  //    named in one line, and no longer hold up sign-out. Nothing is cleared when the server cannot be asked.
+  seed();
+  ls.setItem(out(ME, "t1", "bnn_game_scores_g5_p1"), JSON.stringify(bundle(3)));
+  ls.setItem(`bnn_game_snap_g5`, JSON.stringify({ game: { name: "Trifecta", code: "610175" }, players: [{ id: "p1", display_name: "Amit" }] }));
+  const mine = unsyncedWork(ls, ME).filter((i) => i.owner === ME);
+  ok(mine.length === 3, `three of mine pending before classification (got ${mine.length})`);
+  ok(splitRetired(mine, [{ id: "g1", status: "not_member" }, { id: "g5", status: "not_member" }]).retired.length === 0, "a game that exists but the member was removed from is NOT retired (the review: removal is not deletion)");
+  const split = splitRetired(mine, [{ id: "g1", status: "ended" }]);   // g5 absent = deleted; the round draft has no game
+  ok(split.retired.length === 2 && split.retired.find((r) => r.item.gameId === "g1")?.reason === "ended" && split.retired.find((r) => r.item.gameId === "g5")?.reason === "deleted", "an ended game's entry and a missing game's entry are retired, each with its reason");
+  ok(split.live.length === 1 && !split.live[0].gameId, "a round draft (no game) stays live");
+  ok(splitRetired(mine, [{ id: "g1", status: "active" }, { id: "g5", status: "active" }]).retired.length === 0, "entries for active games are never retired");
+  ok(retiredSummary(split.retired) === "Unsynced entries for 1 deleted game and 1 ended game were cleared — they could no longer be sent. A recovery copy stays on this phone.", `the one-line account (got: ${retiredSummary(split.retired)})`);
+  const archiveBeforeRetire = ls.getItem(SCORING_ARCHIVE_KEY);
+  const { removed: gone, archived: wasArchived } = retireItems(split.retired, ME, ls);
+  ok(wasArchived, "the archive write is reported");
+  ok(gone.includes(out(ME, "t1", "bnn_game_scores_g1_p1")) && gone.includes(out(ME, "t1", "bnn_game_scores_g5_p1")) && gone.includes("bnn_game_snap_g5"), `the entries and the deleted game's snapshot are removed (${gone.join(", ")})`);
+  ok(ls.getItem("bnn_game_snap_g1") !== null, "an ended game's snapshot stays (the game can still be viewed)");
+  ok(ls.getItem(out(ME, "t1", "bnn_round_draft_v1")) !== null && ls.getItem(out(OTHER, "t9", "bnn_game_scores_g3_p2")) !== null, "the live draft and another identity's outbox are untouched");
+  ok(ls.getItem(SCORING_ARCHIVE_KEY) !== archiveBeforeRetire && (ls.getItem(SCORING_ARCHIVE_KEY) || "").includes("bnn_game_scores_g5_p1"), "a recovery copy was archived before anything was removed");
+  ok(unsyncedWork(ls, ME).filter((i) => i.owner === ME).length === 1, "only the round draft is still pending");
+  // through the flow: the server is asked once, with the items' game ids; a null answer clears nothing
+  seed(); let askedIds: string[][] = [];
+  ok((await retireUnsyncable(unsyncedWork(ls, ME), ME, async (ids) => { askedIds.push(ids); return null; }, ls)).retired.length === 0 && askedIds.length === 1 && askedIds[0].join() === "g1", `the server is asked once, about the member's OWN pending games only (asked ${JSON.stringify(askedIds)}) and null clears nothing`);
+  ok(ls.getItem(out(ME, "t1", "bnn_game_scores_g1_p1")) !== null, "nothing removed when the server could not be asked");
+  ok((await retireUnsyncable(unsyncedWork(ls, ME), ME, async () => { throw new Error("offline"); }, ls)).retired.length === 0, "a throwing lookup clears nothing");
+  ok((await retireUnsyncable([], ME, async (ids) => { askedIds.push(ids); return []; }, ls)).retired.length === 0 && askedIds.length === 1, "no items: the server is not asked");
+  // the review's P1: another identity's outbox (and one saved before the identity was known) is never judged by this member's game list
+  seed();
+  ok((await retireUnsyncable(unsyncedWork(ls, ME), ME, async () => [], ls)).retired.length === 1 && ls.getItem(out(OTHER, "t9", "bnn_game_scores_g3_p2")) !== null && ls.getItem(out("", "t0", "bnn_game_scores_g4_p1")) !== null && ls.getItem("bnn_game_snap_g1") === null, "an empty answer retires only the member's own game entry; the other identity's and the unknown-identity outboxes stay");
+  // sign-out itself: with the only pending game deleted, no question is asked and the sign-out goes through
+  seed(); ls.removeItem(out(ME, "t1", "bnn_round_draft_v1")); asked.length = 0; signOuts = 0;
+  ok((await signOutSafely(ME, { ...deps(null), gameStates: async () => [] })) === true && asked.length === 0 && signOuts === 1, "a deleted game's entry no longer holds up sign-out (no question, signed out)");
+  ok(ls.getItem(out(OTHER, "t9", "bnn_game_scores_g3_p2")) !== null && ls.getItem(out("", "t0", "bnn_game_scores_g4_p1")) !== null, "and the other identities' outboxes survived the sign-out with retirement");
+  ok(retiredSummary([{ item: { key: "k", label: "l", owner: ME, gameId: "g1" }, reason: "deleted" }], false).includes("no recovery copy could be kept"), "when the archive could not be written the note says so");
+
   // 5. nothing pending: no question, straight through
   ls.clear(); ls.setItem("bnn_app_boot_v1", "{}"); asked.length = 0;
   ok((await signOutSafely(ME, deps(null))) === true && asked.length === 0 && ls.getItem("bnn_app_boot_v1") === null, "with nothing pending there is no question and the cache is cleared");

@@ -62,7 +62,7 @@ check("Admin home exposes searchable Games oversight", all(x in manage for x in 
 admin_screen = manage[manage.index("function AdminGamesOversight"):manage.index("function RoundSaveDiag")]
 check("Admin inspection opens existing Game without joining and returns to oversight", all(x in home for x in [
     'setOpenGameId(gid); setOpenGameReturnTab("admin"); setTab("games")',
-    'onExitOpenGame={openGameReturnTab === "admin"',
+    'onExitOpenGame={openGameReturnTab ?',
 ]) and "onExitOpenGame?.()" in tournaments and '.from("game_players").insert' not in admin_screen)
 check("Game room labels system-admin actions explicitly", "System admin repair" in tournaments and "as system admin" in tournaments and 'Admin repair · you are not the organizer' not in tournaments)
 check("organizer UI hides completed Game deletion", "canDelete: !completedGame" in tournaments and "Only a system admin can delete a completed game" in workspace)

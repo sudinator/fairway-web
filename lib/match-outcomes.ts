@@ -10,7 +10,7 @@ import type { Game, Player } from "@/lib/game-types";
 
 export type Side = { key: string; userId: string | null; name: string }[];
 /** kind "singles" = one against one (head-to-head); "pairs" = two against two (partners). winner "a" | "b" | "halved". */
-export type MatchOutcome = { gameId: string; date: string; format: string; kind: "singles" | "pairs"; a: Side; b: Side; winner: "a" | "b" | "halved";
+export type MatchOutcome = { gameId: string; date: string; course: string; format: string; kind: "singles" | "pairs"; a: Side; b: Side; winner: "a" | "b" | "halved";
   /** 212.127: the margin as the scorecard states it, compact — "3&2", "2 up"; "" when halved */
   margin: string };
 /** "3 & 2" → "3&2", "2 UP" → "2 up", "Halved" → "" (the scoring functions' wording, compacted for a list) */
@@ -22,7 +22,7 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
   const playerOf = playerLookup(players);
   const ch = (p: Player) => chBasis(p, game.course_par, holes);
   const side = (keys: string[]): Side => keys.map((k) => { const p = playerOf(k); return { key: k, userId: (p as { user_id?: string | null } | null)?.user_id ?? null, name: p?.display_name ?? "?" }; });
-  const base = { gameId: game.id, date: String((game as { played_at?: string }).played_at || "").slice(0, 10), format: game.game_type };
+  const base = { gameId: game.id, date: String((game as { played_at?: string }).played_at || "").slice(0, 10), course: game.course || "", format: game.game_type };
   const add = (kind: "singles" | "pairs", a: string[], b: string[], lead: number, result?: string) =>
     out.push({ ...base, kind, a: side(a), b: side(b), winner: lead > 0 ? "a" : lead < 0 ? "b" : "halved", margin: lead === 0 ? "" : compactMargin(result) });
 
@@ -62,8 +62,10 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
   return out;
 }
 
-export type H2HRow = { userId: string; name: string; won: number; lost: number; halved: number };
-export type PartnerRow = { userId: string; name: string; played: number; won: number; halved: number; points: number; formats: string[] };
+/** 212.133 (owner): every record opens the games behind it — "Lost 4&3 · Nov 3 · Francis Byrne", newest first */
+export type RecordMatch = { gameId: string; date: string; course: string; format: string; result: "won" | "lost" | "halved"; margin: string; with?: string[]; against: string[] };
+export type H2HRow = { userId: string; name: string; won: number; lost: number; halved: number; matches: RecordMatch[] };
+export type PartnerRow = { userId: string; name: string; played: number; won: number; halved: number; points: number; formats: string[]; matches: RecordMatch[] };
 /** Best partner needs at least this many matches together (owner-approved, Oct 20 2026). */
 export const BEST_PARTNER_MIN = 3;
 const FORMAT_NAME: Record<string, string> = { fourball: "four-ball", alt_shot: "alternate shot", trifecta: "Trifecta" };
@@ -78,21 +80,24 @@ export function memberRecord(outcomes: MatchOutcome[], userId: string): { headTo
     if (!mine) continue;
     const res = o.winner === "halved" ? "halved" : o.winner === mine ? "won" : "lost";
     const theirs = mine === "a" ? o.b : o.a, ours = mine === "a" ? o.a : o.b;
+    const match: RecordMatch = { gameId: o.gameId, date: o.date, course: o.course, format: o.format, result: res, margin: o.margin, with: ours.filter((p) => p.userId !== userId).map((p) => p.name), against: theirs.map((p) => p.name) };
     if (o.kind === "singles") {
       for (const opp of theirs) {
         if (!opp.userId) continue;
-        const r = h2h.get(opp.userId) || { userId: opp.userId, name: opp.name, won: 0, lost: 0, halved: 0 };
-        r[res]++; h2h.set(opp.userId, r);
+        const r = h2h.get(opp.userId) || { userId: opp.userId, name: opp.name, won: 0, lost: 0, halved: 0, matches: [] };
+        r[res]++; r.matches.push(match); h2h.set(opp.userId, r);
       }
     } else {
       for (const mate of ours) {
         if (!mate.userId || mate.userId === userId) continue;
-        const r = partners.get(mate.userId) || { userId: mate.userId, name: mate.name, played: 0, won: 0, halved: 0, points: 0, formats: [] };
-        r.played++; if (!r.formats.includes(o.format)) r.formats.push(o.format); if (res === "won") { r.won++; r.points += 1; } else if (res === "halved") { r.halved++; r.points += 0.5; }
+        const r = partners.get(mate.userId) || { userId: mate.userId, name: mate.name, played: 0, won: 0, halved: 0, points: 0, formats: [], matches: [] };
+        r.played++; r.matches.push(match); if (!r.formats.includes(o.format)) r.formats.push(o.format); if (res === "won") { r.won++; r.points += 1; } else if (res === "halved") { r.halved++; r.points += 0.5; }
         partners.set(mate.userId, r);
       }
     }
   }
+  const newestFirst = (m: RecordMatch[]) => m.sort((x, y) => y.date.localeCompare(x.date) || x.gameId.localeCompare(y.gameId));
+  h2h.forEach((r) => newestFirst(r.matches)); partners.forEach((r) => newestFirst(r.matches));
   return {
     headToHead: [...h2h.values()].sort((x, y) => (y.won + y.lost + y.halved) - (x.won + x.lost + x.halved) || y.won - x.won || x.name.localeCompare(y.name)),
     partners: rankPartnerRecords([...partners.values()]),
@@ -110,4 +115,12 @@ export function rankPartnerRecords(partners: PartnerRow[]): PartnerRow[] {
 }
 export function bestPartnerRecord(partners: PartnerRow[]): PartnerRow | null {
   return rankPartnerRecords(partners).find(p => p.played >= BEST_PARTNER_MIN && partnerRate(p) != null) ?? null;
+}
+
+/** "Lost 4&3 · Nov 3 · Francis Byrne" — one match of a record, as the Profile lists it (the opponent/partner is the row). */
+export function recordMatchLine(m: RecordMatch): string {
+  const verb = m.result === "won" ? "Won" : m.result === "lost" ? "Lost" : "Halved";
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(m.date);
+  const when = d ? new Date(+d[1], +d[2] - 1, +d[3]).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : m.date;
+  return [`${verb}${m.margin ? ` ${m.margin}` : ""}`, when, m.course].filter(Boolean).join(" · ");
 }

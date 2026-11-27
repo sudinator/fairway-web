@@ -9,7 +9,7 @@ Allowed: a posted ROUND's snapshot (rounds-based files), the accessor itself, th
 import re, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 # files whose `.course_handicap` is a ROUND's snapshot or the accessor itself
-ROUND_FILES = {"lib/golf.ts", "lib/round-prep.ts", "lib/personal-bests.ts", "lib/season-summary.ts", "lib/badges.ts", "lib/season-rounds.ts", "lib/game-list-summary.ts",
+ROUND_FILES = {"lib/golf.ts", "lib/round-prep.ts", "lib/personal-bests.ts", "lib/season-summary.ts", "lib/badges.ts", "lib/season-rounds.ts", "lib/game-list-summary.ts", "lib/my-data-export.ts",
                "components/round-detail.tsx", "components/round-editor.tsx", "components/manage.tsx", "lib/draft.ts", "lib/game-shape.ts", "lib/manual-handicap.ts"}
 # exact lines allowed elsewhere (deliberate reads of the stored / previous figure)
 ALLOW = [

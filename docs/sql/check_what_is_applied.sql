@@ -1,4 +1,4 @@
--- check_what_is_applied.sql — which recent migrations (0185 onward, 0185–0240) a database has recorded.
+-- check_what_is_applied.sql — which recent migrations (0185 onward, 0185–0242) a database has recorded.
 -- Run in the Supabase SQL editor (read-only). "missing" rows must be applied, in number order, before the matching release.
 -- Regenerate when a migration is added (212.36 recreated it: the copy referred to in the handoff was not in the package).
 with expected(id) as (values
@@ -57,7 +57,9 @@ with expected(id) as (values
   ('0237_club_round_standings'),
   ('0238_club_round_standings_year'),
   ('0239_club_round_standings_summaries'),
-  ('0240_hole_parent_and_penalty_confirmation_guards')
+  ('0240_hole_parent_and_penalty_confirmation_guards'),
+  ('0241_my_data_exports'),
+  ('0242_deleted_game_truth')
 )
 select e.id, case when m.id is null then 'missing' else 'applied' end as status
 from expected e left join public.schema_migrations m on m.id = e.id

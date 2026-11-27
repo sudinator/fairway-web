@@ -6,15 +6,31 @@ import { C } from "@/lib/golf";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { fetchTestClubIds, withoutTestClubs } from "@/lib/test-clubs";
-import { matchOutcomes, memberRecord, bestPartnerRecord, partnerRate, BEST_PARTNER_MIN, formatsLabel, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
+import { matchOutcomes, memberRecord, bestPartnerRecord, partnerRate, BEST_PARTNER_MIN, formatsLabel, recordMatchLine, type H2HRow, type PartnerRow, type RecordMatch } from "@/lib/match-outcomes";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 
 const pts = (n: number) => (Math.floor(n) === n ? String(n) : `${Math.floor(n) || ""}½`);
+/** The games behind a record, newest first; each opens its game (the recap). Data rows (DISPLAY_RULES): 13/700 cream, 11 sage. */
+function matchList(matches: RecordMatch[], onOpenGame?: (gameId: string) => void) {
+  return (
+    <div data-record-matches style={{ background: C.greenMid, borderRadius: 10, padding: "6px 12px" }}>
+      {matches.map((m) => (
+        <button key={`${m.gameId}:${m.against.join(",")}`} type="button" data-record-match={m.gameId} onClick={(e) => { e.stopPropagation(); onOpenGame?.(m.gameId); }} disabled={!onOpenGame}
+          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 0", background: "none", border: "none", borderTop: `1px solid ${C.green}`, color: C.cream, textAlign: "left", cursor: onOpenGame ? "pointer" : "default", fontSize: 13, fontWeight: 700 }}>
+          <span style={{ flex: 1 }}>{recordMatchLine(m)}{m.with?.length ? <span style={{ color: C.sage, fontWeight: 500 }}> · with {m.with.join(" & ")}</span> : null}</span>
+          {onOpenGame ? <span style={{ color: C.sage, fontSize: 11 }}>Open ›</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-export function HeadToHead({ user }: { user: { id: string } }) {
+export function HeadToHead({ user, onOpenGame }: { user: { id: string }; onOpenGame?: (gameId: string) => void }) {
   const supabase = useMemo(() => createClient(), []);
+  // 212.133 (owner): a record is tappable — it opens the games behind it, each a line "Lost 4&3 · Nov 3 · Francis Byrne"
+  const [open, setOpen] = useState<string | null>(null);
   const [rec, setRec] = useState<{ headToHead: H2HRow[]; partners: PartnerRow[] } | null>(null);
   // 210.2 (review point 9): a failed load is an error with Retry — never "no history", never a partial record.
   const [err, setErr] = useState<string | null>(null);
@@ -67,7 +83,11 @@ export function HeadToHead({ user }: { user: { id: string } }) {
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }} data-h2h>
           <thead><tr><th style={{ ...th, textAlign: "left" }}>Against · singles</th><th style={th}>W</th><th style={th}>L</th><th style={th}>H</th></tr></thead>
           <tbody>{rec.headToHead.map((r) => (
-            <tr key={r.userId}><td style={tdName}>{r.name}</td><td style={td}>{r.won}</td><td style={td}>{r.lost}</td><td style={td}>{r.halved}</td></tr>
+            <React.Fragment key={r.userId}>
+              <tr data-h2h-row={r.userId} onClick={() => setOpen(open === `h:${r.userId}` ? null : `h:${r.userId}`)} style={{ cursor: "pointer" }} aria-expanded={open === `h:${r.userId}`}>
+                <td style={tdName}>{r.name} <span style={{ color: C.sage, fontSize: 11 }}>{open === `h:${r.userId}` ? "▴" : "▾"}</span></td><td style={td}>{r.won}</td><td style={td}>{r.lost}</td><td style={td}>{r.halved}</td></tr>
+              {open === `h:${r.userId}` ? <tr><td colSpan={4} style={{ paddingBottom: 8 }}>{matchList(r.matches, onOpenGame)}</td></tr> : null}
+            </React.Fragment>
           ))}</tbody>
         </table>
       ) : null}
@@ -75,7 +95,10 @@ export function HeadToHead({ user }: { user: { id: string } }) {
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }} data-partners>
           <thead><tr><th style={{ ...th, textAlign: "left" }}>With · four-ball, alt shot, Trifecta</th><th style={th}>Played</th><th style={th}>Won</th><th style={th}>Pts</th><th style={th}>Rate</th></tr></thead>
           <tbody>{rec.partners.map((r) => (
-            <tr key={r.userId}><td style={tdName}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""}</td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td><td style={td}>{r.played >= BEST_PARTNER_MIN && partnerRate(r) != null ? `${Math.round(100 * partnerRate(r)!)}%` : "—"}</td></tr>
+            <React.Fragment key={r.userId}>
+            <tr data-partner-row={r.userId} onClick={() => setOpen(open === `p:${r.userId}` ? null : `p:${r.userId}`)} style={{ cursor: "pointer" }} aria-expanded={open === `p:${r.userId}`}><td style={tdName}>{r.name}{best && best.userId === r.userId ? " ⭐" : ""} <span style={{ color: C.sage, fontSize: 11 }}>{open === `p:${r.userId}` ? "▴" : "▾"}</span></td><td style={td}>{r.played}</td><td style={td}>{r.won}</td><td style={td}>{pts(r.points)}</td><td style={td}>{r.played >= BEST_PARTNER_MIN && partnerRate(r) != null ? `${Math.round(100 * partnerRate(r)!)}%` : "—"}</td></tr>
+            {open === `p:${r.userId}` ? <tr><td colSpan={5} style={{ paddingBottom: 8 }}>{matchList(r.matches, onOpenGame)}</td></tr> : null}
+            </React.Fragment>
           ))}</tbody>
         </table>
       ) : null}

@@ -210,6 +210,24 @@ const FAQ: Faq[] = [
       "Each hole is capped at net double bogey for that calculation.",
     ],
   },
+  {
+    q: "How do I get a copy of my data?",
+    keywords: "download export data csv excel spreadsheet my rounds email copy backup",
+    steps: [
+      "Open Profile and find Your data.",
+      "Tap Email me my data — your rounds, holes and games arrive as three CSV files at the email on your account.",
+      "They open in Excel or Google Sheets. Only your own data is included; nothing from Money. Once a day.",
+    ],
+  },
+  {
+    q: "Where can I see the games behind my head-to-head record?",
+    keywords: "head to head record opponent partner match history won lost halved games",
+    steps: [
+      "Open Profile and find Head-to-head & partners.",
+      "Tap an opponent or partner to list the matches behind the record — the result, date and course of each.",
+      "Tap a match to open that game.",
+    ],
+  },
 ];
 
 const STOP = new Set(

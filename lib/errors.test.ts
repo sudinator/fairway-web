@@ -55,6 +55,14 @@ function eq<T>(a: T, b: T, label: string) {
 { eq(adviceFor({}).code, "BNN-UNK", "an unrecognised error still yields a quotable code");
   ok(adviceFor({}).action.length > 0, "an unrecognised error still gives advice"); }
 
+// 212.135: the app's own rule messages (P0001 raised by an app function, P0002 "Game not found") are shown as written.
+// The owner saw "Couldn't delete that. Try again" three times for a game the server had already deleted.
+{ eq(adviceFor({ code: "P0002", message: "Game not found" }).action, "Game not found", "a rule's own message is shown");
+  eq(adviceFor({ code: "P0001", message: "Only a system admin can delete this game" }).code, "P0001", "and keeps its code");
+  eq(adviceFor({ code: "P0001", message: "The invite has expired" }).action, "The invite has expired", "a rule message is not mistaken for a sign-in problem by the message regexes");
+  eq(adviceFor({ code: "P0001", message: "  " }).code, "P0001", "a P0001 with a blank message keeps its code");
+  ok(adviceFor({ code: "P0001", message: "  " }).action !== "", "and falls through to the generic advice"); }
+
 // The composed string: what failed, what to do, code last.
 {
   const m = failureMessage("Couldn't save the pairing", { code: "42501" });

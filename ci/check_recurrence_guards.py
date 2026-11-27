@@ -155,8 +155,17 @@ for f in list((ROOT / 'ci').glob('*.sh')) + list((ROOT / 'ci').glob('assert-*.sq
         line = text.count('\n', 0, m.start()) + 1
         problems.append(f'J {f.relative_to(ROOT)}:{line}: writes provider-owned cron.job directly — use the scheduler API (212.106)')
 
+# K. a top-level `set role anon` in an assertion file (212.133): the GitHub database lane runs on the Supabase stack, whose
+#    backend closed the connection on exactly that statement in ci/assert-my-data-exports.sql. Check anon by privilege
+#    (has_table_privilege / has_function_privilege, as ci/assert-anon-boundary.sql does) or switch inside a DO block via
+#    execute, as ci/assert-draft-private.sql does — never a bare top-level statement.
+for f in sorted((ROOT / "ci").glob("assert-*.sql")):
+    for i, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+        if re.match(r"\s*set\s+(local\s+|session\s+)?role\s+'?anon'?\s*;", line, re.I):
+            problems.append(f"K {f.relative_to(ROOT)}:{i}: top-level `set role anon` — check anon by privilege or switch inside a DO block (212.133)")
+
 if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks, no app-role calls to server-only functions; 9 denial-call canaries; scheduler API only, 6 metadata canaries)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks, no app-role calls to server-only functions; 9 denial-call canaries; scheduler API only, 6 metadata canaries; no top-level anon role switch in assertions)")

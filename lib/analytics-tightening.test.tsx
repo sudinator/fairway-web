@@ -7,7 +7,7 @@ import {completePenaltyRound} from './round-penalties';
 import {analyticsCoverage} from './analytics-quality';
 import {ShotSynthesis} from '../components/compare-stats';
 import type {Round} from './golf';
-const partner=(id:string,played:number,points:number):PartnerRow=>({userId:id,name:id,played,points,won:Math.floor(points),halved:points%1?1:0,formats:['fourball']});
+const partner=(id:string,played:number,points:number):PartnerRow=>({userId:id,name:id,played,points,won:Math.floor(points),halved:points%1?1:0,formats:['fourball'],matches:[]});
 ok(bestPartnerRecord([partner('Frequent',12,6),partner('Unbeaten',3,3)])?.userId==='Unbeaten','partnership rate beats accumulated volume');
 ok(bestPartnerRecord([partner('Small',3,3),partner('Larger',6,6)])?.userId==='Larger','equal rate favours larger sample');
 ok(bestPartnerRecord([partner('Two',2,2),partner('Qualified',4,2)])?.userId==='Qualified','three-match minimum retained');

@@ -78,6 +78,7 @@
     "claim_marker(uuid)": "authenticated",
     "claim_scoring_device(uuid,uuid,boolean)": "authenticated",
     "club_pending_signups(uuid)": "authenticated",
+    "club_round_standings_data(uuid,integer)": "authenticated",
     "course_api_status(text[])": "authenticated",
     "course_field_averages(uuid,text)": "authenticated",
     "course_owner_groups(uuid)": "authenticated",
@@ -110,8 +111,10 @@
     "finish_tee_group_and_post(uuid)": "authenticated",
     "game_added_note(uuid,uuid)": "",
     "game_announced_or_mine(uuid)": "authenticated",
+    "game_exists(uuid)": "authenticated",
     "game_scoring_started(uuid)": "",
     "game_setup_line(uuid,uuid)": "",
+    "games_states(uuid[])": "authenticated",
     "get_admin_analytics()": "authenticated",
     "get_admin_engagement()": "authenticated",
     "get_admin_extra_stats()": "authenticated",
@@ -226,8 +229,7 @@
     "update_game_contest(uuid,text,integer[],text,text)": "authenticated",
     "upsert_tee_time_rsvp(uuid,uuid,text,text[])": "authenticated",
     "valid_invite(text)": "",
-    "void_contest_entry(uuid,boolean)": "authenticated",
-    "club_round_standings_data(uuid,integer)": "authenticated"
+    "void_contest_entry(uuid,boolean)": "authenticated"
   },
   "guard_exceptions": {
     "daily_active": "the activity ping (0206)",
@@ -849,6 +851,12 @@
       "roles": "public",
       "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = money_audit.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
     },
+    "my_data_exports.own data exports": {
+      "check": null,
+      "cmd": "r",
+      "roles": "authenticated",
+      "using": "(user_id = auth.uid())"
+    },
     "notifications.create notifications": {
       "check": "(user_id = auth.uid())",
       "cmd": "a",
@@ -1127,6 +1135,7 @@
     "authenticated:holes": "DELETE,INSERT,SELECT,UPDATE",
     "authenticated:member_badges": "SELECT",
     "authenticated:money_audit": "SELECT",
+    "authenticated:my_data_exports": "SELECT",
     "authenticated:notifications": "DELETE,INSERT,SELECT,UPDATE",
     "authenticated:nudges": "SELECT",
     "authenticated:player_cards": "SELECT",
