@@ -33,7 +33,7 @@ async function main() {
   // tap a name → that player's matches, and back
   await act(async () => { first?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   ok(!!el.querySelector("[data-colosseum-player='u-b']") && el.querySelectorAll("[data-colosseum-match]").length === 3, "tapping Raj opens his three matches");
-  ok((el.textContent || "").includes("gives 3") || (el.textContent || "").includes("gets 3"), "the stakes line names the handicap difference");
+  ok(/(gives (you|Raj) 3|you give 3)/.test(el.textContent || ""), `the stakes line names the handicap difference (${(el.textContent || "").match(/.{0,20}3.{0,10}/)?.[0]})`);
   await act(async () => { el.querySelector("[data-colosseum-back]")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   ok(!!el.querySelector("[data-colosseum-board]"), "back to the table");
 

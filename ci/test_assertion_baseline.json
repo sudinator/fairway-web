@@ -1,5 +1,5 @@
 {
-  "total": 447735,
+  "total": 447784,
   "suites": {
     "(unnamed suites)": 522,
     "add player blocked": 4,
@@ -13,7 +13,7 @@
     "analytics quality": 35,
     "analytics read": 12,
     "analytics tightening": 22,
-    "approved match results presentation": 574,
+    "approved match results presentation": 580,
     "badges": 75,
     "bucket-model": 34,
     "card": 12,
@@ -59,6 +59,8 @@
     "groups start over": 6,
     "groups unit move": 4,
     "half-stroke simulation": 168914,
+    "head-to-head": 26,
+    "head-to-head card render": 17,
     "head-to-head errors": 8,
     "held notice": 5,
     "hole result consistency": 981,

@@ -27,8 +27,10 @@ scoring = (ROOT / "components/game/scoring-views.tsx").read_text(encoding="utf-8
 if re.search(r'<div\s+style=\{\{\s*overflowX:\s*"auto"', scoring):
     errors.append("components/game/scoring-views.tsx: match progression must use HScroll")
 # 204.0: one progression table (the Ryder table serves team and no-team singles alike), inside HScroll.
-if scoring.count("<HScroll>") < 1 or scoring.count("MATCH PROGRESSION") < 1:
-    errors.append("components/game/scoring-views.tsx: expected the match progression table inside HScroll")
+# 212.137: that table is the head-to-head card (components/game/head-to-head-card), which singles opens from Details ›.
+card = (ROOT / "components/game/head-to-head-card.tsx").read_text(encoding="utf-8")
+if card.count("<HScroll>") < 1 or card.count("MATCH PROGRESSION") < 1 or "HeadToHeadCard" not in scoring:
+    errors.append("components/game/head-to-head-card.tsx: expected the match progression table inside HScroll, used by scoring-views")
 
 if errors:
     print("MOBILE FIT CONTRACT: FAIL")

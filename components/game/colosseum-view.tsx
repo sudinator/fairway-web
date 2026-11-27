@@ -8,7 +8,8 @@
 import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { Eyebrow, btn } from "@/components/ui";
-import { colosseumStandings, colosseumPlayerMatches, colosseumSummaryLine, colosseumSidePoints, isCupColosseum, fmtHalf, type ColosseumRow } from "@/lib/colosseum";
+import { colosseumStandings, colosseumPlayerMatches, colosseumSummaryLine, colosseumSidePoints, isCupColosseum, fmtHalf, colosseumSides, colosseumStakes, type ColosseumRow } from "@/lib/colosseum";
+import { HeadToHeadCard } from "@/components/game/head-to-head-card";
 import { pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 
@@ -20,6 +21,8 @@ export function ColosseumView({ game, players, user }: { game: Game; players: Pl
   const me = players.find((p) => p.user_id === user.id);
   const myKey = me ? pkey(me) : null;
   const [open, setOpen] = useState<string | null>(null);
+  /** 212.137: a match opened from a player's list — the head-to-head card, the viewer on the left when they are in it */
+  const [match, setMatch] = useState<{ a: string; b: string } | null>(null);
   const th: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 700, textAlign: "right", padding: "4px 10px" };
   const td: React.CSSProperties = { borderTop: `1px solid ${C.borderGreen}`, padding: "6px 12px", textAlign: "right", fontSize: 13, color: C.cream, fontVariantNumeric: "tabular-nums" };
   if (st.rows.length < 2) return <div style={{ color: C.sage, fontSize: 13, marginTop: 14 }}>A Colosseum needs at least two players.</div>;
@@ -29,6 +32,11 @@ export function ColosseumView({ game, players, user }: { game: Game; players: Pl
   const sides = cup ? colosseumSidePoints(st, (k) => st.rows.find((r) => r.key === k)?.team) : null;
   const teamName = (key: string | null) => teams?.find((t) => t.key === key)?.name ?? key ?? "";
   const openRow = open ? st.rows.find((r) => r.key === open) : null;
+  if (match) {
+    const aKey = match.a === myKey || match.b !== myKey ? match.a : match.b, bKey = aKey === match.a ? match.b : match.a;
+    const sides = colosseumSides(game, players, aKey, bKey);
+    if (sides) return <HeadToHeadCard holes={game.holes_meta || []} a={sides.a} b={sides.b} basis="course" aIsViewer={aKey === myKey} stakes={colosseumStakes(game, players, aKey, bKey, aKey === myKey)} onBack={() => setMatch(null)} backLabel={`‹ ${openRow?.name ?? "Standings"}`} />;
+  }
   if (openRow) {
     const lines = colosseumPlayerMatches(st, openRow.key);
     return (
@@ -43,20 +51,20 @@ export function ColosseumView({ game, players, user }: { game: Game; players: Pl
           {lines.map((m) => {
             const color = !m.started ? C.sage : m.lead > 0 ? C.cream : m.lead < 0 ? C.overRedDark : C.sage;   // DISPLAY_RULES 7: never gold on greenLight
             return (
-              <div key={m.opponent} data-colosseum-match={m.opponent} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, fontSize: 13 }}>
+              <div key={m.opponent} data-colosseum-match={m.opponent} onClick={() => setMatch({ a: openRow.key, b: m.opponent })} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, fontSize: 13, cursor: "pointer" }}>
                 <div>
                   <div style={{ color: C.cream, fontWeight: 700 }}>{m.opponentName}</div>
-                  <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{m.gives > 0 ? `gives ${m.gives}` : m.gives < 0 ? `gets ${-m.gives}` : "level"}{m.group ? (m.group === openRow.group ? " · same group" : ` · group ${m.group}`) : ""}</div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{m.gives > 0 ? `${openRow.key === myKey ? "you give" : `${openRow.name} gives`} ${m.gives}` : m.gives < 0 ? `${m.opponentName} gives ${openRow.key === myKey ? "you" : openRow.name} ${-m.gives}` : "level"}{m.group ? (m.group === openRow.group ? " · same group" : ` · group ${m.group}`) : ""}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ color, fontWeight: 800 }}>{m.started ? m.result : "—"}</div>
-                  <div style={{ color: C.sage, fontSize: 11 }}>{m.started ? (m.decided ? "final" : `thru ${m.thru}`) : "not started"}</div>
+                  <div style={{ color: C.sage, fontSize: 11 }}>{m.started ? (m.decided ? "final" : `thru ${m.thru}`) : "not started"} ›</div>
                 </div>
               </div>
             );
           })}
         </div>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>Each match is this player's net score against the other's on every hole — the strokes on their own card. "Gives 3" is the difference in playing handicaps, shown for the stakes.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>Each match is this player's net score against the other's on every hole — the strokes on their own card. "You give 3" is the difference in playing handicaps, shown for the stakes. Tap a match for the hole-by-hole card.</div>
       </div>
     );
   }

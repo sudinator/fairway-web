@@ -1,4 +1,5 @@
 "use client";
+import { HeadToHeadCard } from "@/components/game/head-to-head-card";
 import { askConfirm } from "@/components/confirm";
 import { shortNamer } from "@/lib/short-names";
 import { sortByName } from "@/lib/names";
@@ -22,7 +23,6 @@ import {
   netBySix,
   matchStatus,
   matchStrokesFor,
-  matchProgress,
   matchLeadLabel,
   trifectaRowState,
   matchAllowance,
@@ -50,7 +50,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, hasCourseHandicap, shapeOf, dotStrokes, fullStrokes, altShotSides, skinsTieOf } from "@/lib/game-shape";
+import { pkey, chBasis, hasCourseHandicap, shapeOf, dotStrokes, fullStrokes, altShotSides, skinsTieOf, strokeSets } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
@@ -83,7 +83,6 @@ import type { TrifectaRowSide } from "@/lib/golf";
 import type { Game, Player } from "@/lib/game-types";
 import { singlesTeamStandings, foursomeTeamStandings, trifectaResults, membersOf, altShotInputsFor, fmtPoints } from "@/lib/game-results";
 import { teamAccent, teamColour, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
-import { HScroll } from "@/components/hscroll";
 import { addPairing as nextPairingAdd, removePairing as nextPairingRemove, addFoursome as nextFoursomeAdd, removeFoursome as nextFoursomeRemove, renameFoursome as nextFoursomeRename, assignFoursomePlayer, unassignFoursomePlayer, deriveTeeGroupsFromFoursomes } from "@/lib/game-structure";
 
 const supabase = createClient();
@@ -745,24 +744,7 @@ export function MatchView({
           : st.lead === 0
             ? "All square"
             : `${leader} ${Math.abs(st.lead)} UP`;
-        const progressionLeads = matchProgress(
-          game.holes_meta,
-          pa.scores || [],
-          pb.scores || [],
-          chBasis(pa, game.course_par, game.holes_meta?.length),
-          chBasis(pb, game.course_par, game.holes_meta?.length),
-          game.allowance_pct ?? 100,
-        );
-        const progressionRows = game.holes_meta.map((hole, h) => {
-          const lead = progressionLeads[h];
-          const ga = pa.scores?.[h] ?? null;
-          const gb = pb.scores?.[h] ?? null;
-          if (lead == null || ga == null || gb == null || ga <= 0 || gb <= 0) return null;
-          const allocHoles = game.holes_meta.map((x) => ({ hole_number: x.n, stroke_index: x.si }));
-          const aNet = ga - matchStrokesFor(allow.a, hole.si, allocHoles);
-          const bNet = gb - matchStrokesFor(allow.b, hole.si, allocHoles);
-          return { hole: hole.n, aNet, bNet, lead };
-        }).filter((row): row is { hole: number; aNet: number; bNet: number; lead: number } => row != null);
+        // (the per-hole net rows this view built itself were retired in 212.137 — the head-to-head card below draws them)
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const iAmIn = pr.a === myKey || pr.b === myKey;
         const toggleProgress = () => setOpenProgress((v) => v === idx ? null : idx);
@@ -830,35 +812,18 @@ export function MatchView({
 
               {openProgress === idx && (
                 <div style={{ background: C.greenLight, padding: "8px 12px", borderLeft: `1px solid ${iAmIn ? C.gold : C.borderGreen}`, borderRight: `1px solid ${iAmIn ? C.gold : C.borderGreen}`, borderBottom: `1px solid ${iAmIn ? C.gold : C.borderGreen}` }}>
-                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 7 }}>MATCH PROGRESSION</div>
-                  {progressionRows.length === 0 ? (
-                    <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
-                  ) : (
-                    <HScroll>
-                      <div style={{ minWidth: 330 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
-                          <span>HOLE</span>
-                          <span>{shortOf(pa)} NET</span>
-                          <span>{shortOf(pb)} NET</span>
-                          <span style={{ textAlign: "right" }}>MATCH</span>
-                        </div>
-                        {progressionRows.map((row) => {
-                          const aWon = row.aNet < row.bNet;
-                          const bWon = row.bNet < row.aNet;
-                          const label = matchLeadLabel(row.lead);
-                          return (
-                            <div key={row.hole} style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, alignItems: "center", padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, color: C.cream, fontSize: 12 }}>
-                              <span style={{ color: C.sage }}>{row.hole}</span>
-                              <span style={{ fontWeight: aWon ? 800 : 500, color: aWon ? C.gold : C.cream }}>{row.aNet}</span>
-                              <span style={{ fontWeight: bWon ? 800 : 500, color: bWon ? C.gold : C.cream }}>{row.bNet}</span>
-                              <span style={{ textAlign: "right", fontWeight: 800, color: label === "AS" ? C.cream : row.lead > 0 ? C.gold : C.sage }}>{label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </HScroll>
-                  )}
-                  <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
+                  {/* 212.137 (owner): the head-to-head card — both players' gross and net, who won each hole, the running
+                      state, what is needed from here, the strokes to come and the swing. The viewer is on the left when in it. */}
+                  {(() => {
+                    const viewerIsB = pkey(pb) === myKey;   // pa/pb may already be swapped for team display — test the players, not the stored pairing
+                    const [L, R, aL, aR] = viewerIsB ? [pb, pa, allow.b, allow.a] : [pa, pb, allow.a, allow.b];
+                    // each side's strokes from strokeSets' opponent set — the one source for every dot (185.0), the same
+                    // numbers matchStatus scores with (pairStrokes → matchStrokesFor off the difference)
+                    const sideOf = (p: typeof pa) => ({ name: p.display_name, gross: game.holes_meta.map((_, h) => p.scores?.[h] ?? null), strokes: game.holes_meta.map((x) => strokeSets(game, p, x.si, players).find((set) => set.key === "opponent")?.strokes ?? 0) });
+                    const give = Math.round(aL) - Math.round(aR);
+                    const stakes = `${give > 0 ? `${iAmIn ? "You get" : `${L.display_name} gets`} ${give}` : give < 0 ? `${R.display_name} gets ${-give}` : "Level"} · strokes off the difference`;
+                    return <HeadToHeadCard holes={game.holes_meta} a={sideOf(L)} b={sideOf(R)} basis="opponent" aIsViewer={iAmIn} stakes={stakes} host="greenLight" />;
+                  })()}
                 </div>
               )}
 

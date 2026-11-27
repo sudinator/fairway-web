@@ -8,6 +8,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 src = (root / "components/game/scoring-views.tsx").read_text(encoding="utf-8")
+card = (root / "components/game/head-to-head-card.tsx").read_text(encoding="utf-8")   # 212.137
 
 def need(cond, msg):
     if not cond:
@@ -31,7 +32,7 @@ checks = [
     ('final halve labels both sides', 'const finalHalved = st.thru > 0 && st.thru === game.holes_meta.length && st.lead === 0' in block and block.count('finalHalved ? "Halved"') == 2 and '>Final<' in block),
     ('no redundant down status', ' DN' not in block and '`DN`' not in block),
     ('details stays clickable', block.count('Details ›') == 2 and block.count('onClick={toggleProgress}') >= 3),
-    ('progression remains canonical', 'matchProgress(' in src and 'MATCH PROGRESSION' in src and 'Net scores drive the running match position' in src),
+    ('progression remains canonical', 'HeadToHeadCard' in src and 'MATCH PROGRESSION' in card and 'Net scores drive the running match position' in card and 'matchCloseoutStatus' in (root / "lib/head-to-head.ts").read_text(encoding="utf-8")),
 ]
 for label, ok in checks:
     need(ok, label)

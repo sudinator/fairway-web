@@ -14,8 +14,9 @@
  * points break by the points won in the matches between the tied players, then by aggregate holes up, then name.
  */
 import { matchCloseoutStatus, type MatchCloseoutStatus, type MatchHoleMeta } from "./golf";
-import { fullStrokes, chBasis, pkey, type DotGame, type ShapePlayer } from "./game-shape";
+import { fullStrokes, strokeSets, chBasis, pkey, type DotGame, type ShapePlayer } from "./game-shape";
 import { applyAllowance } from "./golf";
+import { matchStateLabel, type H2HSide } from "./head-to-head";
 
 export type ColosseumPlayer = ShapePlayer & { display_name?: string | null; scores?: (number | null)[] | null; tee_group?: number | null };
 /** A Ryder Cup Colosseum (owner, Nov 27): two sides, and only pairs on OPPOSITE sides are matches — 6 v 6 is 36. */
@@ -28,7 +29,7 @@ export type ColosseumMatch = {
   /** running lead from a's perspective after each hole both have played (null = not yet) */
   progress: (number | null)[];
   status: MatchCloseoutStatus;
-  /** playing-handicap difference, positive = a gives strokes to b (shown for the stakes; the strokes are on each card) */
+  /** playing-handicap difference, positive = a (the lower handicap) gives strokes to b (shown for the stakes; the strokes are on each card) */
   gives: number;
 };
 export type ColosseumRow = {
@@ -51,7 +52,7 @@ export const cupColosseumMatchCount = (players: { team?: string | null }[]) =>
 
 /** In the field: everyone who is playing, plus a player marked Out who has already scored — their matches stand on the
  *  holes played (the singles rule); a no-show who never scored is simply not in the field. */
-const inField = (p: ColosseumPlayer) => !p.no_show || (p.scores || []).some((x) => x != null && x > 0);
+export const inField = (p: ColosseumPlayer) => !p.no_show || (p.scores || []).some((x) => x != null && x > 0);
 /** The ONE match-count rule (the header, the line-up, the view, the Cup): n(n−1)/2, or |A| × |B| with two sides. */
 export function colosseumMatchCountFor(game: { game_type: string; teams?: unknown }, players: ColosseumPlayer[]): number {
   const field = players.filter(inField);
@@ -91,7 +92,7 @@ export function colosseumMatches(game: ColosseumGame, players: ColosseumPlayer[]
         if (x < y) lead++; else if (y < x) lead--;
         return lead;
       });
-      out.push({ a: pkey(a), b: pkey(b), progress, status: matchCloseoutStatus(progress, holeCount), gives: ph(a) - ph(b) });
+      out.push({ a: pkey(a), b: pkey(b), progress, status: matchCloseoutStatus(progress, holeCount), gives: ph(b) - ph(a) });   // the lower handicap GIVES strokes
     }
   }
   return out;
@@ -162,6 +163,27 @@ export function colosseumSidePoints(st: ColosseumStandings, teamOf: (key: string
   return out;
 }
 
+/** The two sides of one Colosseum match for the head-to-head card: gross per hole and each player's OWN strokes. */
+export function colosseumSides(game: ColosseumGame, players: ColosseumPlayer[], aKey: string, bKey: string): { a: H2HSide; b: H2HSide } | null {
+  const holes = game.holes_meta || [];
+  const side = (key: string): H2HSide | null => {
+    const p = players.find((x) => pkey(x) === key); if (!p) return null;
+    // the course set from strokeSets — the one source for every dot (185.0); a Colosseum is the course basis
+    return { name: p.display_name || "—", gross: holes.map((_, i) => p.scores?.[i] ?? null), strokes: holes.map((h) => strokeSets(game, p, h.si, players).find((x) => x.key === "course")?.strokes ?? 0) };
+  };
+  const a = side(aKey), b = side(bKey);
+  return a && b ? { a, b } : null;
+}
+/** "You give 9 · net v net" / "Raj gives you 3 · net v net" — the stakes line for the card, from a's side. */
+export function colosseumStakes(game: ColosseumGame, players: ColosseumPlayer[], aKey: string, bKey: string, aIsViewer: boolean): string {
+  const holeCount = game.holes_meta?.length || 18;
+  const ph = (k: string) => { const p = players.find((x) => pkey(x) === k); return p ? Math.round(applyAllowance(chBasis(p, game.course_par, holeCount), game.allowance_pct ?? 100)) : 0; };
+  const d = ph(bKey) - ph(aKey);   // positive: a (the lower handicap) gives strokes
+  const aName = players.find((x) => pkey(x) === aKey)?.display_name || "—", bName = players.find((x) => pkey(x) === bKey)?.display_name || "—";
+  const who = aIsViewer ? "You" : aName;
+  return `${d > 0 ? `${who} give${aIsViewer ? "" : "s"} ${d}` : d < 0 ? `${bName} gives ${aIsViewer ? "you" : aName} ${-d}` : "Level handicaps"} · net v net`;
+}
+
 export type ColosseumOpponentLine = {
   opponent: string; opponentName: string; group: number | null;
   /** from this player's perspective */
@@ -182,12 +204,8 @@ export function colosseumPlayerMatches(st: ColosseumStandings, key: string): Col
   return out.sort((x, y) => y.lead - x.lead || x.opponentName.localeCompare(y.opponentName));
 }
 
-/** "3 & 2", "2 UP", "Halved" for a decided match; "2 up", "1 down", "A/S" while in play; "" before it starts. */
-export function resultFor(status: MatchCloseoutStatus, lead: number): string {
-  if (status.thru === 0) return "";
-  if (status.decided) return status.result === "Halved" ? "Halved" : lead > 0 ? `Won ${status.result}` : `Lost ${status.result}`;
-  return lead === 0 ? "A/S" : `${Math.abs(lead)} ${lead > 0 ? "up" : "down"}`;
-}
+/** The match's state from one side — the one printer (lib/head-to-head matchStateLabel). */
+export const resultFor = (status: MatchCloseoutStatus, lead: number): string => matchStateLabel(status, lead);
 
 /** "4 up · 1 down · 2 halved so far" — the strip above the standings. */
 export function colosseumSummaryLine(st: ColosseumStandings, key: string): string {

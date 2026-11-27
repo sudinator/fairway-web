@@ -93,5 +93,18 @@ for(const bestBall of [true,false]){
  if(bestBall){ok(t.el.textContent?.includes('VIOLET')&&t.el.textContent?.includes('BURGUNDY'),'2 v 2 uses actual team names above players');ok(!t.el.textContent?.includes('PAIR 1'),'named team no longer labelled Pair 1');}
  ok(t.el.textContent?.includes('2–0'),'skins counts unchanged');ok(t.el.textContent?.includes('carrying'),'unresolved carry retained');ok(!t.el.textContent?.includes('2 UP'),'skins are never match-play UP');t.unmount();
 }
+// 212.137: Details › opens the head-to-head card from the VIEWER's side — also when the stored pairing is display-reversed
+// (team match, pairing stored {a: Burgundy's Yusuf, b: Violet's Xavier}: Violet is shown left, so pa is Xavier already).
+{
+ const f=fixture('match',2,6,18);f.game.pairings=[{a:'y',b:'x'}];f.players=[f.players[0],f.players[2]];
+ for(const [id,left] of [['x','Xavier'],['y','Yusuf']] as [string,string][]){
+  const t=renderScreen(<MatchView game={f.game} players={f.players} user={{id}} isCreator={false} mode="play" onChanged={onChanged}/>);
+  const details=[...t.el.querySelectorAll<HTMLElement>('button')].find(b=>b.textContent?.includes('Details'))!;
+  act(()=>{details.dispatchEvent(new MouseEvent('click',{bubbles:true}));});
+  const card=t.el.querySelector('[data-h2h-card]')!;ok(!!card,`${left}: the card opens`);
+  ok((card.textContent||'').startsWith('')&&(card.querySelector('[data-h2h-card] > div:nth-child(1)')?.textContent||card.textContent||'').includes(`${left} v `),`${left} is on the left of the card (${(card.textContent||'').slice(0,40)})`);
+  ok((card.textContent||'').includes('To win:'),'the needed line is worded for the viewer');t.unmount();
+ }
+}
 eq(changed,0,'opening/closing results triggers no mutation callback');
 report('approved match results presentation');

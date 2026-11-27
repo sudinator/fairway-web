@@ -29,7 +29,7 @@ eq("16 players = 120 matches", colosseumMatchCount(16), 120);
   eq("the first four holes are halved (B's strokes)", m.progress.slice(0, 4), [0, 0, 0, 0]);
   eq("A leads by one from the 5th", m.progress[4], 1);
   eq("the match closes out when the lead passes the holes left: 8 up with 6 to play after the 12th", [m.status.decided, m.status.result, m.status.thru], [true, "8 & 6", 12]);
-  eq("A gives B 4 is read as a −4 difference from A's side", m.gives, -4);
+  eq("A (scratch) gives B 4", m.gives, 4);
   const st = colosseumStandings(game, [a, b]);
   eq("A has the point", st.rows.map((r) => [r.name, r.points, r.rank]), [["Amit", 1, 1], ["Ben", 0, 2]]);
 }
@@ -39,7 +39,7 @@ eq("16 players = 120 matches", colosseumMatchCount(16), 120);
   const a = P("a", "Amit", 0, par(18)), b = P("b", "Ben", 4, Array(18).fill(5));
   const [m] = colosseumMatches({ ...game, allowance_pct: 50 }, [a, b]);
   eq("50% allowance halves two holes, not four", m.progress.slice(0, 3), [0, 0, 1]);
-  eq("and the stakes line shows the allowanced difference", m.gives, -2);
+  eq("and the stakes line shows the allowanced difference", m.gives, 2);
 }
 
 // a 4-player field, hand-worked. All scratch so net = gross. Holes 1..3 scored by everyone; D in another group is

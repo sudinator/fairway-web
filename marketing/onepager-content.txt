@@ -3,7 +3,7 @@ Birdie Num Num one-pager content (auto-generated from lib/capabilities.json)
 TAGLINE: Live scoring, real handicaps, and every game your group loves — in one free app you add to your phone.
 
 == CLUB EDITION ==
-- Every format you play: Stableford, stroke play, skins, singles, four-ball, Trifecta, Alternate Shot and Scramble - scored hole by hole.
+- Every format you play: Stableford, stroke play, skins, singles, four-ball, Trifecta, Alternate Shot, Scramble and the Colosseum (everyone plays everyone) - scored hole by hole.
 - Your own Ryder Cup: Create teams and scheduled sessions. Follow match points, standings and the overall result across your event.
 - Live, shared scoring: One keeper enters the group and standings update in real time. Share a live link and anyone can follow the round from the clubhouse.
 - Handicaps that keep themselves: Track a WHS-style index, with automatic course handicaps and net scoring. Or enter your own handicap index.
@@ -15,7 +15,7 @@ TAGLINE: Live scoring, real handicaps, and every game your group loves — in on
 - Built for the course: Save scores on your phone when the signal drops, then sync when connected. Phone alerts keep your group in the loop.
 
 == TGC EDITION ==
-- Every format you play: Stableford, stroke play, skins, singles, four-ball, Trifecta, Alternate Shot and Scramble - scored hole by hole.
+- Every format you play: Stableford, stroke play, skins, singles, four-ball, Trifecta, Alternate Shot, Scramble and the Colosseum (everyone plays everyone) - scored hole by hole.
 - Your own Ryder Cup: Create teams and scheduled sessions. Follow match points, standings and the overall result across your event.
 - Live, shared scoring: One keeper enters the group and standings update in real time. Share a live link and anyone can follow the round from the clubhouse.
 - Handicaps that keep themselves: Track a WHS-style index, with automatic course handicaps and net scoring. Or enter your own handicap index.

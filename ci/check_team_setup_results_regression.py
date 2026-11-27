@@ -14,6 +14,7 @@ org = read('components/game/organizer-panel.tsx')
 ws = read('components/game/setup/game-setup-workspace.tsx')
 seg = read('components/game/segment-views.tsx')
 score = read('components/game/scoring-views.tsx')
+card = read('components/game/head-to-head-card.tsx')   # 212.137: the progression table lives here
 
 checks = [
     ('create fourball names visible', 'teamMode || gameType === "fourball" || gameType === "alt_shot"' in trn),
@@ -27,10 +28,10 @@ checks = [
     # score, and removing it in 190.2 failed a guard whose real intent is "the panel opens". The
     # caret plus aria-expanded is the affordance, and setOpenProgress is the mechanism.
     ('match progression is clickable',
-     'MATCH PROGRESSION' in score and 'setOpenProgress' in score
+     'HeadToHeadCard' in score and 'setOpenProgress' in score
      and 'onClick={toggleProgress}' in score and 'aria-expanded={openProgress === idx}' in score),
-    # 202.2: names come through the one shortening rule (lib/short-names), not a hand split.
-    ('match progression shows both net scores', 'shortOf(pa)} NET' in score and 'shortOf(pb)} NET' in score and 'Net scores drive the running match position' in score),
+    # 212.137: the progression is the head-to-head card — both players' gross AND net, hole result, running state.
+    ('match progression shows both players\' gross and net', 'MATCH PROGRESSION' in card and 'Net scores drive the running match position' in card and '>net</th>' in card and 'gross</th>' in card),
 ]
 for label, ok in checks:
     need(ok, label)

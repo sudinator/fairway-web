@@ -43,11 +43,12 @@ export function HScroll({
       }
     };
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
+    // 212.137: guarded — a browser (or the render harness) without ResizeObserver still scrolls; it just doesn't re-measure on resize
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
     el.addEventListener("scroll", update, { passive: true });
     return () => {
-      ro.disconnect();
+      ro?.disconnect();
       el.removeEventListener("scroll", update);
     };
   }, [children]);

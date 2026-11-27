@@ -7,6 +7,7 @@ import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/li
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
 import { ColosseumView } from "@/components/game/colosseum-view";
+import { IndividualLeaderboard } from "@/components/game/individual-leaderboard";
 import { colosseumMatchCountFor, isCupColosseum } from "@/lib/colosseum";
 import { cupScrambleMatches, scrambleTeamsOf, cupSideNames, type ScrambleGroup, scrambleTeeGroups } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
@@ -4498,6 +4499,8 @@ function GameRoom({
               Results tab, header and pair boxes suppressed (the scorecard already names the group). */}
           {/* 212.2: a scramble's leaderboard (or matches) under the card, as the other team formats show theirs */}
           {game.game_type === "scramble" && <ScrambleView game={game} players={players} altShotScores={altShotScores} />}
+          {/* 212.137 (owner): everyone's card under the scorecard, with "v you" and the head-to-head card a tap away */}
+          {game.game_type === "colosseum" && <IndividualLeaderboard game={game} players={players} user={user} />}
           {(game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (() => {
             const keys = new Set(cardPlayers.map((p) => pkey(p)));
             const mineF = (game.foursomes || []).find((f) => f.a.some((k) => keys.has(k)) || f.b.some((k) => keys.has(k)));
