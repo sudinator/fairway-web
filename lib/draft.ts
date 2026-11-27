@@ -382,13 +382,14 @@ export function loadSyncedWatermark(gameId: string, rowId: string): { scores: an
   } catch { return null; }
 }
 
-// Count holes whose local backup differs from the watermark (any tracked field).
-// With no watermark yet, every entered hole counts as pending.
-export function rowPendingHoles(
+// The holes (1-based) whose local backup differs from the watermark on any tracked field. With no watermark yet, every
+// entered hole counts as pending. Deletions and stats-only edits also require server confirmation. ONE rule: the count
+// (rowPendingHoles), the Profile's "holes 3, 7" (lib/sign-out) and the update interlock all read this.
+export function pendingHoleNumbers(
   backup: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
   wm: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
-): number {
-  if (!backup) return 0;
+): number[] {
+  if (!backup) return [];
   const w = wm || { scores: [], putts: [], fairways: [], penalties: [], sand: [] };
   const n = Math.max(
     backup.scores?.length || 0, backup.putts?.length || 0, backup.fairways?.length || 0,
@@ -396,7 +397,7 @@ export function rowPendingHoles(
     w.scores?.length || 0, w.putts?.length || 0, w.fairways?.length || 0,
     w.penalties?.length || 0, w.sand?.length || 0,
   );
-  let c = 0;
+  const out: number[] = [];
   for (let i = 0; i < n; i++) {
     const diff =
       (backup.scores?.[i] ?? null) !== (w.scores?.[i] ?? null) ||
@@ -404,10 +405,16 @@ export function rowPendingHoles(
       (backup.fairways?.[i] ?? null) !== (w.fairways?.[i] ?? null) ||
       (backup.penalties?.[i] ?? null) !== (w.penalties?.[i] ?? null) ||
       (backup.sand?.[i] ?? null) !== (w.sand?.[i] ?? null);
-    // Deletions and stats-only edits also require server confirmation.
-    if (diff) c++;
+    if (diff) out.push(i + 1);
   }
-  return c;
+  return out;
+}
+// Count holes whose local backup differs from the watermark (any tracked field).
+export function rowPendingHoles(
+  backup: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
+  wm: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
+): number {
+  return pendingHoleNumbers(backup, wm).length;
 }
 
 // clearAllLocalState (sign-out's sweep of every bnn_* key) was RETIRED in 212.130: it removed other identities' unsynced

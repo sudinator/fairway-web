@@ -588,7 +588,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <YourData />
 
-      <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} />
+      <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} onOpenGame={onOpenGame} />
     </div>
   );
 }

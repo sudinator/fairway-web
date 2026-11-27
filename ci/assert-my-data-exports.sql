@@ -40,15 +40,15 @@ do $$ declare nxt timestamptz; begin
   if nxt is null or nxt < now() + interval '9 minutes' or nxt > now() + interval '11 minutes' then raise exception 'a failed attempt 5 minutes ago holds 15 minutes, got %', nxt; end if;
 end $$;
 reset role;
-set local role anon;
+-- anon has nothing: checked by privilege, never by switching the session to anon (a top-level `set role anon` crashed
+-- the Supabase stack's backend in the GitHub database lane on 212.133's first run; ci/assert-anon-boundary.sql checks the
+-- same way)
 do $$
-declare denied boolean := false; n int;
 begin
-  begin select count(*) into n from public.my_data_exports; exception when insufficient_privilege then denied := true; end;
-  if not denied then raise exception 'anon must not read the ledger'; end if;
-  denied := false;
-  begin perform public.my_data_export_next_allowed('24100000-0000-0000-0000-0000000000a1'); exception when insufficient_privilege then denied := true; end;
-  if not denied then raise exception 'anon must not call the once-a-day function'; end if;
+  if has_table_privilege('anon', 'public.my_data_exports', 'select') then raise exception 'anon must not read the ledger'; end if;
+  if has_table_privilege('anon', 'public.my_data_exports', 'insert') then raise exception 'anon must not write the ledger'; end if;
+  if has_function_privilege('anon', 'public.my_data_export_next_allowed(uuid)', 'execute') then raise exception 'anon must not call the once-a-day function'; end if;
+  if has_table_privilege('authenticated', 'public.my_data_exports', 'insert') or has_table_privilege('authenticated', 'public.my_data_exports', 'update') or has_table_privilege('authenticated', 'public.my_data_exports', 'delete') then raise exception 'members must not write the ledger'; end if;
 end $$;
 reset role;
 rollback;

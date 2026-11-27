@@ -18,12 +18,12 @@
  *      (ci: lib/sign-out.test.ts; ci/check_sign_out_contract.py keeps both buttons on this path).
  * 212.132: the four corrections above came from the independent review of 212.130 (docs/REVIEW_BRIEF.md).
  */
-import { rowPendingHoles, draftHasScores, personalRoundFingerprint } from "./draft";
+import { rowPendingHoles, pendingHoleNumbers, draftHasScores, personalRoundFingerprint } from "./draft";
 import { archiveScoringBackups, isScoreKey, SCORING_ARCHIVE_KEY, SCORING_OWNER_KEY } from "./scoring-device";
 import { resetPhoneDiagnostics } from "./phone-diagnostics";
 import { RECOVERY_PREFIX } from "./saved-score-verification";
 
-export type UnsyncedItem = { key: string; label: string; /** the outbox identity the item belongs to ("" = saved before the identity was known) */ owner: string };
+export type UnsyncedItem = { key: string; label: string; /** the outbox identity the item belongs to ("" = saved before the identity was known) */ owner: string; /** the game to open, when the item belongs to one (212.134: the Profile notice is tappable) */ gameId?: string; /** the holes that differ from the server's copy (1-based), for a game score */ holes?: number[] };
 const OUTBOX = /^bnn_device_scores:([^:]*):([^:]*):/;
 function parse(storage: Storage, key: string): any { try { return JSON.parse(storage.getItem(key) || "null"); } catch { return null; } }
 function gameLabel(storage: Storage, gameId: string): string {
@@ -46,11 +46,11 @@ export function unsyncedWork(storage: Storage = window.localStorage, currentUser
         if (n > 0) {
           const rest = key.slice("bnn_game_scores_".length), id = rest.slice(0, rest.lastIndexOf("_"));
           const player = parse(storage, `bnn_game_snap_${id}`)?.players?.find((p: any) => p.id === rest.slice(rest.lastIndexOf("_") + 1));
-          items.push({ key: full, owner, label: `${gameLabel(storage, id)}${player?.display_name ? ` · ${player.display_name}` : ""}: ${n} hole${n === 1 ? "" : "s"} not yet synced` });
+          items.push({ key: full, owner, gameId: id, holes: pendingHoleNumbers(backup, wm), label: `${gameLabel(storage, id)}${player?.display_name ? ` · ${player.display_name}` : ""}: ${n} hole${n === 1 ? "" : "s"} not yet synced` });
         }
       } else if (key.startsWith("bnn:altshot-side-drafts:")) {
         const rows = parse(storage, full);
-        if (Array.isArray(rows) && rows.length) items.push({ key: full, owner, label: `${gameLabel(storage, key.slice("bnn:altshot-side-drafts:".length))}: ${rows.length} team score edit${rows.length === 1 ? "" : "s"} not yet synced` });
+        if (Array.isArray(rows) && rows.length) items.push({ key: full, owner, gameId: key.slice("bnn:altshot-side-drafts:".length), label: `${gameLabel(storage, key.slice("bnn:altshot-side-drafts:".length))}: ${rows.length} team score edit${rows.length === 1 ? "" : "s"} not yet synced` });
       } else if (key === "bnn_round_draft_v1") {
         const round = parse(storage, full)?.round;
         if (round && draftHasScores(round)) {

@@ -2482,6 +2482,11 @@ function GameRoom({
       notifyError("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
       return;
     }
+    // 212.134: say why nothing will be sent, instead of a silent no-op (the Profile's "Open ›" lands here)
+    if (!isPrimaryScoringDevice()) {
+      notifyError("This phone is no longer the scoring device, so its saved entries can\u2019t be sent from here. Make it primary (the notice above) or use Profile \u2192 Download saved scores.");
+      return;
+    }
     setSyncing(true);
     try { if (await load()) await drainOutbox(); } finally { setSyncing(false); }
   };

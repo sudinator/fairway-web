@@ -43,6 +43,7 @@ async function main() {
   ok(items.length === 4, `four unsynced items found (got ${items.length}: ${items.map((i) => i.label).join(" | ")})`);
   ok(items.filter((i) => i.owner === ME).length === 2 && items.some((i) => i.owner === OTHER) && items.some((i) => i.owner === ""), "each item carries its outbox identity (mine, another's, unknown)");
   ok(items.some((i) => i.label.includes("Saturday Stableford · #481207 · Amit: 1 hole not yet synced")), "a pending game score is named by game, code and player");
+  ok(items.some((i) => i.gameId === "g1" && i.holes?.join() === "1"), "a pending game score names its game and the holes that differ (212.134)");
   ok(items.some((i) => i.label.includes("Round at Oak Hollow · 2026-11-20: scores not yet saved")), "a personal round with scores and no server ack is pending");
   ok(items.some((i) => i.key.startsWith(`bnn_device_scores:${OTHER}:`)), "another identity's pending score counts too");
   ok(!items.some((i) => i.key.includes("g2")), "a synced backup (watermark matches) is not pending");

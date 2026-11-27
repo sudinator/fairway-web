@@ -13,7 +13,7 @@ import { notifyError } from "@/components/toast";
 import { signOutSafely, unsyncedWork, type UnsyncedItem } from "@/lib/sign-out";
 import { downloadScoringRecovery } from "@/lib/scoring-device";
 
-export function SignOutRow({ userId, onSignOut }: { userId: string; onSignOut: () => Promise<{ error: { message?: string } | null }> }) {
+export function SignOutRow({ userId, onSignOut, onOpenGame }: { userId: string; onSignOut: () => Promise<{ error: { message?: string } | null }>; onOpenGame?: (gameId: string) => void }) {
   const [pending, setPending] = useState<UnsyncedItem[]>([]);
   const [busy, setBusy] = useState(false);
   useEffect(() => { try { setPending(unsyncedWork(undefined, userId).filter((p) => p.owner === userId)); } catch { setPending([]); } }, [userId]);   // this member's own items; another account's are kept regardless
@@ -22,7 +22,15 @@ export function SignOutRow({ userId, onSignOut }: { userId: string; onSignOut: (
       {pending.length > 0 && (
         <div data-unsynced-notice style={{ color: C.gold, fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>
           {pending.length === 1 ? "Scores on this phone haven’t synced yet" : `${pending.length} items on this phone haven’t synced yet`} — open that scorecard online to sync before signing out.
-          <div style={{ color: C.sage, marginTop: 4 }}>{pending.slice(0, 3).map((p) => <div key={p.key}>{p.label}</div>)}</div>
+          {/* 212.134 (owner): each item opens its game — opening the scorecard is what sends the entries; the holes are named */}
+          <div style={{ color: C.sage, marginTop: 4 }}>{pending.slice(0, 5).map((p) => (
+            p.gameId && onOpenGame
+              ? <button key={p.key} type="button" data-unsynced-item={p.gameId} onClick={() => onOpenGame(p.gameId!)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: `1px solid ${C.green}`, padding: "8px 0", color: C.cream, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  <span style={{ flex: 1 }}>{p.label}{p.holes?.length ? <span style={{ color: C.sage, fontWeight: 500, fontSize: 11 }}> · hole{p.holes.length === 1 ? "" : "s"} {p.holes.join(", ")}</span> : null}</span>
+                  <span style={{ color: C.sage, fontSize: 11 }}>Open ›</span>
+                </button>
+              : <div key={p.key}>{p.label}</div>
+          ))}</div>
         </div>
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
