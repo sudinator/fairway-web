@@ -8,12 +8,13 @@
  */
 import type { Game, Player } from "@/lib/game-types";
 import * as PS from "@/lib/player-scoring";
-import { courseHandicapOf } from "@/lib/game-shape";
+import { courseHandicapOf, pkey } from "@/lib/game-shape";
 import { matchOutcomes } from "@/lib/match-outcomes";
+import { colosseumStandings } from "@/lib/colosseum";
 import { buildHighlights } from "@/lib/game-highlights";
 import { indivSegScheme, segRanges, segValues, segLeadersFor } from "@/lib/segments";
 
-export const STANDINGS_FORMATS = new Set(["stableford", "stroke", "fourball", "trifecta"]);
+export const STANDINGS_FORMATS = new Set(["stableford", "stroke", "fourball", "trifecta", "colosseum"]);   // 212.136: + Colosseum (own ball)
 export const STANDINGS_MIN_GAMES = 5;
 
 export type StandingRow = {
@@ -89,6 +90,22 @@ export function seasonStandings(games: Game[], playersByGame: Record<string, Pla
         for (const l of segLeadersFor(finishers.map((p) => ({ p, seg: segValues(p, game, ranges) })), game, ranges)) {
           if (!l.complete || l.val == null) continue;
           for (const nm of l.who) { const p = finishers.find((x) => x.display_name === nm); const r = p && row(p); if (r) r.segments++; }
+        }
+      }
+    }
+    // Colosseum (212.136): the table's first place is a win (never each of the 7 match wins — that would swamp the
+    // column); every match goes into the match record
+    if (game.game_type === "colosseum") {
+      const st = colosseumStandings(game, players);
+      for (const t of st.rows) {
+        const p = finishers.find((x) => pkey(x) === t.key); const r = p && row(p); if (!r) continue;
+        if (t.rank === 1 && t.played > 0) r.wins++;
+        if (t.rank <= 3 && finishers.length >= 5) r.top3++;
+      }
+      for (const m of matchOutcomes(game, players)) {
+        for (const side of ["a", "b"] as const) for (const sd of m[side]) {
+          const p = players.find((x) => x.user_id === sd.userId); const r = p && row(p); if (!r) continue;
+          if (m.winner === "halved") r.matchH++; else if (m.winner === side) r.matchW++; else r.matchL++;
         }
       }
     }

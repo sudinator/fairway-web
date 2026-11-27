@@ -36,7 +36,7 @@ export function selectGuidedFamily(state: GuidedFormatState, family: "stroke" | 
   // they play team v team.
   if (state.gameType === "scramble") return family === "match" ? { fmtFamily: "match", matchKind: "team" } : { fmtFamily: "stroke" };
   if (family === "stroke") {
-    if (state.gameType === "match" || state.gameType === "fourball" || state.gameType === "trifecta") {
+    if (state.gameType === "match" || state.gameType === "fourball" || state.gameType === "trifecta" || state.gameType === "colosseum") {
       return { fmtFamily: "stroke", gameType: "stableford" };
     }
     if (state.gameType === "skins") {
@@ -58,10 +58,16 @@ export function selectGuidedStrokeFormat(gameType: "stableford" | "stroke" | "sk
 }
 
 export function selectGuidedMatchKind(state: GuidedFormatState, kind: "ind" | "team"): CreateFormatPatch {
-  if (kind === "ind") return { matchKind: "ind", gameType: "match" };
+  // 212.136: Individual keeps a Colosseum already chosen; otherwise it is a singles match
+  if (kind === "ind") return state.gameType === "colosseum" ? { matchKind: "ind" } : { matchKind: "ind", gameType: "match" };
   return state.gameType === "fourball" || state.gameType === "trifecta"
     ? { matchKind: "team" }
     : { matchKind: "team", gameType: "fourball" };
+}
+
+/** 212.136: the Individual match formats — a singles match (pairings) or the Colosseum (everyone plays everyone). */
+export function selectGuidedIndividualFormat(gameType: "match" | "colosseum"): CreateFormatPatch {
+  return { gameType };   // teamMode is the Team tile's (a team Colosseum: side v side, as a team singles match)
 }
 
 export function selectGuidedTeamFormat(
@@ -97,6 +103,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
     case "stableford": return "Stableford";
     case "stroke": return `Stroke Play · ${state.strokeBasis === "gross" ? "Gross" : "Net"}`;
     case "match": return `Match Play · ${state.teamMode ? "Team" : "Individual"}`;
+    case "colosseum": return state.teamMode ? "Colosseum · Side v side · everyone plays the other side · net vs net" : "Colosseum · Everyone plays everyone · net vs net";
     case "fourball": return `Four-ball · Team vs Team · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"}`;
     case "trifecta": return `Trifecta · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"} · 2 singles + team, 1 pt each`;
     case "alt_shot":
@@ -120,7 +127,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
 }
 
 export function reachableFormatKeys(): string[] {
-  const out = ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team"];
+  const out = ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "colosseum", "colosseum:team"];
   for (const score of ["best_ball", "aggregate"] as const) out.push(`fourball:team:${score}`);
   for (const score of ["best_ball", "aggregate"] as const) out.push(`trifecta:${score}`);
   // 212.38: Alternate Shot has its own Create button (components/tournaments.tsx) but was missing from this list.
@@ -175,6 +182,9 @@ export function replayFormatKey(key: string, extra: { matchLength?: MatchLength;
   } else if (type === "fourball" || type === "trifecta") {
     family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat(type));
     click(() => ({ teamScoreMode: (type === "fourball" ? b : a) as "best_ball" | "aggregate" }));
+  } else if (type === "colosseum") {
+    family("match"); click((st) => selectGuidedMatchKind(st, "ind")); click(() => selectGuidedIndividualFormat("colosseum"));
+    if (a === "team") click(() => setGuidedTeamMode(true));
   } else if (type === "alt_shot") {
     family("match"); click((st) => selectGuidedMatchKind(st, "team")); click(() => selectGuidedTeamFormat("alt_shot"));
   } else if (type === "skins") {

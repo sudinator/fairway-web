@@ -6,6 +6,7 @@
 //   * "Played with": everyone else (with an account) in a game the golfer played.
 // Callers pass only ENDED games whose round the golfer kept (cancelled games never reach here).
 import { matchStatus, computeTrifecta } from "./golf";
+import { colosseumMatches } from "./colosseum";
 import { chBasis } from "./game-shape";
 
 export type SeasonGame = {
@@ -44,6 +45,13 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
         const st = matchStatus(g.holes_meta, a.scores || [], b.scores || [], ch(a), ch(b), g.allowance_pct ?? 100);
         if (!st.result) continue;
         matches.push({ opponentId: identity(pr.a === me ? b : a), opponent: (pr.a === me ? b : a).display_name, result: outcome(pr.a === me ? st.lead : -st.lead), played_at: g.played_at });
+      }
+    }
+    if (g.game_type === "colosseum") {   // 212.136: every decided match I was in
+      for (const m of colosseumMatches(g as never, players as never)) {
+        if ((m.a !== me && m.b !== me) || !m.status.decided) continue;
+        const opp = pOf(m.a === me ? m.b : m.a); if (!opp) continue;
+        matches.push({ opponentId: identity(opp), opponent: opp.display_name, result: outcome(m.a === me ? m.status.lead : -m.status.lead), played_at: g.played_at });
       }
     }
     if (g.game_type === "trifecta") {

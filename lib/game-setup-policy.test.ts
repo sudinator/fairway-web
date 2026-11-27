@@ -46,6 +46,16 @@ check("stableford to match scored blocked", decision(baseGame(), [scored], { typ
 check("team to individual scored blocked", decision({ ...baseGame(), game_type: "fourball", foursomes }, [scored], { type: "set_format", target: "stableford" }), "block");
 check("fourball to trifecta same foursomes confirm", decision({ ...baseGame(), game_type: "fourball", teams, foursomes }, [scored], { type: "set_format", target: "trifecta" }), "confirm");
 check("allowance scored confirm", decision(baseGame(), [scored], { type: "set_allowance", pct: 85 }), "confirm");
+// 212.136: the Colosseum — an own-card format for format switches (the same cards reread), a fixed field once scoring starts
+check("stableford to colosseum scored confirm", decision(baseGame(), [scored], { type: "set_format", target: "colosseum" }), "confirm");
+check("colosseum to stroke scored confirm", decision({ ...baseGame(), game_type: "colosseum" }, [scored], { type: "set_format", target: "stroke" }), "confirm");
+check("fourball to colosseum scored blocked", decision({ ...baseGame(), game_type: "fourball", foursomes }, [scored], { type: "set_format", target: "colosseum" }), "block");
+check("add player to a colosseum midround blocked (every pair is a match)", decision({ ...baseGame(), game_type: "colosseum" }, [scored], { type: "add_player" }), "block");
+check("colosseum side v side scored blocked", decision({ ...baseGame(), game_type: "colosseum" }, [scored], { type: "set_match_team", on: true }), "block");
+check("colosseum side v side before scores allowed", decision({ ...baseGame(), game_type: "colosseum" }, [blank], { type: "set_match_team", on: true }), "allow");
+check("colosseum no-show midround confirm", decision({ ...baseGame(), game_type: "colosseum" }, [scored], { type: "toggle_no_show", player: scored, next: true }), "confirm");
+{ const d = decideSetupChange({ game: { ...baseGame(), game_type: "colosseum" }, players: [scored], action: { type: "toggle_no_show", player: scored, next: true } }) as { message?: string };
+  check("colosseum no-show text: their matches stand on the holes played", /matches stand on the holes already played/.test(d.message || ""), true); }
 check("skins style scored blocked", decision({ ...baseGame(), game_type: "skins" }, [scored], { type: "set_skins_style", style: "team_11" }), "block");
 check("match team scored blocked", decision({ ...baseGame(), game_type: "match" }, [scored], { type: "set_match_team", on: true }), "block");
 check("ended edit blocks until reopen", decision({ ...baseGame(), status: "ended" }, [scored], { type: "set_allowance", pct: 85 }), "block");

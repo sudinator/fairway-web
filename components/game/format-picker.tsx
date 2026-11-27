@@ -30,7 +30,7 @@ import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
 
 /** Which formats belong to which family, derived from one list rather than restated per screen. */
 export const STROKE_FAMILY: GameType[] = ["stableford", "stroke", "skins"];
-export const MATCH_FAMILY: GameType[] = ["match", "fourball", "alt_shot", "trifecta", "skins"];
+export const MATCH_FAMILY: GameType[] = ["match", "colosseum", "fourball", "alt_shot", "trifecta", "skins"];   // 212.136: + Colosseum
 
 export type FormatVerdict = { allowed: boolean; reason?: string };
 const ALWAYS_ALLOWED: FormatVerdict = { allowed: true };

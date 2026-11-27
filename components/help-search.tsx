@@ -103,7 +103,7 @@ const FAQ: Faq[] = [
   },
   {
     q: "What are the different formats?",
-    keywords: "formats stableford stroke play skins match four ball trifecta alternate shot foursomes scramble difference explain types which",
+    keywords: "formats stableford stroke play skins match four ball trifecta alternate shot foursomes scramble colosseum difference explain types which",
     steps: [
       "Stableford - points per hole vs par (kindest for mixed groups).",
       "Stroke play - lowest total wins, gross or net.",
@@ -113,6 +113,18 @@ const FAQ: Faq[] = [
       "Trifecta - four-ball plus the two 1-v-1 singles (three contests).",
       "Alternate Shot - partners alternate strokes with one ball per side and a shared team scorecard.",
       "Scramble - teammates choose the best shot each time and record one score per team per hole.",
+      "Colosseum - everyone plays everyone: every pair of players is a match off the same scorecards; 1 point a win, half for a halve; the table decides.",
+    ],
+  },
+  {
+    q: "How does the Colosseum work?",
+    keywords: "colosseum everyone plays everyone round robin all play all matches table standings three ball 3 ball",
+    steps: [
+      "Open Games, start a game, choose Match play, Individual, then Colosseum. Add the players and tee groups - there are no pairings to set.",
+      "Everyone keeps their own card as usual (one marker per group can score the foursome). Every pair of players is a match: 8 players is 28 matches.",
+      "A hole goes to the lower net score. Strokes are each player's own - full course handicap times the game's allowance, the same dots as on the card - not strokes off the lower handicap.",
+      "1 point a win, half for a halve. Ties on points: the matches between the tied players, then holes up. Tap a name in the table for that player's matches.",
+      "Rounds post to each player's history like any own-ball game, and every match goes into head-to-head records.",
     ],
   },
   {

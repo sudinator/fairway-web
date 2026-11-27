@@ -192,7 +192,7 @@ export function GameSetupWorkspace({
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
-    { key: "format" as const, title: "Format", sub: game.game_type === "scramble" ? `Scramble · ${usesTeams ? `Ryder Cup · ${perSide} v ${perSide}` : (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "format" as const, title: "Format", sub: game.game_type === "scramble" ? `Scramble · ${usesTeams ? `Ryder Cup · ${perSide} v ${perSide}` : (game as { scramble_team_size?: number | null }).scramble_team_size === 1 ? "captains only" : "teams of 2 to 4"} · ${SCRAMBLE_METHOD_LABEL[scrambleMethodOf(game as never) as ScrambleMethod] ?? "USGA allowance"}` : `${game.game_type === "colosseum" ? "Colosseum · everyone plays everyone" : game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];

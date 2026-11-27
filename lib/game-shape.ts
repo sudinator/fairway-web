@@ -13,11 +13,11 @@ import { scrambleTeamHandicap, customAllowanceFor } from "./scramble";
  * The single ball is what drives everything else — a side has one score rather than two, and the
  * handicap allowance is 50% of the partners' combined Course Handicaps.
  */
-export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot" | "scramble";
+export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot" | "scramble" | "colosseum";
 
 /** Every game type, for exhaustiveness tests and for building pickers without hardcoding a list. */
 export const GAME_TYPES: GameType[] = [
-  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot", "scramble",
+  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot", "scramble", "colosseum",
 ];
 export type TeamDef = { key: string; name: string };
 export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null };
@@ -45,6 +45,8 @@ export const skinsTieOf = (game: { skins_mode?: string | null }): "carryover" | 
 //   absolute          → computeSkins / allocateStrokes  (stableford, stroke, individual skins)
 //   relative_pair     → matchAllowance                  (singles & team match; 1:1 team skins / computeHeadToHeadSkins)
 //   relative_foursome → fourballNets                    (four-ball, trifecta; 2v2 best-ball skins / computeTeamBestBallSkins)
+//   absolute          → lib/colosseum                    (212.136: every pair of players is a match, net vs net off each
+//                                                         player's OWN card — the Stableford basis, no pairings, no teams)
 export type GameShape = {
   type: GameType;
   skinsStyle: "individual" | "team_11" | "team_2v2" | null;
@@ -52,7 +54,7 @@ export type GameShape = {
   usesMatchups: boolean;
   usesFoursomes: boolean;
   dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side" | "scramble_team";
-  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "scramble" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
+  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "scramble" | "colosseum" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
 };
 export function shapeOf(game: ShapeGame): GameShape {
   const gt = game.game_type;
@@ -67,6 +69,8 @@ export function shapeOf(game: ShapeGame): GameShape {
   // their historical local-foursome matchup structure for backward compatibility.
   const usesTeams =
     teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot"
+      // 212.136: a Ryder Cup Colosseum has the Cup's two sides; only cross-side pairs are matches
+      || gt === "colosseum"
       // 212.5: a Ryder Cup scramble has the Cup's two teams; its matches are built from groups, like four-ball
       || gt === "scramble");
   const usesMatchups =

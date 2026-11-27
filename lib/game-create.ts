@@ -49,7 +49,7 @@ export type GamePayloadOpts = {
 
 // The auto-name label for a game type.
 export function gameTypeLabel(gameType: GameTypeOpt): string {
-  return gameType === "scramble" ? "Scramble" : gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
+  return gameType === "colosseum" ? "Colosseum" : gameType === "scramble" ? "Scramble" : gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
 }
 
 // The automatic game name, "Format / Course / Date", used when the organizer leaves the name blank.
@@ -101,7 +101,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     game_type: o.gameType,
     pairings: [],
     teams:
-      ((o.gameType === "match" || o.gameType === "skins") && o.teamMode) || o.gameType === "fourball" || o.gameType === "alt_shot" || o.gameType === "trifecta"
+      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "colosseum") && o.teamMode) || o.gameType === "fourball" || o.gameType === "alt_shot" || o.gameType === "trifecta"
         || (o.gameType === "scramble" && !!o.scramble?.cupTeams)   // 212.3: a Ryder Cup scramble keeps the Cup's two teams
         ? [
             { key: "A", name: o.team1.trim() || "Team 1", ...(o.teamColors?.[0] ? { color: o.teamColors[0] } : {}) },
@@ -113,7 +113,8 @@ export function buildGamePayload(o: GamePayloadOpts) {
     trifecta_scoring: o.gameType === "trifecta" ? "match" : null, // one Trifecta rule (183.0)
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
-    leg_config: o.gameType === "alt_shot" || o.gameType === "scramble" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,
+    // 212.136: a Colosseum has no six-hole segments (every hole is already 28 matches); side contests stay available
+    leg_config: o.gameType === "alt_shot" || o.gameType === "scramble" || o.gameType === "colosseum" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,
     // 211.1: scramble settings (null for every other format)
     ...(o.gameType === "scramble" ? {
       scramble_team_size: o.scramble?.teamSize ?? null, scramble_handicap: o.scramble?.handicap ?? "usga",
@@ -161,8 +162,8 @@ export type PostCreateDestination = {
 // Lean Create owns only the core game. Formats that need persisted structure hand off
 // directly to the relevant Manage Game section after the game/player rows exist.
 export function postCreateDestination(gameType: GameTypeOpt, teamMode: boolean): PostCreateDestination {
-  if (gameType === "stableford" || gameType === "stroke") return { roomTab: "play" };
-  if (gameType === "trifecta" || gameType === "fourball" || gameType === "alt_shot" || ((gameType === "match" || gameType === "skins") && teamMode)) {
+  if (gameType === "stableford" || gameType === "stroke" || (gameType === "colosseum" && !teamMode)) return { roomTab: "play" };   // 212.136: a Colosseum has no structure to set
+  if (gameType === "trifecta" || gameType === "fourball" || gameType === "alt_shot" || ((gameType === "match" || gameType === "skins" || gameType === "colosseum") && teamMode)) {
     return { roomTab: "setup", setupTab: "teams" };
   }
   if (gameType === "match") return { roomTab: "setup", setupTab: "matchups" };

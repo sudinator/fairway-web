@@ -6,6 +6,8 @@ import { scrambleFinishGaps } from "@/lib/scramble-game";
 import { SCRAMBLE_METHOD_LABEL, scrambleMethodText, OFFERED_METHODS } from "@/lib/scramble-method";
 import { ScrambleAllowanceEditor, type ScrambleAllowance } from "@/components/game/scramble-allowance-editor";
 import { ScrambleView } from "@/components/game/scramble-view";
+import { ColosseumView } from "@/components/game/colosseum-view";
+import { colosseumMatchCountFor, isCupColosseum } from "@/lib/colosseum";
 import { cupScrambleMatches, scrambleTeamsOf, cupSideNames, type ScrambleGroup, scrambleTeeGroups } from "@/lib/scramble-teams";
 import type { ScramblePatch } from "@/components/game/scramble-settings";
 import { rpcAll } from "@/lib/fetch-all";
@@ -130,7 +132,7 @@ import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/s
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
 import { gameTeeOptions } from "@/lib/game-tee-options";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
-import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
+import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedIndividualFormat, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
 import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
 import { Competitions } from "@/components/competitions";
@@ -341,9 +343,9 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   const [scrambleMinDrives, setScrambleMinDrives] = useState<number | null>(null);
   const [scrambleAllowance, setScrambleAllowance] = useState<ScrambleAllowance | null>(null);   // 211.9: null = USGA's
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
-  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" || (seed?.gameType === "scramble" && !!seed?.competitionSession) ? "match" : "stroke");
-  const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
-  const [teamMode, setTeamMode] = useState(seed?.gameType === "match");
+  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "colosseum" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" || (seed?.gameType === "scramble" && !!seed?.competitionSession) ? "match" : "stroke");
+  const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? (seed.gameType === "colosseum" ? "ind" : "team") : "ind");   // 212.136: a Cup Colosseum is Individual → Colosseum with the Cup's sides
+  const [teamMode, setTeamMode] = useState(seed?.gameType === "match" || seed?.gameType === "colosseum");
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   // 212.41: the one-step draft's teams (and the fixed ids its guests get) — kept in the local draft with everything else
@@ -707,7 +709,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
   const matchOneStep = oneStep && isMatchOneStep(gameType as GC.GameTypeOpt) && !bestBallTeamSkins;
   // the format the four-ball-family rules (field sizes, groups unlocking, Review) should apply: best-ball team skins plays as four-ball
   const lineupKind = (bestBallTeamSkins ? "fourball" : gameType) as GC.GameTypeOpt;
-  const matchHasMatchups = matchOneStep && (gameType === "match" || teamMode);
+  const matchHasMatchups = matchOneStep && gameType !== "colosseum" && (gameType === "match" || teamMode);   // 212.136: a Colosseum pairs everyone itself
   const draft = (() => {
     if (!oneStep || !pickedFav || !tee) return null;
     const holesCount = holesForLength(pickedFav.holes, matchLength).length;
@@ -984,8 +986,8 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       setErr(`This Ryder Cup session is ${GC.gameTypeLabel(seed.competitionSession.format)}. Keep that format here, or cancel and change the session from the Ryder Cup.`);
       return;
     }
-    if (seed?.competitionSession && gameType === "match" && !teamMode) {
-      setErr("Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
+    if (seed?.competitionSession && (gameType === "match" || gameType === "colosseum") && !teamMode) {
+      setErr(gameType === "colosseum" ? "A Ryder Cup Colosseum plays side against side. Keep Team Colosseum turned on so the result can roll into the Ryder Cup score." : "Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
       return;
     }
     if (seed?.competitionSession?.format === "trifecta" && teamScoreMode !== "best_ball") {
@@ -1065,7 +1067,7 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
       // Lean Create owns the core game only. Persisted structure stays authoritative in
       // Manage Game, so formats that need teams/matchups/foursomes hand off there.
       const destination = seed?.competitionSession
-        ? { roomTab: "setup" as const, setupTab: (gameType === "match" ? "matchups" : "groups") as SetupTab }
+        ? { roomTab: "setup" as const, setupTab: (gameType === "match" ? "matchups" : gameType === "colosseum" ? "teams" : "groups") as SetupTab }
         : GC.postCreateDestination(gameType, teamMode);
       // Set BEFORE the clear, so nothing between here and unmount can write the draft back.
       doneRef.current = true;
@@ -1453,8 +1455,9 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "team"))} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
             </div>
             {matchKind === "ind" ? (
-              <div style={{ marginTop: 8 }}>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "ind"))} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedIndividualFormat("match"))} style={{ ...btn(gameType === "match"), flex: 1, fontSize: 13 }}>Singles match</button>
+                <button data-format-colosseum onClick={() => applyGuidedFormatPatch(selectGuidedIndividualFormat("colosseum"))} style={{ ...btn(gameType === "colosseum"), flex: 1, fontSize: 13 }}>Colosseum</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
@@ -1484,6 +1487,8 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
               : "Every player hits, the team picks the best shot and everyone plays from there — one score per team. Every team on one leaderboard. Scramble rounds don't count toward handicaps.")
             : gameType === "stroke"
             ? "Everyone plays their own ball; lowest total wins. Pick gross or net below — every stroke counts, with no Stableford safety net."
+            : gameType === "colosseum"
+            ? "Everyone plays everyone: every pair of players is a match, read off the scorecards you already keep — 8 players is 28 matches, nothing extra to enter. Net v net off each player's own card. 1 point a win, ½ a halve; a race to the top of the table. No pairings to set."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
         {gameType === "scramble" && (
@@ -1591,15 +1596,17 @@ export function CreateGame({   // 212.41: exported for the one-step walkthrough 
           );
         })()}
         {/* 212.45 (owner, Oct 26): no team tile for one-step formats — the teams are named and picked on the Teams step */}
-        {!teamGroupOneStep && ((gameType === "match" || gameType === "fourball" || gameType === "alt_shot") || (fmtFamily === "stroke" && gameType === "skins")) && (
+        {!teamGroupOneStep && ((gameType === "match" || gameType === "colosseum" || gameType === "fourball" || gameType === "alt_shot") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={(gameType === "fourball" || gameType === "alt_shot") ? true : teamMode} disabled={gameType === "fourball" || gameType === "alt_shot"} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" || gameType === "alt_shot" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "colosseum" ? "Team Colosseum (side v side)" : gameType === "fourball" || gameType === "alt_shot" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
                 ? "Two teams, 1:1 pairings \u2014 skins roll into each team's total. A halved hole carries the pot forward. (For 2-v-2 better-ball, use Match \u00b7 Team \u00b7 Best-ball skins.)"
+                : gameType === "colosseum"
+                ? "Two sides. Everyone on one side plays everyone on the other (6 v 6 is 36 matches); only cross-side matches count, each worth a point to the winning side, \u00bd each when halved. The sides need not be equal. " + (teamGroupOneStep ? "You'll put players on sides on the Teams step." : "You'll assign players to sides after creating.")
                 : gameType === "alt_shot"
                 ? "Two teams. Each 2-v-2 foursome plays one ball per side and is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each)."
                 : gameType === "fourball"
@@ -4218,15 +4225,15 @@ function GameRoom({
       })()}
 
       {roomTab === "play" && (
-      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot" || game.game_type === "colosseum" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "alt_shot" ? "⛳ Alternate Shot Match" : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
+          {game.game_type === "colosseum" ? "🏛 Colosseum" : game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "alt_shot" ? "⛳ Alternate Shot Match" : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? "2 singles + a team match · 3 pts/foursome" : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
+            {game.game_type === "colosseum" ? `${isCupColosseum(game) ? "side v side" : "everyone plays everyone"} · ${colosseumMatchCountFor(game, players)} matches · net v net` : game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? "2 singles + a team match · 3 pts/foursome" : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -4518,6 +4525,8 @@ function GameRoom({
         />
       ) : game.game_type === "scramble" && roomTab === "play" ? (
         <ScrambleView game={game} players={players} altShotScores={altShotScores} />
+      ) : game.game_type === "colosseum" && roomTab === "play" ? (
+        <ColosseumView game={game} players={players} user={user} />
       ) : game.game_type === "skins" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <SkinsView game={game} players={players} user={user}
           isCreator={game.created_by === user.id} mode={roomTab} onChanged={load} />

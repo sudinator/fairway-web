@@ -6,7 +6,7 @@ shape = (root / 'lib/game-shape.ts').read_text()
 match = re.search(r'export const GAME_TYPES[^=]*=\s*\[(.*?)\]', shape, re.S)
 if not match: raise SystemExit('Cannot read canonical GAME_TYPES catalog')
 actual = set(re.findall(r'"([a-z_]+)"', match.group(1)))
-labels = {'stableford': 'stableford', 'stroke': 'stroke play', 'match': 'singles', 'fourball': 'four-ball', 'skins': 'skins', 'trifecta': 'trifecta', 'alt_shot': 'alternate shot', 'scramble': 'scramble'}
+labels = {'stableford': 'stableford', 'stroke': 'stroke play', 'match': 'singles', 'fourball': 'four-ball', 'skins': 'skins', 'trifecta': 'trifecta', 'alt_shot': 'alternate shot', 'scramble': 'scramble', 'colosseum': 'colosseum'}
 if actual != set(labels): raise SystemExit('Update the member-format descriptions for the changed GAME_TYPES catalog')
 cap = json.loads((root / 'lib/capabilities.json').read_text())
 body = next(c['body'] for c in cap['cards'] if c['title'] == 'Every format you play').lower()

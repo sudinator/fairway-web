@@ -1,3 +1,4 @@
+import { colosseumMatchCountFor } from "./colosseum";
 import { gameTypeLabel, type GameTypeOpt } from "./game-create";
 // The ONE wording for the line-up link's title and preview (201.5): used by the server metadata
 // (what iMessage/WhatsApp show when the link is pasted) and by the page's own document.title.
@@ -44,11 +45,12 @@ export function liveDescription(d: { ended?: boolean; course?: string | null; pl
   return `${bits.join(" · ")}${bits.length ? " — " : ""}the scorecard and leaderboard as they happen.`;
 }
 
-export function lineupDescription(d: { ended?: boolean; course?: string | null; players?: unknown[]; allowance_pct?: number | null; game_type?: string | null } | null | undefined): string {
+export function lineupDescription(d: { ended?: boolean; course?: string | null; players?: unknown[]; allowance_pct?: number | null; game_type?: string | null; teams?: unknown } | null | undefined): string {
   if (!d) return "Tees, playing handicaps, opponents and strokes — live until the game ends.";
   if (d.ended) return "This game has finished. Open Birdie Num Num for the results.";
   const n = Array.isArray(d.players) ? d.players.length : 0;
   const bits = [d.course || null, n ? `${n} player${n === 1 ? "" : "s"}` : null, d.game_type ? gameTypeLabel(d.game_type as GameTypeOpt) : null,   // 212.23: "Stroke play", not the raw "stroke"
+    d.game_type === "colosseum" && n >= 2 ? `${colosseumMatchCountFor({ game_type: "colosseum", teams: d.teams }, (d.players || []) as never)} matches` : null,   // 212.136: the one match-count rule
     d.allowance_pct != null && d.allowance_pct !== 100 ? `${d.allowance_pct}% allowance` : null].filter(Boolean);
   return `${bits.join(" · ")}${bits.length ? " — " : ""}tees, playing handicaps, opponents and strokes. Live until the game ends.`;
 }

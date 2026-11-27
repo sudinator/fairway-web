@@ -19,6 +19,7 @@ import { altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import { scrambleLeaderboard, scrambleMatch } from "@/lib/scramble";
+import { colosseumStandings } from "@/lib/colosseum";
 import { liveScrambleTeamHandicap } from "@/lib/live-scramble";
 import { cupSideNames } from "@/lib/scramble-teams";
 import { scrambleMethodOf } from "@/lib/game-shape";
@@ -112,9 +113,9 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   // draws, via lib/live-scoring — not a second set of engine calls here. Alternate Shot had no branch
   // at all and fell through to summing per-player Stableford points; an Alternate Shot player has no
   // individual score, so a decided match showed 0-0 on the public standings (staging 248110).
-  if (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") {
+  if (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "colosseum") {
     const legs = liveLegs(
-      { game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par },
+      { game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par, teams },
       Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, course_handicap_source: v.course_handicap_source, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
       pairings, foursomes, meta, allowance, altShotScores,
     );
@@ -171,6 +172,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
+    case "colosseum": return `Colosseum — everyone plays everyone: every pair of players is a match, read off the cards everyone keeps. A hole goes to the lower net score (each player's own strokes). 1 point a win, ½ a halve; the table decides.${allow}`;
     case "scramble": return `Scramble — every player hits, the team picks the best shot and everyone plays from there, so each team posts one score per hole. ${game.scramble_mode === "match" ? "Teams play team v team, hole by hole." : "Every team on one leaderboard."} ${game.scramble_handicap === "gross" ? "Gross — no handicap strokes." : "Team handicaps use the USGA scramble allowance, with strokes taken hole by hole."}`;
     default: return "";
   }
@@ -342,6 +344,7 @@ function Scorecard({ data }: { data: LiveData }) {
       </div>
 
       {game.game_type === "scramble" && <LiveScramble data={data!} />}
+      {game.game_type === "colosseum" && <LiveColosseum data={data!} />}
 
       {ts && (
         <>
@@ -759,6 +762,41 @@ function SkinsCarry({ game, players, meta, allowance }: { game: LiveGame; player
   );
 }
 
+
+/** 212.136: the Colosseum on the live page — the same engine as the app (lib/colosseum): the table, one row a player. */
+function LiveColosseum({ data }: { data: LiveData }) {
+  const { game, players } = data;
+  const meta = game.holes_meta || [];
+  // the sides travel with the game so a Cup / team Colosseum counts cross-side pairs only — the same as the team standings above it
+  const shapeGame = { game_type: "colosseum", course_par: game.course_par ?? null, allowance_pct: game.allowance_pct, holes_meta: meta, pairings: [], teams: game.teams ?? null, foursomes: null } as never;
+  const field = players.map((p) => ({ id: p.id, user_id: p.id, display_name: p.display_name, course_handicap: liveCh(p.ch ?? null, meta.length, p.course_handicap_source), course_handicap_source: "manual" as const, scores: p.scores || [], tee_group: p.tee_group, team: p.team, no_show: p.no_show }));
+  const st = colosseumStandings(shapeGame, field as never);
+  if (st.rows.length < 2) return null;
+  const half = fmtHalf;   // the page's own half printer (the same rule as lib/colosseum fmtHalf)
+  const decided = st.matches.filter((m) => m.status.decided).length;
+  const th: React.CSSProperties = { color: C.faint, fontSize: 11, fontWeight: 700, textAlign: "right", padding: "4px 10px" };
+  const td: React.CSSProperties = { borderTop: `1px solid ${C.line}`, padding: "6px 12px", textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" };
+  return (
+    <>
+      <SectionTitle>{`Colosseum${game.teams && game.teams.length === 2 ? " · side v side" : ""} · ${st.rows.length} players · ${decided} of ${st.matchCount} matches decided`}</SectionTitle>
+      <div style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "8px 12px" }} data-live-colosseum>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr><th style={{ ...th, textAlign: "left" }}>Pos</th><th style={{ ...th, textAlign: "left" }}>Player</th><th style={th}>W</th><th style={th}>L</th><th style={th}>H</th><th style={th}>Pts</th><th style={th}>Holes</th></tr></thead>
+          <tbody>{st.rows.map((r) => (
+            <tr key={r.key}>
+              <td style={{ ...td, textAlign: "left", fontWeight: 800 }}>{r.pos}</td>
+              <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.name}</td>
+              <td style={td}>{r.won}</td><td style={td}>{r.lost}</td><td style={td}>{r.halved}</td>
+              <td style={{ ...td, fontWeight: 800 }}>{half(r.points)}</td>
+              <td style={td}>{r.holes > 0 ? `+${r.holes}` : r.holes}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>1 point a win, ½ a halve; a match still in play counts as it stands. Ties: the matches between the tied players, then holes up.</div>
+      </div>
+    </>
+  );
+}
 
 /** 211.1: a scramble on the live page — the same engine as the app (lib/scramble): the leaderboard or the matches. */
 /** 212.1: a scramble's teams on the live page — ONE calculation for the leaderboard and the team cards. */

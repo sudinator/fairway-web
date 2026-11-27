@@ -50,7 +50,7 @@ const endedBlock = (): SetupDecision => block("This game has ended. Reopen it be
 const individualReinterpretation = (game: Game, target: GameType): boolean => {
   const current = shapeOf(game).view;
   const targetShape = shapeOf({ ...game, game_type: target }).view;
-  const individual = new Set(["stableford", "stroke", "skins_individual"]);
+  const individual = new Set(["stableford", "stroke", "skins_individual", "colosseum"]);   // 212.136: own-card formats, reread the same cards
   return individual.has(current) && individual.has(targetShape);
 };
 
@@ -136,8 +136,8 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       const effect =
         game.game_type === "fourball" || game.game_type === "trifecta"
           ? "Unplayed holes score net double bogey for their team."
-          : game.game_type === "match"
-          ? "Their match stands on the holes already played."
+          : game.game_type === "match" || game.game_type === "colosseum"
+          ? (game.game_type === "colosseum" ? "Their matches stand on the holes already played." : "Their match stands on the holes already played.")
           : "Their unplayed holes score nothing.";
       return requireConfirm(
         action.next ? `Mark ${action.player.display_name} out?` : `Return ${action.player.display_name} to play?`,

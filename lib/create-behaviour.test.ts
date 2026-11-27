@@ -10,7 +10,7 @@ import { createBehaviour, behaviourCases } from "@/lib/create-behaviour";
 import { defaultAllowanceFor } from "@/lib/game-create";
 
 const keys = reachableFormatKeys();
-ok(keys.length === 20, `20 reachable combinations (got ${keys.length})`);
+ok(keys.length === 22, `22 reachable combinations (got ${keys.length})`);   // 212.136: + the Colosseum (individual, team)
 const records = behaviourCases(keys).map(createBehaviour);
 
 // 1. the replayed clicks land on the combination each key names
@@ -18,7 +18,7 @@ for (const r of records.slice(0, keys.length)) {
   const f = r.format, [type, a, b, c] = r.key.split(":");
   const want: Record<string, unknown> = { gameType: type };
   if (type === "stroke") want.strokeBasis = a;
-  if (type === "match") want.teamMode = a === "team";
+  if (type === "match" || type === "colosseum") want.teamMode = a === "team";
   if (type === "fourball") want.teamScoreMode = b;
   if (type === "trifecta") want.teamScoreMode = a;
   if (type === "skins") { want.skinsStyle = a; want.skinsMode = a === "team_2v2" ? c : b; if (a === "team_2v2") want.teamScoreMode = b; }

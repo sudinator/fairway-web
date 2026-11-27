@@ -24,7 +24,7 @@ export const BEHAVIOUR_ROSTER: RosterMember[] = [
 export const BEHAVIOUR_GUESTS: GuestEntry[] = [{ id: "guest-1", display_name: "Guest Kumar", handicap_index: 18, guest_of: "u-amit" }];
 
 /** 212.67: a Ryder Cup SESSION, as the Cup hands it to Create (seed.competitionSession + teamNames + participantTeams). */
-export type SessionSeed = { format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble"; scrambleTeamSize?: 2 | 3 | 4; cupName: string; sessionName: string; sessionId: string; competitionId: string; teams: { A: string; B: string } };
+export type SessionSeed = { format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble" | "colosseum"; scrambleTeamSize?: 2 | 3 | 4; cupName: string; sessionName: string; sessionId: string; competitionId: string; teams: { A: string; B: string } };
 export const BEHAVIOUR_CUP = { cupName: "Baseline Cup", sessionName: "Session 1", sessionId: "sess-1", competitionId: "cup-1", teams: { A: "Americas", B: "Europe" } };
 /** 212.68: a session is played 4 a side — the behaviour roster (7 members + the creator) gains an eighth member and has no guest. */
 export const BEHAVIOUR_CUP_EXTRA = { id: "u-dev", display_name: "Dev Kapoor", handicap_index: 12.5 };
@@ -63,7 +63,7 @@ export function createBehaviour(c: CreateCase) {
     ? "Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover." : null;
   const sh = shapeOf(game as never) as unknown as Record<string, unknown>;
   const shape = Object.fromEntries(Object.entries(sh).filter(([, v]) => typeof v !== "function").sort(([a], [b]) => a.localeCompare(b)));
-  const destination = ses ? { roomTab: "setup", setupTab: f.gameType === "match" ? "matchups" : "groups" } : postCreateDestination(f.gameType, f.teamMode);
+  const destination = ses ? { roomTab: "setup", setupTab: f.gameType === "match" ? "matchups" : f.gameType === "colosseum" ? "teams" : "groups" } : postCreateDestination(f.gameType, f.teamMode);
   const link = ses ? { table: "competition_sessions", set: { game_id: "GAME" }, where: { id: ses.sessionId, competition_id: ses.competitionId, game_id: null } } : null;
   return { id: c.id, key: c.key, label: formatReviewLabel(f), format: f, fieldCount, blocked, game, players, destination, shape, ...(link ? { link } : {}) };
 }
@@ -91,6 +91,7 @@ export function behaviourCases(keys: string[]): CreateCase[] {
     { id: "cup session · trifecta", key: "trifecta:best_ball", session: { ...cup, format: "trifecta" } },
     { id: "cup session · alt_shot", key: "alt_shot", session: { ...cup, format: "alt_shot" } },
     { id: "cup session · singles", key: "match:team", session: { ...cup, format: "match" } },
+    { id: "cup session · colosseum", key: "colosseum:team", session: { ...cup, format: "colosseum" } },   // 212.136
     { id: "cup session · scramble teams of 2", key: "scramble:match", scrambleTeamSize: 2, session: { ...cup, format: "scramble", scrambleTeamSize: 2 } },
     { id: "cup session · scramble teams of 4", key: "scramble:match", scrambleTeamSize: 4, session: { ...cup, format: "scramble", scrambleTeamSize: 4 } },
   );

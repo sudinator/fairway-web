@@ -134,6 +134,13 @@ their number; the running index exists to converge with it over time.
     `holes_meta` and every positional player array while preserving players, tees, handicaps, teams,
     groups, matchups and contests. Once any individual or Alternate Shot score exists, the control
     remains visible but disabled with an explanation; Reset Scores restores editability. — DB + CI
+8d. **The Colosseum is an own-card format (212.136, owner).** Every pair of players in the field is a match read
+    off the cards everyone already keeps; a hole goes to the lower NET on each player's OWN strokes (full course
+    handicap × allowance — the Stableford basis, never strokes off the lower handicap per pair). 1 point a win, ½ a
+    halve; ties by the matches between the tied, then holes up. No pairings, no teams, no shared-ball scores; rounds
+    post like Stableford's. With two sides (a Ryder Cup session or "Team Colosseum") only cross-side pairs are
+    matches, |A| × |B| of them, each worth the session's points. The standings table is the view — never a card per
+    match. The scorecard is the existing group card. — lib/colosseum, DB (0243 setup lock), CI
 9. **Yardages on every scorecard.** Per-hole yardages show on ALL scorecards (entry, read-only, game
    group card, round detail, share), based on each player's chosen tee
    (`favorite_courses.data.tees[].yardages`). — manual

@@ -13,6 +13,7 @@ import * as PS from "@/lib/player-scoring";
 import { matchOutcomes } from "@/lib/match-outcomes";
 import { skinsTotals, singlesTeamStandings, foursomeTeamStandings, trifectaResults } from "@/lib/game-results";
 import { pkey } from "@/lib/game-shape";
+import { colosseumStandings, fmtHalf } from "@/lib/colosseum";
 import type { TeamRound } from "@/lib/team-rounds";
 
 const SHARED_BALL = new Set(["scramble", "alt_shot"]);
@@ -44,6 +45,15 @@ export function gameResultFor(game: Game, players: Player[], userId: string): Ga
     const pos = PS.posWithin(me, finishers, game);
     const tied = finishers.some((p) => p !== me && PS.posWithin(p, finishers, game) === pos);
     return { ...NONE, result: `${tied ? "T" : ""}${ordinal(pos)} of ${finishers.length}` };
+  }
+  if (game.game_type === "colosseum") {   // 212.136: place in the table and the record, from the same engine as the game screen
+    if (!meP) return NONE;
+    if (meP.no_show) return { ...NONE, lines: [{ text: "Marked as a no-show" }] };
+    const st = colosseumStandings(game, players);
+    const row = st.rows.find((r) => r.key === pkey(meP));
+    if (!row || !row.played) return { ...NONE, lines: [{ text: "No match was played" }] };
+    const tied = st.rows.some((r) => r !== row && r.rank === row.rank);
+    return { result: `${tied ? "T" : ""}${ordinal(row.rank)} of ${st.rows.length}`, caption: null, lines: [{ text: `${row.won}-${row.lost}-${row.halved} W-L-H · ${fmtHalf(row.points)} pt${row.points === 1 ? "" : "s"}` }] };
   }
   if (game.game_type === "skins") {
     if (!meP) return NONE;
@@ -112,7 +122,7 @@ export function teamResultLine(game: Game, players: Player[], me: Player): Line 
 /** Format names as members write them in a game's title. */
 const FORMAT_WORDS: Record<string, string[]> = {
   stableford: ["stableford"], stroke: ["stroke play", "stroke", "medal"], match: ["match play", "match"], fourball: ["four-ball", "fourball", "four ball", "best ball", "bestball"],
-  trifecta: ["trifecta"], skins: ["skins"], scramble: ["scramble"], alt_shot: ["alternate shot", "alt shot", "foursomes"],
+  trifecta: ["trifecta"], skins: ["skins"], scramble: ["scramble"], alt_shot: ["alternate shot", "alt shot", "foursomes"], colosseum: ["colosseum"],
 };
 const COURSE_SUFFIX = /\s+(golf course|golf club|country club|golf links|gc|cc|g\.c\.|c\.c\.)$/i;
 /** Does the title already say this? (212.127, owner: "if the title already has the game type, course name, date …

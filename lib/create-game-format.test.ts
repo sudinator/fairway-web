@@ -72,7 +72,14 @@ const keys = reachableFormatKeys();
 // 183.0: Trifecta has one rule, so the two per-hole shapes (trifecta:best_ball:per_hole, trifecta:aggregate:per_hole) are gone: 19 → 17.
 // 211.1: scramble adds two shapes — one leaderboard and team v team: 17 → 19.
 // 212.38: Alternate Shot has its own Create button but was missing from the list: 19 → 20.
-eq(keys.length, 20, "current reachable format shape count");
+// 212.136: the Colosseum (Match play → Individual), alone or side v side: 20 → 22.
+eq(keys.length, 22, "current reachable format shape count");
+eq(keys.includes("colosseum:team"), true, "the team Colosseum is reachable");
+eq(formatReviewLabel({ ...base, gameType: "colosseum", teamMode: true }), "Colosseum · Side v side · everyone plays the other side · net vs net", "team colosseum review");
+eq(keys.includes("colosseum"), true, "the Colosseum is reachable");
+eq(formatReviewLabel({ ...base, gameType: "colosseum" }), "Colosseum · Everyone plays everyone · net vs net", "colosseum review");
+eq(JSON.stringify(selectGuidedMatchKind({ ...base, gameType: "colosseum", fmtFamily: "match", matchKind: "ind" } as never, "ind")), JSON.stringify({ matchKind: "ind" }), "Individual keeps a chosen Colosseum");
+eq(JSON.stringify(selectGuidedFamily({ ...base, gameType: "colosseum", fmtFamily: "match", matchKind: "ind" } as never, "stroke")), JSON.stringify({ fmtFamily: "stroke", gameType: "stableford" }), "Stroke play from a Colosseum goes to Stableford");
 eq(keys.includes("alt_shot"), true, "alternate shot is reachable");
 eq(keys.includes("scramble:field") && keys.includes("scramble:match"), true, "both scramble shapes are reachable");
 eq(formatReviewLabel({ ...base, gameType: "scramble", scrambleTeamSize: 4, scrambleHandicap: "usga", scrambleMinDrives: null, fmtFamily: "stroke" } as never), "Scramble · Leaderboard · USGA handicaps", "scramble review (leaderboard)");

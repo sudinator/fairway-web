@@ -12,6 +12,7 @@ import type { Game, Player } from "@/lib/game-types";
 import { buildHighlights, type Highlights } from "@/lib/game-highlights";
 import { buildRecapSections, andList, type RecapSections } from "@/lib/game-recap-sections";
 import { scrambleResults, scrambleScoreText } from "@/lib/scramble-game";
+import { colosseumStandings, colosseumSidePoints, isCupColosseum } from "@/lib/colosseum";
 import { cupSideNames } from "@/lib/scramble-teams";
 import { scoreCompetitionGame } from "@/lib/competition";
 
@@ -122,6 +123,31 @@ function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotSco
     if (unfinished) notes.push(`${unfinished} match${unfinished === 1 ? "" : "es"} unfinished`);
     const n = (game.pairings || []).length;
     return { headline: `${n} singles match${n === 1 ? "" : "es"}`, endedEarly: unfinished > 0, notes, personal, signature: `singles:${sig.join(",")}`, winner: null };
+  }
+  // COLOSSEUM (212.136): the table decides — the same engine as the game screen. Headline is the winner (or the tie);
+  // each player's line is their place and record. An unfinished match counts as it stands and is noted.
+  if (game.game_type === "colosseum") {
+    const st = colosseumStandings(game, players);
+    // a Cup / team Colosseum: the sides' score is the headline (a Cup session scores exactly this, lib/competition)
+    if (teams && isCupColosseum(game)) {
+      const sp = colosseumSidePoints(st, (k) => st.rows.find((r) => r.key === k)?.team);
+      const t = teamLine(teams, sp.A, sp.B);
+      teamPersonal(t.winner);
+      if (sp.open) notes.push(`${sp.open} match${sp.open === 1 ? "" : "es"} unfinished — counted as they stood`);
+      return { headline: t.headline, endedEarly: sp.open > 0, notes, personal, signature: `colosseum-sides:${sp.A}:${sp.B}:${sp.open}`, winner: t.winner };
+    }
+    const open = st.matches.filter((m) => m.status.thru > 0 && !m.status.decided).length;
+    const never = st.matches.filter((m) => m.status.thru === 0).length;
+    st.rows.forEach((r) => {
+      const tied = st.rows.some((x) => x !== r && x.rank === r.rank);
+      personal[r.key] = `you finished ${tied ? "tied " : ""}${ordinal(r.rank)} of ${st.rows.length} — ${r.won} won, ${r.lost} lost, ${r.halved} halved (${pts(r.points)} pt${r.points === 1 ? "" : "s"})`;
+    });
+    if (open) notes.push(`${open} match${open === 1 ? "" : "es"} unfinished — counted as they stood`);
+    if (never) notes.push(`${never} match${never === 1 ? "" : "es"} never started`);
+    const top = st.rows[0];
+    const leaders = top ? st.rows.filter((r) => r.rank === top.rank) : [];
+    const headline = !top || !top.played ? "Colosseum — no matches played" : leaders.length > 1 ? `${leaders.map((r) => r.name).join(" and ")} tied on ${pts(top.points)} point${top.points === 1 ? "" : "s"}` : `${top.name} won the Colosseum with ${pts(top.points)} point${top.points === 1 ? "" : "s"} (${top.won}-${top.lost}-${top.halved})`;
+    return { headline, endedEarly: open > 0, notes, personal, winner: null, signature: `colosseum:${st.rows.map((r) => `${r.key}=${r.points}/${r.holes}`).join(",")}:${open}` };
   }
   if ((game.game_type === "fourball" || game.game_type === "alt_shot") && !teams) {
     const n = (game.foursomes || []).filter((f: any) => f.a?.length && f.b?.length).length;

@@ -9,10 +9,10 @@ import { groupShapesOk, allowsOneShortGroup, fieldFitsTeamGroups, teamGroupField
 import type { CreateGameSection } from "@/components/game/setup/create-game-workspace";
 
 /** Formats whose Create flow is one step. Moved family by family, each after the owner approves it on staging. */
-export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble", "fourball", "trifecta", "alt_shot", "match", "skins", "stableford", "stroke"]);   // 212.43: + the four-ball family; 212.58: + match play and skins; 212.59: + Stableford and stroke play
+export const ONE_STEP_FORMATS: ReadonlySet<GameTypeOpt> = new Set<GameTypeOpt>(["scramble", "fourball", "trifecta", "alt_shot", "match", "skins", "stableford", "stroke", "colosseum"]);   // 212.43: + the four-ball family; 212.58: + match play and skins; 212.59: + Stableford and stroke play; 212.136: + Colosseum (groups only, like Stableford)
 /** 212.58: match play (individual or team) and skins (individual or team 1:1) — matchups built inside Create.
  *  212.59: Stableford and stroke play take the same step with groups only. */
-export const isMatchOneStep = (t: GameTypeOpt) => t === "match" || t === "skins" || t === "stableford" || t === "stroke";
+export const isMatchOneStep = (t: GameTypeOpt) => t === "match" || t === "skins" || t === "stableford" || t === "stroke" || t === "colosseum";
 /** The step's label: "Teams" when there are teams to pick, "Matchups" for individual match play, "Groups" when that's all there is. */
 export const teamsStepLabel = (t: GameTypeOpt, teamMode: boolean): string =>
   !isMatchOneStep(t) || teamMode ? "Teams" : t === "match" ? "Matchups" : "Groups";
@@ -48,6 +48,10 @@ export function playerCountHint(t: GameTypeOpt, o: { players: number; captains?:
     if (o.teamMode) return n % 2 === 0 ? { text: `${players(n)} two teams of ${n / 2}, with ${n / 2} matches.`, ok: true } : { text: `${n} players can't split into two equal teams — add or remove one.`, ok: false };
     if (t === "skins") return { text: `${players(n)} an individual skins game.`, ok: true };
     if (t === "stableford" || t === "stroke") return { text: `${n} ${n === 1 ? "player" : "players"} — everyone keeps their own card; groups are optional (${word(groupsNeeded(n), "group")} of 3 or 4 if you want one scorer per group).`, ok: true };
+    // 212.136: a Colosseum is n(n−1)/2 matches off the same cards; three is the smallest field that is more than a single
+    if (t === "colosseum") return n < 3
+      ? { text: "A Colosseum needs at least 3 players — with 2 it's just a singles match.", ok: false }
+      : { text: `${players(n)} ${word((n * (n - 1)) / 2, "match", "matches")} — everyone plays everyone off their own card; groups are optional (${word(groupsNeeded(n), "group")} of 3 or 4 if you want one scorer per group).`, ok: true };
     return n % 2 === 0 ? { text: `${players(n)} ${word(n / 2, "match", "matches")}.`, ok: true } : { text: `${players(n)} ${word((n - 1) / 2, "match", "matches")} — one player has a bye.`, ok: true };
   }
   if (isTeamGroupOneStep(t)) {
@@ -149,6 +153,8 @@ export function matchupsProblem(t: GameTypeOpt, o: { teamMode: boolean; players:
     const un = ps.filter((p) => !p.team).length;
     if (un) return `Put ${un === 1 ? "1 player" : `${un} players`} on a team.`;
     const [na, nb] = teams.map((x) => ps.filter((p) => p.team === x.key).length);
+    // 212.136: a team Colosseum has no matchups to set — everyone on one side plays everyone on the other, any sizes
+    if (t === "colosseum") return na && nb ? null : "Both sides need players.";
     if (na !== nb) return `The teams need the same number of players — now ${teams[0].name} ${na} v ${teams[1].name} ${nb}.`;
     const keyTeam = new Map(ps.map((p) => [o.keyOf(p), p.team]));
     if (pairs.some((x) => keyTeam.get(x.a) === keyTeam.get(x.b))) return "Each matchup pairs one player from each team.";
@@ -192,10 +198,12 @@ export function groupsFromMatches(pairings: { a: string; b: string }[]): Map<str
  * 212.68 — a Ryder Cup session's Players hint (owner, Oct 28: sit-outs are unticked on the Players step for every format;
  * a scramble session keeps the session's team size). `sides` is each ticked player's side (A / B / null).
  */
-export function cupSessionHint(format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble", scrambleTeamSize: number | undefined, sides: (string | null)[], nameA: string, nameB: string): { text: string; ok: boolean } {
+export function cupSessionHint(format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble" | "colosseum", scrambleTeamSize: number | undefined, sides: (string | null)[], nameA: string, nameB: string): { text: string; ok: boolean } {
   const a = sides.filter((x) => x === "A").length, b = sides.filter((x) => x === "B").length;
   const who = `${nameA} ${a} · ${nameB} ${b}`;
   if (format === "match") return a === b && a > 0 ? { text: `${who} — ${a} singles ${a === 1 ? "match" : "matches"}.`, ok: true } : { text: `${who} — singles need the same number a side; untick the player sitting out.`, ok: false };
+  // 212.136: a Cup Colosseum — everyone on one side plays everyone on the other; the sides need not be equal
+  if (format === "colosseum") return a === b && a > 0 ? { text: `${who} — ${a * b} matches (everyone on each side plays everyone on the other).`, ok: true } : { text: `${who} — a Ryder Cup Colosseum needs the same number a side, as the session was planned; untick the player sitting out.`, ok: false };
   const unit = format === "scramble" ? (scrambleTeamSize ?? 2) : 2;
   const label = format === "scramble" ? `teams of ${unit}` : "pairs";
   if (a === b && a > 0 && a % unit === 0) return { text: `${who} — ${a / unit} ${a / unit === 1 ? "match" : "matches"} of ${label}.`, ok: true };

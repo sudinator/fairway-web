@@ -217,7 +217,7 @@ export function OrganizerPanel({
   // (206.1: the unconditional reset that stood here overwrote names typed since the last save
   // whenever the game reloaded; the effect above already follows genuine outside changes.)
   const currentFormatFamily: FormatFamily =
-    game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
+    game.game_type === "match" || game.game_type === "colosseum" || game.game_type === "fourball" || game.game_type === "trifecta" ||
     (game.game_type === "skins" && shapeOf(game).skinsStyle === "team_2v2")
       ? "match"
       : "stroke";
@@ -726,17 +726,18 @@ export function OrganizerPanel({
                 </div>
               );
             })()}
-            {game.status !== "ended" && game.game_type === "match" && onSetMatchTeam && (() => {
+            {game.status !== "ended" && (game.game_type === "match" || game.game_type === "colosseum") && onSetMatchTeam && (() => {
               const isTeam = shapeOf(game).usesTeams;
+              const col = game.game_type === "colosseum";
               return (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>Players</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => onSetMatchTeam(false)} disabled={blocked({ type: "set_match_team", on: false })} title={reasonFor({ type: "set_match_team", on: false })} style={{ ...btn(!isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: false }) ? .45 : 1 }}>Individual</button>
-                    <button onClick={() => onSetMatchTeam(true)} disabled={blocked({ type: "set_match_team", on: true })} title={reasonFor({ type: "set_match_team", on: true })} style={{ ...btn(isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: true }) ? .45 : 1 }}>Team (e.g. 4 v 4)</button>
+                    <button onClick={() => onSetMatchTeam(false)} disabled={blocked({ type: "set_match_team", on: false })} title={reasonFor({ type: "set_match_team", on: false })} style={{ ...btn(!isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: false }) ? .45 : 1 }}>{col ? "Everyone plays everyone" : "Individual"}</button>
+                    <button onClick={() => onSetMatchTeam(true)} disabled={blocked({ type: "set_match_team", on: true })} title={reasonFor({ type: "set_match_team", on: true })} style={{ ...btn(isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: true }) ? .45 : 1 }}>{col ? "Side v side" : "Team (e.g. 4 v 4)"}</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-                    {isTeam ? "Team match — assign two teams, then pair players 1:1 across them in Matchups." : "Individual — 1:1 pairings, each match stands alone."}
+                    {col ? (isTeam ? "Side v side — two sides; everyone on one side plays everyone on the other (only cross-side matches count)." : "Everyone plays everyone — every pair in the field is a match.") : isTeam ? "Team match — assign two teams, then pair players 1:1 across them in Matchups." : "Individual — 1:1 pairings, each match stands alone."}
                   </div>
                 </div>
               );

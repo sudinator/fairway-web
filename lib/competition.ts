@@ -1,5 +1,6 @@
 import type { Game, Player } from "./game-types";
 import { scrambleMatchProgress } from "./scramble";
+import { colosseumMatches } from "./colosseum";
 import { altShotProgress, computeTrifecta, fourballProgress, matchCloseoutStatus, matchProgress, type FourballMember } from "./golf";
 import { pkey, chBasis, altShotSides, scrambleTeamHandicapFor } from "./game-shape";
 import { readAltShotSideScores } from "./alt-shot-scores";
@@ -40,7 +41,7 @@ export type CompetitionSession = {
   id: string;
   competition_id: string;
   name: string;
-  format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble";
+  format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble" | "colosseum";
   /** 212.3 (0212): a scramble session's team size — both teams in every match have this many players. */
   scramble_team_size?: number | null;
   session_order: number;
@@ -100,13 +101,15 @@ export function fmtCompetitionPoints(n: number): string {
   if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
   const whole = Math.floor(n);
   const fraction = n - whole;
-  const glyph = Math.abs(fraction - 0.25) < 1e-9 ? "¼" : Math.abs(fraction - 0.5) < 1e-9 ? "½" : Math.abs(fraction - 0.75) < 1e-9 ? "¾" : null;
+  const glyph = Math.abs(fraction - 0.25) < 1e-9 ? "¼" : Math.abs(fraction - 0.5) < 1e-9 ? "½" : Math.abs(fraction - 0.75) < 1e-9 ? "¾"
+    // 212.136: a Colosseum session at ¼ a match halves to an eighth
+    : Math.abs(fraction - 0.125) < 1e-9 ? "⅛" : Math.abs(fraction - 0.375) < 1e-9 ? "⅜" : Math.abs(fraction - 0.625) < 1e-9 ? "⅝" : Math.abs(fraction - 0.875) < 1e-9 ? "⅞" : null;
   if (glyph) return whole ? `${whole}${glyph}` : glyph;
   return Number(n.toFixed(2)).toString();
 }
 
 export function competitionFormatLabel(format: CompetitionSession["format"]): string {
-  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : format === "trifecta" ? "Trifecta" : format === "scramble" ? "Scramble" : "Singles";
+  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : format === "trifecta" ? "Trifecta" : format === "scramble" ? "Scramble" : format === "colosseum" ? "Colosseum" : "Singles";
 }
 
 export function competitionSchedule(sessions: CompetitionSession[], tieRule: Competition["tie_rule"] = "shared"): CompetitionSchedule {
@@ -197,6 +200,22 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
     return out;
   }
 
+  // COLOSSEUM (212.136, owner): every player on one side against every player on the other, off the same cards —
+  // lib/colosseum with the Cup filter; each match worth the session's points.
+  if (game.game_type === "colosseum") {
+    for (const m of colosseumMatches(game as never, players as never)) {
+      const ta = teamOf(m.a), tb = teamOf(m.b);
+      if (!ta || !tb || ta === tb) continue;
+      const st = m.status, started = st.thru > 0, decided = st.decided;
+      const reversed = ta === "B" && tb === "A";
+      const displayLead = reversed ? -st.lead : st.lead;
+      out.matchCount++;
+      if (decided) out.decidedCount++;
+      if (started) award(out, st.lead, decided, ta, tb, pointsPerMatch);
+      out.matches.push({ key: `${m.a}-${m.b}`, leftNames: nameOf(reversed ? m.b : m.a), rightNames: nameOf(reversed ? m.a : m.b), thru: st.thru, lead: displayLead, result: decided ? (st.result === "AS" ? "Halved" : st.result) : "", started, decided, winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B") });
+    }
+    return out;
+  }
   if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta" && game.game_type !== "scramble") return out;
   for (const f of game.foursomes || []) {
     if (!f.a.length || !f.b.length) continue;

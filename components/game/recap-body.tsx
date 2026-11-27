@@ -9,13 +9,14 @@ import { fmtSkins } from "@/lib/skins-format";
 import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
 import { C } from "@/lib/golf";
+import { fmtHalf } from "@/lib/colosseum";
 import { teamAccent, teamColour } from "@/lib/game-colors";
 import { fmtMatchDate } from "@/lib/lineup-meta";
 import type { Recap } from "@/lib/game-recap";
 import type { Game } from "@/lib/game-types";
 
 export type RecapContest = { label: string; hole: number; name: string; value: string };
-const FORMAT: Record<string, string> = { match: "Singles", fourball: "Four-ball", alt_shot: "Alternate shot", scramble: "Scramble", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
+const FORMAT: Record<string, string> = { colosseum: "Colosseum", match: "Singles", fourball: "Four-ball", alt_shot: "Alternate shot", scramble: "Scramble", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
 const SCR_COLS = "24px minmax(0, 1fr) 44px 44px 48px";   // 212.15: the scramble leaderboard's columns
 const S = {
   eye: { color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 800 } as React.CSSProperties,
@@ -163,6 +164,16 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, c
                 })}
               </div>
             )}
+        </div>
+      ) : null}
+      {s.colosseum ? (
+        <div style={S.box} data-recap-colosseum>
+          <div style={{ ...S.th, display: "flex", justifyContent: "space-between" }}><span>COLOSSEUM · THE TABLE</span><span>{s.colosseum.matches} matches</span></div>
+          {s.colosseum.rows.map((r, i) => (
+            <div key={i} style={rowS}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.name}</span>
+              <span style={{ color: C.sage, fontSize: 12, whiteSpace: "nowrap" }}>{r.won}-{r.lost}-{r.halved} · {r.holes > 0 ? `+${r.holes}` : r.holes}</span>
+              <span style={S.num}>{fmtHalf(r.points)}</span></div>
+          ))}
         </div>
       ) : null}
       {s.leaderboard && !s.flights?.length ? (

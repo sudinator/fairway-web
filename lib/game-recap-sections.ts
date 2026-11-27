@@ -14,6 +14,7 @@ import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
 import { isFullCard } from "@/lib/round-rules";
 import { scrambleResults } from "@/lib/scramble-game";
+import { colosseumStandings } from "@/lib/colosseum";
 import { indivSegScheme, segRanges, segValues, segLeadersFor } from "@/lib/segments";
 
 export type MatchRow = { winners: string[]; losers: string[]; result: string; team: string | null; halved: boolean; lead: number; thru: number };
@@ -31,6 +32,8 @@ export type RecapSections = {
   individualStats: boolean;      // false for alternate shot (one ball per pair) and scramble (one per team)
   /** 211.1: a scramble's final leaderboard, or its matches. */
   scramble?: { mode: "field" | "match"; gross: boolean; rows: { pos: string; name: string; members: string; gross: number; handicap: number; net: number; toPar: number; thru: number; holes?: number }[]; matches: { name: string; line: string; a: string; b: string }[] };
+  /** 212.136: the Colosseum's final table (every player) — pos, name, record, points, holes up. */
+  colosseum?: { rows: { pos: string; name: string; won: number; lost: number; halved: number; points: number; holes: number }[]; matches: number };
   tiles: Tile[];
   /** 212.71: the game's segments (sixes / nines) — each segment's winner(s) and value — when the game had a scheme. */
   segments?: { label: string; short: string; who: string[]; val: number; unit: "pts" | "net" }[];
@@ -115,6 +118,21 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
       const lose = rows.filter((r) => !r.halved && r.team === other(teamResult.winner!));
       if (lose.length === 1) tiles.push({ label: `${teamName(other(teamResult.winner))}'s only win`, who: lose[0].winners.join(" & "), what: `${lose[0].result} over ${lose[0].losers.join(" & ")}` });
     }
+  }
+  // ---- Colosseum (212.136): the table, and the biggest win among the decided matches ----
+  if (game.game_type === "colosseum") {
+    const st = colosseumStandings(game, players);
+    const tiedAt = (r: { rank: number }) => st.rows.filter((x) => x.rank === r.rank).length > 1;
+    out.colosseum = { rows: st.rows.map((r) => ({ pos: `${tiedAt(r) ? "T" : ""}${r.rank}`, name: r.name, won: r.won, lost: r.lost, halved: r.halved, points: r.points, holes: r.holes })), matches: st.matchCount };
+    const decided = st.matches.filter((m) => m.status.decided && m.status.lead !== 0);
+    const nameOf = (k: string) => st.rows.find((r) => r.key === k)?.name || "?";
+    const rows: MatchRow[] = decided.map((m) => toRow([nameOf(m.a)], [nameOf(m.b)], null, m.status.lead, m.status.thru, m.status.result));
+    const big = orderByMargin(rows)[0];
+    if (big) { const ties = rows.filter((r) => Math.abs(r.lead) === Math.abs(big.lead) && r.thru === big.thru); tiles.push({ label: ties.length > 1 ? "Biggest wins" : "Biggest win", who: ties.map((r) => r.winners.join(" & ")).join(" · "), what: big.result + (ties.length > 1 ? " each" : "") }); }
+    const unbeaten = st.rows.filter((r) => r.played > 0 && r.lost === 0 && r.played === st.rows.length - 1);
+    if (unbeaten.length) tiles.push({ label: unbeaten.length > 1 ? "Unbeaten" : "Unbeaten", who: unbeaten.map((r) => r.name).join(" · "), what: unbeaten.map((r) => `${r.won}-0-${r.halved}`).join(" · ") });
+    const dec = st.matches.filter((m) => m.status.decided).length;
+    out.sub = `${st.rows.length} players · ${dec} of ${st.matchCount} matches decided`;
   }
   // ---- Four-ball / alternate shot (with or without teams) ----
   if (game.game_type === "fourball" || game.game_type === "alt_shot") {

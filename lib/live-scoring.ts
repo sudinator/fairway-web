@@ -12,6 +12,7 @@
  * things to quietly fix during an extraction.
  */
 import { scrambleMatchProgress } from "./scramble";
+import { colosseumMatches } from "./colosseum";
 import { liveScrambleTeamHandicap } from "./live-scramble";
 import { strokeSets } from "./game-shape";
 import { altShotSides } from "./game-shape";
@@ -41,6 +42,8 @@ export type LiveScoringGame = {
   allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
   course_par?: number | null;
+  /** 212.136: a Cup / team Colosseum's two sides — with them only cross-side pairs are matches */
+  teams?: unknown;
 };
 
 /**
@@ -121,6 +124,14 @@ export function liveLegs(
         const progress = matchProgress(m, a?.scores || [], b?.scores || [], liveCh(a?.ch ?? null, holes, a?.course_handicap_source), liveCh(b?.ch ?? null, holes, b?.course_handicap_source), allowance);
         return fromProgress(progress, [pr.a as string], [pr.b as string], "single");
       });
+  }
+
+  // COLOSSEUM (212.136): every pair (or, with two Cup teams, every cross-side pair) off the same cards — lib/colosseum,
+  // the app's engine, on the live feed's players (course handicap as the feed carries it; nine-hole halving already done).
+  if (game.game_type === "colosseum") {
+    const shapeGame = { game_type: "colosseum", course_par: game.course_par ?? null, allowance_pct: game.allowance_pct, holes_meta: meta, pairings: [], teams: (game as { teams?: unknown }).teams ?? null, foursomes: null } as never;
+    const field = Object.values(byId).map((p) => ({ id: p.id, user_id: p.id, display_name: "", course_handicap: liveCh(p.ch ?? null, holes, p.course_handicap_source), course_handicap_source: "manual" as const, scores: p.scores || [], team: p.team, no_show: p.no_show }));
+    return colosseumMatches(shapeGame, field as never).map((m) => ({ kind: "single" as const, aIds: [m.a], bIds: [m.b], thru: m.status.thru, lead: m.status.lead, settled: m.status.decided, result: m.status.result }));
   }
 
   if (game.game_type === "fourball") {

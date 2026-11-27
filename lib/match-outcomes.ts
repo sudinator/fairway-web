@@ -7,6 +7,7 @@ import { pkey, chBasis } from "@/lib/game-shape";
 import { membersOf, altShotInputsFor, playerLookup } from "@/lib/game-results";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
+import { colosseumMatches } from "@/lib/colosseum";
 
 export type Side = { key: string; userId: string | null; name: string }[];
 /** kind "singles" = one against one (head-to-head); "pairs" = two against two (partners). winner "a" | "b" | "halved". */
@@ -48,6 +49,11 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
         add("pairs", f.a, f.b, st.lead, (st as { result?: string }).result);
       }
     }
+  } else if (game.game_type === "colosseum") {   // 212.136: every pair in the field is a singles record (28 for 8 players)
+    for (const m of colosseumMatches(game, players)) {
+      if (!m.status.decided) continue;   // the recap's decided rule
+      add("singles", [m.a], [m.b], m.status.lead, m.status.result);
+    }
   } else if (game.game_type === "trifecta") {
     for (const f of game.foursomes || []) {
       if (!f.a?.length || !f.b?.length) continue;
@@ -68,7 +74,7 @@ export type H2HRow = { userId: string; name: string; won: number; lost: number; 
 export type PartnerRow = { userId: string; name: string; played: number; won: number; halved: number; points: number; formats: string[]; matches: RecordMatch[] };
 /** Best partner needs at least this many matches together (owner-approved, Oct 20 2026). */
 export const BEST_PARTNER_MIN = 3;
-const FORMAT_NAME: Record<string, string> = { fourball: "four-ball", alt_shot: "alternate shot", trifecta: "Trifecta" };
+const FORMAT_NAME: Record<string, string> = { fourball: "four-ball", alt_shot: "alternate shot", trifecta: "Trifecta", colosseum: "Colosseum" };
 /** "four-ball and Trifecta" — the formats a partner record came from. */
 export const formatsLabel = (formats: string[]) => { const n = formats.map((f) => FORMAT_NAME[f] || f); return n.length <= 1 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`; };
 

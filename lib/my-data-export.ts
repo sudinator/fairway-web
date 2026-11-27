@@ -24,7 +24,7 @@ export function toCsv(header: string[], rows: unknown[][]): string {
   return BOM + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
 const day = (v: string | null | undefined) => (v ? String(v).slice(0, 10) : "");
-const FORMAT: Record<string, string> = { stableford: "Stableford", stroke: "Stroke play", match: "Match play", fourball: "Best ball", trifecta: "Trifecta", skins: "Skins", alt_shot: "Alternate shot", scramble: "Scramble" };
+const FORMAT: Record<string, string> = { stableford: "Stableford", stroke: "Stroke play", match: "Match play", fourball: "Best ball", trifecta: "Trifecta", skins: "Skins", alt_shot: "Alternate shot", scramble: "Scramble", colosseum: "Colosseum" };
 
 /** The round with strokes received per hole, as every screen computes them (manage.tsx roundCh → chBasis). */
 function withRecv(r: Round): Round {

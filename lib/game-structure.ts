@@ -15,7 +15,14 @@ export function buildFormatPatch(game: Game, next: Game["game_type"]): Record<st
   const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
   if ((next === "fourball" || next === "alt_shot") && (!Array.isArray(game.teams) || game.teams.length !== 2)) patch.teams = DEFAULT_TEAMS;
   if ((next === "fourball" || next === "alt_shot") && !Array.isArray(game.foursomes)) patch.foursomes = [];
-  if (next === "alt_shot") patch.leg_config = { scheme: "none", metric: "net", points: {} };
+  if (next === "alt_shot" || next === "colosseum") patch.leg_config = { scheme: "none", metric: "net", points: {} };   // 212.136: no segments in a Colosseum
+  // 212.136 (the review): a Colosseum with two teams is SIDE V SIDE (only cross-side pairs are matches), so teams left
+  // behind by a four-ball or a team match must not carry over silently — they are stashed (restored by Manage Game's
+  // "Side v side" toggle, buildMatchTeamPatch) and the game starts as everyone-plays-everyone.
+  if (next === "colosseum" && Array.isArray(game.teams) && game.teams.length === 2) {
+    patch.teams = null;
+    patch.structure_stash = { ...(game.structure_stash || {}), teams: game.teams };
+  }
   if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
   if (next === "trifecta" && game.trifecta_scoring !== "match") patch.trifecta_scoring = "match"; // the only Trifecta rule (183.0)
   if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";

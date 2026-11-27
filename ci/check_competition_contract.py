@@ -43,7 +43,8 @@ check('Ryder Cup Trifecta uses one scorecard with fixed match and best-ball cont
 # Manage Game's syncTeamPlayFoursomes calls — so the rule is checked where it now lives, and the call is checked in the screen.
 structure_ops = (root/'lib/structure-ops.ts').read_text()
 check('Ryder Cup Trifecta exposes team groups and synchronizes their foursomes', 'game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta"' in structure_ops and 'SO.teamPlayFoursomesAfter(game, nextPlayers)' in tour and 'game.game_type === "alt_shot" || game.game_type === "trifecta"' in (root/'components/game/setup/game-setup-workspace.tsx').read_text())
-check('Trifecta session planning converts foursomes into three matches', 'format === "trifecta" ? enteredCount * 3 : enteredCount' in comp and 'session.planned_match_count / 3' in comp)
+check('Trifecta session planning converts foursomes into three matches', 'format === "trifecta" ? enteredCount * 3 :' in comp and 'session.planned_match_count / 3' in comp)
+check('Colosseum session planning converts players a side into |A| x |B| matches (212.136)', 'format === "colosseum" ? enteredCount * enteredCount :' in comp and 'Math.round(Math.sqrt(session.planned_match_count))' in comp and '<option value="colosseum">Colosseum</option>' in comp)
 check('one match row keeps teams left/right with centered result', 'gridTemplateColumns: "minmax(0,1fr) 18px minmax(0,1fr)"' in comp and 'm.leftNames' in comp and 'm.rightNames' in comp)
 check('linked Cup games keep persistent team contract', all(x in mig for x in ['competition_game_player_contract', 'competition_game_structure_contract', 'competition_roster_contract']))
 check('roster trigger handles DELETE without touching NEW', "case when tg_op = 'DELETE' then old.competition_id else new.competition_id end" in mig)

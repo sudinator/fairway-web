@@ -213,4 +213,24 @@ ok("game 645502 freezes all nine Trifecta contests at mathematical close-out", (
   assert.equal(tri.contests[1].perHole.length, 9, "all gross-score hole detail remains stored in the model");
 });
 
+// 212.136 (owner): a Cup Colosseum — everyone on one side plays everyone on the other, |A| × |B| matches at the session's points
+ok("a Cup Colosseum scores every cross-side pair at the session's points", () => {
+  const col: Game = { ...game, game_type: "colosseum", pairings: [] };
+  const field: Player[] = [
+    { ...basePlayer, id: "p1", user_id: "u1", display_name: "A1", team: "A", scores: [4, 4, 4] },
+    { ...basePlayer, id: "p2", user_id: "u2", display_name: "A2", team: "A", scores: [5, 5, 5] },
+    { ...basePlayer, id: "p3", user_id: "u3", display_name: "B1", team: "B", scores: [4, 4, 4] },
+    { ...basePlayer, id: "p4", user_id: "u4", display_name: "B2", team: "B", scores: [6, 6, 6] },
+    { ...basePlayer, id: "p5", user_id: "u5", display_name: "B3", team: "B", scores: [5, 5, 5] },
+  ];
+  const s = scoreCompetitionGame(col, field, [], 0.25);
+  assert.equal(s.matchCount, 6, "2 × 3 cross-side matches — never the 10 of a full round robin");
+  assert.equal(s.decidedCount, 6);
+  // A1 (4s): halves B1, beats B2, beats B3 → 2½ matches; A2 (5s): loses B1, beats B2, halves B3 → 1½. A = 4 of 6, B = 2 of 6
+  assert.equal(s.projectedA, 1, "4 matches × ¼");
+  assert.equal(s.projectedB, 0.5, "2 matches × ¼");
+  assert.ok(s.matches.every((m) => m.leftNames.startsWith("A") && m.rightNames.startsWith("B")), "Cup Team A is always on the left");
+  assert.equal(competitionFormatLabel("colosseum"), "Colosseum");
+});
+
 console.log(`competition: ${n} passed, 0 failed`);

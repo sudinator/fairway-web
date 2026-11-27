@@ -91,6 +91,11 @@ same(fbPatch, { game_type:"fourball", allowance_pct:85, teams:DEFAULT_TEAMS, fou
 const asPatch = buildFormatPatch(baseGame({teams:null,foursomes:null}), "alt_shot");
 same(asPatch, { game_type:"alt_shot", allowance_pct:50, teams:DEFAULT_TEAMS, foursomes:[], leg_config:{scheme:"none",metric:"net",points:{}} }, "alternate shot team structure + side games off");
 
+// 212.136: a switch TO a Colosseum stashes a four-ball's / team match's teams — a side-v-side Colosseum is chosen, never inherited
+const colFromFb = buildFormatPatch(baseGame({ game_type: "fourball", teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }], foursomes: [] }), "colosseum");
+same(colFromFb, { game_type: "colosseum", allowance_pct: 100, leg_config: { scheme: "none", metric: "net", points: {} }, teams: null, structure_stash: { teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }] } }, "colosseum from four-ball: teams stashed, side games off");
+same(buildFormatPatch(baseGame({ teams: null, foursomes: null }), "colosseum"), { game_type: "colosseum", allowance_pct: 100, leg_config: { scheme: "none", metric: "net", points: {} } }, "colosseum from stableford: nothing to stash");
+
 const teams=[{key:"A",name:"Alpha"},{key:"B",name:"Beta"}];
 const pairings=[{a:"p1",b:"p2"}];
 const foursomes:F[]=[{id:"f1",name:"Foursome 1",a:["p1","p3"],b:["p2"]}];

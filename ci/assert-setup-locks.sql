@@ -76,6 +76,10 @@ begin
   update public.games set game_type = 'fourball' where id = fb;
   update public.games set game_type = 'stroke' where id = sf;
   update public.games set game_type = 'stableford' where id = sf;
+  -- 0243: the Colosseum is an own-card format — Stableford ↔ Colosseum reread the same cards; four-ball ↔ Colosseum is refused
+  update public.games set game_type = 'colosseum' where id = sf;
+  update public.games set game_type = 'stableford' where id = sf;
+  if not pg_temp.refused(format('update public.games set game_type = %L where id = %L', 'colosseum', fb), 'switch between team and individual') then raise exception 'rule 4 (0243): four-ball became a Colosseum after scoring'; end if;
   -- 5, 6: the team structure is locked — names and colours are not
   if not pg_temp.refused(format('update public.games set teams = null where id = %L', fb), 'team structure is locked') then raise exception 'rule 5/6: teams removed after scoring'; end if;
   update public.games set teams = '[{"key":"A","name":"Crimson","color":"red"},{"key":"B","name":"Navy"}]'::jsonb where id = fb;

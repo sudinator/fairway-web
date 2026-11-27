@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { C } from "@/lib/golf";
 import { Eyebrow, Avatar, btn, Segmented } from "@/components/ui";
-import { seasonStandings, rankBy, METRICS, STANDINGS_MIN_GAMES, type StandingRow, type StandingsMetric, type ContestWin } from "@/lib/season-standings";
+import { seasonStandings, rankBy, METRICS, STANDINGS_MIN_GAMES, STANDINGS_FORMATS, type StandingRow, type StandingsMetric, type ContestWin } from "@/lib/season-standings";
 import { roundsStandings, rankRounds, ROUNDS_METRICS, ROUNDS_MIN, type RoundsStandingRow, type RoundsMetric, type RoundSummary } from "@/lib/season-rounds";
 import { contestLeaderboard, type Contest, type ContestEntry } from "@/lib/contests";
 import type { Game, Player } from "@/lib/game-types";
@@ -56,7 +56,7 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
         const entries = contests.length ? await fetchAllIn<ContestEntry>(supabase, "game_contest_entries", "contest_id", contests.map((c) => c.id)) : [];
         const wins: ContestWin[] = [];
         contests.forEach((c) => contestLeaderboard(c, entries.filter((e) => e.contest_id === c.id && !e.voided)).forEach((w) => { if (w.best) wins.push({ gameId: c.game_id, userId: w.best.player_id, name: w.best.player_name }); }));
-        if (live) setGames({ rows: seasonStandings(gs, byGame, wins), games: gs.filter((g) => ["stableford", "stroke", "fourball", "trifecta"].includes(g.game_type)).length });
+        if (live) setGames({ rows: seasonStandings(gs, byGame, wins), games: gs.filter((g) => STANDINGS_FORMATS.has(g.game_type)).length });
       } catch (e) { if (live) setErr("games", e); }
     })();
     return () => { live = false; };
@@ -116,7 +116,7 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
           <div><button type="button" data-standings-retry onClick={() => retry(tab)} style={{ ...btn(false), marginTop: 8, fontSize: 12 }}>Try again</button></div>
         </div>
       ) : loading ? <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading…</div> : !lines.length ? (
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball or trifecta games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{tab === "games" ? "No ended Stableford, stroke play, best-ball, trifecta or Colosseum games this year yet." : "No 18-hole rounds logged this year by members who share them."}</div>
       ) : (
         <>
           <div style={{ marginTop: 10 }}>
@@ -151,7 +151,7 @@ export function SeasonStandings({ groupId, userId, year = new Date().getFullYear
           ) : null}
           <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, marginTop: 10 }}>
             {tab === "games"
-              ? `Ended club games this year — Stableford, stroke play, best ball and trifecta. A win is a first place or a won match. At least ${STANDINGS_MIN_GAMES} games to be ranked; ties share the place. Tap a name for every number.`
+              ? `Ended club games this year — Stableford, stroke play, best ball, trifecta and Colosseum. A win is a first place or a won best-ball match (a Colosseum counts its first place; its matches go in the match record). At least ${STANDINGS_MIN_GAMES} games to be ranked; ties share the place. Tap a name for every number.`
               : `Every 18-hole round logged in BNN this year by members who share them (change in Profile). Scoring averages are to par. At least ${ROUNDS_MIN} rounds to be ranked; ties share the place. Members log unevenly — the count is on every row.`}
           </div>
         </>

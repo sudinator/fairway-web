@@ -105,7 +105,7 @@ export type GameSeed = {
     competitionId: string;
     name: string;
     sessionOrder: number;
-    format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble"; scrambleTeamSize?: number;
+    format: "fourball" | "alt_shot" | "match" | "trifecta" | "scramble" | "colosseum"; scrambleTeamSize?: number;
     playDate: string;
     pointsPerMatch: number;
     /** 212.68: the matches the session planned (a trifecta foursome counts 3) — Review checks the line-up against it. */
