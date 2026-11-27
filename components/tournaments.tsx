@@ -14,10 +14,10 @@ import { shortNamer } from "@/lib/short-names";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 import { autoScores, isStagingClient } from "@/lib/auto-score";
 import { useScoringDevice } from "@/components/scoring-device";
-import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked, storageWriteFailed } from "@/lib/scoring-device";
+import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked, storageWriteFailed, archiveScoringBackups } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, upsertAltShotScoreLocal, loadAltShotDrafts, saveAltShotDraft, clearAltShotDraft, clearAllAltShotDrafts, type AltShotScoreRow, type AltShotScoreSide } from "@/lib/alt-shot-side-scores";
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
@@ -2156,6 +2156,7 @@ function GameRoom({
   const [shareCard, setShareCard] = useState(false);
   const [shareGame, setShareGame] = useState(false);
 
+  const onBackRef = useRef(onBack); onBackRef.current = onBack;   // 212.135: `load` closes a deleted game's room; the latest prop, not the first render's
   const load = useCallback(async () => {
     if (deviceState === "checking") recoveryReadyRef.current = false;
     if (resettingRef.current || scoreWriterRef.current?.busy) return;
@@ -2208,6 +2209,22 @@ function GameRoom({
       .eq("game_id", gameId);
     if (request !== loadRequestRef.current || revision !== scoreRevisionRef.current || scoreWriterRef.current?.busy) return;
     if (gameError || playersError || !g || !ps) {
+      // 212.135: "no row" while online is either a game the server no longer has, or a game this member can no longer
+      // see. Only the server can tell them apart (game_exists is SECURITY DEFINER, membership-blind). A deleted game's
+      // local copy is archived and cleared here — otherwise the phone shows it forever as FINAL + "not synced"
+      // (owner, Nov 27: game 610175 deleted by system admin, still bootable from Profile three hours later).
+      if (gameError?.code === "PGRST116" && !playersError) {
+        const { data: exists, error: existsError } = await supabase.rpc("game_exists", { p_game: gameId });
+        if (request !== loadRequestRef.current) return;
+        if (!existsError && exists === false) {
+          try { archiveScoringBackups(); } catch { /* archive is best-effort; the server has no game to lose scores for */ }
+          clearAllGameScores(gameId); clearMemBackups();
+          clearActiveGame();
+          notifyInfo("This game was deleted. Its copy on this phone has been cleared.");
+          onBackRef.current();
+          return;
+        }
+      }
       recoveryReadyRef.current = false;
       if (!gameRef.current) bootFromSnapshot();
       setSyncState("error");
@@ -3775,7 +3792,7 @@ function GameRoom({
     if (!game || !(await askConfirm(`Reopen "${game.name}" as system admin?`))) return;
     const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
     if (error) { notifyError(failureMessage("Couldn't reopen", error)); return; }
-    await adminLog(`System admin reopened game "${game.name}"`); await load();
+    await load();   // 212.135: the server writes the activity row itself (0242), with the device — not logged here again
   };
   const adminResetGame = async () => {
     if (!game || !(await askConfirm(`Reset ALL scores in "${game.name}" as system admin? This can't be undone.`))) return;
@@ -3791,6 +3808,11 @@ function GameRoom({
     if (!(await askConfirm(`Delete "${game.name}" as system admin? ${roundRule} This can't be undone.`))) return;
     const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
     if (error) { notifyError(failureMessage("Couldn't delete that", error)); return; }
+    // 212.135: the same coherent local wipe the organizer's Delete does. Without it the admin's own phone kept the
+    // snapshot, backups and active-game pointer of a game the server no longer had (owner, Nov 27, game 610175).
+    try { archiveScoringBackups(); } catch { /* best-effort */ }
+    clearAllGameScores(game.id); clearMemBackups();
+    clearActiveGame();
     onBack();
   };
   const adminReassignOrganizer = async () => {

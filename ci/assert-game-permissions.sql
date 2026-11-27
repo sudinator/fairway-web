@@ -158,6 +158,7 @@ begin
        'record_feature_use',
        -- read-only answers
        'can_see_game', 'is_game_organizer', 'is_tee_group_marker', 'plays_with_guest', 'game_announced_or_mine', 'ensure_game_event',
+       'game_exists',   -- 0242: one bit (does the row exist) for an id the caller already holds; ci/assert-deleted-game-truth.sql
        -- the club's Money tab (club admins manage money; not game setup)
        'save_bet_expense_atomic', 'delete_bet_expense_atomic');
   if bad is not null then raise exception 'UNCLASSIFIED game functions (decide who may call them, test it, and list them here): %', bad; end if;

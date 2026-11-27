@@ -36,6 +36,11 @@ order = [flow.find("unsyncedWork(storage"), flow.find("archiveScoringBackups(fal
 if any(i < 0 for i in order) or order != sorted(order): problems.append("lib/sign-out.ts: signOutSafely must scan, ask and archive, await the sign-out, then clear — in that order")
 if "if (error) {" not in flow or flow.find("if (error) {") > order[3]: problems.append("lib/sign-out.ts: a sign-out error must return before anything is removed")
 if flow.find("deps.notify(") > order[3] and "deps.notify(" in flow[order[3]:]: problems.append("lib/sign-out.ts: nothing may be toasted after the clear — the screen that shows toasts is gone once signed out")
+# 212.135: the automatic retirement of unsyncable entries (deleted/ended games) judges only the member's OWN entries,
+# never another identity's outbox by this member's game list (the cold review's P1), and archives before it removes
+retire = flow[flow.find("export function retireItems"):flow.find("export function retiredSummary")]
+if "items.filter((i) => i.owner === userId)" not in flow[flow.find("export async function retireUnsyncable"):]: problems.append("lib/sign-out.ts: retireUnsyncable must consider only the signed-in member's own entries")
+if retire.find("archiveScoringBackups(false, userId)") < 0 or retire.find("archiveScoringBackups(false, userId)") > retire.find("storage.removeItem("): problems.append("lib/sign-out.ts: retireItems must archive before it removes")
 for must in ("key === SCORING_ARCHIVE_KEY || key.startsWith(RECOVERY_PREFIX)) continue", "(m[1] !== userId || opts.keepOwnOutbox)) continue", "keepOwnOutbox: !archived"):
     if must not in flow: problems.append(f"lib/sign-out.ts: cleanup must keep the recovery archive, the Recovery copies, other identities' outboxes, and the member's own when it could not be archived ({must})")
 # 4. the test runs
@@ -44,4 +49,4 @@ if "node .testout-screens/lib/sign-out.test.js" not in pkg or '"lib/sign-out.tes
     problems.append("lib/sign-out.test.ts must be compiled (tsconfig.screens.json) and run (package.json test)")
 if problems:
     print("SIGN-OUT CONTRACT: FAIL"); [print("  " + x) for x in problems]; sys.exit(1)
-print("sign-out contract: PASS (both buttons on signOutSafely; no sweep; archive and other identities kept; test wired)")
+print("sign-out contract: PASS (both buttons on signOutSafely; no sweep; archive and other identities kept; retirement own-entries-only and archived first; test wired)")

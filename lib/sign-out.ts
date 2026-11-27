@@ -22,6 +22,7 @@ import { rowPendingHoles, pendingHoleNumbers, draftHasScores, personalRoundFinge
 import { archiveScoringBackups, isScoreKey, SCORING_ARCHIVE_KEY, SCORING_OWNER_KEY } from "./scoring-device";
 import { resetPhoneDiagnostics } from "./phone-diagnostics";
 import { RECOVERY_PREFIX } from "./saved-score-verification";
+import { DEVICE_ID_KEY } from "./device-identity";
 
 export type UnsyncedItem = { key: string; label: string; /** the outbox identity the item belongs to ("" = saved before the identity was known) */ owner: string; /** the game to open, when the item belongs to one (212.134: the Profile notice is tappable) */ gameId?: string; /** the holes that differ from the server's copy (1-based), for a game score */ holes?: number[] };
 const OUTBOX = /^bnn_device_scores:([^:]*):([^:]*):/;
@@ -67,6 +68,54 @@ export function unsyncedWork(storage: Storage = window.localStorage, currentUser
   return items;
 }
 
+export type GameState = { id: string; status: string | null };
+export type RetiredItem = { item: UnsyncedItem; reason: "deleted" | "ended" };
+/**
+ * 212.135 (owner decision: automatic). An entry for a game the server no longer has, or has ENDED, can never sync:
+ * the room refuses scores for an ended game and a deleted one has nowhere to go. Such entries sat in the Profile notice
+ * for weeks (staging games 341750, ended Oct 28; 610175, deleted Nov 27) and held up sign-out. `states` is the server's
+ * answer for the items' games (rpc games_states — only games the member plays in are returned, so a game that is
+ * missing from the answer is one the server has no row for). Items without a game (round drafts) are always live.
+ */
+export function splitRetired(items: UnsyncedItem[], states: GameState[]): { live: UnsyncedItem[]; retired: RetiredItem[] } {
+  const byId = new Map(states.map((s) => [s.id, s.status]));
+  const live: UnsyncedItem[] = [], retired: RetiredItem[] = [];
+  for (const item of items) {
+    if (!item.gameId) { live.push(item); continue; }
+    if (!byId.has(item.gameId)) retired.push({ item, reason: "deleted" });   // 'not_member' (exists, member removed) stays live
+    else if (byId.get(item.gameId) === "ended") retired.push({ item, reason: "ended" });
+    else live.push(item);
+  }
+  return { live, retired };
+}
+/**
+ * Archive once (a recovery copy stays on the phone), then remove the retired entries and their sync watermarks; a
+ * deleted game's snapshot goes too, so it can no longer be opened from this phone. Returns the keys removed.
+ */
+export function retireItems(retired: RetiredItem[], userId: string, storage: Storage = window.localStorage): { removed: string[]; archived: boolean } {
+  if (!retired.length) return { removed: [], archived: true };
+  let archived = true;
+  try { archiveScoringBackups(false, userId); } catch { archived = false; }   // a full phone: the entries are unsyncable either way
+  const removed: string[] = [];
+  const drop = (key: string) => { if (storage.getItem(key) != null) { storage.removeItem(key); removed.push(key); } };
+  for (const { item, reason } of retired) {
+    drop(item.key);
+    const m = OUTBOX.exec(item.key), prefix = m ? m[0] : "", key = item.key.slice(prefix.length);
+    if (key.startsWith("bnn_game_scores_")) drop(`${prefix}${key.replace("bnn_game_scores_", "bnn_game_wm_")}`);
+    if (reason === "deleted" && item.gameId) drop(`bnn_game_snap_${item.gameId}`);
+  }
+  return { removed, archived };
+}
+/** A one-line account of what was cleared, for the Profile notice. */
+export function retiredSummary(retired: RetiredItem[], archived = true): string {
+  const games = new Map<string, "deleted" | "ended">();
+  for (const r of retired) if (r.item.gameId && !games.has(r.item.gameId)) games.set(r.item.gameId, r.reason);
+  const deleted = Array.from(games.values()).filter((v) => v === "deleted").length, ended = games.size - deleted;
+  const part = (n: number, what: string) => `${n} ${what} game${n === 1 ? "" : "s"}`;
+  const parts = [deleted ? part(deleted, "deleted") : "", ended ? part(ended, "ended") : ""].filter(Boolean);
+  return `Unsynced entries for ${parts.join(" and ")} were cleared — they could no longer be sent. ${archived ? "A recovery copy stays on this phone." : "This phone is nearly out of storage, so no recovery copy could be kept."}`;
+}
+
 /**
  * Remove the signed-out identity's local state. Kept: the recovery archive, and the score outboxes of OTHER identities
  * (a shared phone, or a member who signed in with a second Google account before the accounts were merged).
@@ -78,6 +127,7 @@ export function clearLocalStateForSignOut(userId: string, storage: Storage = win
     for (const key of keys) {
       if (!(key.startsWith("bnn_") || key.startsWith("bnn-") || key.startsWith("bnn:"))) continue;
       if (key === SCORING_ARCHIVE_KEY || key.startsWith(RECOVERY_PREFIX)) continue;   // recovery data is never removed by sign-out
+      if (key === DEVICE_ID_KEY) continue;   // 212.135: the phone's id outlives the account signed in on it
       const m = OUTBOX.exec(key);
       if (m && (m[1] !== userId || opts.keepOwnOutbox)) continue;   // another identity's, or saved before the identity was known, or ours when it could not be archived
       if (key === SCORING_OWNER_KEY) { const owner = parse(storage, key); if ((owner?.user && owner.user !== userId) || opts.keepOwnOutbox) continue; }   // kept with the outbox: it is the token the next sign-in resumes
@@ -96,11 +146,26 @@ type Deps = {
   confirm: (q: { title: string; message: string; confirmLabel: string; danger: boolean }) => Promise<boolean>;
   notify: (message: string) => void;
   storage?: Storage;
+  /** 212.135: the server's status for the pending items' games (rpc games_states); null when it cannot be asked */
+  gameStates?: (gameIds: string[]) => Promise<GameState[] | null>;
 };
+/** Ask the server which of the items' games are gone or ended, and clear those entries. Returns the retired entries. */
+export async function retireUnsyncable(items: UnsyncedItem[], userId: string, gameStates: Deps["gameStates"], storage: Storage): Promise<{ retired: RetiredItem[]; archived: boolean }> {
+  const mine = items.filter((i) => i.owner === userId);   // only this member's own entries: another identity's outbox is never judged by this member's game list (the review)
+  const ids = Array.from(new Set(mine.map((i) => i.gameId).filter((g): g is string => !!g)));
+  if (!ids.length || !gameStates) return { retired: [], archived: true };
+  let states: GameState[] | null = null;
+  try { states = await gameStates(ids); } catch { states = null; }
+  if (!states) return { retired: [], archived: true };   // offline or refused: nothing is cleared on a guess
+  const { retired } = splitRetired(mine, states);
+  const { archived } = retireItems(retired, userId, storage);
+  return { retired, archived };
+}
 /** The one sign-out flow (Profile and the paused-account screen). Returns true once signed out and cleared. */
 export async function signOutSafely(userId: string, deps: Deps): Promise<boolean> {
   const storage = deps.storage ?? window.localStorage;
-  const pending = unsyncedWork(storage, userId);
+  let pending = unsyncedWork(storage, userId);
+  if ((await retireUnsyncable(pending, userId, deps.gameStates, storage)).retired.length) pending = unsyncedWork(storage, userId);
   // only the signed-out member's own items are at stake: another identity's outbox (or one saved before the identity was
   // known) is kept and resumes when that account is next used
   const mine = pending.filter((p) => p.owner === userId), others = pending.length - mine.length;

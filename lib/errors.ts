@@ -69,6 +69,13 @@ export function adviceFor(error: SupabaseishError): FailureAdvice {
   const msg = error?.message || "";
   const code = error?.code || "";
 
+  // 212.135: P0001 / P0002 are the app's OWN rules refusing ("Game not found", "Only a system admin can delete this
+  // game") — written to be shown, so they come before the message regexes (a rule saying "…has expired" is not a
+  // sign-in problem). Hiding them behind "Try again" cost the owner three messages to learn a game was gone.
+  if ((code === "P0001" || code === "P0002") && msg.trim()) {
+    return { action: msg.trim().replace(/\s+/g, " "), code };
+  }
+
   if (code === "42501" || /row-level security|violates row-level/i.test(msg)) {
     // Retrying will fail identically — this needs someone with different permissions.
     return { action: "You may not have permission for this. Ask a group admin.", code: "42501" };

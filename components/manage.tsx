@@ -54,6 +54,12 @@ import { chartXAxis, formatChartDate, showCountLabels } from "@/lib/chart-axis";
 import { ChartTip, ChartTooltip, DismissableChart } from "@/components/charts/chart-tip";
 
 const supabase = createClient();
+/** 212.135: which of these games the server still has, and their status. null when offline or refused (nothing is cleared on a guess). */
+const gameStatesFromServer = async (gameIds: string[]) => {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return null;
+  const { data, error } = await supabase.rpc("games_states", { p_games: gameIds });
+  return error || !Array.isArray(data) ? null : (data as { id: string; status: string | null }[]);
+};
 
 // Create an in-app notification for a user. `detail` is the optional second line (0165).
 async function notify(userId: string, message: string, detail?: string | null, groupId?: string | null) {
@@ -588,7 +594,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <YourData />
 
-      <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} onOpenGame={onOpenGame} />
+      <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} onOpenGame={onOpenGame} gameStates={gameStatesFromServer} />
     </div>
   );
 }
@@ -2922,6 +2928,8 @@ export function ActivityTab() {
           <div style={{ color: C.cream, fontSize: 14 }}>{r.summary}</div>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>
             {r.actor_name || "Someone"} · {fmtDate(r.created_at)} at {new Date(r.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {timeAgo(r.created_at)}
+            {/* 212.135 (owner): the device behind the action — name and the id's first block; the full id is in the row's details */}
+            {r.details?.device?.name ? ` · ${r.details.device.name}${r.details.device.id ? ` (${String(r.details.device.id).slice(0, 8)})` : ""}` : ""}
           </div>
         </div>
       ))}

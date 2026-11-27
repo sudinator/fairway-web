@@ -54,6 +54,15 @@ writes you already made; it never invents data.
 whenever your rounds change. Idempotent recompute of your badges and shared player card; also acts as a
 one-time backfill of history. No score or handicap data is changed — only derived badge/card records.
 
+**A8 · Unsyncable entries are cleared (212.135, owner decision)** — lib/sign-out `retireUnsyncable`, run when
+Profile opens and before a sign-out; components/tournaments.tsx when a game room is opened online. A score
+entry on this phone for a game the server has DELETED, or has ENDED, can never be sent (the room refuses
+scores for an ended game; a deleted one has nowhere to go). Such entries are archived to the recovery copy
+(Profile → Download saved scores), then removed, and the Profile row says so in one line ("Unsynced entries
+for 1 deleted game were cleared…"). A deleted game's local snapshot goes too, so it can no longer be opened
+from this phone. Nothing is cleared on a guess: offline, or when the server cannot be asked, the entries
+stay. Entries for ACTIVE games are never touched — those still sync when the scorecard is opened.
+
 ---
 
 ## B. Automatically RELOADS or REFRESHES the screen
@@ -104,6 +113,12 @@ is closed.
 ---
 
 ## D. Database triggers (fire automatically on data changes)
+
+**D0 · Activity rows are stamped with the device (212.135, owner)** — `activity_log_stamp_device` BEFORE INSERT on
+activity_log. Every row written during a request (by the app or by a server function) gains `details.device`
+= {id, name, token} from the request headers the app sends: a per-installation id, a readable name ("iPhone -
+home-screen app"), the scoring-device token. Rows written by scheduled jobs carry none. Admin → Activity shows
+the name on each row. It names a device, never a person; only system admins can read the log.
 
 These run inside Postgres when rows change. They're infrastructure/notification plumbing, not gameplay:
 - Notifications auto-created on: being added to a game, money owed, a tee time posted, a bet posted, a

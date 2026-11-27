@@ -1,5 +1,6 @@
 "use client";
 
+import { deviceIdentity } from "./device-identity";
 import { scoringDeviceToken, markScoringDeviceRevoked } from "./scoring-device";
 
 import { createBrowserClient } from "@supabase/ssr";
@@ -33,6 +34,10 @@ export function createClient() {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         const token = scoringDeviceToken();
         if (token) headers.set("x-bnn-scoring-device", token);
+        // 212.135: which phone or computer made the request, for the activity log (server-side logging reads these)
+        const device = deviceIdentity();
+        if (device.id) headers.set("x-bnn-device-id", device.id);
+        if (device.name) headers.set("x-bnn-device-name", device.name);
         const response = await fetch(input, { ...init, headers });
         if (!response.ok) {
           try {
