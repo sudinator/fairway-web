@@ -46,3 +46,13 @@ listed in one line each, so the author knows what was looked at. No praise.
 ## What happens next
 The author assesses each finding (reachability × harm, the repo's own rule), the owner decides scope, and accepted
 items ship in the next drop with their own tests and guards — then that drop is reviewed cold in turn.
+
+## Cadence (owner, Nov 26, 2026 — a release took 50 minutes; target 25 for a release of that size, 15 for a small one)
+- The full verification bar (suite, guards, every lane, build, clean-extract preflight) runs ONCE, at the end. Between a
+  review and its fixes only the suites that touch the changed files are run.
+- The review and the clean-extract preflight run at the same time; neither waits for the other.
+- One review pass by default. A second pass only when the first found something in the new code that needed more than
+  a trivial fix — and then with a narrow brief naming the corrections to verify, not a fresh full review.
+- Drops stay small: a handful of findings or one feature. The review scales with the diff.
+- Never cut: the cold review itself, or the clean-extract preflight (the only check that runs on exactly what is handed over).
+

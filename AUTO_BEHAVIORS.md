@@ -117,7 +117,7 @@ These run inside Postgres when rows change. They're infrastructure/notification 
 ## E. NOT automatic — these always require an explicit tap
 
 For contrast, none of the following ever happen on their own: deleting a round (soft-delete, with a
-game-linked warning), marking a partial round complete, ending a game, logging a side-contest result,
+game-linked warning), marking a partial round complete, ending a game, logging a side-contest result, emailing you your data (Profile → Your data, once a day),
 recording a settlement / marking money paid, creating a game or tee time, changing anyone's handicap,
 posting a bet, or posting to GHIN. All are button-driven and confirmable.
 

@@ -45,6 +45,7 @@ import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges }
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit } from "@/lib/draft";
 import { SignOutRow } from "@/components/sign-out-row";
+import { YourData } from "@/components/your-data";
 import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
@@ -425,7 +426,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
   );
 }
 
-export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [], onOpen }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[]; onOpen?: (r: Round) => void }) {
+export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [], onOpen, onOpenGame }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[]; onOpen?: (r: Round) => void; onOpenGame?: (gameId: string) => void }) {
   const [name, setName] = useState(profile?.display_name || "");
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
   const [phone, setPhone] = useState(profile?.phone || "");
@@ -581,9 +582,11 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
 
-      <HeadToHead user={user} />
+      <HeadToHead user={user} onOpenGame={onOpenGame} />
 
       <PushToggle user={user} profile={profile} />
+
+      <YourData />
 
       <SignOutRow userId={user.id} onSignOut={() => supabase.auth.signOut()} />
     </div>

@@ -274,6 +274,7 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-api-checks.sql"
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-daily-stale-games.sql"
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-analytics-quality.sql"
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-penalty-tracking.sql"
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-my-data-exports.sql"
 BNN_DISPOSABLE_DATABASE=1 bash "$ROOT/ci/test_daily_stale_concurrency.sh" "$DB_URL"
 
 # 211.2: THE SECURITY CONTRACT — every table, rule, permission and privileged function, against the snapshot

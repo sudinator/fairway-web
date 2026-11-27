@@ -849,6 +849,12 @@
       "roles": "public",
       "using": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = money_audit.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
     },
+    "my_data_exports.own data exports": {
+      "check": null,
+      "cmd": "r",
+      "roles": "authenticated",
+      "using": "(user_id = auth.uid())"
+    },
     "notifications.create notifications": {
       "check": "(user_id = auth.uid())",
       "cmd": "a",
@@ -1127,6 +1133,7 @@
     "authenticated:holes": "DELETE,INSERT,SELECT,UPDATE",
     "authenticated:member_badges": "SELECT",
     "authenticated:money_audit": "SELECT",
+    "authenticated:my_data_exports": "SELECT",
     "authenticated:notifications": "DELETE,INSERT,SELECT,UPDATE",
     "authenticated:nudges": "SELECT",
     "authenticated:player_cards": "SELECT",

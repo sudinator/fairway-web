@@ -247,7 +247,7 @@ export function Home({ session }: { session: any }) {
     loadTeamRounds(createClient(), uid).then((x) => { if (live) setTeamRounds(x); }).catch(() => {});
     return () => { live = false; };
   }, [session?.user?.id, tab]);
-  const [openGameReturnTab, setOpenGameReturnTab] = useState<"admin" | null>(null);
+  const [openGameReturnTab, setOpenGameReturnTab] = useState<"admin" | "profile" | null>(null);
   useEffect(() => { if (tab !== "games") { setGameSeed(null); setOpenGameId(null); setOpenGameReturnTab(null); } }, [tab]);
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   // Tracks the in-progress round draft so we can show a "Resume" banner from any
@@ -999,14 +999,14 @@ export function Home({ session }: { session: any }) {
         ) : tab === "notifications" ? (
           <NotificationsScreen user={user} onNavigate={navigateFromNotif} />
         ) : tab === "profile" ? (
-          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} onOpen={setViewing} />
+          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} onOpen={setViewing} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setOpenGameReturnTab("profile"); setTab("games"); setMoreOpen(false); }} />
         ) : tab === "teetimes" && activeGroup ? (
           <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setOpenGameReturnTab(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setOpenGameReturnTab(null); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (
           <Tournaments key={scoreCorrectionVisit} session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} isGroupAdmin={activeGroup.role === "admin"} seed={gameSeed} openGameId={openGameId}
-            onExitOpenGame={openGameReturnTab === "admin" ? () => { setOpenGameId(null); setOpenGameReturnTab(null); setTab("admin"); } : undefined} />
+            onExitOpenGame={openGameReturnTab ? () => { const back = openGameReturnTab; setOpenGameId(null); setOpenGameReturnTab(null); setTab(back); } : undefined} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (

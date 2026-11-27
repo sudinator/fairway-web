@@ -1,5 +1,5 @@
 {
-  "total": 447564,
+  "total": 447611,
   "suites": {
     "(unnamed suites)": 514,
     "add player blocked": 4,
@@ -56,7 +56,7 @@
     "groups start over": 6,
     "groups unit move": 4,
     "half-stroke simulation": 168914,
-    "head-to-head errors": 3,
+    "head-to-head errors": 8,
     "held notice": 5,
     "hole result consistency": 981,
     "hole skip": 14,
@@ -75,6 +75,8 @@
     "match length": 49,
     "match length picker": 18,
     "money refresh": 9,
+    "my data export": 17,
+    "my data route": 19,
     "names": 3,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
@@ -124,6 +126,7 @@
     "trifecta card render": 8,
     "trifecta results row": 20,
     "unsubscribe route": 12,
-    "update safety": 38
+    "update safety": 38,
+    "your data card": 6
   }
 }

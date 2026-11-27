@@ -93,6 +93,8 @@
     "lib/sign-out.test.ts",
     "lib/release-check.test.tsx",
     "lib/held-notice.test.tsx",
+    "lib/my-data-export.test.ts",
+    "lib/your-data-render.test.tsx",
     "lib/save-trace-toggle.test.tsx",
     "lib/design-gallery.tsx",
     "lib/test-fixtures/messy-games.ts",
