@@ -578,31 +578,11 @@ export function MatchView({
   // 207.2: one implementation (lib/game-results), shared with the completion recap.
   const teamStandings = isTeam ? singlesTeamStandings(game, players) : null;
 
-  const fmtPts = fmtPoints;
 
   return (
     <div style={{ marginTop: 18 }}>
-      {mode === "play" && isTeam && teamStandings && (
-        <div style={{ background: C.green, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-          <div style={{ color: C.cream, fontSize: 11, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
-          <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
-            <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamColour(teams![0], 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
-              <div style={{ color: teamStandings.decidedPts.A >= teamStandings.decidedPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.A)}</div>
-            </div>
-            <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
-            <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamColour(teams![1], 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
-              <div style={{ color: teamStandings.decidedPts.B >= teamStandings.decidedPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.B)}</div>
-            </div>
-          </div>
-          <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-            {teamStandings.out > 0 && <span data-points-outlook>If every match ended now: <b style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 15 }}>{teams?.[0]?.name ?? "A"} {fmtPts(teamStandings.pts.A)} · {teams?.[1]?.name ?? "B"} {fmtPts(teamStandings.pts.B)}</b></span>}
-          </div>
-          {teams && teamStandings && (
-            <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
-          )}
-        </div>
+      {mode === "play" && isTeam && teamStandings && teams && (
+        <TeamRunningScore label="TEAM MATCH · RUNNING SCORE" teams={[teams[0], teams[1]]} decided={{ A: teamStandings.decidedPts.A ?? 0, B: teamStandings.decidedPts.B ?? 0 }} projected={{ A: teamStandings.pts.A ?? 0, B: teamStandings.pts.B ?? 0 }} out={teamStandings.out} />
       )}
 
       {/* Team assignments now live in Organizer · Manage Game so each player is configured once. */}
@@ -918,6 +898,39 @@ export function SweepAchievedBanner({ name, potNote }: { name: string; potNote?:
       {potNote ? (
         <div style={{ display: "inline-block", marginTop: 9, background: "#1a1206", color: C.gold, fontWeight: 800, fontSize: 13, padding: "5px 12px", borderRadius: 999 }}>{potNote}</div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The running team score every BNN two-team format shows (212.137: extracted from the team singles view so the team
+ * Colosseum draws the SAME block — owner: "the original color and format we show for all other BNN team scores"):
+ * team names in their colours, decided points large in Georgia (the leader's in gold), "If every match ended now" while
+ * matches are out, then the matches still out and the clinch line.
+ */
+export function TeamRunningScore({ label, teams, decided, projected, out }: {
+  label: string; teams: [{ key: string; name: string; color?: string | null }, { key: string; name: string; color?: string | null }];
+  decided: { A: number; B: number }; projected: { A: number; B: number }; out: number;
+}) {
+  const f = fmtPoints;
+  return (
+    <div data-team-running-score style={{ background: C.green, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+      <div style={{ color: C.cream, fontSize: 11, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ color: teamColour(teams[0], 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams[0].name}</div>
+          <div style={{ color: decided.A >= decided.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{f(decided.A)}</div>
+        </div>
+        <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ color: teamColour(teams[1], 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams[1].name}</div>
+          <div style={{ color: decided.B >= decided.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{f(decided.B)}</div>
+        </div>
+      </div>
+      <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+        {out > 0 && <span data-points-outlook>If every match ended now: <b style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 15 }}>{teams[0].name} {f(projected.A)} · {teams[1].name} {f(projected.B)}</b></span>}
+      </div>
+      <TeamClinchLine aPts={decided.A} bPts={decided.B} unclaimed={out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
     </div>
   );
 }

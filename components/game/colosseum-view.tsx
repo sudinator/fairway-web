@@ -10,6 +10,7 @@ import { C } from "@/lib/golf";
 import { Eyebrow, btn } from "@/components/ui";
 import { colosseumStandings, colosseumPlayerMatches, colosseumSummaryLine, colosseumSidePoints, isCupColosseum, fmtHalf, colosseumSides, colosseumStakes, type ColosseumRow } from "@/lib/colosseum";
 import { HeadToHeadCard } from "@/components/game/head-to-head-card";
+import { TeamRunningScore } from "@/components/game/scoring-views";
 import { pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 
@@ -28,7 +29,7 @@ export function ColosseumView({ game, players, user }: { game: Game; players: Pl
   if (st.rows.length < 2) return <div style={{ color: C.sage, fontSize: 13, marginTop: 14 }}>A Colosseum needs at least two players.</div>;
 
   const cup = isCupColosseum(game);
-  const teams = cup ? (game.teams as { key: string; name: string }[]) : null;
+  const teams = cup ? (game.teams as { key: string; name: string; color?: string | null }[]) : null;
   const sides = cup ? colosseumSidePoints(st, (k) => st.rows.find((r) => r.key === k)?.team) : null;
   const teamName = (key: string | null) => teams?.find((t) => t.key === key)?.name ?? key ?? "";
   const openRow = open ? st.rows.find((r) => r.key === open) : null;
@@ -85,14 +86,13 @@ export function ColosseumView({ game, players, user }: { game: Game; players: Pl
   return (
     <div data-colosseum-view style={{ marginTop: 18 }}>
       <Eyebrow>COLOSSEUM · {cup ? "SIDE V SIDE" : "EVERYONE PLAYS EVERYONE"} · {st.rows.length} PLAYERS · {st.matchCount} MATCHES</Eyebrow>
+      {/* 212.137 (owner): the team score every BNN two-team format shows — team colours, decided points, "if every
+          match ended now", matches still out, the clinch line — one shared block (components/game/scoring-views) */}
       {cup && teams && sides && (
-        <div data-colosseum-sides style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
-          <span style={{ color: C.cream, fontWeight: 800 }}>{teamName("A")}</span>
-          <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtPts(sides.A)} – {fmtPts(sides.B)}</span>
-          <span style={{ color: C.cream, fontWeight: 800 }}>{teamName("B")}</span>
+        <div data-colosseum-sides style={{ marginTop: 8 }}>
+          <TeamRunningScore label="COLOSSEUM · RUNNING SCORE" teams={[teams[0], teams[1]]} decided={{ A: sides.decidedA, B: sides.decidedB }} projected={{ A: sides.A, B: sides.B }} out={sides.open} />
         </div>
       )}
-      {cup && sides && sides.open > 0 && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{sides.open} match{sides.open === 1 ? "" : "es"} still in play — counted as they stand.</div>}
       {myKey && (
         <button type="button" data-colosseum-mine onClick={() => setOpen(myKey)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", background: C.greenLight, border: "none", borderRadius: 12, padding: "8px 12px", marginTop: 8, color: C.cream, fontSize: 12, cursor: "pointer", textAlign: "left" }}>
           <span>My matches: <b style={{ color: C.cream }}>{colosseumSummaryLine(st, myKey)}</b></span><span style={{ color: C.sage }}>›</span>

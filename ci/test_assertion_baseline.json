@@ -1,5 +1,5 @@
 {
-  "total": 447784,
+  "total": 447789,
   "suites": {
     "(unnamed suites)": 522,
     "add player blocked": 4,
@@ -26,7 +26,7 @@
     "club net scoring": 334,
     "club report view": 11,
     "colosseum": 40,
-    "colosseum render": 15,
+    "colosseum render": 17,
     "combined club directory": 58,
     "compact team editor": 12,
     "competition": 17,
@@ -60,7 +60,7 @@
     "groups unit move": 4,
     "half-stroke simulation": 168914,
     "head-to-head": 26,
-    "head-to-head card render": 17,
+    "head-to-head card render": 20,
     "head-to-head errors": 8,
     "held notice": 5,
     "hole result consistency": 981,

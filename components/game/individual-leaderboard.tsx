@@ -12,6 +12,7 @@ import { Eyebrow, btn } from "@/components/ui";
 import { fullStrokes, pkey, courseHandicapOf } from "@/lib/game-shape";
 import { colosseumMatches, colosseumSides, colosseumStakes, inField, resultFor } from "@/lib/colosseum";
 import { HeadToHeadCard } from "@/components/game/head-to-head-card";
+import { compactMargin } from "@/lib/match-outcomes";
 import type { Game, Player } from "@/lib/game-types";
 
 type Row = { key: string; name: string; ch: number | null; thru: number; gross: number; grossToPar: number; net: number; vs: { lead: number; thru: number; decided: boolean; result: string } | null };
@@ -38,7 +39,11 @@ export function IndividualLeaderboard({ game, players, user }: { game: Game; pla
     sort === "gross" ? x.grossToPar - y.grossToPar || y.thru - x.thru || x.name.localeCompare(y.name)
     : sort === "vs" ? (y.vs?.lead ?? -99) - (x.vs?.lead ?? -99) || x.name.localeCompare(y.name)
     : x.net - y.net || y.thru - x.thru || x.name.localeCompare(y.name));
-  const vsLabel = (v: Row["vs"]) => !v || v.thru === 0 ? "—" : resultFor({ thru: v.thru, lead: v.lead, decided: v.decided, result: v.result }, v.lead);
+  // compact so it fits one line in a narrow column: "Won 7&5", "Lost 1 up", "2 up", "A/S" (the margin as the head-to-head
+  // records print it, lib/match-outcomes compactMargin)
+  const vsLabel = (v: Row["vs"]) => !v || v.thru === 0 ? "—"
+    : v.decided ? (v.result === "Halved" || v.lead === 0 ? "Halved" : `${v.lead > 0 ? "Won" : "Lost"} ${compactMargin(v.result)}`)
+    : resultFor({ thru: v.thru, lead: v.lead, decided: false, result: "" }, v.lead);
   const vsColor = (v: Row["vs"]) => !v || v.thru === 0 ? C.sage : v.lead > 0 ? C.underDark : v.lead < 0 ? C.overRedDark : C.sage;
   const th: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 700, textAlign: "right", padding: "4px 10px" };
   const td: React.CSSProperties = { borderTop: `1px solid ${C.borderGreen}`, padding: "6px 12px", textAlign: "right", fontSize: 13, color: C.cream, fontVariantNumeric: "tabular-nums" };
@@ -74,7 +79,7 @@ export function IndividualLeaderboard({ game, players, user }: { game: Game; pla
                 <td style={td}>{r.thru}</td>
                 <td style={td}>{r.gross}<span style={{ color: C.sage, fontSize: 11, marginLeft: 4 }}>{toPar(r.grossToPar)}</span></td>
                 <td style={{ ...td, fontWeight: 800 }}>{toPar(r.net)}</td>
-                {colosseum && <td style={{ ...td, color: vsColor(r.vs), fontWeight: 700 }}>{mine ? "—" : vsLabel(r.vs)}</td>}
+                {colosseum && <td style={{ ...td, color: vsColor(r.vs), fontWeight: 700, whiteSpace: "nowrap" }}>{mine ? "—" : vsLabel(r.vs)}</td>}
               </tr>
             );
           })}

@@ -1,3 +1,13 @@
+## 212.138.261127 — Staging feedback on 212.137: the "v you" column on one line; a team Colosseum shows the standard team score
+
+Owner, Nov 27 (two screenshots of 212.137 on staging): "the final score card results display poorly on three lines … for teams play this needs the original color and format that we show for all other BNN team scores and the status of how many matches still undecided".
+
+(1) The leaderboard's "v you" column wrapped a finished match onto three lines ("Won / 7 & / 5"). It now prints compactly and never wraps: "Won 7&5", "Lost 1 up", "2 up", "A/S" — the margin as head-to-head records print it (lib/match-outcomes compactMargin). (2) A team (Ryder Cup / side v side) Colosseum showed its own plain sides bar. It now draws the SAME running-score block as every other BNN two-team format — team names in their colours, decided points large in Georgia with the leader in gold, "If every match ended now" while matches are out, the matches-still-out line and the clinch banner ("Orange needs 1 match point to win this session", "Mauve wins, 5–4") — because that block is now one component, `TeamRunningScore` (components/game/scoring-views), extracted verbatim from the team singles view, which uses it too. `colosseumSidePoints` now returns decided and projected points separately and counts unstarted matches as still out.
+
+Tests: lib/h2h-card-render (+3: the 'v you' cell never wraps; a decided win reads "Won 10&8", a loss at 18 "Lost 1 up"), lib/colosseum-render (+2: the shared running-score block with its label; the matches-out / all-in line), lib/results-outlook-render (34, unchanged — team singles draws the extracted block exactly as before). Full bar green; clean-extract preflight on the zip.
+
+Deploy: code only. Staging check: a finished Colosseum → leaderboard under the card, "v you" on one line; a team Colosseum → the running-score block (team colours, matches still out, clinch line).
+
 ## 212.137.261127 — The head-to-head card ("how am I 1 up thru 11") and the leaderboard under the scorecard
 
 **Owner, Nov 27 (mock-up approved): "show an individual leaderboard at the bottom of the scorecard so everyone can see what everyone else is doing … clickable … shows both gross and net … look at the match progression; also in the main leaderboard when I click on an opponent, the same thing."**

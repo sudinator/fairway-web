@@ -47,6 +47,8 @@ async function main() {
   const first = lb.el.querySelector("[data-lb-row]");
   ok(!!first && (first.textContent || "").includes("Raj"), `Raj (three birdies) leads on net (first: ${first?.textContent})`);
   ok((lb.el.querySelector("[data-lb-row='u-m']")?.textContent || "").includes("7 up"), "Mike's row shows 'v you' 7 up");
+  const vsCell = lb.el.querySelector("[data-lb-row='u-m'] td:last-child") as HTMLElement | null;
+  ok(vsCell?.style.whiteSpace === "nowrap", "the 'v you' cell never wraps (owner, Nov 27: 'Won 7 & 5' ran to three lines)");
   ok((lb.el.querySelector("[data-lb-row='u-p']")?.textContent || "").includes("—"), "Pete (no scores) sits below with no numbers");
   await act(async () => { lb.el.querySelector("[data-lb-sort='vs']")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   ok((lb.el.querySelector("[data-lb-row]")?.textContent || "").includes("Mike"), "sorted by 'v you', Mike (7 up) is first");
@@ -54,6 +56,16 @@ async function main() {
   ok(!!lb.el.querySelector("[data-h2h-card]") && (lb.el.textContent || "").includes("Amit v Mike") && (lb.el.textContent || "").includes("You give 9"), "tapping Mike opens the head-to-head card from Amit's side");
   await act(async () => { lb.el.querySelector("[data-h2h-back]")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   ok(!!lb.el.querySelector("[data-individual-leaderboard]"), "back to the leaderboard");
+
+  // 2b. finished matches print compactly on one line: "Won 7&5" / "Lost 1 up" (owner's screenshot: three lines)
+  {
+    const done = [mk("a", "Amit", 0, par, 1), mk("w", "Walt", 0, Array(18).fill(5), 1), mk("l", "Lou", 0, [3, ...par.slice(1)], 1)];
+    const t2 = renderScreen(<IndividualLeaderboard game={game} players={done} user={{ id: "u-a" }} />);
+    await tick();
+    const cell = (k: string) => (t2.el.querySelector(`[data-lb-row='${k}'] td:last-child`)?.textContent || "");
+    ok(cell("u-w") === "Won 10&8", `a decided win reads "Won 10&8" (got "${cell("u-w")}")`);
+    ok(cell("u-l") === "Lost 1 up", `a decided loss at 18 reads "Lost 1 up" (got "${cell("u-l")}")`);
+  }
 
   // 3. from the Colosseum standings: a player's match row opens the same card
   const v = renderScreen(<ColosseumView game={game} players={players} user={{ id: "u-a" }} />);

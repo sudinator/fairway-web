@@ -151,14 +151,18 @@ export function colosseumStandings(game: ColosseumGame, players: ColosseumPlayer
   return { rows: list, matches, matchCount: colosseumMatchCountFor(game, field), holeCount };
 }
 
-/** A Cup / team Colosseum: each side's points from the cross-side matches (1 a win, ½ a halve, as they stand). */
-export function colosseumSidePoints(st: ColosseumStandings, teamOf: (key: string) => string | null | undefined): { A: number; B: number; open: number } {
-  const out = { A: 0, B: 0, open: 0 };
+/** A Cup / team Colosseum: each side's points from the cross-side matches (1 a win, ½ a halve). `A`/`B` count every
+ *  started match as it stands (the projection); `decidedA`/`decidedB` only finished ones; `open` = matches not yet
+ *  decided, started or not (the "still out" count the team score block shows). */
+export function colosseumSidePoints(st: ColosseumStandings, teamOf: (key: string) => string | null | undefined): { A: number; B: number; decidedA: number; decidedB: number; open: number } {
+  const out = { A: 0, B: 0, decidedA: 0, decidedB: 0, open: 0 };
   for (const m of st.matches) {
     const ta = teamOf(m.a), tb = teamOf(m.b);
-    if ((ta !== "A" && ta !== "B") || (tb !== "A" && tb !== "B") || ta === tb || m.status.thru === 0) continue;
+    if ((ta !== "A" && ta !== "B") || (tb !== "A" && tb !== "B") || ta === tb) continue;
     if (!m.status.decided) out.open++;
-    if (m.status.lead > 0) out[ta] += 1; else if (m.status.lead < 0) out[tb] += 1; else { out[ta] += 0.5; out[tb] += 0.5; }
+    if (m.status.thru === 0) continue;
+    const add = (side: "A" | "B", v: number) => { out[side] += v; if (m.status.decided) out[side === "A" ? "decidedA" : "decidedB"] += v; };
+    if (m.status.lead > 0) add(ta, 1); else if (m.status.lead < 0) add(tb, 1); else { add(ta, 0.5); add(tb, 0.5); }
   }
   return out;
 }

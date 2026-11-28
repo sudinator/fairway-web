@@ -42,7 +42,11 @@ async function main() {
   const r2 = renderScreen(<ColosseumView game={game({ teams: [{ key: "A", name: "Reds" }, { key: "B", name: "Blues" }] })} players={cupPlayers} user={{ id: "u-a" }} />);
   await act(async () => { await new Promise((res) => setTimeout(res, 5)); });
   ok((r2.el.textContent || "").includes("4 MATCHES") && !!r2.el.querySelector("[data-colosseum-sides]"), "2 v 2 is four matches and the sides' score shows");
-  ok((r2.el.querySelector("[data-colosseum-sides]")?.textContent || "").includes("Reds") && (r2.el.querySelector("[data-colosseum-sides]")?.textContent || "").includes("Blues"), "the sides are named");
+  const sidesEl = r2.el.querySelector("[data-colosseum-sides]");
+  ok((sidesEl?.textContent || "").includes("Reds") && (sidesEl?.textContent || "").includes("Blues"), "the sides are named");
+  // 212.137 (owner): the SAME running-score block every BNN team format shows — label, decided points, matches out / all in
+  ok(!!sidesEl?.querySelector("[data-team-running-score]") && (sidesEl?.textContent || "").includes("COLOSSEUM · RUNNING SCORE"), "the shared team running-score block");
+  ok(/All matches in|still out/.test(sidesEl?.textContent || ""), `the matches-out status line (${(sidesEl?.textContent || "").slice(-60)})`);
 
   // the recap: table section, headline, and the Cup headline for a team Colosseum
   const ended = game({ status: "ended" });
