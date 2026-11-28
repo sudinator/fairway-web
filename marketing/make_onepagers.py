@@ -10,7 +10,9 @@ Outputs (deterministic via invariant mode so a CI drift-check is stable):
   public/BNN-onepager-tgc.pdf    - TGC edition (+ exclusives band)
   marketing/onepager-content.txt - text manifest the CI drift-check diffs
 """
-import json, os
+import json, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from onepager_manifest import manifest_text, MANIFEST_PATH
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -82,17 +84,9 @@ def build(path, edition_label, features, band=None):
     c.showPage(); c.save(); print("wrote",os.path.relpath(path,ROOT))
 
 def manifest():
-    # Deterministic text dump of exactly what the sheets contain, LF-only.
-    lines=["Birdie Num Num one-pager content (auto-generated from lib/capabilities.json)","","TAGLINE: "+CAP["tagline"],""]
-    for ed,label in [("club","CLUB EDITION"),("tgc","TGC EDITION")]:
-        lines.append("== "+label+" ==")
-        for c in cards_for(ed): lines.append(f"- {c['title']}: {c['body']}")
-        if ed=="tgc":
-            lines.append("  TGC EXCLUSIVES:")
-            for x in CAP["tgcExclusives"]: lines.append(f"   * {x['title']}: {x['body']}")
-        lines.append("")
-    with open(os.path.join(ROOT,"marketing","onepager-content.txt"),"w",newline="\n",encoding="utf-8") as f:
-        f.write("\n".join(lines).rstrip()+"\n")
+    # the text is built by marketing/onepager_manifest (no reportlab), so the guard can check it in any CI lane
+    with open(MANIFEST_PATH,"w",newline="\n",encoding="utf-8") as f:
+        f.write(manifest_text(CAP))
     print("wrote marketing/onepager-content.txt")
 
 os.makedirs(os.path.join(ROOT,"public"),exist_ok=True)

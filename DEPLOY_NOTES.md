@@ -1,3 +1,12 @@
+## 212.139.261127 — CI fix: the one-pager guard no longer needs reportlab
+
+GitHub's "application" lane failed on 212.138: "one-pagers: reportlab is not installed — the generator cannot run". The guard added in 212.136 (ci/check_onepagers_sync.py, first in `npm run guards`) regenerated the PDFs, which needs reportlab; only the marketing lane installs it. My local bar and the clean-extract preflight both had reportlab, so neither saw it — the same blind spot as the original miss, one lane over.
+- marketing/onepager_manifest.py (standard library only) now builds the text manifest; marketing/make_onepagers.py imports it, so the generator and the guard share one rule and its output is byte-identical (checked: content file and both PDFs unchanged against the 212.138 zip).
+- The guard compares the committed manifest with what lib/capabilities.json produces — no PDF build. The manifest is exactly the sheets' content, so a stale manifest is a stale sheet; the marketing lane still rebuilds and diffs the PDFs.
+- Verified with reportlab hidden from the interpreter (passes) and against a stale manifest (fails, naming the fix).
+
+Deploy: code only. No app change.
+
 ## 212.138.261127 — Staging feedback on 212.137: the "v you" column on one line; a team Colosseum shows the standard team score
 
 Owner, Nov 27 (two screenshots of 212.137 on staging): "the final score card results display poorly on three lines … for teams play this needs the original color and format that we show for all other BNN team scores and the status of how many matches still undecided".
